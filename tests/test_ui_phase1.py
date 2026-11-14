@@ -163,13 +163,14 @@ class SettingsTest(_Base):
     """صفحة الإعدادات."""
 
     def test_tabs_by_permission(self):
-        """المدير يرى 5 تبويبات، والكاشير تبويبين فقط وبلا زر استعادة."""
+        """المدير يرى 6 تبويبات، والكاشير تبويبين فقط وبلا زر استعادة."""
         from morv.infra import users
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
         k = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
         admin_page = SettingsPage(self.session())        # تبقى في متغير وإلا حذفها Qt مع تبويباتها
-        self.assertEqual(admin_page.tabs.count(), 5)
+        self.assertEqual(admin_page.tabs.count(), 6)     # + حقول بطاقة الصنف
+        self.assertIsNotNone(admin_page.fields_tab)
         p = SettingsPage(self.session(k))
         self.assertEqual(p.tabs.count(), 2)               # الاختصارات والنسخ فقط
         self.assertIsNone(p.shop_tab)                     # لا يرى بيانات المحل أصلًا

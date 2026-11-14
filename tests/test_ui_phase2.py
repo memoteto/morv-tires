@@ -121,7 +121,7 @@ class InventoryPageTest(_Base):
         from morv.ui.inventory_page import InventoryPage, ItemDialog
         admin_page = InventoryPage(self.session)            # تبقى في متغير وإلا حذفها Qt مع تبويباتها
         cashier_page = InventoryPage(self.cashier_session)
-        self.assertEqual(admin_page.tabs.count(), 4)
+        self.assertEqual(admin_page.tabs.count(), 3)        # حقول البطاقة انتقلت إلى الإعدادات
         self.assertEqual(cashier_page.tabs.count(), 3)
         dlg = ItemDialog(self.session, None)
         self.assertIn("size", dlg.widgets)          # حقل الإطار

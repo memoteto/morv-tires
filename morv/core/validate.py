@@ -51,7 +51,8 @@ def national_id(text: str) -> str:
     try:
         born = date(century + int(s[1:3]), int(s[3:5]), int(s[5:7]))
     except ValueError as e:
-        raise ValidationError("تاريخ الميلاد داخل الرقم القومي غير صحيح") from e
+        raise ValidationError("الرقم القومي غير صحيح: الخانات من 2 إلى 7 يجب أن تكون سنة وشهر ويوم ميلاد "
+                              "صحيحة — راجعه من البطاقة") from e
     if born > date.today():
         raise ValidationError("تاريخ الميلاد داخل الرقم القومي في المستقبل")
     if s[7:9] not in _GOVERNORATES:

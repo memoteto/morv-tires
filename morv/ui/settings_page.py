@@ -57,6 +57,11 @@ class SettingsPage(QWidget):
             self.tabs.addTab(self.users_tab, "المستخدمون والصلاحيات")
             self.audit_tab = AuditTab(session)
             self.tabs.addTab(self.audit_tab, "سجل العمليات")
+        self.fields_tab = None
+        if session.can("settings.edit"):
+            from morv.ui.inventory_page import ItemFieldsTab   # استيراد محلي لتجنب الدوران
+            self.fields_tab = ItemFieldsTab(session)
+            self.tabs.addTab(self.fields_tab, "حقول بطاقة الصنف")
         self.tabs.addTab(ShortcutsTab(), "الاختصارات")
         self.backup_tab = BackupTab(session)
         self.tabs.addTab(self.backup_tab, "النسخ الاحتياطي")

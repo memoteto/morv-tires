@@ -1,4 +1,5 @@
-"""شاشة المخزون بتبويباتها: الأصناف، وإعداد حقول بطاقة الصنف، والدفعات والجرد (المرحلة 3).
+"""شاشة المخزون بتبويباتها: الأصناف، والدفعات والجرد (المرحلة 3).
+إعداد حقول بطاقة الصنف في «الإعدادات» (للمدير؛ يُستخدم نادرًا — قرار المالك).
 
 نافذة الصنف تُبنى من إعداد الحقول: كل حقل ظاهر يصير عنصر إدخال بنوعه (نص/رقم/قائمة/نعم-لا/مقاس)،
 والإلزامي يُعلَّم بنجمة ويُفحص في طبقة البيانات لا في الواجهة فقط.
@@ -32,10 +33,6 @@ class InventoryPage(QWidget):
         self.tabs.addTab(self.items_tab, "الأصناف")
         self.tabs.addTab(placeholder(3), "الدفعات (DOT)")
         self.tabs.addTab(placeholder(3), "الجرد والتسويات")
-        self.fields_tab = None
-        if session.can("settings.edit"):
-            self.fields_tab = ItemFieldsTab(session)
-            self.tabs.addTab(self.fields_tab, "حقول بطاقة الصنف")
         lay.addWidget(self.tabs)
 
 
@@ -152,7 +149,7 @@ class ItemDialog(Modal):
         self.body.addLayout(kinds)
         self.fields_box = QWidget()
         self.body.addWidget(self.fields_box)
-        self.body.addWidget(muted("الحقول الظاهرة والإلزامية تتبع «المخزون ← حقول بطاقة الصنف»."))
+        self.body.addWidget(muted("الحقول الظاهرة والإلزامية تتبع «الإعدادات ← حقول بطاقة الصنف»."))
         self.widgets: dict = {}
         self.add_footer("حفظ", self.save)
         self.set_kind(it.kind if it else "tire")
