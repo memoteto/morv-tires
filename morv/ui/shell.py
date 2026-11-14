@@ -18,25 +18,32 @@ from morv.ui import icons, theme
 SIDE_WIDE = 244     # عرض الشريط الجانبي مفتوحًا
 SIDE_NARROW = 72    # عرضه مطويًا (أيقونات فقط)
 
-# (المفتاح، الاسم الظاهر، الأيقونة، المرحلة التي تبني الصفحة) بترتيب ظهورها في الشريط
+# (المفتاح، الاسم الظاهر، الأيقونة، المرحلة التي تبني الصفحة) بترتيب ظهورها في الشريط.
+# قائمة مسطحة بلا مجموعات ولا فواصل (قرار المالك: لا زحمة في الشريط).
+# - «المبيعات» صفحتها قائمة فواتير البيع والمرتجعات.
+# - «المشتريات» فيها فاتورة الشراء وقائمة فواتير الشراء؛ مرتجع الشراء مؤجل للإصدار التالي.
+# - «المخزون» فيها تبويبات: الأصناف، الدفعات (DOT)، الجرد والتسويات.
+# - «الإعدادات» فيها النسخ الاحتياطي.
 NAV = [
-    ("dashboard", "لوحة التحكم", "dashboard", 7),
-    ("sale", "البيع", "sale", 3),
-    ("invoices", "فواتير البيع والمرتجع", "invoices", 3),
-    ("purchase", "المشتريات", "purchase", 2),
-    ("items", "الأصناف والمخزون", "items", 2),
+    ("home", "الرئيسية", "home", 7),
+    ("pos", "نقطة البيع", "pos", 3),
+    ("sales", "المبيعات", "sales", 3),
+    ("purchases", "المشتريات", "purchases", 2),
+    ("inventory", "المخزون", "inventory", 2),
     ("customers", "العملاء", "customers", 1),
     ("suppliers", "الموردون", "suppliers", 1),
     ("installments", "التقسيط", "installments", 5),
     ("treasury", "الخزينة", "treasury", 4),
     ("reports", "التقارير", "reports", 6),
     ("settings", "الإعدادات", "settings", 1),
-    ("backup", "النسخ الاحتياطي", "backup", 1),
 ]
 
 
-def placeholder(title: str, phase: int) -> QWidget:
-    """صفحة مؤقتة تخبر المستخدم أن الشاشة لم تُبنَ بعد وفي أي مرحلة ستُبنى."""
+def placeholder(phase: int) -> QWidget:
+    """صفحة مؤقتة تخبر المستخدم أن الشاشة لم تُبنَ بعد وفي أي مرحلة ستُبنى.
+
+    لا تكرر عنوان الصفحة لأنه ظاهر في الشريط العلوي.
+    """
     page = QWidget()
     lay = QVBoxLayout(page)
     lay.setContentsMargins(24, 24, 24, 24)
@@ -44,11 +51,8 @@ def placeholder(title: str, phase: int) -> QWidget:
     card.setObjectName("card")
     inner = QVBoxLayout(card)
     inner.setContentsMargins(24, 24, 24, 24)
-    head = QLabel(title)
-    head.setObjectName("pageTitle")
     note = QLabel(f"هذه الشاشة تُبنى في المرحلة {phase} من خطة V1.")
     note.setObjectName("muted")
-    inner.addWidget(head)
     inner.addWidget(note)
     inner.addStretch(1)
     lay.addWidget(card)
@@ -67,6 +71,8 @@ class MainWindow(QMainWindow):
         self.collapsed = settings.get(con, "ui.sidebar_collapsed", "0") == "1"
         self.colors = theme.apply(app, self.dark)
         self.setWindowTitle(APP_NAME)
+        # لا شريط حالة: كان يمتد بعرض النافذة ويقطع الشريط الجانبي من الأسفل.
+        # رقم الإصدار يظهر تلميحًا عند وضع الماوس على اسم البرنامج.
         self.setMinimumSize(1024, 640)
 
         root = QWidget()
@@ -81,12 +87,11 @@ class MainWindow(QMainWindow):
         col.setSpacing(0)
         col.addWidget(self._build_topbar())
         self.stack = QStackedWidget()
-        for _key, title, _icon, phase in NAV:
-            self.stack.addWidget(placeholder(title, phase))
+        for _key, _title, _icon, phase in NAV:
+            self.stack.addWidget(placeholder(phase))
         col.addWidget(self.stack, 1)
         row.addWidget(main, 1)
         self.setCentralWidget(root)
-        self.statusBar().showMessage(f"{APP_NAME} {VERSION}")
 
         self.nav.currentRowChanged.connect(self.go)
         self.nav.setCurrentRow(0)
@@ -109,6 +114,7 @@ class MainWindow(QMainWindow):
         self.side_toggle.clicked.connect(self.toggle_sidebar)
         self.brand = QLabel(APP_NAME)
         self.brand.setObjectName("brand")
+        self.brand.setToolTip(f"{APP_NAME} {VERSION}")
         top.addWidget(self.side_toggle)
         top.addWidget(self.brand, 1)
         lay.addLayout(top)
@@ -150,7 +156,7 @@ class MainWindow(QMainWindow):
         self.title.setText(NAV[row][1])
 
     def go_key(self, key: str) -> None:
-        """الانتقال إلى صفحة بمفتاحها (مثل 'backup')، للاستخدام من أي مكان في البرنامج."""
+        """الانتقال إلى صفحة بمفتاحها (مثل 'settings')، للاستخدام من أي مكان في البرنامج."""
         for i, entry in enumerate(NAV):
             if entry[0] == key:
                 self.nav.setCurrentRow(i)

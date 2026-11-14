@@ -36,13 +36,15 @@ class ShellTest(unittest.TestCase):
         self.assertEqual(self.app.layoutDirection(), Qt.LayoutDirection.RightToLeft)
         self.assertEqual(w.stack.count(), len(NAV))
         self.assertEqual(w.nav.count(), len(NAV))
-        self.assertIn("backup", [k for k, *_ in NAV])  # النسخ الاحتياطي شاشة ضرورية
+        self.assertIn("settings", [k for k, *_ in NAV])  # النسخ الاحتياطي داخل الإعدادات
+        from PySide6.QtWidgets import QStatusBar
+        self.assertIsNone(w.findChild(QStatusBar))  # شريط الحالة كان يقطع الشريط الجانبي
 
     def test_navigation(self):
         """اختيار صفحة يغيّر المحتوى والعنوان."""
         w = self.window()
-        w.go_key("backup")
-        self.assertEqual(w.title.text(), "النسخ الاحتياطي")
+        w.go_key("settings")
+        self.assertEqual(w.title.text(), "الإعدادات")
         self.assertEqual(w.stack.currentIndex(), w.nav.currentRow())
         with self.assertRaises(KeyError):
             w.go_key("not_a_page")
@@ -65,6 +67,29 @@ class ShellTest(unittest.TestCase):
         self.assertEqual(w.side.width(), SIDE_NARROW)
         self.assertEqual(w.nav.item(0).text(), "")
         self.assertTrue(self.window().collapsed)
+
+
+class NavDataTest(unittest.TestCase):
+    """بيانات الشريط الجانبي (لا تحتاج Qt)."""
+
+    def test_nav_entries(self):
+        """مفاتيح وأسماء وأيقونات فريدة، وكل أيقونة مرسومة فعلًا.
+
+        خطأ سابق: أيقونة الإعدادات كانت تشبه أيقونة الشمس (زر الوضع الفاتح)،
+        فلا يُسمح لعنصر في الشريط باستخدام أيقونات الشريط العلوي.
+        """
+        import ast
+        from pathlib import Path
+        src = (Path(__file__).resolve().parent.parent / "morv" / "ui").joinpath
+        nav = ast.literal_eval(src("shell.py").read_text(encoding="utf-8").split("NAV = ", 1)[1].split("\n]\n", 1)[0] + "\n]")
+        paths = ast.literal_eval(src("icons.py").read_text(encoding="utf-8").split("PATHS = ", 1)[1].split("\n}\n", 1)[0] + "\n}")
+        for column in range(3):
+            values = [entry[column] for entry in nav]
+            self.assertEqual(len(values), len(set(values)), f"تكرار في العمود {column}")
+        for _key, _title, icon_name, _phase in nav:
+            self.assertIn(icon_name, paths)
+            self.assertNotIn(icon_name, {"sun", "moon", "collapse", "expand"})
+        self.assertNotIn("backup", [e[0] for e in nav])
 
 
 if __name__ == "__main__":
