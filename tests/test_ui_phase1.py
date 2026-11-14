@@ -9,6 +9,7 @@ from tests.qt_app import get_app, require_qt
 
 PW_LOGIN = "Admin12345"
 PW_BACKUP = "Morv-Backup-2026"
+LONG_LOGIN = "OwnerLogin2026xx"   # 16 حرفًا: لاختبار رفض تطابق كلمة النسخ مع كلمة الدخول
 
 
 @require_qt()
@@ -63,19 +64,19 @@ class WizardTest(_Base):
         w.next()
         self.assertEqual(w.order[w.index], "admin")
         w.admin_name.setText("صاحب المحل")
-        w.admin_pw.setText(PW_LOGIN)
+        w.admin_pw.setText(LONG_LOGIN)
         w.admin_pw2.setText("different1")
         w.next()
         self.assertIn("غير متطابقتين", w.notice.text())
-        w.admin_pw2.setText(PW_LOGIN)
+        w.admin_pw2.setText(LONG_LOGIN)
         w.next()
         self.assertEqual(w.order[w.index], "backup")
         w.bk_pw.setText("short1")
         w.bk_pw2.setText("short1")
         w.next()
         self.assertIn("12", w.notice.text())
-        w.bk_pw.setText(PW_LOGIN)                  # نفس كلمة الدخول مرفوضة
-        w.bk_pw2.setText(PW_LOGIN)
+        w.bk_pw.setText(LONG_LOGIN)                # نفس كلمة الدخول مرفوضة (وهي 16 حرفًا فتتجاوز فحص الطول)
+        w.bk_pw2.setText(LONG_LOGIN)
         w.next()
         self.assertIn("مختلفة", w.notice.text())
         w.bk_pw.setText(PW_BACKUP)
@@ -95,7 +96,7 @@ class WizardTest(_Base):
         self.assertEqual(users.count_users(self.con), 1)
         self.assertTrue(backup.is_encryption_ready(self.con))
         self.assertEqual(len(backup.list_backups()), 1)
-        self.assertEqual(users.login(self.con, "admin", PW_LOGIN).role, "manager")
+        self.assertEqual(users.login(self.con, "admin", LONG_LOGIN).role, "manager")
 
     def test_restore_branch_validates_secret(self):
         """مسار الاستعادة: ملف من جهاز آخر، سر خطأ مرفوض، سر صحيح يُقبل دون كتابة شيء."""
@@ -167,7 +168,8 @@ class SettingsTest(_Base):
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
         k = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
-        self.assertEqual(SettingsPage(self.session()).tabs.count(), 5)
+        admin_page = SettingsPage(self.session())        # تبقى في متغير وإلا حذفها Qt مع تبويباتها
+        self.assertEqual(admin_page.tabs.count(), 5)
         p = SettingsPage(self.session(k))
         self.assertEqual(p.tabs.count(), 3)
         self.assertFalse(p.backup_tab.restore_btn.isVisibleTo(p))
@@ -199,7 +201,8 @@ class SettingsTest(_Base):
         """نسخ الآن يضيف صفًا، واختبار الصف المختار ينجح، والبطاقات تتحدث."""
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
-        tab = SettingsPage(self.session()).backup_tab
+        page = SettingsPage(self.session())
+        tab = page.backup_tab
         self.assertEqual(tab.model.rowCount(), 0)
         tab.backup_now()
         self.assertEqual(tab.model.rowCount(), 1)
@@ -214,7 +217,8 @@ class SettingsTest(_Base):
         from morv.infra import shop
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
-        tab = SettingsPage(self.session()).shop_tab
+        page = SettingsPage(self.session())
+        tab = page.shop_tab
         tab.phone.setText("123")
         tab.save()
         self.assertIn("الهاتف", tab.notice.text())
