@@ -48,6 +48,7 @@ class ValidateTest(unittest.TestCase):
         self.assertEqual(validate.suggest_item_code("tire", "Michelin", {"size": "205/55R16"}, 1), "TR-2055516-MI")
         self.assertEqual(validate.suggest_item_code("battery", "ACDelco", {"ah": "70"}, 1), "BT-70-ACD")
         self.assertEqual(validate.suggest_item_code("service", "", {}, 3), "SV-003")
+        self.assertEqual(validate.suggest_item_code("tire", "ميشلان", {"size": "205/55R16"}, 7), "TR-2055516-007")  # ماركة عربية
 
 
 class _Db(unittest.TestCase):

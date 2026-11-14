@@ -14,6 +14,7 @@ from morv.core.text import ltr
 from morv.infra import items
 from morv.infra.items import Item
 from morv.ui.listpage import ListPage
+from morv.ui.modal import Modal
 from morv.ui.shell_placeholder import placeholder
 from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
 
@@ -112,7 +113,7 @@ class ItemsPage(ListPage):
     def toggle_active(self, it: Item) -> None:
         """إيقاف أو تفعيل مع تأكيد."""
         verb = "إيقاف" if it.active else "تفعيل"
-        if ask(self, verb, f"{verb} الصنف «{it.name}»؟" + (" لن يظهر في البيع." if it.active else "")):
+        if ask(self, verb, f"{verb} الصنف «{it.name}»؟" + (" لن يظهر في البيع." if it.active else ""), danger=it.active):
             items.set_active(self.session.con, self.session.user, it.id, not it.active)
             self.reload(keep_id=it.id)
 
@@ -125,17 +126,18 @@ class ItemsPage(ListPage):
             self.reload(keep_id=dlg.saved.id)
 
 
-class ItemDialog(QDialog):
-    """نافذة الصنف المبنية من إعداد الحقول."""
+class ItemDialog(Modal):
+    """نافذة الصنف المبنية من إعداد الحقول.
+
+    الترتيب كما في التصميم: حقول النوع (المقاس...) أولًا، ثم الماركة والموديل والباركود، ثم الاسم
+    والكود (يُقترحان تلقائيًا من البيانات ويمكن تعديلهما)، ثم الأسعار وحد الطلب، ثم الباقي.
+    """
+    FIRST = ("brand", "model", "barcode", "name", "code", "price_retail", "price_wholesale", "price_super", "min_qty")
 
     def __init__(self, session, it: Item | None, parent=None):
-        """بناء النافذة؛ تغيير النوع يعيد بناء حقول النوع."""
-        super().__init__(parent)
+        """بناء النافذة؛ تغيير النوع يعيد بناء الحقول."""
+        super().__init__("تعديل صنف" if it else "صنف جديد", parent, width=700)
         self.session, self.it, self.saved = session, it, None
-        self.setWindowTitle("تعديل صنف" if it else "صنف جديد")
-        self.setMinimumWidth(680)
-        self.lay = QVBoxLayout(self)
-        self.lay.setContentsMargins(24, 20, 24, 16)
         kinds = QHBoxLayout()
         kinds.addWidget(muted("نوع الصنف"))
         self.kind_buttons = {}
@@ -147,26 +149,26 @@ class ItemDialog(QDialog):
             self.kind_buttons[k] = b
             kinds.addWidget(b)
         kinds.addStretch(1)
-        self.lay.addLayout(kinds)
+        self.body.addLayout(kinds)
         self.fields_box = QWidget()
-        self.lay.addWidget(self.fields_box)
-        self.notice = Notice()
-        self.lay.addWidget(self.notice)
-        btns = QHBoxLayout()
-        save = primary_button("حفظ")
-        save.setShortcut("Ctrl+S")
-        save.clicked.connect(self.save)
-        cancel = QPushButton("إلغاء")
-        cancel.clicked.connect(self.reject)
-        btns.addWidget(save)
-        btns.addWidget(cancel)
-        btns.addStretch(1)
-        self.lay.addLayout(btns)
+        self.body.addWidget(self.fields_box)
+        self.body.addWidget(muted("الحقول الظاهرة والإلزامية تتبع «المخزون ← حقول بطاقة الصنف»."))
         self.widgets: dict = {}
+        self.add_footer("حفظ", self.save)
         self.set_kind(it.kind if it else "tire")
         if it:
             for b in self.kind_buttons.values():
                 b.setEnabled(False)      # النوع لا يتغير بعد الإنشاء
+
+    def _ordered_fields(self, kind: str) -> list:
+        """حقول النوع أولًا، ثم المشتركة بالترتيب المعتمد، ثم بقية المشتركة."""
+        all_f = [f for f in items.fields(self.session.con, kind) if f.show]
+        if kind == "service":
+            all_f = [f for f in all_f if f.key not in ("brand", "model", "min_qty", "origin", "loc", "war", "cond")]
+        specific = [f for f in all_f if f.kind != "common"]
+        common = {f.key: f for f in all_f if f.kind == "common"}
+        head = [common.pop(k) for k in self.FIRST if k in common]
+        return specific + head + list(common.values())
 
     def set_kind(self, kind: str) -> None:
         """إعادة بناء الحقول للنوع المختار."""
@@ -179,11 +181,7 @@ class ItemDialog(QDialog):
         self.widgets = {}
         it = self.it
         price_ok = self.session.user.is_manager or self.session.can("items.prices")
-        for fld in items.fields(self.session.con, kind):
-            if not fld.show:
-                continue
-            if kind == "service" and fld.key in ("brand", "model", "min_qty", "origin", "loc", "war", "cond"):
-                continue
+        for fld in self._ordered_fields(kind):
             label = fld.label + (" *" if fld.required else "")
             current = ""
             if it:
@@ -197,6 +195,7 @@ class ItemDialog(QDialog):
                 w.addItems(fld.options)
                 if current in fld.options:
                     w.setCurrentText(current)
+                w.currentIndexChanged.connect(self._suggest)
             elif fld.ftype == "bool":
                 w = QCheckBox("نعم")
                 w.setChecked(current == "1")
@@ -207,21 +206,22 @@ class ItemDialog(QDialog):
             elif fld.ftype in ("num", "size") or fld.key in ("code", "barcode"):
                 w = ltr_edit(fld.example)
                 w.setText(current)
+                w.textChanged.connect(self._suggest)
             else:
                 w = QLineEdit(current)
                 w.setPlaceholderText(fld.example)
+                w.textChanged.connect(self._suggest)
             if fld.key.startswith("price_") and not price_ok:
                 w.setEnabled(False)
             self.widgets[fld.key] = w
             f.addRow(label, w)
-            if fld.key == "name":
-                gen = QPushButton("توليد الاسم والكود من البيانات")
-                gen.setObjectName("segment")
-                gen.clicked.connect(self.generate)
-                f.addRow("", gen)
+            if fld.key == "code":
+                f.addRow("", muted("الاسم والكود يُقترحان تلقائيًا من الماركة والمقاس؛ اتركهما فارغين لقبول المقترح أو اكتب ما تريد"))
         self.fields_box.setLayout(f)
-        self.lay.replaceWidget(old, self.fields_box)
+        self.body.replaceWidget(old, self.fields_box)
+        old.hide()
         old.deleteLater()
+        self._suggest()
 
     def _value(self, key: str) -> str:
         """قيمة حقل كنص."""
@@ -236,8 +236,8 @@ class ItemDialog(QDialog):
             return str(w.value())
         return w.text()
 
-    def generate(self) -> None:
-        """اقتراح الاسم والكود من الماركة والموديل والمقاس/الأمبير."""
+    def suggestions(self) -> tuple[str, str]:
+        """(الاسم، الكود) المقترحان من البيانات الحالية."""
         attrs = {k: self._value(k) for k in ("size", "li", "si", "ah")}
         if attrs.get("size"):
             try:
@@ -245,24 +245,31 @@ class ItemDialog(QDialog):
             except validate.ValidationError:
                 pass
         name = validate.suggest_item_name(self.kind, self._value("brand"), self._value("model"), attrs)
-        code = validate.suggest_item_code(self.kind, self._value("brand"), attrs, items.next_service_seq(self.session.con))
-        if name and "name" in self.widgets:
-            self.widgets["name"].setText(name)
-        if "code" in self.widgets and not self.widgets["code"].text().strip():
-            self.widgets["code"].setText(code)
+        code = validate.suggest_item_code(self.kind, self._value("brand"), attrs, items.next_seq(self.session.con, self.kind))
+        return name, code
+
+    def _suggest(self, *_args) -> None:
+        """عرض المقترح كنص باهت داخل حقلي الاسم والكود وهما فارغان."""
+        if "name" not in self.widgets:
+            return
+        name, code = self.suggestions()
+        self.widgets["name"].setPlaceholderText(name or "اسم الصنف كما يظهر في الفاتورة")
+        if "code" in self.widgets:
+            self.widgets["code"].setPlaceholderText(code)
 
     def save(self) -> None:
-        """جمع القيم والحفظ عبر طبقة البيانات (التي تتحقق من الإلزامي)."""
+        """جمع القيم والحفظ؛ الاسم والكود الفارغان يأخذان المقترح."""
         try:
             prices = [parse_money(self._value(k)) if self._value(k).strip() else 0
                       for k in ("price_retail", "price_wholesale", "price_super")]
         except MoneyError as e:
             self.notice.show_message(f"السعر: {e}")
             return
+        name, code = self.suggestions()
         attrs = {k: self._value(k) for k in self.widgets if k not in items.FIXED_KEYS}
-        it = Item(self.it.id if self.it else None, self.kind, self._value("code"), self._value("name"),
-                  self._value("barcode"), self._value("brand"), self._value("model"), *prices,
-                  int(self._value("min_qty") or 0), self._value("notes"), True, attrs)
+        it = Item(self.it.id if self.it else None, self.kind, self._value("code").strip() or code,
+                  self._value("name").strip() or name, self._value("barcode"), self._value("brand"),
+                  self._value("model"), *prices, int(self._value("min_qty") or 0), self._value("notes"), True, attrs)
         try:
             self.saved = (items.update if self.it else items.create)(self.session.con, self.session.user, it)
         except items.ItemError as e:
@@ -351,18 +358,15 @@ class ItemFieldsTab(QWidget):
             self.reload()
 
 
-class CustomFieldDialog(QDialog):
+class CustomFieldDialog(Modal):
     """حوار حقل مخصص: الاسم والنوع والاختيارات."""
 
     def __init__(self, parent=None):
         """الحقول."""
-        super().__init__(parent)
-        self.setWindowTitle("حقل مخصص")
-        self.setFixedWidth(420)
+        super().__init__("حقل مخصص", parent, width=440)
         self.label = self.ftype = ""
         self.options = []
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 16)
+        lay = self.body
         f = form()
         self.name = QLineEdit()
         self.type = QComboBox()
@@ -374,9 +378,7 @@ class CustomFieldDialog(QDialog):
         f.addRow("النوع", self.type)
         f.addRow("الاختيارات", self.opts)
         lay.addLayout(f)
-        ok = primary_button("إضافة")
-        ok.clicked.connect(self.go)
-        lay.addWidget(ok)
+        self.add_footer("إضافة", self.go)
 
     def go(self) -> None:
         """جمع القيم."""

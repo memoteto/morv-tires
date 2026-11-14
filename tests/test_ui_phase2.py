@@ -134,9 +134,11 @@ class InventoryPageTest(_Base):
         dlg.widgets["size"].setText("205/55r16")
         dlg.widgets["li"].setText("91")
         dlg.widgets["si"].setCurrentText("V")
-        dlg.generate()
-        self.assertEqual(dlg.widgets["name"].text(), "إطار Michelin Primacy 4 205/55R16 91V")
-        self.assertEqual(dlg.widgets["code"].text(), "TR-2055516-MI")
+        # الاسم والكود يُقترحان تلقائيًا كنص باهت، ويُقبلان عند الحفظ إن تُركا فارغين
+        self.assertEqual(dlg.widgets["name"].placeholderText(), "إطار Michelin Primacy 4 205/55R16 91V")
+        self.assertEqual(dlg.widgets["code"].placeholderText(), "TR-2055516-MI")
+        keys = list(dlg.widgets)
+        self.assertLess(keys.index("size"), keys.index("name"))   # حقول النوع قبل المشتركة
         dlg.widgets["price_retail"].setText("6450")
         dlg.save()
         self.assertIn("الفئة", dlg.notice.text())     # إلزامي ناقص
@@ -145,7 +147,29 @@ class InventoryPageTest(_Base):
         dlg.save()
         self.assertIsNotNone(dlg.saved)
         self.assertEqual(dlg.saved.price_retail, 645000)
+        self.assertEqual(dlg.saved.code, "TR-2055516-MI")
         self.assertEqual(items.count(self.con), 1)
+        # بطارية بنفس النافذة
+        dlg2 = ItemDialog(self.session, None)
+        dlg2.set_kind("battery")
+        dlg2.widgets["brand"].setText("Varta")
+        dlg2.widgets["ah"].setText("70")
+        dlg2.widgets["volt"].setCurrentText("12V")
+        dlg2.widgets["cca"].setText("640")
+        dlg2.widgets["tech"].setCurrentText("EFB")
+        dlg2.widgets["box"].setText("L3")
+        dlg2.widgets["pol"].setCurrentText("الموجب يمين")
+        dlg2.widgets["dims"].setText("278×175×190")
+        dlg2.widgets["price_retail"].setText("4200")
+        dlg2.save()
+        self.assertEqual(dlg2.saved.name, "بطارية Varta 70 أمبير")
+        # خدمة
+        dlg3 = ItemDialog(self.session, None)
+        dlg3.set_kind("service")
+        dlg3.widgets["name"].setText("تركيب إطار")
+        dlg3.widgets["price_retail"].setText("50")
+        dlg3.save()
+        self.assertEqual(dlg3.saved.code, "SV-001")
 
     def test_scan_enter_opens_preview(self):
         """Enter في البحث بباركود يفتح معاينة الصنف مباشرة."""
@@ -170,6 +194,26 @@ class InventoryPageTest(_Base):
         self.assertFalse(next(f for f in items.fields(self.con, "tire") if f.key == "season").show)
         row = next(i for i in range(tab.table.rowCount()) if tab.table.item(i, 0).data(Qt.ItemDataRole.UserRole) == "size")
         self.assertFalse(tab.table.item(row, 2).flags() & Qt.ItemFlag.ItemIsEnabled)
+
+
+class ModalTest(_Base):
+    """النافذة المنبثقة الموحّدة."""
+
+    def test_fits_screen_and_footer_visible(self):
+        """خطأ من تجربة المالك: نافذة الصنف كانت أطول من الشاشة فاختفى زر الحفظ. الآن تتقيد بالشاشة
+        ويبقى التذييل ظاهرًا والجسم يتمرر."""
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QGuiApplication
+        from morv.ui.inventory_page import ItemDialog
+        from morv.ui.customers_page import CustomerDialog
+        avail = QGuiApplication.primaryScreen().availableGeometry().height()
+        for dlg in (ItemDialog(self.session, None), CustomerDialog(self.session, None)):
+            dlg.show()
+            self.app.processEvents()
+            self.assertLessEqual(dlg.height(), avail - 60)
+            self.assertTrue(dlg.footer.isVisibleTo(dlg))
+            self.assertTrue(dlg.windowFlags() & Qt.WindowType.FramelessWindowHint)   # بلا شريط عنوان من النظام
+            dlg.close()
 
 
 class ShellPagesTest(_Base):

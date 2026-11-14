@@ -283,9 +283,9 @@ def by_barcode(con, code: str) -> Item | None:
     return get(con, r[0]) if r else None
 
 
-def next_service_seq(con) -> int:
-    """الرقم التالي لكود خدمة مقترح."""
-    return con.execute("SELECT count(*)+1 FROM items WHERE kind='service'").fetchone()[0]
+def next_seq(con, kind: str) -> int:
+    """الرقم التسلسلي التالي لكود مقترح من نوع معين."""
+    return con.execute("SELECT count(*)+1 FROM items WHERE kind=?", (kind,)).fetchone()[0]
 
 
 def search(con, query: str = "", kind: str | None = None, include_inactive: bool = False,

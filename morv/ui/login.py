@@ -11,6 +11,7 @@ from morv import APP_NAME, VERSION
 from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, shop, users
+from morv.ui.modal import Modal
 from morv.ui.widgets import Notice, PasswordEdit, form, muted, primary_button
 
 
@@ -91,17 +92,14 @@ class LoginDialog(QDialog):
         self.accept()
 
 
-class ChangePasswordDialog(QDialog):
+class ChangePasswordDialog(Modal):
     """تغيير كلمة مرور المستخدم الحالي (إجباري عند أول دخول، أو اختياري من الإعدادات)."""
 
     def __init__(self, con, user, current: str | None = None, forced: bool = False, parent=None):
         """current: كلمة المرور الحالية إن عُرفت (بعد الدخول مباشرة) فلا تُطلب مرة أخرى."""
-        super().__init__(parent)
+        super().__init__("تغيير كلمة المرور", parent, width=440)
         self.con, self.user, self.current = con, user, current
-        self.setWindowTitle("تغيير كلمة المرور")
-        self.setFixedWidth(420)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 24, 24, 20)
+        lay = self.body
         lay.addWidget(muted("يجب تغيير كلمة المرور المؤقتة قبل المتابعة." if forced else
                             f"تغيير كلمة مرور {user.display_name}."))
         f = form()
@@ -113,11 +111,7 @@ class ChangePasswordDialog(QDialog):
         f.addRow("الجديدة", self.new)
         f.addRow("تأكيدها", self.new2)
         lay.addLayout(f)
-        self.notice = Notice()
-        lay.addWidget(self.notice)
-        btn = primary_button("حفظ")
-        btn.clicked.connect(self.save)
-        lay.addWidget(btn)
+        self.add_footer("حفظ", self.save)
 
     def save(self) -> None:
         """التحقق والحفظ."""

@@ -123,8 +123,8 @@ class ListPage(QWidget):
         self.view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.view.setAlternatingRowColors(True)
         self.view.verticalHeader().setVisible(False)
-        self.view.horizontalHeader().setStretchLastSection(True)
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)   # عمود الاسم يتمدد
         self.view.clicked.connect(lambda idx: self.show_preview(self.model.rows[idx.row()]))
         self.view.doubleClicked.connect(lambda idx: self.open_dialog(self.model.rows[idx.row()][0]) if self.can_edit() else None)
         left.addWidget(self.view, 1)

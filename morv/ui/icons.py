@@ -35,6 +35,7 @@ PATHS = {
     "logout": "<path d='M9 7l-5 5 5 5M4 12h11M20 4v16'/>",
     "usb": "<path d='M8 3h8v8H8z'/><path d='M6 11h12v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z'/>",
     "shield": "<path d='M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z'/><path d='m9 12 2 2 4-4'/>",
+    "close": "<path d='M6 6l12 12M18 6 6 18'/>",
     "moon": "<path d='M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'/>",
 }
 

@@ -7,6 +7,10 @@ from morv.core.text import norm_ar
 from morv.infra.users import audit
 
 
+SUPPLIES = {"tires": "إطارات", "batteries": "بطاريات", "both": "إطارات وبطاريات", "other": "أخرى"}
+PAY_METHODS = {"cash": "نقدي", "transfer": "تحويل بنكي", "wallet": "InstaPay / محفظة"}
+
+
 class SupplierError(ValueError):
     """بيانات مورد مرفوضة، برسالة تصلح للعرض."""
 
@@ -23,6 +27,12 @@ class Supplier:
     tax_id: str = ""
     notes: str = ""
     active: bool = True
+    payment_days: int = 0
+    credit_limit: int = 0
+    supplies: str = "both"
+    pay_method: str = "cash"
+    commercial_reg: str = ""
+    bank_info: str = ""
 
 
 def _clean(s: Supplier) -> Supplier:
@@ -35,6 +45,10 @@ def _clean(s: Supplier) -> Supplier:
         s.phone2 = validate.mobile(s.phone2, required=False)
     except validate.ValidationError as e:
         raise SupplierError(str(e)) from e
+    if s.supplies not in SUPPLIES or s.pay_method not in PAY_METHODS:
+        raise SupplierError("قيمة غير معروفة في «يورّد لنا» أو طريقة السداد")
+    if s.payment_days < 0 or s.credit_limit < 0:
+        raise SupplierError("مدة السداد وحد الائتمان لا يكونان سالبين")
     return s
 
 
@@ -51,9 +65,11 @@ def create(con, by, s: Supplier) -> Supplier:
     if dup:
         raise SupplierError(f"يوجد مورد مسجّل بنفس الرقم: {dup}")
     cur = con.execute(
-        "INSERT INTO suppliers (name, name_norm, mobile, phone2, contact_person, address, tax_id, notes) VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT INTO suppliers (name, name_norm, mobile, phone2, contact_person, address, tax_id, notes, payment_days, "
+        "credit_limit, supplies, pay_method, commercial_reg, bank_info) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (s.name, norm_ar(s.name), s.mobile, s.phone2 or None, s.contact_person.strip() or None,
-         s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None))
+         s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None, s.payment_days,
+         s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None))
     s.id = cur.lastrowid
     audit(con, by, "supplier.create", "supplier", s.id, f"{s.name} · {s.mobile}")
     return get(con, s.id)
@@ -67,9 +83,11 @@ def update(con, by, s: Supplier) -> Supplier:
         raise SupplierError(f"يوجد مورد مسجّل بنفس الرقم: {dup}")
     con.execute(
         "UPDATE suppliers SET name=?, name_norm=?, mobile=?, phone2=?, contact_person=?, address=?, tax_id=?, notes=?, "
+        "payment_days=?, credit_limit=?, supplies=?, pay_method=?, commercial_reg=?, bank_info=?, "
         "updated_at=strftime('%Y-%m-%d %H:%M:%S','now','localtime') WHERE id=?",
         (s.name, norm_ar(s.name), s.mobile, s.phone2 or None, s.contact_person.strip() or None,
-         s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None, s.id))
+         s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None, s.payment_days,
+         s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None, s.id))
     audit(con, by, "supplier.update", "supplier", s.id, s.name)
     return get(con, s.id)
 
@@ -102,11 +120,13 @@ def get(con, supplier_id: int) -> Supplier:
     if not r:
         raise SupplierError("المورد غير موجود")
     return Supplier(r["id"], r["name"], r["mobile"], r["phone2"] or "", r["contact_person"] or "",
-                    r["address"] or "", r["tax_id"] or "", r["notes"] or "", bool(r["active"]))
+                    r["address"] or "", r["tax_id"] or "", r["notes"] or "", bool(r["active"]),
+                    r["payment_days"], r["credit_limit"], r["supplies"], r["pay_method"],
+                    r["commercial_reg"] or "", r["bank_info"] or "")
 
 
 def search(con, query: str = "", include_inactive: bool = False, limit: int = 300, offset: int = 0) -> list[tuple]:
-    """بحث القائمة: (id, name, mobile, contact_person, active)."""
+    """بحث القائمة: (id, name, mobile, contact_person, active, payment_days, supplies)."""
     q = (query or "").strip()
     where, params = [], []
     if not include_inactive:
@@ -115,7 +135,7 @@ def search(con, query: str = "", include_inactive: bool = False, limit: int = 30
         digits = "".join(ch for ch in validate.to_latin(q) if ch.isdigit())
         where.append("(name_norm LIKE ? OR (? <> '' AND mobile LIKE ?))")
         params += [f"%{norm_ar(q)}%", digits, f"%{digits}%"]
-    sql = ("SELECT id, name, mobile, contact_person, active FROM suppliers" +
+    sql = ("SELECT id, name, mobile, contact_person, active, payment_days, supplies FROM suppliers" +
            (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY name_norm LIMIT ? OFFSET ?")
     return con.execute(sql, (*params, limit, offset)).fetchall()
 

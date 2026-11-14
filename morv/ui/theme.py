@@ -101,6 +101,15 @@ QCheckBox::indicator {{ width:18px; height:18px; }}
 QListWidget#userList {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:10px; }}
 QListWidget#userList::item {{ height:44px; padding:0 10px; border-radius:8px; margin:2px; }}
 QListWidget#userList::item:selected {{ background:{t['primary_soft']}; color:{t['text']}; }}
+QFrame#modalFrame {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:14px; }}
+QWidget#modalHeader {{ background:{t['surface2']}; border-top-left-radius:14px; border-top-right-radius:14px; border-bottom:1px solid {t['border']}; }}
+QLabel#modalTitle {{ font-size:16px; font-weight:700; }}
+QWidget#modalBody {{ background:{t['surface']}; }}
+QWidget#modalFooter {{ background:{t['surface2']}; border-top:1px solid {t['border']}; border-bottom-left-radius:14px; border-bottom-right-radius:14px; }}
+QScrollArea {{ background:transparent; border:0; }}
+QScrollArea > QWidget > QWidget {{ background:transparent; }}
+QSpinBox {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px; padding:0 10px; }}
+QPlainTextEdit {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; padding:6px 10px; }}
 QToolTip {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']};
             border-radius:6px; padding:4px 8px; }}
 """

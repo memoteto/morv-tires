@@ -94,12 +94,16 @@ def suggest_item_name(kind: str, brand: str, model: str, attrs: dict) -> str:
 
 
 def suggest_item_code(kind: str, brand: str, attrs: dict, seq: int) -> str:
-    """كود داخلي مقترح: TR-2055516-MI للإطار، BT-70-ACD للبطارية، SV-003 للخدمة."""
-    b = to_latin(brand or "").upper()
-    b = re.sub(r"[^A-Z0-9]", "", b)
+    """كود داخلي مقترح بحروف لاتينية فقط (يصلح للباركود والماسح):
+
+    إطار: TR-2055516-MI (المقاس + أول حرفين من الماركة اللاتينية)، بطارية: BT-70-ACD،
+    خدمة: SV-003. إن كانت الماركة عربية يُستخدم رقم تسلسلي بدل حروفها.
+    """
+    b = re.sub(r"[^A-Z0-9]", "", (brand or "").upper())
+    tail = lambda n: b[:n] if b else f"{seq:03d}"   # noqa: E731 — تعبير قصير محلي
     if kind == "tire":
         size = re.sub(r"[^0-9]", "", attrs.get("size", "") or "")
-        return f"TR-{size or '0'}-{b[:2] or 'XX'}"
+        return f"TR-{size or '0'}-{tail(2)}"
     if kind == "battery":
-        return f"BT-{attrs.get('ah', '') or '0'}-{b[:3] or 'XXX'}"
+        return f"BT-{attrs.get('ah', '') or '0'}-{tail(3)}"
     return f"SV-{seq:03d}"

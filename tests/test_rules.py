@@ -106,11 +106,14 @@ class UiRulesTest(unittest.TestCase):
     """قواعد الاتجاه والتنسيق والجداول."""
 
     def test_forbidden_calls(self):
-        """أشياء ممنوعة في الواجهة: نافذة بلا إطار، وعناصر داخل صفوف الجداول، وقلب الاتجاه."""
-        banned = ["FramelessWindowHint", "setIndexWidget", "setDirection("]
+        """أشياء ممنوعة في الواجهة: نافذة رئيسية بلا إطار، وعناصر داخل صفوف الجداول، وقلب الاتجاه،
+        وQMessageBox (تنسيقه لا يتبع الثيم وينقلب في RTL؛ البديل morv.ui.modal)."""
+        banned = ["FramelessWindowHint", "setIndexWidget", "setDirection(", "QMessageBox"]
         for f in py_files(PKG):
             for no, line in code_lines(f):
                 for word in banned:
+                    if word == "FramelessWindowHint" and f.name == "modal.py":
+                        continue   # النافذة المنبثقة الموحّدة وحدها بلا إطار (برأس داخلي قابل للسحب)
                     self.assertNotIn(word, line, f"{f.name}:{no}")
 
     def test_align_right_only_absolute(self):

@@ -3,9 +3,8 @@
 الرصيد وكشف الحساب والفاتورة تأتي في مراحلها؛ هنا بيانات العميل ومركباته فقط.
 الرقم القومي يُعرض مخفيًا إلا آخر 4 أرقام.
 """
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QPlainTextEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QHBoxLayout, QLineEdit, QListWidget,
+                               QPlainTextEdit, QPushButton, QSpinBox, QWidget)
 
 from morv.core.money import fmt, parse_money, MoneyError
 from morv.core.text import ltr
@@ -13,7 +12,8 @@ from morv.core import validate
 from morv.infra import customers
 from morv.infra.customers import Customer, Vehicle
 from morv.ui.listpage import ListPage
-from morv.ui.widgets import Notice, ask, danger_button, form, info, ltr_edit, muted, primary_button
+from morv.ui.modal import Modal
+from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
 
 
 class CustomersPage(ListPage):
@@ -78,7 +78,7 @@ class CustomersPage(ListPage):
     def toggle_active(self, c: Customer) -> None:
         """إيقاف أو تفعيل مع تأكيد."""
         verb = "إيقاف" if c.active else "تفعيل"
-        if ask(self, verb, f"{verb} العميل «{c.name}»؟" + (" لن يظهر في البيع." if c.active else "")):
+        if ask(self, verb, f"{verb} العميل «{c.name}»؟" + (" لن يظهر في البيع." if c.active else ""), danger=c.active):
             customers.set_active(self.session.con, self.session.user, c.id, not c.active)
             self.reload(keep_id=c.id)
 
@@ -91,20 +91,17 @@ class CustomersPage(ListPage):
             self.reload(keep_id=dlg.saved.id)
 
 
-class CustomerDialog(QDialog):
+class CustomerDialog(Modal):
     """نافذة بيانات العميل. حقول التقسيط والآجل تحت مفتاح «بيانات إضافية»."""
 
     def __init__(self, session, c: Customer | None, parent=None):
         """بناء النافذة وملء الحقول عند التعديل."""
-        super().__init__(parent)
+        super().__init__("تعديل عميل" if c else "عميل جديد", parent, width=640)
         self.session = session
         self.c = c
         self.saved = None
         self.vehicles: list[Vehicle] = list(c.vehicles) if c else []
-        self.setWindowTitle("تعديل عميل" if c else "عميل جديد")
-        self.setMinimumWidth(620)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 16)
+        lay = self.body
         f = form()
         self.name = QLineEdit(c.name if c else "")
         self.name.setPlaceholderText("الاسم ثلاثي على الأقل")
@@ -181,18 +178,7 @@ class CustomerDialog(QDialog):
         if c and any((c.national_id, c.work_place, c.mobile2, c.credit_limit, c.tax_id, c.whatsapp_ok)):
             self.more.setChecked(True)
 
-        self.notice = Notice()
-        lay.addWidget(self.notice)
-        btns = QHBoxLayout()
-        save = primary_button("حفظ")
-        save.setShortcut("Ctrl+S")
-        save.clicked.connect(self.save)
-        cancel = QPushButton("إلغاء")
-        cancel.clicked.connect(self.reject)
-        btns.addWidget(save)
-        btns.addWidget(cancel)
-        btns.addStretch(1)
-        lay.addLayout(btns)
+        self.add_footer("حفظ", self.save)
         self.name.setFocus()
 
     def _refresh_vehicles(self) -> None:
@@ -234,17 +220,14 @@ class CustomerDialog(QDialog):
         self.accept()
 
 
-class VehicleDialog(QDialog):
+class VehicleDialog(Modal):
     """حوار مركبة واحدة."""
 
     def __init__(self, parent=None):
         """الحقول."""
-        super().__init__(parent)
+        super().__init__("مركبة", parent, width=460)
         self.vehicle = None
-        self.setWindowTitle("مركبة")
-        self.setFixedWidth(440)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 16)
+        lay = self.body
         f = form()
         self.make = QLineEdit()
         self.make.setPlaceholderText("تويوتا")
@@ -262,11 +245,7 @@ class VehicleDialog(QDialog):
                        ("مقاس البطارية", self.battery), ("آخر عداد كم", self.odo)):
             f.addRow(lbl, w)
         lay.addLayout(f)
-        self.notice = Notice()
-        lay.addWidget(self.notice)
-        ok = primary_button("إضافة")
-        ok.clicked.connect(self.go)
-        lay.addWidget(ok)
+        self.add_footer("إضافة", self.go)
 
     def go(self) -> None:
         """تحقق بسيط ثم القبول."""
