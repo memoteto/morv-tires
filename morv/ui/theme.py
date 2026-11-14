@@ -70,7 +70,8 @@ QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2
              gridline-color:{t['border']}; selection-background-color:{t['select']}; selection-color:{t['text']}; }}
 QHeaderView::section {{ background:{t['surface2']}; color:{t['muted']}; border:0;
                        border-bottom:1px solid {t['border']}; padding:0 8px; height:36px; font-weight:600; }}
-QStatusBar {{ color:{t['muted']}; }}
+QToolTip {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']};
+            border-radius:6px; padding:4px 8px; }}
 """
 
 
