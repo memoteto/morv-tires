@@ -211,8 +211,10 @@ class SettingsTest(_Base):
         tab.backup_now()
         self.assertEqual(tab.model.rowCount(), 1)
         self.assertIn("تمت النسخة", tab.notice.text())
-        tab.view.setCurrentIndex(tab.model.index(0, 0))
-        tab.view.selectRow(0)
+        # selectRow في RTL على جدول غير معروض يختار عمودًا بعرض الحشو فيفشل؛ نختار عبر نموذج التحديد مباشرة
+        from PySide6.QtCore import QItemSelectionModel
+        flags = QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows
+        tab.view.selectionModel().setCurrentIndex(tab.model.index(0, 0), flags)
         tab.test_selected()
         self.assertIn("نجح", tab.notice.text())
         self.assertNotEqual(tab.stat_test[1].text(), "لم يُجرَ بعد")
