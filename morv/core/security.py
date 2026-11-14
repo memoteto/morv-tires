@@ -15,6 +15,11 @@ ROLES = {"manager": "مدير", "cashier": "كاشير"}
 
 # الصلاحيات المفعّلة حاليًا فقط؛ كل مرحلة تضيف صلاحيات شاشاتها عند بنائها.
 PERMISSIONS = {
+    "customers.manage": "إضافة وتعديل العملاء",
+    "suppliers.manage": "إضافة وتعديل الموردين",
+    "items.manage": "إضافة وتعديل الأصناف",
+    "items.prices": "تعديل أسعار البيع",
+    "items.cost_view": "رؤية التكلفة والهامش",
     "users.manage": "المستخدمون والصلاحيات",
     "settings.edit": "الإعدادات العامة",
     "backup.restore": "الاستعادة من نسخة احتياطية",
@@ -23,7 +28,7 @@ PERMISSIONS = {
 # الصلاحيات الافتراضية لكل دور (قالب يُطبَّق عند إنشاء المستخدم ويمكن تعديله بعدها)
 ROLE_DEFAULTS = {
     "manager": set(PERMISSIONS),
-    "cashier": set(),
+    "cashier": {"customers.manage"},
 }
 
 
