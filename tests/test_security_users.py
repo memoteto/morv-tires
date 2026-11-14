@@ -130,6 +130,8 @@ class UsersTest(unittest.TestCase):
         """تغيير كلمة المرور يتطلب القديمة؛ والمدير يعيّن لغيره مع إلزام التغيير."""
         with self.assertRaises(users.AuthError):
             users.change_own_password(self.con, self.admin, "wrong", "NewPass12345")
+        with self.assertRaisesRegex(users.AuthError, "تختلف"):   # خطأ اكتُشف في تجربة المالك
+            users.change_own_password(self.con, self.admin, "Admin12345", "Admin12345")
         users.change_own_password(self.con, self.admin, "Admin12345", "NewPass12345")
         self.assertEqual(users.login(self.con, "admin", "NewPass12345").id, self.admin.id)
         c = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")

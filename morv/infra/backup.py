@@ -268,6 +268,23 @@ def usb_dir(con) -> Path | None:
     return Path(v) if v else None
 
 
+def same_drive_as_data(folder) -> bool:
+    """هل المجلد على نفس قرص مجلد البيانات؟ (فلاشة على نفس القرص لا تحمي من تعطّل الجهاز)."""
+    try:
+        a = Path(folder).resolve()
+        b = paths.data_dir().resolve()
+    except OSError:
+        return False
+    if a.drive or b.drive:                 # Windows: مقارنة حرف القرص
+        return a.drive.upper() == b.drive.upper()
+    while not a.exists() and a.parent != a:   # المجلد قد لا يكون أُنشئ بعد؛ نصعد لأقرب موجود
+        a = a.parent
+    try:                                   # Linux: مقارنة الجهاز
+        return a.stat().st_dev == b.stat().st_dev
+    except OSError:
+        return False
+
+
 def usb_available(con) -> bool:
     """هل الفلاشة موصولة الآن (مجلدها موجود)؟"""
     d = usb_dir(con)
@@ -359,7 +376,8 @@ def restore_file(db_path, backup_path, secret: str | None = None, dek: bytes | N
         if not ok:
             raise BackupError(detail)
         safety = None
-        if db.exists():
+        # قاعدة بلا مستخدمين (جهاز جديد أنشأها للتو) لا تستحق نسخة أمان
+        if db.exists() and _has_users(db):
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             sdir = db.parent / "backups"
             sdir.mkdir(exist_ok=True)
@@ -375,6 +393,18 @@ def restore_file(db_path, backup_path, secret: str | None = None, dek: bytes | N
         return safety
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _has_users(db_path) -> bool:
+    """هل في القاعدة مستخدمون؟ تُقرأ للقراءة فقط؛ قاعدة بلا جدول users تُعامل كفارغة."""
+    try:
+        con = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True)
+        try:
+            return con.execute("SELECT count(*) FROM users").fetchone()[0] > 0
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return False
 
 
 # ---------- الجدولة والصحة ----------

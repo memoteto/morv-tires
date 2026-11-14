@@ -49,11 +49,14 @@ def validate(name: str, phone: str) -> tuple[str, str]:
 
 
 def save(con, name: str, phone: str, address: str) -> Shop:
-    """حفظ بيانات المحل بعد فحصها."""
+    """حفظ بيانات المحل بعد فحصها. العنوان اختياري لكنه لا يكون رقمًا وحده."""
     name, phone = validate(name, phone)
+    address = (address or "").strip()
+    if address and to_latin(address).isdigit():
+        raise ShopError("العنوان لا يكون رقمًا فقط")
     settings.put(con, "shop.name", name)
     settings.put(con, "shop.phone", phone)
-    settings.put(con, "shop.address", (address or "").strip())
+    settings.put(con, "shop.address", address)
     return load(con)
 
 

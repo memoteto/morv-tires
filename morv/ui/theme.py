@@ -66,6 +66,9 @@ QLineEdit:focus {{ border:2px solid {t['primary']}; }}
 QPushButton {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px;
               min-height:38px; padding:0 14px; }}
 QPushButton#primary {{ background:{t['primary']}; color:{t['on_primary']}; border:0; font-weight:600; }}
+QPushButton#primary:disabled {{ background:{t['border']}; color:{t['muted']}; }}
+QPushButton#choice {{ text-align:left; padding:0 16px; }}
+QPushButton#choice:checked {{ background:{t['primary_soft']}; border:2px solid {t['primary']}; color:{t['text']}; font-weight:600; }}
 QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2']}; border:0;
              gridline-color:{t['border']}; selection-background-color:{t['select']}; selection-color:{t['text']}; }}
 QHeaderView::section {{ background:{t['surface2']}; color:{t['muted']}; border:0;
@@ -76,9 +79,9 @@ QPushButton:disabled {{ color:{t['muted']}; border-color:{t['border']}; }}
 QLabel#noticeError {{ background:{t['danger_soft']}; color:{t['danger']}; border-radius:8px; padding:8px 12px; }}
 QLabel#noticeSuccess {{ background:{t['success_soft']}; color:{t['success']}; border-radius:8px; padding:8px 12px; }}
 QLabel#noticeWarn {{ background:{t['warn_soft']}; color:{t['warn']}; border-radius:8px; padding:8px 12px; }}
-QLabel#pillOk {{ background:{t['success_soft']}; color:{t['success']}; border-radius:12px; padding:4px 10px; }}
-QLabel#pillWarn {{ background:{t['warn_soft']}; color:{t['warn']}; border-radius:12px; padding:4px 10px; }}
-QLabel#pillDanger {{ background:{t['danger_soft']}; color:{t['danger']}; border-radius:12px; padding:4px 10px; font-weight:600; }}
+QLabel#pillOk {{ background:{t['success_soft']}; color:{t['success']}; border-radius:14px; padding:4px 12px; max-height:28px; }}
+QLabel#pillWarn {{ background:{t['warn_soft']}; color:{t['warn']}; border-radius:14px; padding:4px 12px; max-height:28px; }}
+QLabel#pillDanger {{ background:{t['danger_soft']}; color:{t['danger']}; border-radius:14px; padding:4px 12px; max-height:28px; font-weight:600; }}
 QLabel#keybox {{ font-family:'Courier New',monospace; font-size:22px; font-weight:700; letter-spacing:2px;
                  background:{t['surface2']}; border:2px dashed {t['border_strong']}; border-radius:12px; padding:16px; }}
 QWidget#wizSide {{ background:{t['side']}; }}

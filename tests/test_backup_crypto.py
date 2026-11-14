@@ -137,6 +137,10 @@ class ScheduleTest(_Device):
         self.assertEqual(len(dailies), backup.KEEP_DAILY + 2)
         self.assertEqual(len([b for b in kept if b.kind == "manual"]), backup.KEEP_OTHER)
 
+    def test_same_drive_warning(self):
+        """مجلد على نفس قرص البيانات يُكتشف (الفلاشة يجب أن تكون خارج الجهاز)."""
+        self.assertTrue(backup.same_drive_as_data(self.dir / "fake_usb"))
+
     def test_usb_copy_and_health(self):
         """النسخ للفلاشة يتحقق بالبصمة، والصحة تنتقل بين الحالات."""
         self.assertEqual(backup.health(self.con)[0], "danger")        # لا نسخة بعد
@@ -189,8 +193,9 @@ class NewDeviceRestoreTest(unittest.TestCase):
         os.environ["MORV_DATA_DIR"] = str(self.b)
         self.assertIsNone(keystore.load_dek())
         f = next(self.usb.glob("*.mtb"))
+        open_main_db(self.b / "morv_tires.db").close()   # كما يفعل التطبيق: قاعدة فارغة قبل المعالج
         safety = backup.restore_file(self.b / "morv_tires.db", f, secret=secret)
-        self.assertIsNone(safety)                     # لا قاعدة سابقة على الجهاز الجديد
+        self.assertIsNone(safety)                     # قاعدة فارغة لا تستحق نسخة أمان
         con = open_main_db(self.b / "morv_tires.db")
         try:
             self.assertEqual(con.execute("SELECT username, display_name, role FROM users ORDER BY id").fetchall(),

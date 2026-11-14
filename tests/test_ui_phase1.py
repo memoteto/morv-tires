@@ -163,7 +163,7 @@ class SettingsTest(_Base):
     """صفحة الإعدادات."""
 
     def test_tabs_by_permission(self):
-        """المدير يرى 5 تبويبات، والكاشير 3 فقط وبلا زر استعادة."""
+        """المدير يرى 5 تبويبات، والكاشير تبويبين فقط وبلا زر استعادة."""
         from morv.infra import users
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
@@ -171,9 +171,9 @@ class SettingsTest(_Base):
         admin_page = SettingsPage(self.session())        # تبقى في متغير وإلا حذفها Qt مع تبويباتها
         self.assertEqual(admin_page.tabs.count(), 5)
         p = SettingsPage(self.session(k))
-        self.assertEqual(p.tabs.count(), 3)
+        self.assertEqual(p.tabs.count(), 2)               # الاختصارات والنسخ فقط
+        self.assertIsNone(p.shop_tab)                     # لا يرى بيانات المحل أصلًا
         self.assertFalse(p.backup_tab.restore_btn.isVisibleTo(p))
-        self.assertFalse(p.shop_tab.name.isEnabled())
 
     def test_users_tab_actions(self):
         """إنشاء مستخدم من الحوار، وتعديل صلاحية، وحماية آخر مدير تظهر رسالتها."""
@@ -223,6 +223,10 @@ class SettingsTest(_Base):
         tab.save()
         self.assertIn("الهاتف", tab.notice.text())
         tab.phone.setText("01111111111")
+        tab.address.setText("0")
+        tab.save()
+        self.assertIn("العنوان", tab.notice.text())
+        tab.address.setText("")
         tab.save()
         self.assertEqual(shop.load(self.con).phone, "01111111111")
 

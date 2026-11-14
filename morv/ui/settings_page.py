@@ -47,8 +47,10 @@ class SettingsPage(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 20, 24, 20)
         self.tabs = QTabWidget()
-        self.shop_tab = ShopTab(session)
-        self.tabs.addTab(self.shop_tab, "المحل")
+        self.shop_tab = None
+        if session.can("settings.edit"):      # الكاشير لا يرى بيانات المحل أصلًا (قرار المالك)
+            self.shop_tab = ShopTab(session)
+            self.tabs.addTab(self.shop_tab, "المحل")
         if session.can("users.manage"):
             self.users_tab = UsersTab(session)
             self.tabs.addTab(self.users_tab, "المستخدمون والصلاحيات")
@@ -545,10 +547,15 @@ class BackupTab(QWidget):
             self.usb_dir.setText(d)
 
     def save_usb(self) -> None:
-        """حفظ مجلد الفلاشة."""
-        settings.put(self.session.con, "backup.usb_dir", self.usb_dir.text().strip())
-        users.audit(self.session.con, self.session.user, "settings.usb", None, None, self.usb_dir.text().strip())
-        self.notice.show_message("تم حفظ مجلد الفلاشة", "success")
+        """حفظ مجلد الفلاشة، مع تحذير إن كان على قرص النظام نفسه (لا يحمي من تعطّل الجهاز)."""
+        folder = self.usb_dir.text().strip()
+        if folder and backup.same_drive_as_data(folder):
+            if not ask(self, "تنبيه", "هذا المجلد على نفس قرص الجهاز، فلو تعطّل الجهاز ضاعت النسخة معه. "
+                                       "المقصود مجلد على فلاشة أو قرص خارجي. هل تحفظه على أي حال؟"):
+                return
+        settings.put(self.session.con, "backup.usb_dir", folder)
+        users.audit(self.session.con, self.session.user, "settings.usb", None, None, folder)
+        self.notice.show_message("تم حفظ مجلد الفلاشة" + (" (على نفس القرص — مؤقتًا)" if folder and backup.same_drive_as_data(folder) else ""), "success")
         self.refresh()
 
     def change_password(self) -> None:

@@ -187,6 +187,9 @@ def change_own_password(con, user: User, old_password: str, new_password: str) -
     stored = con.execute("SELECT pw_hash FROM users WHERE id=?", (user.id,)).fetchone()[0]
     if not security.verify_password(old_password, stored):
         raise AuthError("كلمة المرور الحالية غير صحيحة")
+    # خطأ اكتُشف في التجربة: الكاشير أعاد الكلمة المؤقتة نفسها فقُبلت، فبقيت معروفة للمدير
+    if new_password == old_password:
+        raise AuthError("كلمة المرور الجديدة يجب أن تختلف عن الحالية")
     set_password(con, user, user.id, new_password, must_change=False)
 
 

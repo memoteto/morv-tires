@@ -156,6 +156,7 @@ class SetupWizard(QDialog):
         self.btn_restore = QPushButton("استعادة من نسخة احتياطية — من فلاشة أو جهاز سابق")
         for b, m in ((self.btn_new, "new"), (self.btn_restore, "restore")):
             b.setCheckable(True)
+            b.setObjectName("choice")           # المختار يتلون من theme.py
             b.setMinimumHeight(56)
             b.clicked.connect(lambda _=False, mode=m: self._pick_mode(mode))
             lay.addWidget(b)
