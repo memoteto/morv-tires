@@ -70,6 +70,32 @@ QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2
              gridline-color:{t['border']}; selection-background-color:{t['select']}; selection-color:{t['text']}; }}
 QHeaderView::section {{ background:{t['surface2']}; color:{t['muted']}; border:0;
                        border-bottom:1px solid {t['border']}; padding:0 8px; height:36px; font-weight:600; }}
+QLabel#cardTitle {{ font-size:15px; font-weight:700; }}
+QPushButton#danger {{ color:{t['danger']}; border-color:{t['danger']}; }}
+QPushButton:disabled {{ color:{t['muted']}; border-color:{t['border']}; }}
+QLabel#noticeError {{ background:{t['danger_soft']}; color:{t['danger']}; border-radius:8px; padding:8px 12px; }}
+QLabel#noticeSuccess {{ background:{t['success_soft']}; color:{t['success']}; border-radius:8px; padding:8px 12px; }}
+QLabel#noticeWarn {{ background:{t['warn_soft']}; color:{t['warn']}; border-radius:8px; padding:8px 12px; }}
+QLabel#pillOk {{ background:{t['success_soft']}; color:{t['success']}; border-radius:12px; padding:4px 10px; }}
+QLabel#pillWarn {{ background:{t['warn_soft']}; color:{t['warn']}; border-radius:12px; padding:4px 10px; }}
+QLabel#pillDanger {{ background:{t['danger_soft']}; color:{t['danger']}; border-radius:12px; padding:4px 10px; font-weight:600; }}
+QLabel#keybox {{ font-family:'Courier New',monospace; font-size:22px; font-weight:700; letter-spacing:2px;
+                 background:{t['surface2']}; border:2px dashed {t['border_strong']}; border-radius:12px; padding:16px; }}
+QWidget#wizSide {{ background:{t['side']}; }}
+QLabel#wizStep {{ color:{t['side_text']}; padding:8px 12px; border-radius:8px; }}
+QLabel#wizStepCur {{ color:#FFFFFF; background:{t['side_hover']}; font-weight:600; padding:8px 12px; border-radius:8px; }}
+QLabel#wizStepDone {{ color:{t['success']}; padding:8px 12px; border-radius:8px; }}
+QLabel#wizBrand {{ color:#FFFFFF; font-size:18px; font-weight:700; }}
+QTabWidget::pane {{ border:1px solid {t['border']}; border-radius:12px; background:{t['surface']}; top:-1px; }}
+QTabBar::tab {{ padding:8px 16px; margin:0 2px; border:1px solid transparent; border-bottom:0;
+                border-top-left-radius:8px; border-top-right-radius:8px; color:{t['muted']}; }}
+QTabBar::tab:selected {{ background:{t['surface']}; border-color:{t['border']}; color:{t['text']}; font-weight:600; }}
+QComboBox {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px; padding:0 10px; }}
+QComboBox QAbstractItemView {{ background:{t['surface']}; selection-background-color:{t['select']}; border:1px solid {t['border']}; }}
+QCheckBox::indicator {{ width:18px; height:18px; }}
+QListWidget#userList {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:10px; }}
+QListWidget#userList::item {{ height:44px; padding:0 10px; border-radius:8px; margin:2px; }}
+QListWidget#userList::item:selected {{ background:{t['primary_soft']}; color:{t['text']}; }}
 QToolTip {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']};
             border-radius:6px; padding:4px 8px; }}
 """

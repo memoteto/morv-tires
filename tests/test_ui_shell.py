@@ -12,21 +12,31 @@ class ShellTest(unittest.TestCase):
     """النافذة الرئيسية على قاعدة وهمية مؤقتة."""
 
     def setUp(self):
-        """قاعدة جديدة في مجلد مؤقت لكل اختبار."""
+        """قاعدة جديدة في مجلد مؤقت لكل اختبار، ومدير داخل."""
+        import os
+        from morv.infra import users
         from morv.infra.db.bootstrap import open_main_db
+        from morv.ui.session import Session
         self.tmp = Path(tempfile.mkdtemp())
+        os.environ["MORV_DATA_DIR"] = str(self.tmp)
         self.con = open_main_db(self.tmp / "morv_tires.db")
+        self.user = users.create_user(self.con, None, "admin", "المدير", "Admin12345", "manager")
+        self.session = Session(self.con, self.user)
         self.app = get_app()
 
     def tearDown(self):
         """إغلاق القاعدة وحذف المجلد المؤقت."""
+        import os
         self.con.close()
+        os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def window(self):
-        """نافذة جديدة على القاعدة الحالية."""
+        """نافذة جديدة على الجلسة الحالية."""
         from morv.ui.shell import MainWindow
-        return MainWindow(self.con, self.app)
+        w = MainWindow(self.session, self.app)
+        w.health_timer.stop()
+        return w
 
     def test_rtl_and_pages(self):
         """الاتجاه RTL للتطبيق كله، ولكل عنصر في الشريط صفحة."""
