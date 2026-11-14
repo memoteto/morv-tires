@@ -10,7 +10,7 @@ from datetime import date
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QListWidget,
+from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget,
                                QListWidgetItem, QMainWindow, QStackedWidget, QToolButton,
                                QVBoxLayout, QWidget)
 
@@ -18,7 +18,11 @@ from morv import APP_NAME, VERSION
 from morv.core import security
 from morv.infra import backup, settings
 from morv.ui import icons, theme
+from morv.ui.customers_page import CustomersPage
+from morv.ui.inventory_page import InventoryPage
 from morv.ui.settings_page import SettingsPage
+from morv.ui.shell_placeholder import placeholder
+from morv.ui.suppliers_page import SuppliersPage
 from morv.ui.widgets import ask
 
 SIDE_WIDE = 244     # عرض الشريط الجانبي مفتوحًا
@@ -36,34 +40,14 @@ NAV = [
     ("pos", "نقطة البيع", "pos", 4),
     ("sales", "المبيعات", "sales", 4),
     ("purchases", "المشتريات", "purchases", 3),
-    ("inventory", "المخزون", "inventory", 2),
-    ("customers", "العملاء", "customers", 2),
-    ("suppliers", "الموردون", "suppliers", 2),
+    ("inventory", "المخزون", "inventory", 0),
+    ("customers", "العملاء", "customers", 0),
+    ("suppliers", "الموردون", "suppliers", 0),
     ("installments", "التقسيط", "installments", 5),
     ("treasury", "الخزينة", "treasury", 6),
     ("reports", "التقارير", "reports", 6),
     ("settings", "الإعدادات", "settings", 0),
 ]
-
-
-def placeholder(phase: int) -> QWidget:
-    """صفحة مؤقتة تخبر المستخدم أن الشاشة لم تُبنَ بعد وفي أي مرحلة ستُبنى.
-
-    لا تكرر عنوان الصفحة لأنه ظاهر في الشريط العلوي.
-    """
-    page = QWidget()
-    lay = QVBoxLayout(page)
-    lay.setContentsMargins(24, 24, 24, 24)
-    card = QFrame()
-    card.setObjectName("card")
-    inner = QVBoxLayout(card)
-    inner.setContentsMargins(24, 24, 24, 24)
-    note = QLabel(f"هذه الشاشة تُبنى في المرحلة {phase} من خطة V1.")
-    note.setObjectName("muted")
-    inner.addWidget(note)
-    inner.addStretch(1)
-    lay.addWidget(card)
-    return page
 
 
 class MainWindow(QMainWindow):
@@ -96,8 +80,10 @@ class MainWindow(QMainWindow):
         col.addWidget(self._build_topbar())
         self.stack = QStackedWidget()
         self.pages = {}
+        builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
+                    "inventory": InventoryPage}
         for key, _title, _icon, phase in NAV:
-            page = SettingsPage(session) if key == "settings" else placeholder(phase)
+            page = builders[key](session) if key in builders else placeholder(phase)
             self.pages[key] = page
             self.stack.addWidget(page)
         col.addWidget(self.stack, 1)

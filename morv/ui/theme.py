@@ -67,6 +67,8 @@ QPushButton {{ background:{t['surface']}; border:1px solid {t['border_strong']};
               min-height:38px; padding:0 14px; }}
 QPushButton#primary {{ background:{t['primary']}; color:{t['on_primary']}; border:0; font-weight:600; }}
 QPushButton#primary:disabled {{ background:{t['border']}; color:{t['muted']}; }}
+QPushButton#segment {{ min-height:34px; padding:0 12px; border-color:{t['border']}; color:{t['muted']}; }}
+QPushButton#segment:checked {{ background:{t['primary_soft']}; color:{t['primary']}; border-color:{t['primary']}; font-weight:600; }}
 QPushButton#choice {{ text-align:left; padding:0 16px; }}
 QPushButton#choice:checked {{ background:{t['primary_soft']}; border:2px solid {t['primary']}; color:{t['text']}; font-weight:600; }}
 QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2']}; border:0;
