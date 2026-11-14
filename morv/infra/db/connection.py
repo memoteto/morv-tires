@@ -13,6 +13,10 @@ from morv import APP_ID
 FORBIDDEN_NAMES = {"tire_shop_live.db"}
 
 
+# الاستثناء الذي ترفعه sqlite3 عند العمل على اتصال مغلق؛ تُعاد تسميته هنا حتى لا تستورد الواجهة sqlite3
+ClosedDatabase = sqlite3.ProgrammingError
+
+
 class UnsafeDatabase(RuntimeError):
     """محاولة فتح قاعدة ليست تابعة للبرنامج — تُرفض دائمًا."""
 

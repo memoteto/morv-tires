@@ -6,13 +6,12 @@
 
 كل شاشة ترث ListPage وتحدد: الأعمدة، ودالة البحث، وبناء المعاينة، ونافذة الإضافة/التعديل.
 """
-import sqlite3
-
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
                                QPushButton, QScrollArea, QTableView, QVBoxLayout, QWidget)
 
+from morv.infra.db.connection import ClosedDatabase
 from morv.ui.widgets import muted, primary_button
 
 PAGE = 300
@@ -216,7 +215,7 @@ class ListPage(QWidget):
         """إعادة البحث بعد توقف الكتابة. إن أُغلقت القاعدة في الأثناء (تسجيل خروج) يُتجاهل."""
         try:
             self.reload()
-        except sqlite3.ProgrammingError:
+        except ClosedDatabase:
             pass
 
     def load_more(self) -> None:
