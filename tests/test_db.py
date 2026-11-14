@@ -167,7 +167,9 @@ class Backups(_TempDir):
         """نسخة تلفت بعد إنشائها يكشفها اختبار الاستعادة بالبصمة وبفحص السلامة."""
         r = backup.create_backup(self.con, "manual", self.dir / "bk")
         data = bytearray(r.path.read_bytes())
-        for i in range(200, 4000):
+        # إتلاف الصفحات الأولى بعد رأس الملف (فحص SQLite لا يرى إتلاف الصفحات الفارغة،
+        # لكن النسخة المشفّرة تكشف أي بايت؛ انظر test_backup_crypto)
+        for i in range(100, 12000):
             data[i] = 0xFF
         r.path.write_bytes(bytes(data))
         self.assertFalse(backup.restore_test(self.con, r.path, r.sha256).ok)
@@ -179,7 +181,7 @@ class Backups(_TempDir):
         """ملف SQLite غريب لا يُقبل كنسخة احتياطية."""
         f = self.dir / "x.db"
         c = sqlite3.connect(f); c.execute("CREATE TABLE x(a)"); c.commit(); c.close()
-        ok, _ = backup.verify_backup(f)
+        ok, _ = backup.verify_db_file(f)
         self.assertFalse(ok)
 
 

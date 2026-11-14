@@ -1,2 +1,2 @@
-# مكتبات التشغيل — مثبّتة الإصدار عمدًا (Qt 6.12 آخر إصدار يدعم Windows 10)
 PySide6-Essentials==6.12.0
+cryptography>=44,<51

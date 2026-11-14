@@ -1,0 +1,133 @@
+"""شاشة الدخول: اختيار المستخدم من قائمة منسدلة وكتابة كلمة المرور.
+
+لا يوجد «نسيت كلمة المرور» (قرار المالك): المدير يعيّن كلمة مرور جديدة من الإعدادات.
+القفل بعد 5 محاولات خاطئة يُنفَّذ في morv.infra.users، وهنا تُعرض رسالته فقط.
+إن كان على المستخدم تغيير كلمة مروره (حساب جديد) يُطلب منه ذلك قبل الدخول.
+"""
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QVBoxLayout
+
+from morv import APP_NAME, VERSION
+from morv.core import security
+from morv.core.text import ltr
+from morv.infra import backup, shop, users
+from morv.ui.widgets import Notice, PasswordEdit, form, muted, primary_button
+
+
+class LoginDialog(QDialog):
+    """نافذة الدخول. بعد exec() الناجح يكون self.user هو المستخدم الداخل."""
+
+    def __init__(self, con, parent=None):
+        """بناء النافذة وتحميل المستخدمين النشطين."""
+        super().__init__(parent)
+        self.con = con
+        self.user = None
+        self.setWindowTitle(f"{APP_NAME} — تسجيل الدخول")
+        self.setFixedWidth(440)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(30, 30, 30, 22)
+        outer.setSpacing(14)
+
+        head = QVBoxLayout()
+        head.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        name = QLabel(shop.load(con).name or APP_NAME)
+        name.setObjectName("pageTitle")
+        name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        head.addWidget(name)
+        sub = muted("اختر المستخدم وأدخل كلمة المرور")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        head.addWidget(sub)
+        outer.addLayout(head)
+
+        f = form()
+        self.combo = QComboBox()
+        self.users = [u for u in users.list_users(con) if u.active]
+        for u in self.users:
+            self.combo.addItem(f"{u.display_name} — {security.ROLES[u.role]}", u.id)
+        self.password = PasswordEdit()
+        self.password.edit.returnPressed.connect(self.try_login)
+        f.addRow("المستخدم", self.combo)
+        f.addRow("كلمة المرور", self.password)
+        outer.addLayout(f)
+
+        self.notice = Notice()
+        outer.addWidget(self.notice)
+        self.login_btn = primary_button("دخول")
+        self.login_btn.setMinimumHeight(48)
+        self.login_btn.clicked.connect(self.try_login)
+        outer.addWidget(self.login_btn)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        outer.addWidget(line)
+        foot = QHBoxLayout()
+        level, text = backup.health(con)
+        foot.addWidget(muted(f"النسخ الاحتياطي: {text}"))
+        foot.addStretch(1)
+        foot.addWidget(muted(ltr(f"v{VERSION}")))
+        outer.addLayout(foot)
+        self.password.edit.setFocus()
+
+    def try_login(self) -> None:
+        """محاولة الدخول وعرض الرسالة عند الفشل."""
+        if self.combo.currentIndex() < 0:
+            self.notice.show_message("لا يوجد مستخدم نشط")
+            return
+        username = self.users[self.combo.currentIndex()].username
+        try:
+            user = users.login(self.con, username, self.password.text())
+        except users.AuthError as e:
+            self.notice.show_message(str(e))
+            self.password.clear()
+            self.password.edit.setFocus()
+            return
+        if user.must_change_pw:
+            dlg = ChangePasswordDialog(self.con, user, self.password.text(), forced=True, parent=self)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                self.password.clear()
+                return
+            user = users.get_user(self.con, user.id)
+        self.user = user
+        self.accept()
+
+
+class ChangePasswordDialog(QDialog):
+    """تغيير كلمة مرور المستخدم الحالي (إجباري عند أول دخول، أو اختياري من الإعدادات)."""
+
+    def __init__(self, con, user, current: str | None = None, forced: bool = False, parent=None):
+        """current: كلمة المرور الحالية إن عُرفت (بعد الدخول مباشرة) فلا تُطلب مرة أخرى."""
+        super().__init__(parent)
+        self.con, self.user, self.current = con, user, current
+        self.setWindowTitle("تغيير كلمة المرور")
+        self.setFixedWidth(420)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 24, 24, 20)
+        lay.addWidget(muted("يجب تغيير كلمة المرور المؤقتة قبل المتابعة." if forced else
+                            f"تغيير كلمة مرور {user.display_name}."))
+        f = form()
+        self.old = PasswordEdit()
+        self.new = PasswordEdit()
+        self.new2 = PasswordEdit()
+        if current is None:
+            f.addRow("كلمة المرور الحالية", self.old)
+        f.addRow("الجديدة", self.new)
+        f.addRow("تأكيدها", self.new2)
+        lay.addLayout(f)
+        self.notice = Notice()
+        lay.addWidget(self.notice)
+        btn = primary_button("حفظ")
+        btn.clicked.connect(self.save)
+        lay.addWidget(btn)
+
+    def save(self) -> None:
+        """التحقق والحفظ."""
+        if self.new.text() != self.new2.text():
+            self.notice.show_message("كلمتا المرور غير متطابقتين")
+            return
+        try:
+            old = self.current if self.current is not None else self.old.text()
+            users.change_own_password(self.con, self.user, old, self.new.text())
+        except users.AuthError as e:
+            self.notice.show_message(str(e))
+            return
+        self.accept()

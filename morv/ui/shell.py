@@ -1,19 +1,25 @@
 """هيكل النافذة الرئيسية: شريط جانبي قابل للطي، وشريط علوي، ومساحة الصفحات.
 
-في المرحلة 0 كل صفحة مجرد لافتة تقول أي مرحلة ستبنيها. الصفحات الحقيقية تُضاف في
-مراحلها وتحل محل اللافتة عبر NAV دون تغيير الهيكل.
+الصفحات غير المبنية بعد لافتة تقول أي مرحلة ستبنيها؛ الصفحة الحقيقية تحل محلها في مرحلتها
+دون تغيير الهيكل. الشريط العلوي يحمل تنبيه النسخ الاحتياطي (يُحدَّث كل دقيقة).
 
 الثيم وحالة طي الشريط تُحفظ في جدول settings عبر morv.infra.settings، فتعود كما تركها
 المستخدم عند فتح البرنامج مرة أخرى.
 """
-from PySide6.QtCore import QSize, Qt
+from datetime import date
+
+from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QListWidget,
                                QListWidgetItem, QMainWindow, QStackedWidget, QToolButton,
                                QVBoxLayout, QWidget)
 
 from morv import APP_NAME, VERSION
-from morv.infra import settings
+from morv.core import security
+from morv.infra import backup, settings
 from morv.ui import icons, theme
+from morv.ui.settings_page import SettingsPage
+from morv.ui.widgets import ask
 
 SIDE_WIDE = 244     # عرض الشريط الجانبي مفتوحًا
 SIDE_NARROW = 72    # عرضه مطويًا (أيقونات فقط)
@@ -24,18 +30,19 @@ SIDE_NARROW = 72    # عرضه مطويًا (أيقونات فقط)
 # - «المشتريات» فيها فاتورة الشراء وقائمة فواتير الشراء؛ مرتجع الشراء مؤجل للإصدار التالي.
 # - «المخزون» فيها تبويبات: الأصناف، الدفعات (DOT)، الجرد والتسويات.
 # - «الإعدادات» فيها النسخ الاحتياطي.
+# أرقام المراحل كما في مستند الخطة (0 = مبنية).
 NAV = [
-    ("home", "الرئيسية", "home", 7),
-    ("pos", "نقطة البيع", "pos", 3),
-    ("sales", "المبيعات", "sales", 3),
-    ("purchases", "المشتريات", "purchases", 2),
+    ("home", "الرئيسية", "home", 6),
+    ("pos", "نقطة البيع", "pos", 4),
+    ("sales", "المبيعات", "sales", 4),
+    ("purchases", "المشتريات", "purchases", 3),
     ("inventory", "المخزون", "inventory", 2),
-    ("customers", "العملاء", "customers", 1),
-    ("suppliers", "الموردون", "suppliers", 1),
+    ("customers", "العملاء", "customers", 2),
+    ("suppliers", "الموردون", "suppliers", 2),
     ("installments", "التقسيط", "installments", 5),
-    ("treasury", "الخزينة", "treasury", 4),
+    ("treasury", "الخزينة", "treasury", 6),
     ("reports", "التقارير", "reports", 6),
-    ("settings", "الإعدادات", "settings", 1),
+    ("settings", "الإعدادات", "settings", 0),
 ]
 
 
@@ -62,10 +69,11 @@ def placeholder(phase: int) -> QWidget:
 class MainWindow(QMainWindow):
     """النافذة الرئيسية. تستخدم إطار نظام التشغيل العادي (بلا نافذة بلا إطار)."""
 
-    def __init__(self, con, app: QApplication):
+    def __init__(self, session, app: QApplication):
         """بناء النافذة واسترجاع الثيم وحالة الشريط المحفوظة."""
         super().__init__()
-        self.con = con
+        self.session = session
+        con = self.con = session.con
         self.app = app
         self.dark = settings.get(con, "ui.theme", "light") == "dark"
         self.collapsed = settings.get(con, "ui.sidebar_collapsed", "0") == "1"
@@ -87,8 +95,11 @@ class MainWindow(QMainWindow):
         col.setSpacing(0)
         col.addWidget(self._build_topbar())
         self.stack = QStackedWidget()
-        for _key, _title, _icon, phase in NAV:
-            self.stack.addWidget(placeholder(phase))
+        self.pages = {}
+        for key, _title, _icon, phase in NAV:
+            page = SettingsPage(session) if key == "settings" else placeholder(phase)
+            self.pages[key] = page
+            self.stack.addWidget(page)
         col.addWidget(self.stack, 1)
         row.addWidget(main, 1)
         self.setCentralWidget(root)
@@ -97,6 +108,11 @@ class MainWindow(QMainWindow):
         self.nav.setCurrentRow(0)
         self._apply_collapse()
         self._refresh_icons()
+        self._shortcuts()
+        self.refresh_health()
+        self.health_timer = QTimer(self)
+        self.health_timer.timeout.connect(self.refresh_health)
+        self.health_timer.start(60_000)
 
     # ---------- البناء ----------
     def _build_side(self) -> QWidget:
@@ -131,21 +147,80 @@ class MainWindow(QMainWindow):
         return self.side
 
     def _build_topbar(self) -> QWidget:
-        """الشريط العلوي: عنوان الصفحة الحالية وزر تبديل الثيم."""
+        """الشريط العلوي: عنوان الصفحة، وتنبيه النسخ الاحتياطي، والمستخدم، والثيم، والخروج."""
         bar = QWidget()
         bar.setObjectName("topbar")
         bar.setFixedHeight(60)
         lay = QHBoxLayout(bar)
         lay.setContentsMargins(20, 0, 20, 0)
+        lay.setSpacing(10)
         self.title = QLabel()
         self.title.setObjectName("pageTitle")
+        self.health_pill = QLabel()
+        self.health_pill.setObjectName("pillOk")
+        self.health_pill.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.health_pill.mousePressEvent = lambda _e: self.open_backup()
+        self.health_pill.setToolTip("افتح النسخ الاحتياطي")
+        u = self.session.user
+        self.user_label = QLabel(f"{u.display_name} · {security.ROLES[u.role]}")
+        self.user_label.setObjectName("muted")
         self.theme_button = QToolButton()
         self.theme_button.setObjectName("topButton")
         self.theme_button.setIconSize(QSize(18, 18))
         self.theme_button.clicked.connect(self.toggle_theme)
+        self.logout_button = QToolButton()
+        self.logout_button.setObjectName("topButton")
+        self.logout_button.setIconSize(QSize(18, 18))
+        self.logout_button.setToolTip("تسجيل الخروج (Ctrl+L)")
+        self.logout_button.clicked.connect(self.logout)
         lay.addWidget(self.title, 1)
+        lay.addWidget(self.health_pill)
+        lay.addWidget(self.user_label)
         lay.addWidget(self.theme_button)
+        lay.addWidget(self.logout_button)
         return bar
+
+    def _shortcuts(self) -> None:
+        """اختصارات لوحة المفاتيح العامة (قائمتها في تبويب الاختصارات)."""
+        QShortcut(QKeySequence("Ctrl+B"), self, activated=self.toggle_sidebar)
+        QShortcut(QKeySequence("Ctrl+D"), self, activated=self.toggle_theme)
+        QShortcut(QKeySequence("Ctrl+L"), self, activated=self.logout)
+        QShortcut(QKeySequence("Ctrl+Q"), self, activated=self.close)
+
+    def refresh_health(self) -> None:
+        """تحديث تنبيه النسخ الاحتياطي في الشريط العلوي."""
+        level, text = backup.health(self.con)
+        self.health_pill.setText({"ok": "النسخ الاحتياطي سليم", "warn": "تنبيه النسخ الاحتياطي",
+                                  "danger": "خلل في النسخ الاحتياطي"}[level])
+        self.health_pill.setObjectName({"ok": "pillOk", "warn": "pillWarn", "danger": "pillDanger"}[level])
+        self.health_pill.setToolTip(text)
+        self.health_pill.style().unpolish(self.health_pill)
+        self.health_pill.style().polish(self.health_pill)
+
+    def open_backup(self) -> None:
+        """الانتقال إلى تبويب النسخ الاحتياطي داخل الإعدادات."""
+        self.go_key("settings")
+        page = self.pages["settings"]
+        page.tabs.setCurrentWidget(page.backup_tab)
+        page.backup_tab.refresh()
+
+    def logout(self) -> None:
+        """تسجيل الخروج والعودة إلى شاشة الدخول."""
+        self.session.on_logout()
+
+    def closeEvent(self, event) -> None:
+        """عند الإغلاق: النسخ المجدول، واقتراح نسخة للفلاشة إن كانت موصولة ولم تُنسخ اليوم."""
+        if backup.is_encryption_ready(self.con):
+            backup.run_scheduled(self.con, self.session.user.username)
+            last_usb = settings.get(self.con, "backup.last_usb_at", "")[:10]
+            today = date.today().isoformat()
+            if backup.usb_available(self.con) and last_usb != today and ask(
+                    self, "نسخة على الفلاشة", "الفلاشة موصولة ولم تُنسخ إليها نسخة اليوم. ننسخ الآن قبل الإغلاق؟"):
+                try:
+                    backup.copy_to_usb(self.con, self.session.user.username)
+                except backup.BackupError:
+                    pass
+        super().closeEvent(event)
 
     # ---------- السلوك ----------
     def go(self, row: int) -> None:
@@ -154,6 +229,8 @@ class MainWindow(QMainWindow):
             return
         self.stack.setCurrentIndex(row)
         self.title.setText(NAV[row][1])
+        if NAV[row][0] == "settings" and hasattr(self, "health_pill"):
+            self.refresh_health()
 
     def go_key(self, key: str) -> None:
         """الانتقال إلى صفحة بمفتاحها (مثل 'settings')، للاستخدام من أي مكان في البرنامج."""
@@ -193,4 +270,5 @@ class MainWindow(QMainWindow):
         self.side_toggle.setIcon(icons.icon("expand" if self.collapsed else "collapse", c["side_text"]))
         self.side_toggle.setToolTip("فتح الشريط" if self.collapsed else "طي الشريط")
         self.theme_button.setIcon(icons.icon("sun" if self.dark else "moon", c["text"], 18))
-        self.theme_button.setToolTip("الوضع الفاتح" if self.dark else "الوضع الداكن")
+        self.theme_button.setToolTip("الوضع الفاتح (Ctrl+D)" if self.dark else "الوضع الداكن (Ctrl+D)")
+        self.logout_button.setIcon(icons.icon("logout", c["text"], 18))
