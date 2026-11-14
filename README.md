@@ -19,7 +19,7 @@
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt
-.venv/bin/python -m unittest discover -s tests -t .
+.venv/bin/python run_tests.py
 .venv/bin/python run.py
 ```
 

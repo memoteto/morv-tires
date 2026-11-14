@@ -70,7 +70,9 @@ class ShellTest(unittest.TestCase):
 
     def test_sidebar_collapse_persists(self):
         """طي الشريط يغيّر العرض ويخفي النصوص ويُحفظ."""
+        from morv.infra import settings
         from morv.ui.shell import SIDE_NARROW, SIDE_WIDE
+        settings.put(self.con, "ui.sidebar_collapsed", "0")   # شاشة CI ضيقة فيبدأ مطويًا افتراضيًا
         w = self.window()
         self.assertEqual(w.side.width(), SIDE_WIDE)
         w.toggle_sidebar()

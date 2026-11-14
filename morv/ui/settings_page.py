@@ -549,8 +549,9 @@ class BackupTab(QWidget):
         self.model.reload()
 
     def _selected(self) -> backup.BackupInfo | None:
-        """النسخة المختارة في الجدول."""
-        idx = self.view.currentIndex()
+        """النسخة المختارة في الجدول (من التحديد الفعلي، ثم المؤشر الحالي)."""
+        rows = self.view.selectionModel().selectedRows() if self.view.selectionModel() else []
+        idx = rows[0] if rows else self.view.currentIndex()
         if not idx.isValid():
             self.notice.show_message("اختر نسخة من القائمة أولًا")
             return None

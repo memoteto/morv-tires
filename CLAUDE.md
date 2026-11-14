@@ -22,6 +22,6 @@
 ## التشغيل
 ```bash
 python -m pip install -r requirements.txt -r requirements-dev.txt
-python -m unittest discover -s tests -t .
+python run_tests.py
 python run.py
 ```
