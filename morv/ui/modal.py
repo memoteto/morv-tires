@@ -26,6 +26,9 @@ class Modal(QDialog):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)   # لتظهر الزوايا المستديرة
         self.setObjectName("modal")
         self._drag: QPoint | None = None
+        screen = QGuiApplication.primaryScreen()
+        if screen:                       # لا تتجاوز عرض الشاشة المتاح
+            width = min(width, screen.availableGeometry().width() - 40)
         self.setFixedWidth(width)
 
         outer = QVBoxLayout(self)

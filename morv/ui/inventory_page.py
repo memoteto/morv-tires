@@ -42,6 +42,7 @@ class ItemsPage(ListPage):
     add_label = "صنف جديد"
     search_placeholder = "الاسم، الكود، المقاس (205/55R16) أو الباركود (F2)"
     filters = [("all", "الكل"), ("tire", "إطارات"), ("battery", "بطاريات"), ("service", "خدمات"), ("inactive", "الموقوفة")]
+    row_icon = staticmethod(lambda r: r[1])      # tire / battery / service
     columns = [
         ("الصنف", lambda r: r[3]),
         ("النوع", lambda r: items.KINDS[r[1]]),
@@ -101,9 +102,9 @@ class ItemsPage(ListPage):
             self.kv("ملاحظات", it.notes)
         self.preview_layout.addWidget(muted("الرصيد والدفعات والتكلفة تظهر هنا بعد المرحلة 3."))
         if self.can_edit():
-            edit = primary_button("تعديل")
+            edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(it.id))
-            toggle = danger_button("إيقاف" if it.active else "تفعيل")
+            toggle = danger_button("إيقاف" if it.active else "تفعيل", "pause" if it.active else "play")
             toggle.clicked.connect(lambda: self.toggle_active(it))
             self.actions(edit, toggle)
 
@@ -159,9 +160,7 @@ class ItemDialog(Modal):
 
     def _ordered_fields(self, kind: str) -> list:
         """حقول النوع أولًا، ثم المشتركة بالترتيب المعتمد، ثم بقية المشتركة."""
-        all_f = [f for f in items.fields(self.session.con, kind) if f.show]
-        if kind == "service":
-            all_f = [f for f in all_f if f.key not in ("brand", "model", "min_qty", "origin", "loc", "war", "cond")]
+        all_f = items.visible_fields(self.session.con, kind)
         specific = [f for f in all_f if f.kind != "common"]
         common = {f.key: f for f in all_f if f.kind == "common"}
         head = [common.pop(k) for k in self.FIRST if k in common]

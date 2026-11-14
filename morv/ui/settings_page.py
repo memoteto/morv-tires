@@ -5,7 +5,7 @@
 """
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout,
                                QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
@@ -62,10 +62,53 @@ class SettingsPage(QWidget):
             from morv.ui.inventory_page import ItemFieldsTab   # استيراد محلي لتجنب الدوران
             self.fields_tab = ItemFieldsTab(session)
             self.tabs.addTab(self.fields_tab, "حقول بطاقة الصنف")
+        self.appearance_tab = AppearanceTab(session)
+        self.tabs.addTab(self.appearance_tab, "المظهر")
         self.tabs.addTab(ShortcutsTab(), "الاختصارات")
         self.backup_tab = BackupTab(session)
         self.tabs.addTab(self.backup_tab, "النسخ الاحتياطي")
         lay.addWidget(self.tabs)
+
+
+class AppearanceTab(QWidget):
+    """الخط وحجمه والوضع الفاتح/الداكن؛ تُطبَّق فورًا على البرنامج كله وتُحفظ لكل الجهاز."""
+
+    def __init__(self, session):
+        """بناء الاختيارات من القيم المحفوظة."""
+        super().__init__()
+        self.session = session
+        lay = QVBoxLayout(self)
+        box, inner = card("الخط")
+        inner.addWidget(muted("الخطان IBM Plex Sans Arabic وCairo مضمّنان مع البرنامج ولا يعتمدان على Windows."))
+        f = form()
+        self.family = QComboBox()
+        from morv.ui import theme
+        for name in theme.available_fonts():
+            self.family.addItem(name)
+        self.family.setCurrentText(settings.get(session.con, "ui.font_family", theme.DEFAULT_FONT))
+        self.size = QComboBox()
+        for s in theme.FONT_SIZES:
+            self.size.addItem(ltr(str(s)), s)
+        self.size.setCurrentIndex(list(theme.FONT_SIZES).index(
+            int(settings.get(session.con, "ui.font_size", str(theme.DEFAULT_SIZE)))))
+        f.addRow("الخط", self.family)
+        f.addRow("حجم الخط", self.size)
+        inner.addLayout(f)
+        self.sample = QLabel("نموذج: إطار ميشلان Primacy 4 مقاس " + ltr("205/55R16") + " بسعر " + ltr("6,450.00"))
+        self.sample.setWordWrap(True)
+        inner.addWidget(self.sample)
+        apply_btn = primary_button("تطبيق", "font")
+        apply_btn.clicked.connect(self.apply)
+        inner.addWidget(apply_btn, 0, Qt.AlignmentFlag.AlignLeading)
+        lay.addWidget(box)
+        lay.addWidget(muted("الوضع الفاتح/الداكن من زر الشمس/القمر في الشريط العلوي (Ctrl+D)."))
+        lay.addStretch(1)
+
+    def apply(self) -> None:
+        """تطبيق الاختيار على النافذة الرئيسية."""
+        win = self.window()
+        if hasattr(win, "set_font"):
+            win.set_font(self.family.currentText(), self.size.currentData())
 
 
 class ShopTab(QWidget):
@@ -159,8 +202,10 @@ class UsersTab(QWidget):
         left = QVBoxLayout()
         self.list = QListWidget()
         self.list.setObjectName("userList")
+        self.list.setSpacing(2)
+        self.list.setUniformItemSizes(True)
         self.list.currentRowChanged.connect(self._select)
-        new = primary_button("مستخدم جديد")
+        new = primary_button("مستخدم جديد", "plus")
         new.clicked.connect(self.new_user)
         left.addWidget(new)
         left.addWidget(self.list, 1)
@@ -211,6 +256,7 @@ class UsersTab(QWidget):
         for u in self.users:
             item = QListWidgetItem(f"{u.display_name} — {security.ROLES[u.role]}" + ("" if u.active else " (موقوف)"))
             item.setData(Qt.ItemDataRole.UserRole, u.id)
+            item.setSizeHint(QSize(0, 44))
             self.list.addItem(item)
         self.list.blockSignals(False)
         idx = next((i for i, u in enumerate(self.users) if u.id == select_id), 0)

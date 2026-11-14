@@ -6,13 +6,14 @@
 
 كل شاشة ترث ListPage وتحدد: الأعمدة، ودالة البحث، وبناء المعاينة، ونافذة الإضافة/التعديل.
 """
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QTimer
+from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
                                QPushButton, QScrollArea, QTableView, QVBoxLayout, QWidget)
 
 from morv.core.text import RLM
 from morv.infra.db.connection import ClosedDatabase
+from morv.ui import icons
 from morv.ui.widgets import muted, primary_button
 
 PAGE = 300
@@ -24,10 +25,13 @@ class TupleModel(QAbstractTableModel):
     columns: قائمة (العنوان، دالة تأخذ الصف وتعيد النص). الصفوف تُضاف بالدفعات دون إعادة البناء.
     """
 
-    def __init__(self, columns: list):
-        """تجهيز الأعمدة."""
+    def __init__(self, columns: list, icon_for=None):
+        """تجهيز الأعمدة. icon_for: دالة تأخذ الصف وتعيد اسم أيقونة للعمود الأول (اختياري)."""
         super().__init__()
         self.columns = columns
+        self.icon_for = icon_for
+        self.icon_color = "#8792A3"
+        self._icon_cache: dict = {}
         self.rows: list = []
 
     def reset_rows(self, rows: list) -> None:
@@ -56,6 +60,12 @@ class TupleModel(QAbstractTableModel):
         """نص الخلية."""
         if role == Qt.ItemDataRole.DisplayRole:
             return self.columns[index.column()][1](self.rows[index.row()])
+        if role == Qt.ItemDataRole.DecorationRole and index.column() == 0 and self.icon_for:
+            name = self.icon_for(self.rows[index.row()])
+            if name not in self._icon_cache:
+                from morv.ui import icons
+                self._icon_cache[name] = icons.icon(name, self.icon_color, 18)
+            return self._icon_cache[name]
         return None
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
@@ -71,6 +81,8 @@ class ListPage(QWidget):
     columns: list = []
     title = ""
     add_label = "جديد"
+    add_icon = "plus"
+    row_icon = None            # دالة (صف → اسم أيقونة) لعمود الاسم
     filters: list = []          # [(المفتاح، العنوان)]؛ فارغة = بلا فلاتر
     search_placeholder = "بحث"
 
@@ -87,7 +99,7 @@ class ListPage(QWidget):
         head = QHBoxLayout()
         self.count_label = muted("")
         head.addWidget(self.count_label, 1)
-        self.add_btn = primary_button(self.add_label)
+        self.add_btn = primary_button(self.add_label, self.add_icon)
         self.add_btn.clicked.connect(lambda: self.open_dialog(None))
         self.add_btn.setEnabled(self.can_edit())
         head.addWidget(self.add_btn)
@@ -100,6 +112,7 @@ class ListPage(QWidget):
         self.search = QLineEdit()
         self.search.setPlaceholderText(self.search_placeholder)
         self.search.setClearButtonEnabled(True)
+        self.search.addAction(icons.icon("search", "#8792A3", 16), QLineEdit.ActionPosition.LeadingPosition)
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
         self._debounce.setInterval(200)
@@ -117,7 +130,7 @@ class ListPage(QWidget):
             tools.addWidget(b)
         left.addLayout(tools)
 
-        self.model = TupleModel(self.columns)
+        self.model = TupleModel(self.columns, self.row_icon)
         self.view = QTableView()
         self.view.setModel(self.model)
         self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -127,6 +140,8 @@ class ListPage(QWidget):
         self.view.verticalHeader().setVisible(False)
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)   # عمود الاسم يتمدد
+        self.view.horizontalHeader().setMinimumSectionSize(90)
+        self.view.setIconSize(QSize(18, 18))
         self.view.clicked.connect(lambda idx: self.show_preview(self.model.rows[idx.row()]))
         self.view.doubleClicked.connect(lambda idx: self.open_dialog(self.model.rows[idx.row()][0]) if self.can_edit() else None)
         left.addWidget(self.view, 1)
@@ -143,7 +158,10 @@ class ListPage(QWidget):
         # لوحة المعاينة (مخفية حتى يُضغط صف)
         self.preview = QFrame()
         self.preview.setObjectName("card")
-        self.preview.setFixedWidth(360)
+        # عرض المعاينة نسبي للشاشة: 360 على الشاشات الواسعة، وأقل على الضيقة
+        screen = QGuiApplication.primaryScreen()
+        avail_w = screen.availableGeometry().width() if screen else 1366
+        self.preview.setFixedWidth(max(280, min(360, avail_w // 4)))
         pv = QVBoxLayout(self.preview)
         pv.setContentsMargins(16, 12, 16, 16)
         top = QHBoxLayout()
@@ -204,6 +222,7 @@ class ListPage(QWidget):
         self.offset = 0
         rows = self.fetch(self.search.text(), self.filter_key, 0)
         self.model.reset_rows(rows)
+        self.view.resizeColumnsToContents()
         self.more_btn.setVisible(len(rows) == PAGE)
         self.empty_label.setVisible(not rows)
         self.count_label.setText(self.total())

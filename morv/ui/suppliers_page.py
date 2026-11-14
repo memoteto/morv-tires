@@ -16,6 +16,7 @@ class SuppliersPage(ListPage):
     add_label = "مورد جديد"
     search_placeholder = "الاسم أو الموبايل (F2)"
     filters = [("all", "الكل"), ("inactive", "الموقوفون")]
+    row_icon = staticmethod(lambda r: "truck")
     columns = [
         ("المورد", lambda r: r[1]),
         ("الموبايل", lambda r: ltr(r[2])),
@@ -59,9 +60,9 @@ class SuppliersPage(ListPage):
             self.kv("ملاحظات", s.notes)
         self.preview_layout.addWidget(muted("الرصيد وفواتير الشراء تظهر هنا بعد المرحلة 3."))
         if self.can_edit():
-            edit = primary_button("تعديل")
+            edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(s.id))
-            toggle = danger_button("إيقاف" if s.active else "تفعيل")
+            toggle = danger_button("إيقاف" if s.active else "تفعيل", "pause" if s.active else "play")
             toggle.clicked.connect(lambda: self.toggle_active(s))
             self.actions(edit, toggle)
 

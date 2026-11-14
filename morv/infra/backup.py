@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from morv import APP_ID
+from morv.core.text import ltr
 from morv.infra import keystore, paths, settings, vault
 
 KINDS = ("manual", "daily", "pre_migration", "safety")
@@ -457,11 +458,11 @@ def health(con) -> tuple[str, str]:
     if last_ok is None:
         return "danger", "لم تُؤخذ نسخة احتياطية بعد"
     if datetime.now() - last_ok > timedelta(days=STALE_DAYS):
-        return "danger", f"آخر نسخة احتياطية منذ {(datetime.now() - last_ok).days} أيام"
+        return "danger", f"آخر نسخة احتياطية منذ {ltr(str((datetime.now() - last_ok).days))} أيام"
     if device_dek(con) is None:
         return "warn", "مفتاح الجهاز مفقود؛ أعد ربط الجهاز من الإعدادات"
     if usb_dir(con):
         last_usb = _parse(settings.get(con, "backup.last_usb_at", ""))
         if last_usb is None or datetime.now() - last_usb > timedelta(days=USB_STALE_DAYS):
             return "warn", "لم تُنقل نسخة إلى الفلاشة منذ أكثر من أسبوع"
-    return "ok", f"آخر نسخة {last_ok.strftime('%Y-%m-%d %H:%M')}"
+    return "ok", f"آخر نسخة {ltr(last_ok.strftime('%Y-%m-%d %H:%M'))}"

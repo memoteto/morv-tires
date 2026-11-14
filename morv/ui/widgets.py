@@ -113,17 +113,28 @@ class Notice(QLabel):
         self.setVisible(bool(text))
 
 
-def primary_button(text: str) -> QPushButton:
-    """زر الإجراء الرئيسي (أزرق)."""
+def primary_button(text: str, icon_name: str | None = None) -> QPushButton:
+    """زر الإجراء الرئيسي (أزرق) بأيقونة اختيارية."""
     b = QPushButton(text)
     b.setObjectName("primary")
+    if icon_name:
+        b.setIcon(icons.icon(icon_name, "#FFFFFF", 18))
     return b
 
 
-def danger_button(text: str) -> QPushButton:
-    """زر إجراء خطر (أحمر) مثل الاستعادة أو الإيقاف."""
+def danger_button(text: str, icon_name: str | None = None) -> QPushButton:
+    """زر إجراء خطر (أحمر) مثل الاستعادة أو الإيقاف، بأيقونة اختيارية."""
     b = QPushButton(text)
     b.setObjectName("danger")
+    if icon_name:
+        b.setIcon(icons.icon(icon_name, "#B42323", 18))
+    return b
+
+
+def icon_button(text: str, icon_name: str, color: str = "#8792A3") -> QPushButton:
+    """زر عادي بأيقونة."""
+    b = QPushButton(text)
+    b.setIcon(icons.icon(icon_name, color, 18))
     return b
 
 

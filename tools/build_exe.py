@@ -30,7 +30,8 @@ def main() -> int:
     args = [str(ROOT / "run.py"), "--name", "MorvTires", "--onedir", "--windowed", "--noconfirm",
             "--clean", "--distpath", str(ROOT / "dist"), "--workpath", str(ROOT / "build"),
             "--specpath", str(ROOT / "build"),
-            "--add-data", f"{migrations}{sep}morv/infra/db/migrations"]
+            "--add-data", f"{migrations}{sep}morv/infra/db/migrations",
+            "--add-data", f"{ROOT / 'morv' / 'ui' / 'fonts'}{sep}morv/ui/fonts"]
     for mod in EXCLUDES:
         args += ["--exclude-module", mod]
     PyInstaller.__main__.run(args)
@@ -40,8 +41,8 @@ def main() -> int:
         for f in out.rglob(name):
             f.unlink()
             print(f"حُذف {f.name}")
-    if not any(out.rglob("0001_foundation.sql")):
-        print("خطأ: ملفات الترقية غير موجودة داخل البناء")
+    if not any(out.rglob("0001_foundation.sql")) or not any(out.rglob("IBMPlexSansArabic-Regular.ttf")):
+        print("خطأ: ملفات الترقية أو الخطوط غير موجودة داخل البناء")
         return 1
     size = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
     print(f"تم البناء: {out} ({size / 1_048_576:.0f} MB)")

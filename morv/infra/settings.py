@@ -4,6 +4,8 @@
 المفاتيح المستخدمة حاليًا:
   ui.theme             'light' أو 'dark'
   ui.sidebar_collapsed '1' أو '0'
+  ui.font_family       اسم الخط (من القائمة المضمّنة)
+  ui.font_size         حجم الخط بالبكسل من 13 إلى 18
 """
 import sqlite3
 

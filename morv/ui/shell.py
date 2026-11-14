@@ -9,7 +9,7 @@
 from datetime import date
 
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget,
                                QListWidgetItem, QMainWindow, QStackedWidget, QToolButton,
                                QVBoxLayout, QWidget)
@@ -60,12 +60,15 @@ class MainWindow(QMainWindow):
         con = self.con = session.con
         self.app = app
         self.dark = settings.get(con, "ui.theme", "light") == "dark"
-        self.collapsed = settings.get(con, "ui.sidebar_collapsed", "0") == "1"
-        self.colors = theme.apply(app, self.dark)
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        # الشريط يبدأ مطويًا تلقائيًا على الشاشات الضيقة (أقل من 1200 بكسل منطقي)
+        self.collapsed = settings.get(con, "ui.sidebar_collapsed", "1" if screen.width() < 1200 else "0") == "1"
+        self.colors = self.apply_theme()
         self.setWindowTitle(APP_NAME)
         # لا شريط حالة: كان يمتد بعرض النافذة ويقطع الشريط الجانبي من الأسفل.
         # رقم الإصدار يظهر تلميحًا عند وضع الماوس على اسم البرنامج.
-        self.setMinimumSize(1024, 640)
+        # الحد الأدنى نسبي للشاشة حتى لا تخرج النافذة عنها على الشاشات الصغيرة أو التكبير العالي
+        self.setMinimumSize(min(1024, screen.width() - 40), min(640, screen.height() - 80))
 
         root = QWidget()
         row = QHBoxLayout(root)
@@ -226,10 +229,23 @@ class MainWindow(QMainWindow):
                 return
         raise KeyError(key)
 
+    def apply_theme(self) -> dict:
+        """تطبيق الثيم بالخط والحجم المحفوظين."""
+        family = settings.get(self.con, "ui.font_family", theme.DEFAULT_FONT)
+        size = int(settings.get(self.con, "ui.font_size", str(theme.DEFAULT_SIZE)))
+        return theme.apply(self.app, self.dark, family, size)
+
+    def set_font(self, family: str, size: int) -> None:
+        """تغيير الخط والحجم فورًا وحفظهما (من تبويب المظهر)."""
+        settings.put(self.con, "ui.font_family", family)
+        settings.put(self.con, "ui.font_size", str(size))
+        self.colors = self.apply_theme()
+        self._refresh_icons()
+
     def toggle_theme(self) -> None:
         """التبديل بين الفاتح والداكن وحفظ الاختيار."""
         self.dark = not self.dark
-        self.colors = theme.apply(self.app, self.dark)
+        self.colors = self.apply_theme()
         settings.put(self.con, "ui.theme", "dark" if self.dark else "light")
         self._refresh_icons()
 

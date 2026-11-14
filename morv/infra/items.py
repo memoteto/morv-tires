@@ -68,6 +68,18 @@ def fields(con, kind: str) -> list[Field]:
                   bool(r[6]), bool(r[7]), bool(r[8]), bool(r[9]), bool(r[10]), r[11]) for r in rows]
 
 
+# حقول مشتركة لا معنى لها للخدمة (بلا مخزون ولا ماركة)
+SERVICE_HIDDEN = ("brand", "model", "min_qty", "origin", "loc", "war", "cond")
+
+
+def visible_fields(con, kind: str) -> list[Field]:
+    """الحقول الظاهرة لنوع، مع استبعاد ما لا ينطبق على الخدمة (المكان الوحيد لهذا المنطق)."""
+    out = [f for f in fields(con, kind) if f.show]
+    if kind == "service":
+        out = [f for f in out if f.key not in SERVICE_HIDDEN]
+    return out
+
+
 def all_fields(con) -> list[Field]:
     """كل الحقول لكل الأنواع (لشاشة الإعداد)."""
     out = []
@@ -147,8 +159,8 @@ def _clean(con, it: Item) -> Item:
     if it.barcode and len(it.barcode) < 4:
         raise ItemError("الباركود 4 خانات على الأقل")
     clean_attrs = {}
-    for f in fields(con, it.kind):
-        if f.key in FIXED_KEYS or not f.show:
+    for f in visible_fields(con, it.kind):
+        if f.key in FIXED_KEYS:
             continue
         raw = it.attrs.get(f.key, "")
         val = str(raw).strip() if raw is not None else ""

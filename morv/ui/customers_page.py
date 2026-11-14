@@ -22,6 +22,7 @@ class CustomersPage(ListPage):
     add_label = "عميل جديد"
     search_placeholder = "الاسم، الموبايل، أو رقم اللوحة (F2)"
     filters = [("all", "الكل"), ("wholesale", "جملة"), ("super", "جملة الجملة"), ("inactive", "الموقوفون")]
+    row_icon = staticmethod(lambda r: "user")
     columns = [
         ("العميل", lambda r: r[1]),
         ("الموبايل", lambda r: ltr(r[2])),
@@ -63,15 +64,16 @@ class CustomersPage(ListPage):
             self.kv("جهة العمل", c.work_place)
         self.kv("حد الآجل", (fmt(c.credit_limit) + f" · {c.credit_days} يوم") if c.credit_limit else "لا يُسمح بالآجل")
         self.kv("تذكيرات واتساب", "موافق" if c.whatsapp_ok else "لم يوافق")
+        self.preview_layout.addWidget(muted("الرصيد وكشف الحساب وآخر زيارة تظهر هنا بعد المرحلة 4 (الفواتير)."))
         self.preview_layout.addWidget(muted("المركبات"))
         if not c.vehicles:
             self.preview_layout.addWidget(muted("لا توجد مركبات مسجلة."))
         for v in c.vehicles:
             self.kv(v.title or "مركبة", " · ".join(x for x in (v.plate, ltr(v.tire_front) if v.tire_front else "", v.battery) if x))
         if self.can_edit():
-            edit = primary_button("تعديل")
+            edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(c.id))
-            toggle = danger_button("إيقاف" if c.active else "تفعيل")
+            toggle = danger_button("إيقاف" if c.active else "تفعيل", "pause" if c.active else "play")
             toggle.clicked.connect(lambda: self.toggle_active(c))
             self.actions(edit, toggle)
 

@@ -6,20 +6,52 @@
   باستدعاء setStyleSheet في البرنامج كله.
 - اتجاه RTL يُضبط مرة واحدة على التطبيق، وكل التخطيطات تتبعه تلقائيًا.
 """
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
 
 from morv.ui.tokens import DARK, LIGHT
 
-FONT_CANDIDATES = ["IBM Plex Sans Arabic", "Segoe UI", "Noto Sans Arabic", "Tahoma"]
+# خطوط عربية مفتوحة الترخيص (OFL) مضمّنة مع البرنامج، فلا يعتمد على ما في Windows
+FONTS_DIR = Path(__file__).with_name("fonts")
+BUNDLED = {"IBM Plex Sans Arabic": ["IBMPlexSansArabic-Regular.ttf", "IBMPlexSansArabic-Bold.ttf"],
+           "Cairo": ["Cairo-Variable.ttf"]}
+FONT_CHOICES = ["IBM Plex Sans Arabic", "Cairo", "Segoe UI", "Tahoma"]
+DEFAULT_FONT = "IBM Plex Sans Arabic"
+FONT_SIZES = (13, 14, 15, 16, 17, 18)
+DEFAULT_SIZE = 14
+_loaded = False
 
 
-def pick_font(px: int = 14) -> QFont:
-    """أول خط متاح من القائمة المعتمدة، بحجم بالبكسل."""
+def load_bundled_fonts() -> None:
+    """تسجيل الخطوط المضمّنة في Qt مرة واحدة."""
+    global _loaded
+    if _loaded:
+        return
+    for files in BUNDLED.values():
+        for name in files:
+            f = FONTS_DIR / name
+            if f.exists():
+                QFontDatabase.addApplicationFont(str(f))
+    _loaded = True
+
+
+def available_fonts() -> list[str]:
+    """الخطوط التي يمكن اختيارها على هذا الجهاز (المضمّنة دائمًا + ما وُجد من النظام)."""
+    load_bundled_fonts()
     families = set(QFontDatabase.families())
-    family = next((f for f in FONT_CANDIDATES if f in families), None)
+    return [f for f in FONT_CHOICES if f in families or f in BUNDLED]
+
+
+def pick_font(px: int = DEFAULT_SIZE, family: str = DEFAULT_FONT) -> QFont:
+    """الخط المطلوب بحجم بالبكسل؛ إن لم يوجد يُؤخذ أول متاح."""
+    load_bundled_fonts()
+    families = set(QFontDatabase.families())
+    if family not in families:
+        family = next((f for f in FONT_CHOICES if f in families), "")
     font = QFont(family) if family else QFont()
-    font.setPixelSize(px)
+    font.setPixelSize(int(px))
     return font
 
 
@@ -47,15 +79,15 @@ def qss(t: dict) -> str:
     """ملف التنسيق الوحيد للبرنامج. أسماء الكائنات (objectName) هي ما يربط العنصر بشكله."""
     return f"""
 QWidget#side {{ background:{t['side']}; }}
-QLabel#brand {{ color:#FFFFFF; font-size:17px; font-weight:700; }}
+QLabel#brand {{ color:#FFFFFF; font-size:{t['fs']+3}px; font-weight:700; }}
 QToolButton#sideToggle {{ color:{t['side_text']}; background:transparent; border:0; border-radius:8px; padding:6px; }}
 QToolButton#sideToggle:hover {{ background:{t['side_hover']}; }}
-QListWidget#nav {{ background:{t['side']}; color:{t['side_text']}; border:0; outline:0; font-size:14px; }}
+QListWidget#nav {{ background:{t['side']}; color:{t['side_text']}; border:0; outline:0; font-size:{t['fs']}px; }}
 QListWidget#nav::item {{ height:40px; padding:0 10px; border-radius:8px; margin:2px 8px; }}
 QListWidget#nav::item:hover {{ background:{t['side_hover']}; }}
 QListWidget#nav::item:selected {{ background:{t['primary']}; color:{t['on_primary']}; }}
 QWidget#topbar {{ background:{t['surface']}; border-bottom:1px solid {t['border']}; }}
-QLabel#pageTitle {{ font-size:20px; font-weight:700; }}
+QLabel#pageTitle {{ font-size:{t['fs']+6}px; font-weight:700; }}
 QLabel#muted {{ color:{t['muted']}; }}
 QFrame#card {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:12px; }}
 QToolButton#topButton {{ background:transparent; border:1px solid {t['border']}; border-radius:8px; padding:6px 10px; }}
@@ -73,9 +105,10 @@ QPushButton#choice {{ text-align:left; padding:0 16px; }}
 QPushButton#choice:checked {{ background:{t['primary_soft']}; border:2px solid {t['primary']}; color:{t['text']}; font-weight:600; }}
 QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2']}; border:0;
              gridline-color:{t['border']}; selection-background-color:{t['select']}; selection-color:{t['text']}; }}
+QTableView::item {{ padding:0 10px; }}
 QHeaderView::section {{ background:{t['surface2']}; color:{t['muted']}; border:0;
                        border-bottom:1px solid {t['border']}; padding:0 8px; height:36px; font-weight:600; }}
-QLabel#cardTitle {{ font-size:15px; font-weight:700; }}
+QLabel#cardTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
 QPushButton#danger {{ color:{t['danger']}; border-color:{t['danger']}; }}
 QPushButton:disabled {{ color:{t['muted']}; border-color:{t['border']}; }}
 QLabel#noticeError {{ background:{t['danger_soft']}; color:{t['danger']}; border-radius:8px; padding:8px 12px; }}
@@ -99,11 +132,11 @@ QComboBox {{ background:{t['surface']}; border:1px solid {t['border_strong']}; b
 QComboBox QAbstractItemView {{ background:{t['surface']}; selection-background-color:{t['select']}; border:1px solid {t['border']}; }}
 QCheckBox::indicator {{ width:18px; height:18px; }}
 QListWidget#userList {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:10px; }}
-QListWidget#userList::item {{ height:44px; padding:0 10px; border-radius:8px; margin:2px; }}
+QListWidget#userList::item {{ padding:10px; border-radius:8px; }}
 QListWidget#userList::item:selected {{ background:{t['primary_soft']}; color:{t['text']}; }}
 QFrame#modalFrame {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:14px; }}
 QWidget#modalHeader {{ background:{t['surface2']}; border-top-left-radius:14px; border-top-right-radius:14px; border-bottom:1px solid {t['border']}; }}
-QLabel#modalTitle {{ font-size:16px; font-weight:700; }}
+QLabel#modalTitle {{ font-size:{t['fs']+2}px; font-weight:700; }}
 QWidget#modalBody {{ background:{t['surface']}; }}
 QWidget#modalFooter {{ background:{t['surface2']}; border-top:1px solid {t['border']}; border-bottom-left-radius:14px; border-bottom-right-radius:14px; }}
 QScrollArea {{ background:transparent; border:0; }}
@@ -120,11 +153,15 @@ def colors(dark: bool) -> dict:
     return DARK if dark else LIGHT
 
 
-def apply(app, dark: bool = False) -> dict:
-    """تطبيق الاتجاه والخط والألوان والتنسيق على التطبيق كله، ويعيد الألوان المستخدمة."""
-    t = colors(dark)
+def apply(app, dark: bool = False, font_family: str = DEFAULT_FONT, font_size: int = DEFAULT_SIZE) -> dict:
+    """تطبيق الاتجاه والخط والألوان والتنسيق على التطبيق كله، ويعيد الألوان المستخدمة.
+
+    أحجام النصوص في QSS تُشتق من الحجم المختار حتى تكبر العناوين مع الخط.
+    """
+    t = dict(colors(dark))
+    t["fs"] = int(font_size)
     app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-    app.setFont(pick_font(14))
+    app.setFont(pick_font(font_size, font_family))
     app.setPalette(palette(t))
     app.setStyleSheet(qss(t))
     return t
