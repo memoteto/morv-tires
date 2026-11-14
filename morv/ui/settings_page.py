@@ -450,6 +450,10 @@ class BackupTab(QWidget):
         pick.clicked.connect(self.pick_usb)
         save = QPushButton("حفظ")
         save.clicked.connect(self.save_usb)
+        # تغيير مجلد الفلاشة وكلمة مرور النسخ للمدير فقط؛ الكاشير ينسخ ويختبر فقط
+        manager = session.user.is_manager
+        for w in (self.usb_dir, pick, save):
+            w.setEnabled(manager)
         urow.addWidget(self.usb_dir, 1)
         urow.addWidget(pick)
         urow.addWidget(save)
@@ -460,11 +464,13 @@ class BackupTab(QWidget):
         krow = QHBoxLayout()
         pw_btn = QPushButton("تغيير كلمة مرور النسخ")
         pw_btn.clicked.connect(self.change_password)
+        pw_btn.setVisible(manager)
         self.rk_btn = QPushButton("مفتاح استرداد جديد")
         self.rk_btn.clicked.connect(self.new_recovery_key)
         self.rk_btn.setVisible(session.user.is_manager)
         self.relink_btn = QPushButton("إعادة ربط هذا الجهاز")
         self.relink_btn.clicked.connect(self.relink)
+        self.pw_btn = pw_btn
         for b in (pw_btn, self.rk_btn, self.relink_btn):
             krow.addWidget(b)
         krow.addStretch(1)

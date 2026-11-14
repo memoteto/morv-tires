@@ -174,6 +174,9 @@ class SettingsTest(_Base):
         self.assertEqual(p.tabs.count(), 2)               # الاختصارات والنسخ فقط
         self.assertIsNone(p.shop_tab)                     # لا يرى بيانات المحل أصلًا
         self.assertFalse(p.backup_tab.restore_btn.isVisibleTo(p))
+        self.assertFalse(p.backup_tab.pw_btn.isVisibleTo(p))      # كلمة مرور النسخ للمدير فقط
+        self.assertFalse(p.backup_tab.usb_dir.isEnabled())
+        self.assertTrue(p.backup_tab.backup_btn.isEnabled())
 
     def test_users_tab_actions(self):
         """إنشاء مستخدم من الحوار، وتعديل صلاحية، وحماية آخر مدير تظهر رسالتها."""
