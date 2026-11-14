@@ -23,7 +23,25 @@ def require_qt():
     return unittest.skip("PySide6 غير مثبتة على هذا الجهاز")
 
 
+_app = None
+
+
+def _shutdown():
+    """إغلاق كل النوافذ وتصريف الأحداث قبل خروج المفسّر، حتى لا تُدمَّر كائنات Qt بترتيب خاطئ
+    (انهيار 139 ظهر على Linux في CI بعد نجاح كل الاختبارات)."""
+    if _app is not None:
+        _app.closeAllWindows()
+        _app.processEvents()
+        _app.sendPostedEvents(None, 0)
+        _app.processEvents()
+
+
 def get_app():
     """تطبيق Qt واحد مشترك لكل الاختبارات (Qt لا يسمح بأكثر من واحد)."""
+    global _app
     from PySide6.QtWidgets import QApplication as App
-    return App.instance() or App([])
+    if _app is None:
+        _app = App.instance() or App([])
+        import atexit
+        atexit.register(_shutdown)
+    return _app

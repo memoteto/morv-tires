@@ -214,6 +214,8 @@ class ModalTest(_Base):
             self.assertTrue(dlg.footer.isVisibleTo(dlg))
             self.assertTrue(dlg.windowFlags() & Qt.WindowType.FramelessWindowHint)   # بلا شريط عنوان من النظام
             dlg.close()
+            dlg.deleteLater()
+        self.app.processEvents()
 
 
 class ShellPagesTest(_Base):
