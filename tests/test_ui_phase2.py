@@ -98,8 +98,9 @@ class SuppliersPageTest(_Base):
     def test_cashier_read_only(self):
         """الكاشير بلا صلاحية الموردين لا يرى زر الإضافة مفعّلًا."""
         from morv.ui.suppliers_page import SuppliersPage
-        self.assertFalse(SuppliersPage(self.cashier_session).add_btn.isEnabled())
-        self.assertTrue(SuppliersPage(self.session).add_btn.isEnabled())
+        cashier_page, admin_page = SuppliersPage(self.cashier_session), SuppliersPage(self.session)
+        self.assertFalse(cashier_page.add_btn.isEnabled())
+        self.assertTrue(admin_page.add_btn.isEnabled())
 
     def test_dialog_saves(self):
         """حفظ مورد من النافذة."""
@@ -118,8 +119,10 @@ class InventoryPageTest(_Base):
         """التبويبات حسب الصلاحية، ونافذة الصنف تُبنى من الحقول وتفرض الإلزامي."""
         from morv.infra import items
         from morv.ui.inventory_page import InventoryPage, ItemDialog
-        self.assertEqual(InventoryPage(self.session).tabs.count(), 4)
-        self.assertEqual(InventoryPage(self.cashier_session).tabs.count(), 3)
+        admin_page = InventoryPage(self.session)            # تبقى في متغير وإلا حذفها Qt مع تبويباتها
+        cashier_page = InventoryPage(self.cashier_session)
+        self.assertEqual(admin_page.tabs.count(), 4)
+        self.assertEqual(cashier_page.tabs.count(), 3)
         dlg = ItemDialog(self.session, None)
         self.assertIn("size", dlg.widgets)          # حقل الإطار
         dlg.set_kind("battery")
