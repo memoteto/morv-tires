@@ -6,6 +6,8 @@
 
 كل شاشة ترث ListPage وتحدد: الأعمدة، ودالة البحث، وبناء المعاينة، ونافذة الإضافة/التعديل.
 """
+import sqlite3
+
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
@@ -101,7 +103,7 @@ class ListPage(QWidget):
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
         self._debounce.setInterval(200)
-        self._debounce.timeout.connect(self.reload)
+        self._debounce.timeout.connect(self._debounced_reload)
         self.search.textChanged.connect(lambda _t: self._debounce.start())
         tools.addWidget(self.search, 1)
         self.filter_buttons = {}
@@ -209,6 +211,13 @@ class ListPage(QWidget):
             self.show_preview_id(keep_id)
         elif self.current_id is not None and not any(r[0] == self.current_id for r in rows):
             self.hide_preview()
+
+    def _debounced_reload(self) -> None:
+        """إعادة البحث بعد توقف الكتابة. إن أُغلقت القاعدة في الأثناء (تسجيل خروج) يُتجاهل."""
+        try:
+            self.reload()
+        except sqlite3.ProgrammingError:
+            pass
 
     def load_more(self) -> None:
         """الصفحة التالية."""
