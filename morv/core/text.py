@@ -33,6 +33,7 @@ def scanner_fix(code: str) -> str:
 
 
 LRI, PDI = "⁦", "⁩"
+RLM = "\u200f"   # علامة اتجاه عربي: تجعل اتجاه الفقرة من اليمين دون أن تظهر
 
 
 def ltr(value) -> str:

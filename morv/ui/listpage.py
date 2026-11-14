@@ -11,6 +11,7 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
                                QPushButton, QScrollArea, QTableView, QVBoxLayout, QWidget)
 
+from morv.core.text import RLM
 from morv.infra.db.connection import ClosedDatabase
 from morv.ui.widgets import muted, primary_button
 
@@ -248,14 +249,23 @@ class ListPage(QWidget):
 
     # ---------- مساعدات للمعاينة ----------
     def kv(self, key: str, value: str) -> None:
-        """سطر «عنوان: قيمة» في المعاينة."""
+        """سطر «عنوان: قيمة» في المعاينة: العنوان بعرض ثابت، والقيمة تبدأ من نفس الحافة دائمًا.
+
+        QLabel يحاذي النص حسب اتجاه النص نفسه لا اتجاه الواجهة، فقيمة تبدأ بأرقام لاتينية كانت تقفز
+        إلى أقصى اليسار (ملاحظة المالك). علامة RLM في أول النص تجعل اتجاه الفقرة عربيًا دون أن تغيّر
+        عزل الأرقام بـ ltr().
+        """
         row = QHBoxLayout()
+        row.setSpacing(10)
         k = muted(key)
-        v = QLabel(value or "—")
+        k.setFixedWidth(118)
+        k.setAlignment(Qt.AlignmentFlag.AlignLeading | Qt.AlignmentFlag.AlignTop)
+        v = QLabel(RLM + (value or "—"))
         v.setWordWrap(True)
+        v.setAlignment(Qt.AlignmentFlag.AlignLeading | Qt.AlignmentFlag.AlignTop)
         v.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        row.addWidget(k, 1)
-        row.addWidget(v, 2)
+        row.addWidget(k)
+        row.addWidget(v, 1)
         w = QWidget()
         w.setLayout(row)
         self.preview_layout.addWidget(w)
