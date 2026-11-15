@@ -20,6 +20,8 @@ PERMISSIONS = {
     "items.manage": "إضافة وتعديل الأصناف",
     "items.prices": "تعديل أسعار البيع",
     "items.cost_view": "رؤية التكلفة والهامش",
+    "purchases.post": "ترحيل فواتير الشراء واستلام البضاعة",
+    "stock.pick_lot": "اختيار دفعة DOT غير الأقدم عند الصرف",
     "users.manage": "المستخدمون والصلاحيات",
     "settings.edit": "الإعدادات العامة",
     "backup.restore": "الاستعادة من نسخة احتياطية",

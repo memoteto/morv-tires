@@ -256,8 +256,8 @@ def set_active(con, by, item_id: int, active: bool) -> None:
 
 
 def has_documents(con, item_id: int) -> bool:
-    """هل للصنف حركات؟ يُوسَّع في المرحلة 3."""
-    return False
+    """هل للصنف حركات (شراء أو دفعات)؟ يُوسَّع في المرحلة 4 بالبيع."""
+    return con.execute("SELECT 1 FROM purchase_lines WHERE item_id=? LIMIT 1", (item_id,)).fetchone() is not None
 
 
 def delete(con, by, item_id: int) -> None:
