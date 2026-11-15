@@ -94,6 +94,16 @@ class Notice(QLabel):
         self.setVisible(bool(text))
 
 
+def dispose(widget, app) -> None:
+    """Destroy a window explicitly before the process exits, or Qt crashes on Windows."""
+    from PySide6.QtCore import QEvent
+    if widget is None:
+        return
+    widget.deleteLater()
+    app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    app.processEvents()
+
+
 def primary_button(text: str, icon_name: str | None = None) -> QPushButton:
     b = QPushButton(text)
     b.setObjectName("primary")

@@ -37,7 +37,7 @@ class CustomersPage(ListPage):
                                 offset=offset)
 
     def total(self) -> str:
-        return f"{customers.count(self.session.con)} عميل نشط"
+        return f"{customers.count(self.session.con)} عميل نشط · اضغط صفًا لمعاينته وكشف حسابه"
 
     def build_preview(self, row_id: int) -> None:
         c = customers.get(self.session.con, row_id)

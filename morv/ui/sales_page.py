@@ -37,7 +37,7 @@ class SalesPage(ListPage):
     def total(self) -> str:
         if not self.can_view():
             return "لا تملك صلاحية الاطلاع على فواتير البيع"
-        return f"{sale_view.count(self.session.con)} فاتورة بيع"
+        return f"{sale_view.count(self.session.con)} فاتورة بيع · اضغط صفًا لمعاينته وعمل مرتجع منه"
 
     def build_preview(self, row_id: int) -> None:
         inv = sale_view.get_sale(self.session.con, row_id)
