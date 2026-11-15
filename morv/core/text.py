@@ -32,7 +32,8 @@ def scanner_fix(code: str) -> str:
     return "".join(_AR101.get(ch, ch) for ch in s).upper()
 
 
-LRI, PDI = "⁦", "⁩"
+LRI, PDI = "\u2066", "\u2069"   # تُكتب بالرمز لا بالحرف نفسه: الحرف غير مرئي ويضيع عند النسخ واللصق
+RLM = "\u200f"   # علامة اتجاه عربي: تجعل اتجاه الفقرة من اليمين دون أن تظهر
 
 
 def ltr(value) -> str:

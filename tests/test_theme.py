@@ -30,12 +30,33 @@ class TooltipTest(unittest.TestCase):
     def test_tooltip_styled_and_readable(self):
         """ملف التنسيق يحدد للتلميح خلفية ولون نص، والتباين بينهما 4.5:1 على الأقل في الوضعين."""
         from morv.ui.tokens import DARK, LIGHT
-        for name, t in (("light", LIGHT), ("dark", DARK)):
+        for name, t in (("light", {**LIGHT, "fs": 14}), ("dark", {**DARK, "fs": 14})):
             rule = re.search(r"QToolTip\s*\{([^}]*)\}", qss_text(t))
             self.assertIsNotNone(rule, f"لا قاعدة للتلميح في الوضع {name}")
             bg = re.search(r"background:\s*(#[0-9A-Fa-f]{6})", rule.group(1)).group(1)
             fg = re.search(r"(?<![-\w])color:\s*(#[0-9A-Fa-f]{6})", rule.group(1)).group(1)
             self.assertGreaterEqual(contrast(bg, fg), 4.5, f"تلميح غير مقروء في الوضع {name}")
+
+
+class ObjectNamesTest(unittest.TestCase):
+    """كل اسم objectName يُستخدم للتنسيق في الواجهة له قاعدة في ملف التنسيق (خطأ إملائي يُخفي التنسيق بصمت)."""
+
+    # أسماء تُستخدم للبحث عن العنصر لا لتنسيقه
+    LOOKUP_ONLY = {"modal"}
+
+    def test_every_object_name_has_a_rule(self):
+        """يجمع setObjectName("...") من كل ملفات الواجهة ويبحث عن #الاسم في QSS."""
+        from pathlib import Path
+        from morv.ui.tokens import LIGHT
+        css = qss_text({**LIGHT, "fs": 14})
+        ui = Path(__file__).resolve().parent.parent / "morv" / "ui"
+        names = set()
+        for f in ui.glob("*.py"):
+            names |= set(re.findall(r'setObjectName\("(\w+)"\)', f.read_text(encoding="utf-8")))
+            # أسماء في قواميس مثل {"error": "noticeError"}
+            names |= set(re.findall(r'"(notice\w+|pill\w+|wizStep\w*)"', f.read_text(encoding="utf-8")))
+        missing = sorted(n for n in names - self.LOOKUP_ONLY if f"#{n}" not in css)
+        self.assertEqual(missing, [], f"أسماء بلا تنسيق: {missing}")
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from morv import APP_NAME, VERSION
 from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, shop, users
+from morv.ui.modal import Modal
 from morv.ui.widgets import Notice, PasswordEdit, form, muted, primary_button
 
 
@@ -28,16 +29,14 @@ class LoginDialog(QDialog):
         outer.setContentsMargins(30, 30, 30, 22)
         outer.setSpacing(14)
 
-        head = QVBoxLayout()
-        head.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         name = QLabel(shop.load(con).name or APP_NAME)
         name.setObjectName("pageTitle")
         name.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        head.addWidget(name)
-        sub = muted("اختر المستخدم وأدخل كلمة المرور")
+        outer.addWidget(name)
+        sub = QLabel("اختر المستخدم وأدخل كلمة المرور")   # بلا التفاف: كان يتراكب على سطرين
+        sub.setObjectName("muted")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        head.addWidget(sub)
-        outer.addLayout(head)
+        outer.addWidget(sub)
 
         f = form()
         self.combo = QComboBox()
@@ -62,7 +61,7 @@ class LoginDialog(QDialog):
         outer.addWidget(line)
         foot = QHBoxLayout()
         level, text = backup.health(con)
-        foot.addWidget(muted(f"النسخ الاحتياطي: {text}"))
+        foot.addWidget(muted(("النسخ الاحتياطي سليم · " if level == "ok" else "") + text))
         foot.addStretch(1)
         foot.addWidget(muted(ltr(f"v{VERSION}")))
         outer.addLayout(foot)
@@ -91,17 +90,14 @@ class LoginDialog(QDialog):
         self.accept()
 
 
-class ChangePasswordDialog(QDialog):
+class ChangePasswordDialog(Modal):
     """تغيير كلمة مرور المستخدم الحالي (إجباري عند أول دخول، أو اختياري من الإعدادات)."""
 
     def __init__(self, con, user, current: str | None = None, forced: bool = False, parent=None):
         """current: كلمة المرور الحالية إن عُرفت (بعد الدخول مباشرة) فلا تُطلب مرة أخرى."""
-        super().__init__(parent)
+        super().__init__("تغيير كلمة المرور", parent, width=440)
         self.con, self.user, self.current = con, user, current
-        self.setWindowTitle("تغيير كلمة المرور")
-        self.setFixedWidth(420)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 24, 24, 20)
+        lay = self.body
         lay.addWidget(muted("يجب تغيير كلمة المرور المؤقتة قبل المتابعة." if forced else
                             f"تغيير كلمة مرور {user.display_name}."))
         f = form()
@@ -113,11 +109,7 @@ class ChangePasswordDialog(QDialog):
         f.addRow("الجديدة", self.new)
         f.addRow("تأكيدها", self.new2)
         lay.addLayout(f)
-        self.notice = Notice()
-        lay.addWidget(self.notice)
-        btn = primary_button("حفظ")
-        btn.clicked.connect(self.save)
-        lay.addWidget(btn)
+        self.add_footer("حفظ", self.save)
 
     def save(self) -> None:
         """التحقق والحفظ."""

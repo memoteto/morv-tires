@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel, QLineE
 
 from morv import APP_NAME
 from morv.core import security
-from morv.infra import backup, settings, shop, users, vault
+from morv.infra import backup, setup, shop, users, vault
 from morv.ui.widgets import Notice, PasswordEdit, form, ltr_edit, muted, primary_button
 
 STEPS_NEW = ["البداية", "بيانات المحل", "حساب المدير", "كلمة مرور النسخ", "مفتاح الاسترداد", "مراجعة وإنهاء"]
@@ -37,6 +37,7 @@ class SetupWizard(QDialog):
         self.result_kind = None
         self.restore_path = None
         self.restore_secret = None
+        self.first_backup_error = None   # نص فشل النسخة الأولى إن فشلت (الإعداد نفسه اكتمل)
         self.mode = "new"
         self.recovery_key = security.new_recovery_key()
 
@@ -419,16 +420,20 @@ class SetupWizard(QDialog):
             self.accept()
             return
         try:
-            shop.save(self.con, self.shop_name.text(), self.shop_phone.text(), self.shop_addr.text())
-            admin = users.create_user(self.con, None, self.admin_user.text(), self.admin_name.text(),
-                                      self.admin_pw.text(), "manager")
-            backup.setup_encryption(self.con, self.bk_pw.text(), self.recovery_key)
-            if self.usb_dir.text().strip():
-                settings.put(self.con, "backup.usb_dir", self.usb_dir.text().strip())
-            users.audit(self.con, admin, "setup.done", None, None, "اكتمل الإعداد الأول")
-            backup.create_backup(self.con, "manual", username=admin.username)
-        except (users.AuthError, shop.ShopError, backup.BackupError) as e:
+            # كل الإعداد في معاملة واحدة: إما يكتمل كله أو لا يُكتب منه شيء (morv/infra/setup.py)
+            admin = setup.run_first_setup(
+                self.con, shop_name=self.shop_name.text(), shop_phone=self.shop_phone.text(),
+                shop_address=self.shop_addr.text(), admin_username=self.admin_user.text(),
+                admin_name=self.admin_name.text(), admin_password=self.admin_pw.text(),
+                backup_password=self.bk_pw.text(), recovery_key=self.recovery_key,
+                usb_dir=self.usb_dir.text())
+        except (users.AuthError, shop.ShopError, backup.BackupError, setup.SetupError) as e:
             self.notice.show_message(str(e))
             return
+        try:
+            backup.create_backup(self.con, "manual", username=admin.username)
+        except backup.BackupError as e:
+            # الإعداد اكتمل؛ فشل النسخة الأولى لا يلغيه، ويظهر في تنبيه النسخ بعد الدخول
+            self.first_backup_error = str(e)
         self.result_kind = "new"
         self.accept()

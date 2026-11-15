@@ -3,9 +3,8 @@
 كل تبويب كلاس مستقل يأخذ الجلسة. التبويبات التي تحتاج صلاحية تُعرض للمخوَّل فقط.
 لا SQL هنا؛ كل شيء عبر morv.infra.
 """
-from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout,
                                QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
@@ -14,7 +13,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, settings, shop, users, vault
-from morv.ui.login import ChangePasswordDialog
+from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
 from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, form, info, ltr_edit, muted,
                              primary_button)
@@ -56,10 +55,58 @@ class SettingsPage(QWidget):
             self.tabs.addTab(self.users_tab, "المستخدمون والصلاحيات")
             self.audit_tab = AuditTab(session)
             self.tabs.addTab(self.audit_tab, "سجل العمليات")
+        self.fields_tab = None
+        if session.can("settings.edit"):
+            from morv.ui.inventory_page import ItemFieldsTab   # استيراد محلي لتجنب الدوران
+            self.fields_tab = ItemFieldsTab(session)
+            self.tabs.addTab(self.fields_tab, "حقول بطاقة الصنف")
+        self.appearance_tab = AppearanceTab(session)
+        self.tabs.addTab(self.appearance_tab, "المظهر")
         self.tabs.addTab(ShortcutsTab(), "الاختصارات")
         self.backup_tab = BackupTab(session)
         self.tabs.addTab(self.backup_tab, "النسخ الاحتياطي")
         lay.addWidget(self.tabs)
+
+
+class AppearanceTab(QWidget):
+    """الخط وحجمه والوضع الفاتح/الداكن؛ تُطبَّق فورًا على البرنامج كله وتُحفظ لكل الجهاز."""
+
+    def __init__(self, session):
+        """بناء الاختيارات من القيم المحفوظة."""
+        super().__init__()
+        self.session = session
+        lay = QVBoxLayout(self)
+        box, inner = card("الخط")
+        inner.addWidget(muted("الخطان IBM Plex Sans Arabic وCairo مضمّنان مع البرنامج ولا يعتمدان على Windows."))
+        f = form()
+        self.family = QComboBox()
+        from morv.ui import theme
+        for name in theme.available_fonts():
+            self.family.addItem(name)
+        self.family.setCurrentText(settings.get(session.con, "ui.font_family", theme.DEFAULT_FONT))
+        self.size = QComboBox()
+        for s in theme.FONT_SIZES:
+            self.size.addItem(ltr(str(s)), s)
+        self.size.setCurrentIndex(list(theme.FONT_SIZES).index(
+            int(settings.get(session.con, "ui.font_size", str(theme.DEFAULT_SIZE)))))
+        f.addRow("الخط", self.family)
+        f.addRow("حجم الخط", self.size)
+        inner.addLayout(f)
+        self.sample = QLabel("نموذج: إطار ميشلان Primacy 4 مقاس " + ltr("205/55R16") + " بسعر " + ltr("6,450.00"))
+        self.sample.setWordWrap(True)
+        inner.addWidget(self.sample)
+        apply_btn = primary_button("تطبيق", "font")
+        apply_btn.clicked.connect(self.apply)
+        inner.addWidget(apply_btn, 0, Qt.AlignmentFlag.AlignLeading)
+        lay.addWidget(box)
+        lay.addWidget(muted("الوضع الفاتح/الداكن من زر الشمس/القمر في الشريط العلوي (Ctrl+D)."))
+        lay.addStretch(1)
+
+    def apply(self) -> None:
+        """تطبيق الاختيار على النافذة الرئيسية."""
+        win = self.window()
+        if hasattr(win, "set_font"):
+            win.set_font(self.family.currentText(), self.size.currentData())
 
 
 class ShopTab(QWidget):
@@ -153,8 +200,10 @@ class UsersTab(QWidget):
         left = QVBoxLayout()
         self.list = QListWidget()
         self.list.setObjectName("userList")
+        self.list.setSpacing(2)
+        self.list.setUniformItemSizes(True)
         self.list.currentRowChanged.connect(self._select)
-        new = primary_button("مستخدم جديد")
+        new = primary_button("مستخدم جديد", "plus")
         new.clicked.connect(self.new_user)
         left.addWidget(new)
         left.addWidget(self.list, 1)
@@ -205,6 +254,7 @@ class UsersTab(QWidget):
         for u in self.users:
             item = QListWidgetItem(f"{u.display_name} — {security.ROLES[u.role]}" + ("" if u.active else " (موقوف)"))
             item.setData(Qt.ItemDataRole.UserRole, u.id)
+            item.setSizeHint(QSize(0, 44))
             self.list.addItem(item)
         self.list.blockSignals(False)
         idx = next((i for i, u in enumerate(self.users) if u.id == select_id), 0)
@@ -278,18 +328,15 @@ class UsersTab(QWidget):
         self.reload(self.current.id)
 
 
-class NewUserDialog(QDialog):
+class NewUserDialog(Modal):
     """حوار إنشاء مستخدم."""
 
     def __init__(self, session, parent=None):
         """الحقول: الاسم، اسم الدخول، كلمة مرور مؤقتة، الدور."""
-        super().__init__(parent)
+        super().__init__("مستخدم جديد", parent, width=460)
         self.session = session
         self.created = None
-        self.setWindowTitle("مستخدم جديد")
-        self.setFixedWidth(440)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 24, 24, 20)
+        lay = self.body
         f = form()
         self.name = QLineEdit()
         self.username = ltr_edit("karim")
@@ -304,11 +351,7 @@ class NewUserDialog(QDialog):
         f.addRow("الدور", self.role)
         lay.addLayout(f)
         lay.addWidget(muted("يُطلب من المستخدم تغيير كلمة المرور عند أول دخول."))
-        self.notice = Notice()
-        lay.addWidget(self.notice)
-        save = primary_button("حفظ")
-        save.clicked.connect(self.save)
-        lay.addWidget(save)
+        self.add_footer("حفظ", self.save)
 
     def save(self) -> None:
         """إنشاء المستخدم."""
@@ -322,26 +365,18 @@ class NewUserDialog(QDialog):
         self.accept()
 
 
-class TempPasswordDialog(QDialog):
+class TempPasswordDialog(Modal):
     """حوار كلمة مرور مؤقتة لمستخدم آخر."""
 
     def __init__(self, session, target, parent=None):
         """حقل واحد."""
-        super().__init__(parent)
+        super().__init__(f"كلمة مرور مؤقتة — {target.display_name}", parent, width=420)
         self.session, self.target = session, target
-        self.setWindowTitle(f"كلمة مرور مؤقتة — {target.display_name}")
-        self.setFixedWidth(400)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 24, 24, 20)
         f = form()
         self.password = PasswordEdit()
         f.addRow("كلمة المرور المؤقتة", self.password)
-        lay.addLayout(f)
-        self.notice = Notice()
-        lay.addWidget(self.notice)
-        save = primary_button("حفظ")
-        save.clicked.connect(self.save)
-        lay.addWidget(save)
+        self.body.addLayout(f)
+        self.add_footer("حفظ", self.save)
 
     def save(self) -> None:
         """الحفظ مع إلزام التغيير."""
@@ -512,8 +547,9 @@ class BackupTab(QWidget):
         self.model.reload()
 
     def _selected(self) -> backup.BackupInfo | None:
-        """النسخة المختارة في الجدول."""
-        idx = self.view.currentIndex()
+        """النسخة المختارة في الجدول (من التحديد الفعلي، ثم المؤشر الحالي)."""
+        rows = self.view.selectionModel().selectedRows() if self.view.selectionModel() else []
+        idx = rows[0] if rows else self.view.currentIndex()
         if not idx.isValid():
             self.notice.show_message("اختر نسخة من القائمة أولًا")
             return None
@@ -571,7 +607,7 @@ class BackupTab(QWidget):
             return
         try:
             backup.change_backup_password(self.session.con, dlg.secret, dlg.new_secret)
-        except vault.VaultError as e:
+        except (vault.VaultError, backup.BackupError) as e:
             info(self, "خطأ", str(e), error=True)
             return
         users.audit(self.session.con, self.session.user, "backup.password")
@@ -585,7 +621,7 @@ class BackupTab(QWidget):
         key = security.new_recovery_key()
         try:
             backup.regenerate_recovery_key(self.session.con, dlg.secret, key)
-        except vault.VaultError as e:
+        except (vault.VaultError, backup.BackupError) as e:
             info(self, "خطأ", str(e), error=True)
             return
         users.audit(self.session.con, self.session.user, "backup.recovery_key")
@@ -599,7 +635,7 @@ class BackupTab(QWidget):
             return
         try:
             backup.relink_device(self.session.con, dlg.secret)
-        except vault.VaultError as e:
+        except (vault.VaultError, backup.BackupError) as e:
             info(self, "خطأ", str(e), error=True)
             return
         users.audit(self.session.con, self.session.user, "backup.relink")
@@ -618,19 +654,16 @@ class BackupTab(QWidget):
         self.session.on_restore(str(b.path), dlg.secret)
 
 
-class SecretDialog(QDialog):
+class SecretDialog(Modal):
     """حوار يطلب سرًا (وكلمة مرور جديدة اختياريًا)."""
 
     def __init__(self, title: str, label: str, new_password: bool = False, parent=None):
         """بناء الحقول."""
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setFixedWidth(440)
+        super().__init__(title, parent, width=460)
         self.secret = ""
         self.new_secret = ""
         self.with_new = new_password
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 24, 24, 20)
+        lay = self.body
         f = form()
         self.cur = PasswordEdit()
         f.addRow(label, self.cur)
@@ -640,11 +673,7 @@ class SecretDialog(QDialog):
             f.addRow("كلمة المرور الجديدة", self.new)
             f.addRow("تأكيدها", self.new2)
         lay.addLayout(f)
-        self.notice = Notice()
-        lay.addWidget(self.notice)
-        ok = primary_button("متابعة")
-        ok.clicked.connect(self.go)
-        lay.addWidget(ok)
+        self.add_footer("متابعة", self.go)
 
     def go(self) -> None:
         """التحقق المحلي ثم القبول."""
@@ -661,17 +690,15 @@ class SecretDialog(QDialog):
         self.accept()
 
 
-class ShowKeyDialog(QDialog):
+class ShowKeyDialog(Modal):
     """عرض مفتاح استرداد جديد مرة واحدة مع إعادة الإدخال للتأكيد."""
 
     def __init__(self, key: str, parent=None):
         """بناء الحوار."""
-        super().__init__(parent)
+        super().__init__("مفتاح الاسترداد الجديد", parent, width=580)
         self.key = key
-        self.setWindowTitle("مفتاح الاسترداد الجديد")
-        self.setFixedWidth(560)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 24, 24, 20)
+        self.close_btn.hide()          # لا يُغلق إلا بتأكيد الكتابة
+        lay = self.body
         box = QLabel(key)
         box.setObjectName("keybox")
         box.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -680,11 +707,14 @@ class ShowKeyDialog(QDialog):
         lay.addWidget(muted("اكتبه بخط يدك وضعه في مظروف مغلق خارج المحل. لن يُعرض مرة أخرى."))
         self.confirm = ltr_edit("أعد كتابة المفتاح للتأكيد")
         lay.addWidget(self.confirm)
-        self.notice = Notice()
-        lay.addWidget(self.notice)
         ok = primary_button("كتبته وتأكدت منه")
         ok.clicked.connect(self.go)
-        lay.addWidget(ok)
+        self.footer_layout.insertWidget(0, ok)
+        self.footer.show()
+
+    def reject(self) -> None:
+        """لا إغلاق بـ Esc قبل التأكيد."""
+        self.notice.show_message("أعد كتابة المفتاح للتأكيد قبل الإغلاق")
 
     def go(self) -> None:
         """لا يُغلق إلا بمطابقة المفتاح."""
@@ -697,18 +727,15 @@ class ShowKeyDialog(QDialog):
         self.accept()
 
 
-class RestoreConfirmDialog(QDialog):
+class RestoreConfirmDialog(Modal):
     """تأكيد الاستعادة: كلمة مرور الدخول للمستخدم الحالي + كتابة كلمة «استعادة»."""
 
     def __init__(self, session, b, parent=None):
         """بناء الحوار."""
-        super().__init__(parent)
+        super().__init__(f"استعادة نسخة {b.at.strftime('%Y-%m-%d %H:%M')}", parent, width=540)
         self.session = session
         self.secret = None
-        self.setWindowTitle(f"استعادة نسخة {b.at.strftime('%Y-%m-%d %H:%M')}")
-        self.setFixedWidth(520)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 24, 24, 20)
+        lay = self.body
         warn = Notice()
         warn.show_message(f"كل ما سُجّل بعد {ltr(b.at.strftime('%Y-%m-%d %H:%M'))} سيختفي من البرنامج. "
                           "قبل الاستعادة تُحفظ نسخة أمان من الوضع الحالي تلقائيًا، فيمكن الرجوع عنها. "
@@ -721,11 +748,7 @@ class RestoreConfirmDialog(QDialog):
         f.addRow("كلمة مرور دخولك", self.login_pw)
         f.addRow("للتأكيد اكتب: استعادة", self.word)
         lay.addLayout(f)
-        self.notice = Notice()
-        lay.addWidget(self.notice)
-        go = danger_button("حفظ نسخة أمان ثم الاستعادة")
-        go.clicked.connect(self.go)
-        lay.addWidget(go)
+        self.add_footer("حفظ نسخة أمان ثم الاستعادة", self.go).setObjectName("danger")
 
     def go(self) -> None:
         """التحقق من كلمة المرور والكلمة."""

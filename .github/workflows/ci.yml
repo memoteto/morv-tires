@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: echo "MORV_DATA_DIR=${RUNNER_TEMP}/morv_data" >> "$GITHUB_ENV"
       - name: الاختبارات
-        run: python -m unittest discover -s tests -t . -v
+        run: python run_tests.py
 
   build-windows:
     needs: test
@@ -61,8 +61,15 @@ jobs:
           Get-Content $f
           if (-not ((Get-Content $f) -match '^ok')) { throw "النتيجة ليست ok" }
           if (-not (Test-Path "$env:MORV_DATA_DIR\morv_tires.db")) { throw "قاعدة البيانات لم تُنشأ" }
+      - name: اسم الأرتيفكت الآمن
+        id: art
+        shell: pwsh
+        # اسم الفرع يحمل "/" في تشغيلات الدمج (3/merge) فيرفضه الرفع؛ نستبدلها بـ "-"
+        run: |
+          $safe = $env:GITHUB_REF_NAME -replace '/', '-'
+          "name=MorvTires-$safe-$env:GITHUB_RUN_NUMBER" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - uses: actions/upload-artifact@v4
         with:
-          name: MorvTires-${{ github.ref_name }}-${{ github.run_number }}
+          name: ${{ steps.art.outputs.name }}
           path: dist/MorvTires
           retention-days: 14

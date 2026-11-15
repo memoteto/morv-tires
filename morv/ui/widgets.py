@@ -3,8 +3,8 @@
 لا SQL هنا؛ كل ما تحتاجه الشاشات من قاعدة البيانات يمر عبر morv.infra.
 """
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-                               QPushButton, QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                               QToolButton, QVBoxLayout, QWidget)
 
 from morv.ui import icons
 
@@ -113,37 +113,38 @@ class Notice(QLabel):
         self.setVisible(bool(text))
 
 
-def primary_button(text: str) -> QPushButton:
-    """زر الإجراء الرئيسي (أزرق)."""
+def primary_button(text: str, icon_name: str | None = None) -> QPushButton:
+    """زر الإجراء الرئيسي (أزرق) بأيقونة اختيارية."""
     b = QPushButton(text)
     b.setObjectName("primary")
+    if icon_name:
+        b.setIcon(icons.icon(icon_name, "#FFFFFF", 18))
     return b
 
 
-def danger_button(text: str) -> QPushButton:
-    """زر إجراء خطر (أحمر) مثل الاستعادة أو الإيقاف."""
+def danger_button(text: str, icon_name: str | None = None) -> QPushButton:
+    """زر إجراء خطر (أحمر) مثل الاستعادة أو الإيقاف، بأيقونة اختيارية."""
     b = QPushButton(text)
     b.setObjectName("danger")
+    if icon_name:
+        b.setIcon(icons.icon(icon_name, "#B42323", 18))
     return b
 
 
-def ask(parent, title: str, text: str) -> bool:
-    """سؤال نعم/لا بالعربية. يعيد True عند الموافقة."""
-    box = QMessageBox(parent)
-    box.setWindowTitle(title)
-    box.setText(text)
-    box.setIcon(QMessageBox.Icon.Question)
-    yes = box.addButton("نعم", QMessageBox.ButtonRole.YesRole)
-    box.addButton("لا", QMessageBox.ButtonRole.NoRole)
-    box.exec()
-    return box.clickedButton() is yes
+def icon_button(text: str, icon_name: str, color: str = "#8792A3") -> QPushButton:
+    """زر عادي بأيقونة."""
+    b = QPushButton(text)
+    b.setIcon(icons.icon(icon_name, color, 18))
+    return b
+
+
+def ask(parent, title: str, text: str, danger: bool = False) -> bool:
+    """سؤال نعم/لا بالنافذة الموحّدة (انظر morv.ui.modal)."""
+    from morv.ui.modal import ask as _ask
+    return _ask(parent, title, text, danger)
 
 
 def info(parent, title: str, text: str, error: bool = False) -> None:
-    """رسالة معلومات أو خطأ بزر «حسنًا»."""
-    box = QMessageBox(parent)
-    box.setWindowTitle(title)
-    box.setText(text)
-    box.setIcon(QMessageBox.Icon.Critical if error else QMessageBox.Icon.Information)
-    box.addButton("حسنًا", QMessageBox.ButtonRole.AcceptRole)
-    box.exec()
+    """رسالة بالنافذة الموحّدة (انظر morv.ui.modal)."""
+    from morv.ui.modal import info as _info
+    _info(parent, title, text, error)

@@ -100,18 +100,27 @@ def migrate(con: sqlite3.Connection, migrations=None, before_apply=None) -> list
     done = []
     for mig in todo:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # كل شيء في نص واحد بين BEGIN وCOMMIT حتى تكون الترقية ذرية.
+        # الترقية ذرية: النص كله داخل معاملة واحدة تبقى مفتوحة بعده، ثم فحص، ثم COMMIT.
         # القيم المدمجة آمنة: الرقم عدد، والاسم مطابق لنمط حروف صغيرة، والبصمة ست عشرية.
         script = (
             "BEGIN IMMEDIATE;\n" + _BOOTSTRAP + "\n" + mig.sql + "\n"
             f"INSERT INTO schema_migrations (version, name, checksum, applied_at) "
-            f"VALUES ({mig.version}, '{mig.name}', '{mig.checksum}', '{now}');\nCOMMIT;"
+            f"VALUES ({mig.version}, '{mig.name}', '{mig.checksum}', '{now}');"
         )
         try:
             con.executescript(script)
-        except sqlite3.Error as e:
+            # ترقية تعيد بناء جدول قد تترك صفوفًا تشير إلى ما لم يعد موجودًا دون أن يعترض SQLite
+            # أثناءها؛ الفحص قبل COMMIT يحوّل ذلك إلى فشل يُتراجع عنه بدل بيانات معطوبة.
+            broken = con.execute("PRAGMA foreign_key_check").fetchall()
+            if broken:
+                tables = "، ".join(sorted({r[0] for r in broken}))
+                raise MigrationError(f"الترقية {mig.version:04d}_{mig.name} تترك {len(broken)} ارتباطًا مكسورًا في: {tables}")
+            con.execute("COMMIT")
+        except (sqlite3.Error, MigrationError) as e:
             if con.in_transaction:
                 con.execute("ROLLBACK")
+            if isinstance(e, MigrationError):
+                raise
             raise MigrationError(f"فشلت الترقية {mig.version:04d}_{mig.name}: {e}") from e
         done.append(mig.version)
     return done

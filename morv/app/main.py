@@ -5,6 +5,8 @@
 
 حلقة الدخول: تسجيل الخروج يغلق النافذة ويعيد شاشة الدخول دون إغلاق البرنامج.
 الاستعادة: تُغلق القاعدة، ويُستبدل ملفها (بعد نسخة أمان)، ثم يعيد البرنامج تشغيل نفسه.
+الاستبدال ذري (backup.restore_file): إن فشلت الاستعادة فالقاعدة كما كانت، فيُعاد فتحها
+ويستمر العمل. المعالج يظهر ما دام الإعداد الأول لم يكتمل (علامة setup.completed_at).
 
 الخيار --smoke (لاختبار البناء آليًا): يعدّ محلًا وهميًا إن لزم، يفتح النافذة كاملة، يكتب
 startup.txt في مجلد البيانات ثم يغلق. وجود الملف وفيه ok يعني أن النسخة المبنية تعمل.
@@ -19,11 +21,12 @@ T_START = time.perf_counter()
 def _smoke_prepare(con) -> None:
     """بيانات وهمية للاختبار الآلي فقط (لا تُستخدم في التشغيل العادي)."""
     from morv.core import security
-    from morv.infra import backup, shop, users
-    if users.count_users(con) == 0:
-        shop.save(con, "محل تجريبي", "01000000000", "")
-        users.create_user(con, None, "admin", "اختبار", "Smoke12345", "manager")
-        backup.setup_encryption(con, "Smoke-Backup-2026", security.new_recovery_key())
+    from morv.infra import setup
+    if not setup.is_complete(con):
+        setup.run_first_setup(
+            con, shop_name="محل تجريبي", shop_phone="01000000000", shop_address="",
+            admin_username="admin", admin_name="اختبار", admin_password="Smoke12345",
+            backup_password="Smoke-Backup-2026", recovery_key=security.new_recovery_key())
 
 
 def _relaunch() -> None:
@@ -50,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     from PySide6.QtWidgets import QApplication, QDialog
 
     from morv import APP_NAME
-    from morv.infra import backup, keystore, users
+    from morv.infra import backup, keystore, setup, users, vault
     from morv.ui import theme
     from morv.ui.login import LoginDialog
     from morv.ui.session import Session
@@ -64,18 +67,35 @@ def main(argv: list[str] | None = None) -> int:
 
     if smoke:
         _smoke_prepare(con)
+    elif paths.looks_synced_or_network(paths.data_dir()):
+        # قاعدة المالك: المزامنة قد تُفسد ملف SQLite أثناء الكتابة. تحذير لا منع.
+        from morv.ui.widgets import info
+        log.warning("مجلد البيانات داخل مجلد مزامنة أو شبكة: %s", paths.data_dir())
+        info(None, "تحذير: مكان البيانات",
+             "مجلد بيانات البرنامج يقع داخل مجلد مزامنة (مثل OneDrive أو Google Drive) أو مجلد شبكة.\n"
+             "المزامنة أثناء العمل قد تُتلف قاعدة البيانات. انقل البيانات إلى مجلد محلي عادي.", error=True)
 
-    # الإعداد الأول (أو الاستعادة على جهاز جديد)
-    if users.count_users(con) == 0:
+    # الإعداد الأول (أو الاستعادة على جهاز جديد)، ويُستكمل إن كان انقطع سابقًا
+    if not setup.is_complete(con):
         wiz = SetupWizard(con)
         if wiz.exec() != QDialog.DialogCode.Accepted:
             con.close()
             return 0
         if wiz.result_kind == "restore":
             con.close()
-            safety = backup.restore_file(paths.db_path(), wiz.restore_path, secret=wiz.restore_secret)
+            try:
+                safety = backup.restore_file(paths.db_path(), wiz.restore_path, secret=wiz.restore_secret)
+            except (backup.BackupError, vault.VaultError) as e:
+                # الاستعادة ذرية: لم يتغير شيء. يُغلق البرنامج، وعند فتحه يظهر المعالج من جديد.
+                log.exception("فشلت الاستعادة على جهاز جديد")
+                from morv.ui.widgets import info
+                info(None, "الاستعادة", f"لم تتم الاستعادة ولم يتغير شيء: {e}\nافتح البرنامج وأعد المحاولة.", error=True)
+                return 1
             con = open_main_db()
-            backup.relink_device(con, wiz.restore_secret)
+            try:
+                backup.relink_device(con, wiz.restore_secret)   # يثبّت بصمة المفتاح في حلقة قديمة
+            except (backup.BackupError, vault.VaultError) as e:
+                log.warning("استُعيدت البيانات لكن تعذّر ربط الجهاز: %s", e)
             users.audit(con, None, "backup.restore", None, None,
                         f"استعادة على جهاز جديد من {wiz.restore_path}" + (f" (نسخة أمان: {safety.name})" if safety else ""))
             log.info("استعادة على جهاز جديد من %s", wiz.restore_path)
@@ -97,11 +117,14 @@ def main(argv: list[str] | None = None) -> int:
             backup.restore_file(paths.db_path(), path, secret=secret, dek=dek)
             log.info("تمت الاستعادة من %s", path)
         except Exception as e:   # noqa: BLE001 — يجب إبلاغ المستخدم بأي فشل هنا
+            # restore_file ذرية: أي فشل يقع قبل الاستبدال، فالقاعدة كما كانت ويُعاد فتحها
             log.exception("فشلت الاستعادة")
             state["con"] = open_main_db()
+            win.session.con = state["con"]
             from morv.ui.widgets import info
-            info(None, "الاستعادة", f"فشلت الاستعادة ولم تتغير البيانات: {e}", error=True)
+            info(None, "الاستعادة", f"لم تتم الاستعادة، والبيانات الحالية كما هي: {e}", error=True)
             win.show()
+            win.health_timer.start()
             return
         _relaunch()
         app.quit()

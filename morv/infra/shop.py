@@ -9,6 +9,7 @@ from pathlib import Path
 
 from morv.core.money import to_latin
 from morv.infra import paths, settings
+from morv.infra.db.connection import transaction
 
 LOGO_FILE = "shop_logo.png"
 _PHONE = re.compile(r"^01[0-9]{9}$")
@@ -48,15 +49,27 @@ def validate(name: str, phone: str) -> tuple[str, str]:
     return name, phone
 
 
-def save(con, name: str, phone: str, address: str) -> Shop:
-    """حفظ بيانات المحل بعد فحصها. العنوان اختياري لكنه لا يكون رقمًا وحده."""
+def check(name: str, phone: str, address: str) -> tuple[str, str, str]:
+    """فحص بيانات المحل كلها قبل أي كتابة. العنوان اختياري لكنه لا يكون رقمًا وحده."""
     name, phone = validate(name, phone)
     address = (address or "").strip()
     if address and to_latin(address).isdigit():
         raise ShopError("العنوان لا يكون رقمًا فقط")
+    return name, phone, address
+
+
+def put(con, name: str, phone: str, address: str) -> None:
+    """كتابة بيانات محل مفحوصة (داخل معاملة المتصل)."""
     settings.put(con, "shop.name", name)
     settings.put(con, "shop.phone", phone)
     settings.put(con, "shop.address", address)
+
+
+def save(con, name: str, phone: str, address: str) -> Shop:
+    """حفظ بيانات المحل بعد فحصها، الثلاثة معًا في معاملة واحدة."""
+    values = check(name, phone, address)
+    with transaction(con):
+        put(con, *values)
     return load(con)
 
 

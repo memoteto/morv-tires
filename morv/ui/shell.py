@@ -9,8 +9,8 @@
 from datetime import date
 
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QListWidget,
+from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget,
                                QListWidgetItem, QMainWindow, QStackedWidget, QToolButton,
                                QVBoxLayout, QWidget)
 
@@ -18,7 +18,11 @@ from morv import APP_NAME, VERSION
 from morv.core import security
 from morv.infra import backup, settings
 from morv.ui import icons, theme
+from morv.ui.customers_page import CustomersPage
+from morv.ui.inventory_page import InventoryPage
 from morv.ui.settings_page import SettingsPage
+from morv.ui.shell_placeholder import placeholder
+from morv.ui.suppliers_page import SuppliersPage
 from morv.ui.widgets import ask
 
 SIDE_WIDE = 244     # عرض الشريط الجانبي مفتوحًا
@@ -36,34 +40,14 @@ NAV = [
     ("pos", "نقطة البيع", "pos", 4),
     ("sales", "المبيعات", "sales", 4),
     ("purchases", "المشتريات", "purchases", 3),
-    ("inventory", "المخزون", "inventory", 2),
-    ("customers", "العملاء", "customers", 2),
-    ("suppliers", "الموردون", "suppliers", 2),
+    ("inventory", "المخزون", "inventory", 0),
+    ("customers", "العملاء", "customers", 0),
+    ("suppliers", "الموردون", "suppliers", 0),
     ("installments", "التقسيط", "installments", 5),
     ("treasury", "الخزينة", "treasury", 6),
     ("reports", "التقارير", "reports", 6),
     ("settings", "الإعدادات", "settings", 0),
 ]
-
-
-def placeholder(phase: int) -> QWidget:
-    """صفحة مؤقتة تخبر المستخدم أن الشاشة لم تُبنَ بعد وفي أي مرحلة ستُبنى.
-
-    لا تكرر عنوان الصفحة لأنه ظاهر في الشريط العلوي.
-    """
-    page = QWidget()
-    lay = QVBoxLayout(page)
-    lay.setContentsMargins(24, 24, 24, 24)
-    card = QFrame()
-    card.setObjectName("card")
-    inner = QVBoxLayout(card)
-    inner.setContentsMargins(24, 24, 24, 24)
-    note = QLabel(f"هذه الشاشة تُبنى في المرحلة {phase} من خطة V1.")
-    note.setObjectName("muted")
-    inner.addWidget(note)
-    inner.addStretch(1)
-    lay.addWidget(card)
-    return page
 
 
 class MainWindow(QMainWindow):
@@ -76,12 +60,15 @@ class MainWindow(QMainWindow):
         con = self.con = session.con
         self.app = app
         self.dark = settings.get(con, "ui.theme", "light") == "dark"
-        self.collapsed = settings.get(con, "ui.sidebar_collapsed", "0") == "1"
-        self.colors = theme.apply(app, self.dark)
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        # الشريط يبدأ مطويًا تلقائيًا على الشاشات الضيقة (أقل من 1200 بكسل منطقي)
+        self.collapsed = settings.get(con, "ui.sidebar_collapsed", "1" if screen.width() < 1200 else "0") == "1"
+        self.colors = self.apply_theme()
         self.setWindowTitle(APP_NAME)
         # لا شريط حالة: كان يمتد بعرض النافذة ويقطع الشريط الجانبي من الأسفل.
         # رقم الإصدار يظهر تلميحًا عند وضع الماوس على اسم البرنامج.
-        self.setMinimumSize(1024, 640)
+        # الحد الأدنى نسبي للشاشة حتى لا تخرج النافذة عنها على الشاشات الصغيرة أو التكبير العالي
+        self.setMinimumSize(min(1024, screen.width() - 40), min(640, screen.height() - 80))
 
         root = QWidget()
         row = QHBoxLayout(root)
@@ -96,8 +83,10 @@ class MainWindow(QMainWindow):
         col.addWidget(self._build_topbar())
         self.stack = QStackedWidget()
         self.pages = {}
+        builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
+                    "inventory": InventoryPage}
         for key, _title, _icon, phase in NAV:
-            page = SettingsPage(session) if key == "settings" else placeholder(phase)
+            page = builders[key](session) if key in builders else placeholder(phase)
             self.pages[key] = page
             self.stack.addWidget(page)
         col.addWidget(self.stack, 1)
@@ -240,10 +229,23 @@ class MainWindow(QMainWindow):
                 return
         raise KeyError(key)
 
+    def apply_theme(self) -> dict:
+        """تطبيق الثيم بالخط والحجم المحفوظين."""
+        family = settings.get(self.con, "ui.font_family", theme.DEFAULT_FONT)
+        size = int(settings.get(self.con, "ui.font_size", str(theme.DEFAULT_SIZE)))
+        return theme.apply(self.app, self.dark, family, size)
+
+    def set_font(self, family: str, size: int) -> None:
+        """تغيير الخط والحجم فورًا وحفظهما (من تبويب المظهر)."""
+        settings.put(self.con, "ui.font_family", family)
+        settings.put(self.con, "ui.font_size", str(size))
+        self.colors = self.apply_theme()
+        self._refresh_icons()
+
     def toggle_theme(self) -> None:
         """التبديل بين الفاتح والداكن وحفظ الاختيار."""
         self.dark = not self.dark
-        self.colors = theme.apply(self.app, self.dark)
+        self.colors = self.apply_theme()
         settings.put(self.con, "ui.theme", "dark" if self.dark else "light")
         self._refresh_icons()
 

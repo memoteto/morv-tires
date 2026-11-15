@@ -1,0 +1,172 @@
+"""شاشة الموردين: قائمة ومعاينة ونافذة إضافة/تعديل. الرصيد الافتتاحي وكشف الحساب في المرحلة 3."""
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLineEdit, QPlainTextEdit, QSpinBox, QWidget
+
+from morv.core.money import MoneyError, fmt, parse_money
+from morv.core.text import ltr
+from morv.infra import suppliers
+from morv.infra.suppliers import Supplier
+from morv.ui.listpage import ListPage
+from morv.ui.modal import Modal
+from morv.ui.widgets import ask, danger_button, form, ltr_edit, muted, primary_button
+
+
+class SuppliersPage(ListPage):
+    """قائمة الموردين."""
+    title = "الموردون"
+    add_label = "مورد جديد"
+    search_placeholder = "الاسم أو الموبايل (F2)"
+    filters = [("all", "الكل"), ("inactive", "الموقوفون")]
+    row_icon = staticmethod(lambda r: "truck")
+    columns = [
+        ("المورد", lambda r: r[1]),
+        ("الموبايل", lambda r: ltr(r[2])),
+        ("جهة الاتصال", lambda r: r[3] or "—"),
+        ("السداد", lambda r: f"آجل {r[5]} يومًا" if r[5] else "نقدي"),
+        ("يورّد", lambda r: suppliers.SUPPLIES.get(r[6], "")),
+        ("الحالة", lambda r: "نشط" if r[4] else "موقوف"),
+    ]
+
+    def can_edit(self) -> bool:
+        """صلاحية الموردين."""
+        return self.session.can("suppliers.manage")
+
+    def fetch(self, query, filter_key, offset):
+        """صفحة من البحث."""
+        return suppliers.search(self.session.con, query, include_inactive=filter_key == "inactive", offset=offset)
+
+    def total(self) -> str:
+        """العدّاد."""
+        return f"{suppliers.count(self.session.con)} مورد نشط"
+
+    def build_preview(self, row_id: int) -> None:
+        """تفاصيل المورد."""
+        s = suppliers.get(self.session.con, row_id)
+        self.heading(s.name, suppliers.SUPPLIES[s.supplies] + ("" if s.active else " · موقوف"))
+        self.kv("الموبايل", ltr(s.mobile))
+        if s.phone2:
+            self.kv("هاتف إضافي", ltr(s.phone2))
+        self.kv("جهة الاتصال", s.contact_person)
+        self.kv("العنوان", s.address)
+        self.kv("السداد", (f"آجل {s.payment_days} يومًا" if s.payment_days else "نقدي") + f" · {suppliers.PAY_METHODS[s.pay_method]}")
+        if s.credit_limit:
+            self.kv("حد الائتمان لنا", ltr(fmt(s.credit_limit)))
+        if s.commercial_reg:
+            self.kv("السجل التجاري", ltr(s.commercial_reg))
+        if s.tax_id:
+            self.kv("الرقم الضريبي", ltr(s.tax_id))
+        if s.bank_info:
+            self.kv("بيانات التحويل", ltr(s.bank_info))
+        if s.notes:
+            self.kv("ملاحظات", s.notes)
+        self.preview_layout.addWidget(muted("الرصيد وفواتير الشراء تظهر هنا بعد المرحلة 3."))
+        if self.can_edit():
+            edit = primary_button("تعديل", "edit")
+            edit.clicked.connect(lambda: self.open_dialog(s.id))
+            toggle = danger_button("إيقاف" if s.active else "تفعيل", "pause" if s.active else "play")
+            toggle.clicked.connect(lambda: self.toggle_active(s))
+            self.actions(edit, toggle)
+
+    def toggle_active(self, s: Supplier) -> None:
+        """إيقاف أو تفعيل مع تأكيد."""
+        verb = "إيقاف" if s.active else "تفعيل"
+        if ask(self, verb, f"{verb} المورد «{s.name}»؟", danger=s.active):
+            suppliers.set_active(self.session.con, self.session.user, s.id, not s.active)
+            self.reload(keep_id=s.id)
+
+    def open_dialog(self, row_id):
+        """نافذة إضافة أو تعديل."""
+        if not self.can_edit():
+            return
+        dlg = SupplierDialog(self.session, suppliers.get(self.session.con, row_id) if row_id else None, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.reload(keep_id=dlg.saved.id)
+
+
+class SupplierDialog(Modal):
+    """نافذة بيانات المورد: الأساسية ثم «بيانات إضافية» تحت مفتاح."""
+
+    def __init__(self, session, s: Supplier | None, parent=None):
+        """بناء الحقول."""
+        super().__init__("تعديل مورد" if s else "مورد جديد", parent, width=600)
+        self.session, self.s, self.saved = session, s, None
+        f = form()
+        self.name = QLineEdit(s.name if s else "")
+        self.name.setPlaceholderText("مثال: الشركة المتحدة لتجارة الإطارات")
+        self.mobile = ltr_edit("01xxxxxxxxx")
+        self.mobile.setText(s.mobile if s else "")
+        self.address = QLineEdit(s.address if s else "")
+        self.address.setPlaceholderText("المدينة — المنطقة")
+        self.notes = QPlainTextEdit(s.notes if s else "")
+        self.notes.setPlaceholderText("أي معلومة تفيد عند التعامل مع المورد")
+        self.notes.setFixedHeight(64)
+        f.addRow("اسم المورد *", self.name)
+        f.addRow("رقم الموبايل *", self.mobile)
+        f.addRow("العنوان", self.address)
+        f.addRow("ملاحظات", self.notes)
+        self.body.addLayout(f)
+        self.body.addWidget(muted("الرصيد السابق مع المورد يُدخل من «الأرصدة الافتتاحية» في المرحلة 3."))
+
+        self.more = QCheckBox("بيانات إضافية (اختيارية)")
+        self.more.toggled.connect(lambda on: self.more_box.setVisible(on))
+        self.body.addWidget(self.more)
+        self.more_box = QWidget()
+        mf = form()
+        self.contact = QLineEdit(s.contact_person if s else "")
+        self.contact.setPlaceholderText("مثال: أ/ مصطفى")
+        self.phone2 = ltr_edit("02xxxxxxxx")
+        self.phone2.setText(s.phone2 if s else "")
+        self.days = QSpinBox()
+        self.days.setRange(0, 365)
+        self.days.setValue(s.payment_days if s else 0)
+        self.limit = ltr_edit("0.00")
+        self.limit.setText(fmt(s.credit_limit) if s and s.credit_limit else "")
+        self.supplies = QComboBox()
+        for k, v in suppliers.SUPPLIES.items():
+            self.supplies.addItem(v, k)
+        self.pay = QComboBox()
+        for k, v in suppliers.PAY_METHODS.items():
+            self.pay.addItem(v, k)
+        if s:
+            self.supplies.setCurrentIndex(list(suppliers.SUPPLIES).index(s.supplies))
+            self.pay.setCurrentIndex(list(suppliers.PAY_METHODS).index(s.pay_method))
+        self.creg = ltr_edit("")
+        self.creg.setText(s.commercial_reg if s else "")
+        self.tax = ltr_edit("")
+        self.tax.setText(s.tax_id if s else "")
+        self.bank = ltr_edit("اسم البنك ورقم الحساب أو رقم المحفظة")
+        self.bank.setText(s.bank_info if s else "")
+        mf.addRow("اسم المسؤول / المندوب", self.contact)
+        mf.addRow("هاتف إضافي", self.phone2)
+        mf.addRow("مدة السداد (أيام)", self.days)
+        mf.addRow("", muted("تحسب تاريخ استحقاق فواتير الشراء الآجلة تلقائيًا"))
+        mf.addRow("حد الائتمان الممنوح لنا", self.limit)
+        mf.addRow("يورّد لنا", self.supplies)
+        mf.addRow("طريقة السداد المفضلة", self.pay)
+        mf.addRow("السجل التجاري", self.creg)
+        mf.addRow("رقم التسجيل الضريبي", self.tax)
+        mf.addRow("بيانات التحويل", self.bank)
+        self.more_box.setLayout(mf)
+        self.more_box.setVisible(False)
+        self.body.addWidget(self.more_box)
+        if s and any((s.contact_person, s.phone2, s.payment_days, s.credit_limit, s.commercial_reg, s.tax_id, s.bank_info)):
+            self.more.setChecked(True)
+        self.add_footer("حفظ", self.save)
+        self.name.setFocus()
+
+    def save(self) -> None:
+        """الحفظ."""
+        try:
+            limit = parse_money(self.limit.text()) if self.limit.text().strip() else 0
+        except MoneyError as e:
+            self.notice.show_message(f"حد الائتمان: {e}")
+            return
+        s = Supplier(self.s.id if self.s else None, self.name.text(), self.mobile.text(), self.phone2.text(),
+                     self.contact.text(), self.address.text(), self.tax.text(), self.notes.toPlainText(), True,
+                     self.days.value(), limit, self.supplies.currentData(), self.pay.currentData(),
+                     self.creg.text(), self.bank.text())
+        try:
+            self.saved = (suppliers.update if self.s else suppliers.create)(self.session.con, self.session.user, s)
+        except suppliers.SupplierError as e:
+            self.notice.show_message(str(e))
+            return
+        self.accept()

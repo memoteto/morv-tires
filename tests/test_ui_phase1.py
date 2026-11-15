@@ -163,15 +163,16 @@ class SettingsTest(_Base):
     """صفحة الإعدادات."""
 
     def test_tabs_by_permission(self):
-        """المدير يرى 5 تبويبات، والكاشير تبويبين فقط وبلا زر استعادة."""
+        """المدير يرى 7 تبويبات، والكاشير 3 فقط وبلا زر استعادة."""
         from morv.infra import users
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
         k = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
         admin_page = SettingsPage(self.session())        # تبقى في متغير وإلا حذفها Qt مع تبويباتها
-        self.assertEqual(admin_page.tabs.count(), 5)
+        self.assertEqual(admin_page.tabs.count(), 7)     # المحل، المستخدمون، السجل، الحقول، المظهر، الاختصارات، النسخ
+        self.assertIsNotNone(admin_page.fields_tab)
         p = SettingsPage(self.session(k))
-        self.assertEqual(p.tabs.count(), 2)               # الاختصارات والنسخ فقط
+        self.assertEqual(p.tabs.count(), 3)               # المظهر والاختصارات والنسخ فقط
         self.assertIsNone(p.shop_tab)                     # لا يرى بيانات المحل أصلًا
         self.assertFalse(p.backup_tab.restore_btn.isVisibleTo(p))
         self.assertFalse(p.backup_tab.pw_btn.isVisibleTo(p))      # كلمة مرور النسخ للمدير فقط
@@ -210,7 +211,10 @@ class SettingsTest(_Base):
         tab.backup_now()
         self.assertEqual(tab.model.rowCount(), 1)
         self.assertIn("تمت النسخة", tab.notice.text())
-        tab.view.selectRow(0)
+        # selectRow في RTL على جدول غير معروض يختار عمودًا بعرض الحشو فيفشل؛ نختار عبر نموذج التحديد مباشرة
+        from PySide6.QtCore import QItemSelectionModel
+        flags = QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows
+        tab.view.selectionModel().setCurrentIndex(tab.model.index(0, 0), flags)
         tab.test_selected()
         self.assertIn("نجح", tab.notice.text())
         self.assertNotEqual(tab.stat_test[1].text(), "لم يُجرَ بعد")
@@ -232,6 +236,29 @@ class SettingsTest(_Base):
         tab.address.setText("")
         tab.save()
         self.assertEqual(shop.load(self.con).phone, "01111111111")
+
+
+class AppearanceTest(_Base):
+    """تبويب المظهر."""
+
+    def test_font_applies_and_persists(self):
+        """تغيير الخط والحجم يُطبَّق على التطبيق ويُحفظ، والخطان المضمّنان متاحان دائمًا."""
+        from morv.infra import settings
+        from morv.ui import theme
+        from morv.ui.shell import MainWindow
+        self.make_admin()
+        self.assertIn("IBM Plex Sans Arabic", theme.available_fonts())
+        self.assertIn("Cairo", theme.available_fonts())
+        w = MainWindow(self.session(), self.app)
+        w.health_timer.stop()
+        w.set_font("Cairo", 16)
+        self.assertEqual(self.app.font().pixelSize(), 16)
+        self.assertEqual(self.app.font().family(), "Cairo")
+        self.assertEqual(settings.get(self.con, "ui.font_size"), "16")
+        w2 = MainWindow(self.session(), self.app)
+        w2.health_timer.stop()
+        self.assertEqual(self.app.font().family(), "Cairo")
+        w.set_font(theme.DEFAULT_FONT, theme.DEFAULT_SIZE)
 
 
 class ShellHealthTest(_Base):
