@@ -23,9 +23,10 @@ class SalesUiTest(unittest.TestCase):
         self.admin = users.create_user(self.con, None, "admin", "المدير", "Admin12345", "manager")
         self.session = Session(self.con, self.admin)
         self.app = get_app()
+        from morv.core.text import norm_ar
         self.con.execute(
             "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
-            "VALUES ('service','SV-1','خدمة وهمية','خدمة وهمية',100,100,100)")
+            "VALUES ('service','SV-1','خدمة وهمية',?,100,100,100)", (norm_ar("خدمة وهمية"),))
 
     def tearDown(self):
         """تنظيف."""
