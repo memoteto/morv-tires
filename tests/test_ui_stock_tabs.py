@@ -135,7 +135,7 @@ class StockTabsTest(unittest.TestCase):
         self.assertEqual([r[2] for r in page.model.rows], ["TR-1"])
 
     def test_reconcile_button_reports_ok_and_problems(self):
-        """المطابقة سليمة تُعلن التطابق؛ وبعد إتلاف رصيد دفعة (بتعطيل الحماية في اختبار فقط) تُعرض الفروق."""
+        """المطابقة سليمة تُعلن التطابق؛ وبعد تغيير رصيد دفعة دون حركة (التعديل مسموح للمحرك) تُعرض الفروق."""
         from morv.ui import stock_pages
         shown = []
         original = stock_pages.info
@@ -146,7 +146,6 @@ class StockTabsTest(unittest.TestCase):
         self.assertEqual(shown[-1][0], "المطابقة")
         self.assertFalse(shown[-1][2])
         self.assertIn("متطابق", shown[-1][1])
-        self.con.execute("DROP TRIGGER stock_lots_no_update")
         self.con.execute("UPDATE stock_lots SET qty_on_hand = qty_on_hand + 1 WHERE item_id = ?", (self.battery,))
         page.open_dialog(None)
         self.assertTrue(shown[-1][2])
