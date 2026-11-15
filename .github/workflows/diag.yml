@@ -43,19 +43,16 @@ jobs:
           from PySide6.QtGui import QShortcut
           from PySide6.QtWidgets import QLineEdit
           pages = [PosPage(Session(con, u)) for _ in range(3)]
+          from PySide6 import QtWidgets as W
+          kinds = {"no_combos": W.QComboBox, "no_view": W.QTableView, "no_spin": W.QSpinBox,
+                   "no_toolbtn": W.QToolButton, "no_pushbtn": W.QPushButton, "no_labels": W.QLabel,
+                   "no_edits": W.QLineEdit}
           for p in pages:
-              if v in ("no_shortcuts", "strip_all"):
-                  for sc in p.findChildren(QShortcut):
-                      sc.setParent(None); sc.deleteLater()
-              if v in ("no_actions", "strip_all"):
-                  for e in p.findChildren(QLineEdit):
-                      for a in e.actions(): e.removeAction(a)
-              if v in ("no_btn_layout", "strip_all"):
-                  lay = p.post_btn.layout()
-                  while lay.count():
-                      w = lay.takeAt(0).widget()
-                      if w: w.setParent(None); w.deleteLater()
-                  lay.deleteLater()
+              if v in kinds:
+                  for w in p.findChildren(kinds[v]):
+                      if v == "no_edits" and isinstance(w.parent(), (W.QComboBox, W.QSpinBox)):
+                          continue
+                      w.setParent(None); w.deleteLater()
           if v == "destroy":
               for p in pages: p.deleteLater()
           from PySide6.QtCore import QEvent
@@ -65,7 +62,7 @@ jobs:
           print("BUILT", v, flush=True)
           os._exit(0)
           PY
-          for v in baseline no_shortcuts no_actions no_btn_layout strip_all destroy; do
+          for v in baseline no_combos no_view no_spin no_toolbtn no_pushbtn no_labels no_edits; do
             n=0; for i in 1 2 3 4 5 6 7 8; do python "$RUNNER_TEMP/r.py" $v > out.txt 2>&1 || n=$((n+1)); done
             echo "RESULT $v crashes=$n/8"; tail -3 out.txt
           done
