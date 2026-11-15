@@ -17,6 +17,7 @@ from morv.infra import installment_collections as collections
 from morv.infra import installment_view, installments, shop
 from morv.infra.installments import ContractError, Guarantor
 from morv.ui.collect_dialog import CollectDialog
+from morv.ui.interest_dialog import InterestDialog
 from morv.ui.listpage import ListPage, TupleModel
 from morv.ui.widgets import Notice, form, ltr_edit, muted, primary_button
 
@@ -396,8 +397,11 @@ class DuePage(QWidget):
         self.collect_btn.clicked.connect(self.collect)
         self.remind_btn = QPushButton("تذكير واتساب")
         self.remind_btn.clicked.connect(self.remind)
+        self.interest_btn = QPushButton("اعتراف فوائد الشهر")
+        self.interest_btn.clicked.connect(self.recognise_interest)
         bar.addWidget(self.collect_btn)
         bar.addWidget(self.remind_btn)
+        bar.addWidget(self.interest_btn)
         bar.addStretch(1)
         root.addLayout(bar)
         self.refresh()
@@ -414,6 +418,7 @@ class DuePage(QWidget):
                                  else "لا تملك صلاحية الاطلاع على الأقساط")
         self.collect_btn.setEnabled(self.session.can("installments.collect") and bool(self.rows))
         self.remind_btn.setEnabled(bool(self.rows))
+        self.interest_btn.setEnabled(self.session.can("installments.manage"))
 
     def can_use(self) -> bool:
         return self.session.can("installments.manage") or self.session.can("installments.collect")
@@ -454,3 +459,9 @@ class DuePage(QWidget):
             return
         QDesktopServices.openUrl(QUrl(link))
         self.notice.show_message("فُتح واتساب برسالة التذكير؛ اضغط إرسال من هناك.", "success")
+
+    def recognise_interest(self) -> None:
+        dlg = InterestDialog(self.session, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.notice.show_message(
+                f"رُحّل قيد {dlg.posted.number} بمبلغ {ltr(fmt(dlg.posted.amount))} جنيه", "success")

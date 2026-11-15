@@ -228,3 +228,21 @@ class DueAndCollectUiTest(unittest.TestCase):
         p.due_page.view.clearSelection()
         p.due_page.view.setCurrentIndex(p.due_page.view.model().index(-1, -1))
         self.assertIsNone(p.due_page.selected())
+
+    def test_interest_dialog_offers_the_month_and_posts_it(self):
+        from morv.ui.interest_dialog import InterestDialog, last_month
+        self.assertEqual(last_month("2026-01-15"), "2025-12")
+        self.assertEqual(last_month("2026-03-01"), "2026-02")
+        dlg = InterestDialog(self.session)
+        self.addCleanup(dlg.deleteLater)
+        dlg.period.setText("2026-12")
+        self.assertFalse(dlg.post_btn.isEnabled())
+
+    def test_interest_button_needs_the_manage_permission(self):
+        from morv.infra import users
+        from morv.ui.installments_page import InstallmentsPage
+        from morv.ui.session import Session
+        cashier = users.create_user(self.con, self.admin, "cash9", "كاشير", "Cash12345", "cashier")
+        p = InstallmentsPage(Session(self.con, cashier))
+        self.addCleanup(p.deleteLater)
+        self.assertFalse(p.due_page.interest_btn.isEnabled())
