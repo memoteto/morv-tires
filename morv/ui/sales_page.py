@@ -1,4 +1,4 @@
-"""شاشة المبيعات: قائمة فواتير البيع المرحّلة ومعاينتها، ونافذة فاتورة بيع جديدة وترحيلها."""
+"""شاشة المبيعات: قائمة فواتير البيع المرحّلة ومعاينتها، ونافذة فاتورة بيع جديدة مطابقة للتصميم المعتمد."""
 import uuid
 from datetime import date
 
@@ -17,7 +17,9 @@ from morv.ui.widgets import form, ltr_edit, muted
 
 ITEM_CHOICES = 50
 PRICE_COLUMN = {"retail": 5, "wholesale": 6, "super": 7}      # موضع سعر الشريحة في صف items.search
-PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة", "transfer": "تحويل بنكي", "wallet": "محفظة", "credit": "على الحساب"}
+TIER_LABELS = {"retail": "قطاعي (تجزئة)", "wholesale": "جملة", "super": "جملة الجملة"}
+PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة"}
+DEFERRED = ("حفظ كمسودة", "معاينة الطباعة", "تعليق الفاتورة", "آجل", "تقسيط", "عميل جديد", "إضافة سريعة")
 
 
 class SalesPage(ListPage):
@@ -84,75 +86,93 @@ class SalesPage(ListPage):
 
 
 class SaleDialog(Modal):
-    """نافذة فاتورة بيع: العميل والعداد، ثم الأسطر وخصومها، ثم وسيلتا الدفع، ثم الترحيل عبر محرك المبيعات."""
+    """نافذة فاتورة بيع بتخطيط التصميم: البيانات والأصناف يمينًا، والملخص والدفع يسارًا، والعناصر المؤجلة معطّلة."""
 
     def __init__(self, session, parent=None):
-        """بناء الرأس وإدخال الأسطر والدفع وجدول الأسطر والإجمالي."""
-        super().__init__("فاتورة بيع جديدة", parent, width=980)
+        """بناء الواجهة والربط بالمحرك."""
+        super().__init__("فاتورة بيع جديدة — نقطة البيع", parent, width=1180)
         self.session = session
         self.posted = None
         self.lines: list[SaleLineIn] = []
         self._names: list[str] = []
         self._busy = False
         self._request_key = uuid.uuid4().hex     # مفتاح واحد للنموذج: إعادة الضغط لا تكرر الفاتورة
+        self.tier = "retail"
 
-        # ---- رأس الفاتورة ----
-        f = form()
+        main = QHBoxLayout()
+        main.setSpacing(14)
+        main.addLayout(self._build_right_column(), 3)
+        main.addLayout(self._build_left_column(), 2)
+        self.body.addLayout(main)
+
+        self.post_btn = self.add_footer("اعتماد الفاتورة", self.post)
+        for label in ("حفظ كمسودة", "معاينة الطباعة", "تعليق الفاتورة"):
+            self.add_footer_widget(self._deferred_button(label))
+
+        self.refresh_items()
+        self._refresh_total()
+        if not items.search(self.session.con, "", limit=1):
+            self.notice.show_message("لا توجد أصناف نشطة؛ أضف أصنافًا من شاشة المخزون أولًا.", "warn")
+
+    # ---------- بناء الأعمدة ----------
+    def _build_right_column(self) -> QVBoxLayout:
+        """الجهة اليمنى: بيانات الفاتورة والعميل، ثم الأصناف والأسطر."""
+        col = QVBoxLayout()
+        col.setSpacing(10)
+
+        head = form()
         self.customer = QComboBox()
-        self.customer.addItem("عميل نقدي", ("", None))
-        for row in customers.search(session.con, "", limit=300):
+        self.customer.addItem("عميل نقدي", ("", "retail"))
+        for row in customers.search(self.session.con, "", limit=300):
             self.customer.addItem(row[1], (row[0], row[3]))
         self.customer.currentIndexChanged.connect(self._on_customer_changed)
         self.odometer = ltr_edit("قراءة العداد (اختياري)")
         self.plate = ltr_edit("رقم اللوحة (اختياري)")
         self.sale_date = ltr_edit("YYYY-MM-DD")
         self.sale_date.setText(date.today().isoformat())
-        f.addRow("العميل", self.customer)
-        f.addRow("قراءة العداد", self.odometer)
-        f.addRow("رقم اللوحة", self.plate)
-        f.addRow("تاريخ الفاتورة *", self.sale_date)
-        self.body.addLayout(f)
+        self.note = ltr_edit("ملاحظة على الفاتورة (اختيارية)")
+        head.addRow("العميل", self._row(self.customer, self._deferred_button("عميل جديد")))
+        head.addRow("فئة السعر", self._tier_row())
+        head.addRow("عداد الكيلومترات", self.odometer)
+        head.addRow("المركبة / اللوحة", self.plate)
+        head.addRow("تاريخ الفاتورة *", self.sale_date)
+        head.addRow("ملاحظة", self.note)
+        col.addLayout(head)
 
-        # ---- إدخال سطر ----
         entry = QFrame()
         entry.setObjectName("card")
-        col = QVBoxLayout(entry)
-        col.setContentsMargins(12, 10, 12, 10)
-        col.setSpacing(8)
-        self.item_search = QLineEdit()
-        self.item_search.setPlaceholderText("ابحث عن صنف أو خدمة: الاسم أو الكود أو المقاس")
-        self.item_search.textChanged.connect(self.refresh_items)
-        self.item_combo = QComboBox()
-        self.item_combo.currentIndexChanged.connect(self._on_item_changed)
-        col.addWidget(self.item_search)
-        col.addWidget(self.item_combo)
-        row = QHBoxLayout()
-        row.setSpacing(10)
+        ec = QVBoxLayout(entry)
+        ec.setContentsMargins(12, 10, 12, 10)
+        ec.setSpacing(8)
+        search_row = self._row(self._item_search_box(), self._deferred_button("إضافة سريعة"))
+        ec.addWidget(search_row)
+        ec.addWidget(self._item_combo_box())
+        cells = QHBoxLayout()
+        cells.setSpacing(10)
         self.qty = QSpinBox()
         self.qty.setRange(1, 100000)
         self.qty.setValue(1)
         self.price = ltr_edit("0.00")
         self.line_disc = ltr_edit("0.00")
-        self.add_btn = QPushButton("إضافة السطر")
-        self.add_btn.clicked.connect(self.add_line)
-        for title, w in (("الكمية", self.qty), ("سعر الوحدة (جنيه)", self.price), ("خصم السطر (جنيه)", self.line_disc)):
+        for title, w in (("الكمية", self.qty), ("السعر (جنيه)", self.price), ("الخصم (جنيه)", self.line_disc)):
             cell = QVBoxLayout()
             cell.setSpacing(4)
             cell.addWidget(muted(title))
             cell.addWidget(w)
-            row.addLayout(cell, 1)
-        row.addWidget(self.add_btn, 0, Qt.AlignmentFlag.AlignBottom)
-        col.addLayout(row)
-        self.body.addWidget(entry)
+            cells.addLayout(cell, 1)
+        self.add_btn = QPushButton("إضافة السطر")
+        self.add_btn.clicked.connect(self.add_line)
+        cells.addWidget(self.add_btn, 0, Qt.AlignmentFlag.AlignBottom)
+        ec.addLayout(cells)
+        col.addWidget(entry)
 
-        # ---- جدول الأسطر ----
         self.lines_model = TupleModel([
-            ("#", lambda r: ltr(str(r[0]))),
-            ("الصنف", lambda r: r[1]),
+            ("م", lambda r: ltr(str(r[0]))),
+            ("الصنف / الخدمة", lambda r: r[1]),
             ("الكمية", lambda r: ltr(str(r[2]))),
-            ("سعر الوحدة", lambda r: ltr(fmt(r[3]))),
-            ("خصم السطر", lambda r: ltr(fmt(r[4])) if r[4] else "—"),
-            ("صافي السطر", lambda r: ltr(fmt(r[2] * r[3] - r[4]))),
+            ("السعر", lambda r: ltr(fmt(r[3]))),
+            ("الخصم", lambda r: ltr(fmt(r[4])) if r[4] else "—"),
+            ("الإجمالي", lambda r: ltr(fmt(r[2] * r[3] - r[4]))),
         ])
         self.view = QTableView()
         self.view.setModel(self.lines_model)
@@ -163,58 +183,72 @@ class SaleDialog(Modal):
         self.view.verticalHeader().setVisible(False)
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.view.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.view.setMinimumHeight(150)
-        self.body.addWidget(self.view)
-
-        # ---- الخصم والإجمالي ----
+        self.view.setMinimumHeight(180)
+        col.addWidget(self.view)
+        self.empty_label = muted("الفاتورة فارغة. ابحث عن صنف أو امسح الباركود للبدء.")
+        col.addWidget(self.empty_label)
         bar = QHBoxLayout()
         self.remove_btn = QPushButton("حذف السطر المختار")
         self.remove_btn.clicked.connect(self.remove_selected)
-        self.invoice_disc = ltr_edit("0.00")
-        self.invoice_disc.setPlaceholderText("خصم على الفاتورة كلها")
-        self.invoice_disc.textChanged.connect(self._refresh_total)
-        self.total_label = QLabel()
-        self.total_label.setObjectName("cardTitle")
         bar.addWidget(self.remove_btn)
         bar.addStretch(1)
-        bar.addWidget(muted("خصم الفاتورة (جنيه)"))
-        bar.addWidget(self.invoice_disc)
-        bar.addWidget(self.total_label)
-        self.body.addLayout(bar)
+        col.addLayout(bar)
+        return col
 
-        # ---- وسائل الدفع: حتى وسيلتين ----
-        pay = form()
+    def _build_left_column(self) -> QVBoxLayout:
+        """الجهة اليسرى: ملخص الفاتورة ثم طرق الدفع."""
+        col = QVBoxLayout()
+        col.setSpacing(10)
+
+        summary = QFrame()
+        summary.setObjectName("card")
+        sc = form()
+        self.subtotal_label = QLabel()
+        self.invoice_disc = ltr_edit("0.00")
+        self.invoice_disc.textChanged.connect(self._refresh_total)
+        self.tax_note = muted("المحل غير مسجّل — بدون ضريبة")
+        self.total_label = QLabel()
+        self.total_label.setObjectName("cardTitle")
+        sc.addRow("الإجمالي قبل الخصم", self.subtotal_label)
+        sc.addRow("خصم على الفاتورة (جنيه)", self.invoice_disc)
+        sc.addRow("الضريبة", self.tax_note)
+        sc.addRow("الإجمالي النهائي (جنيه)", self.total_label)
+        wrap = QVBoxLayout(summary)
+        wrap.setContentsMargins(12, 10, 12, 10)
+        wrap.addLayout(sc)
+        col.addWidget(summary)
+
+        pay = QFrame()
+        pay.setObjectName("card")
+        pc = QVBoxLayout(pay)
+        pc.setContentsMargins(12, 10, 12, 10)
+        pc.setSpacing(8)
+        pc.addWidget(muted("طريقة الدفع"))
+        pc.addWidget(self._deferred_button("آجل"))
+        pc.addWidget(self._deferred_button("تقسيط"))
         self.pay1_method = self._method_combo(first_blank=False)
         self.pay1_amount = ltr_edit("فارغ = كامل الإجمالي")
-        self.pay1_received = ltr_edit("المستلم نقدًا (لحساب الباقي)")
+        self.pay1_received = ltr_edit("المبلغ المستلم نقدًا (لحساب الباقي)")
+        self.pay1_ref = ltr_edit("رقم الإيصال / المرجع (للبطاقة والتحويل)")
         self.pay2_method = self._method_combo(first_blank=True)
         self.pay2_amount = ltr_edit("فارغ = المتبقي")
-        pay.addRow("الدفعة الأولى", self._pair(self.pay1_method, self.pay1_amount, self.pay1_received))
-        pay.addRow("الدفعة الثانية (اختيارية)", self._pair(self.pay2_method, self.pay2_amount))
-        self.body.addLayout(pay)
+        pc.addWidget(muted("الدفعة الأولى"))
+        pc.addWidget(self.pay1_method)
+        pc.addWidget(self.pay1_amount)
+        pc.addWidget(self.pay1_received)
+        pc.addWidget(self.pay1_ref)
+        pc.addWidget(muted("الدفعة الثانية (اختيارية، وسيلتان كحد أقصى)"))
+        pc.addWidget(self.pay2_method)
+        pc.addWidget(self.pay2_amount)
         self.change_label = muted("")
-        self.body.addWidget(self.change_label)
-
-        self.post_btn = self.add_footer("ترحيل الفاتورة", self.post)
-        self.refresh_items()
-        self._refresh_total()
-        if not items.search(self.session.con, "", limit=1):
-            self.notice.show_message("لا توجد أصناف نشطة؛ أضف أصنافًا من شاشة المخزون أولًا.", "warn")
+        pc.addWidget(self.change_label)
+        col.addWidget(pay)
+        col.addStretch(1)
+        return col
 
     # ---------- أدوات بناء ----------
-    @staticmethod
-    def _method_combo(first_blank: bool) -> QComboBox:
-        """قائمة وسيلة دفع؛ الثانية تبدأ بخانة فارغة تعني «لا وسيلة ثانية»."""
-        c = QComboBox()
-        if first_blank:
-            c.addItem("— لا —", None)
-        for key, label in PAYMENT_LABELS.items():
-            c.addItem(label, key)
-        return c
-
-    @staticmethod
-    def _pair(*widgets) -> QFrame:
-        """صف أفقي لعناصر الدفعة الواحدة."""
+    def _row(self, *widgets) -> QFrame:
+        """صف أفقي لعناصر متجاورة."""
         w = QFrame()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 0, 0, 0)
@@ -223,15 +257,64 @@ class SaleDialog(Modal):
             h.addWidget(x, 1)
         return w
 
-    # ---------- العميل والأصناف ----------
-    def _on_customer_changed(self, *_args) -> None:
-        """تغيير شريحة السعر حسب العميل ثم تحديث أسعار الأسطر المعروضة في الاختيار."""
+    def _tier_row(self) -> QFrame:
+        """فئة السعر كأزرار متبادلة؛ الاختيار يحدّد سعر الوحدة للأصناف الجديدة."""
+        w = QFrame()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(6)
+        self.tier_buttons = {}
+        for key, label in TIER_LABELS.items():
+            b = QPushButton(label)
+            b.setCheckable(True)
+            b.setChecked(key == self.tier)
+            b.clicked.connect(lambda _checked=False, k=key: self._set_tier(k))
+            self.tier_buttons[key] = b
+            h.addWidget(b, 1)
+        return w
+
+    def _set_tier(self, key: str) -> None:
+        """تغيير فئة السعر يدويًا ثم تحديث سعر الصنف المختار."""
+        self.tier = key
+        for k, b in self.tier_buttons.items():
+            b.setChecked(k == key)
         self._on_item_changed()
 
-    def _tier_key(self) -> str:
-        """شريحة السعر للعميل الحالي؛ العميل النقدي قطاعي."""
+    def _item_search_box(self) -> QLineEdit:
+        """حقل البحث عن الصنف."""
+        self.item_search = QLineEdit()
+        self.item_search.setPlaceholderText("ابحث عن صنف أو خدمة: الاسم أو الكود أو المقاس")
+        self.item_search.textChanged.connect(self.refresh_items)
+        return self.item_search
+
+    def _item_combo_box(self) -> QComboBox:
+        """قائمة اختيار الصنف."""
+        self.item_combo = QComboBox()
+        self.item_combo.currentIndexChanged.connect(self._on_item_changed)
+        return self.item_combo
+
+    @staticmethod
+    def _deferred_button(label: str) -> QPushButton:
+        """زر لعنصر غير مبني بعد: معطّل مع عبارة «قريبًا» كما في التصميم."""
+        b = QPushButton(f"{label} — قريبًا")
+        b.setEnabled(False)
+        return b
+
+    @staticmethod
+    def _method_combo(first_blank: bool) -> QComboBox:
+        """قائمة وسيلة دفع مدعومة في المحرك فقط؛ الثانية تبدأ بخانة «لا» تعني عدم وجود وسيلة ثانية."""
+        c = QComboBox()
+        if first_blank:
+            c.addItem("— لا —", None)
+        for key, label in PAYMENT_LABELS.items():
+            c.addItem(label, key)
+        return c
+
+    # ---------- العميل والأصناف ----------
+    def _on_customer_changed(self, *_args) -> None:
+        """تغيير العميل يضبط فئة السعر حسب شريحته."""
         data = self.customer.currentData()
-        return (data[1] if data and data[1] else "retail")
+        self._set_tier(data[1] if data and data[1] else "retail")
 
     def refresh_items(self, *_args) -> None:
         """تحديث قائمة اختيار الصنف حسب نص البحث."""
@@ -248,12 +331,12 @@ class SaleDialog(Modal):
         self._on_item_changed()
 
     def _on_item_changed(self, *_args) -> None:
-        """يملأ سعر الوحدة من شريحة العميل للصنف المختار."""
+        """يملأ سعر الوحدة من فئة السعر المختارة للصنف."""
         r = self.item_combo.currentData()
         if r is None:
             self.price.clear()
             return
-        cents = r[PRICE_COLUMN[self._tier_key()]] or r[5]
+        cents = r[PRICE_COLUMN[self.tier]] or r[5]
         self.price.setText(f"{cents // 100}.{cents % 100:02d}")
 
     # ---------- الأسطر ----------
@@ -290,9 +373,10 @@ class SaleDialog(Modal):
         self._refresh_lines()
 
     def _refresh_lines(self) -> None:
-        """إعادة عرض الأسطر والإجمالي."""
+        """إعادة عرض الأسطر والإجمالي ورسالة الفاتورة الفارغة."""
         self.lines_model.reset_rows([(i, self._names[i - 1], ln.qty, ln.unit_price, ln.line_discount)
                                      for i, ln in enumerate(self.lines, start=1)])
+        self.empty_label.setVisible(not self.lines)
         self._refresh_total()
 
     def subtotal_minor(self) -> int:
@@ -309,8 +393,9 @@ class SaleDialog(Modal):
         return self.subtotal_minor() - line_disc - inv_disc
 
     def _refresh_total(self, *_args) -> None:
-        """نص الإجمالي وحساب الباقي المعروض."""
-        self.total_label.setText(f"الإجمالي: {ltr(fmt(self.total_minor()))} جنيه")
+        """نصوص الملخص: قبل الخصم، والنهائي."""
+        self.subtotal_label.setText(f"{ltr(fmt(self.subtotal_minor()))} جنيه")
+        self.total_label.setText(f"{ltr(fmt(self.total_minor()))} جنيه")
 
     def _fail(self, text: str) -> bool:
         """عرض خطأ في شريط الرسائل؛ يعيد False ليسهل الخروج."""
@@ -323,7 +408,8 @@ class SaleDialog(Modal):
         first = sales_rules.Payment(
             method=self.pay1_method.currentData(),
             amount=parse_money(self.pay1_amount.text()) if self.pay1_amount.text().strip() else total,
-            received=parse_money(self.pay1_received.text()) if self.pay1_received.text().strip() else None)
+            received=parse_money(self.pay1_received.text()) if self.pay1_received.text().strip() else None,
+            reference=self.pay1_ref.text().strip() or None)
         out = [first]
         if self.pay2_method.currentData() is not None:
             rest = total - first.amount
@@ -354,7 +440,8 @@ class SaleDialog(Modal):
                 self.session.con, self.session.user, request_key=self._request_key,
                 customer_id=customer[0] or None, lines=list(self.lines), payments=payments,
                 sale_date=self.sale_date.text().strip(), invoice_discount=inv_disc,
-                odometer=odometer, vehicle_plate=self.plate.text().strip() or None)
+                odometer=odometer, vehicle_plate=self.plate.text().strip() or None,
+                notes=self.note.text().strip() or None)
         except (SaleError, sales_rules.SaleRuleError) as e:
             self._fail(f"لم تُرحَّل الفاتورة: {e}")
         except Exception as e:      # أي عطل غير متوقع: المحرك ذري فلا يبقى شيء ناقص
