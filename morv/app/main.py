@@ -145,6 +145,9 @@ def main(argv: list[str] | None = None) -> int:
 
     show_login()
     code = app.exec()
+    from morv.ui.widgets import dispose
+    dispose(state.get("window"), app)
+    state["window"] = None
     if state["con"]:
         try:
             state["con"].close()

@@ -133,6 +133,35 @@ QSpinBox {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['b
 QPlainTextEdit {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; padding:6px 10px; }}
 QToolTip {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']};
             border-radius:6px; padding:4px 8px; }}
+QWidget#cardHead {{ background:transparent; border:0; border-bottom:1px solid {t['border']}; }}
+QLabel#fieldLabel {{ color:{t['muted']}; font-size:{t['fs']-1}px; }}
+QLineEdit:read-only {{ background:{t['surface2']}; border-style:dashed; border-color:{t['border_strong']}; }}
+QFrame#infoStrip {{ background:{t['surface2']}; border:1px solid {t['border']}; border-radius:10px; }}
+QLabel#chip {{ background:{t['surface2']}; color:{t['muted']}; border:1px solid {t['border']}; border-radius:6px;
+               padding:2px 8px; font-size:{t['fs']-2}px; }}
+QLabel#kbd {{ background:{t['surface2']}; color:{t['muted']}; border:1px solid {t['border']}; border-radius:5px;
+              padding:1px 6px; font-size:{t['fs']-3}px; }}
+QLabel#kbdOnPrimary {{ background:rgba(255,255,255,0.18); color:{t['on_primary']}; border:1px solid rgba(255,255,255,0.45);
+                       border-radius:5px; padding:1px 6px; font-size:{t['fs']-3}px; }}
+QPushButton#link {{ background:transparent; border:0; color:{t['primary']}; min-height:28px; padding:0 6px; font-weight:600; }}
+QPushButton#dangerLink {{ background:transparent; border:0; color:{t['danger']}; padding:0 8px; }}
+QFrame#segBar {{ background:{t['surface2']}; border:1px solid {t['border']}; border-radius:10px; }}
+QPushButton#tab {{ background:transparent; border:0; border-radius:8px; min-height:34px; padding:0 14px; color:{t['muted']}; }}
+QPushButton#tab:checked {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border']}; font-weight:600; }}
+QPushButton#quickChip {{ min-height:30px; padding:0 10px; border-color:{t['border']}; font-size:{t['fs']-1}px; }}
+QToolButton#stepBtn {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px;
+                       min-width:34px; min-height:36px; }}
+QFrame#totalBox {{ background:{t['primary_soft']}; border:0; border-radius:10px; }}
+QLabel#totalLabel {{ color:{t['primary']}; font-size:{t['fs']+2}px; font-weight:700; }}
+QLabel#totalValue {{ color:{t['primary']}; font-size:{t['fs']+3}px; font-weight:700; }}
+QFrame#payBox {{ background:{t['surface2']}; border:1px solid {t['border']}; border-radius:10px; }}
+QFrame#changeBox {{ background:{t['success_soft']}; border:0; border-radius:8px; }}
+QLabel#changeLabel {{ color:{t['success']}; font-size:{t['fs']+1}px; font-weight:700; }}
+QLabel#changeValue {{ color:{t['success']}; font-size:{t['fs']+4}px; font-weight:700; }}
+QComboBox#payMethod {{ min-height:56px; padding:0 12px; font-weight:600; }}
+QPushButton#primaryLarge {{ background:{t['primary']}; color:{t['on_primary']}; border:0; border-radius:10px;
+                           min-height:54px; font-size:{t['fs']+4}px; font-weight:700; }}
+QPushButton#primaryLarge:disabled {{ background:{t['border']}; color:{t['muted']}; }}
 """
 
 

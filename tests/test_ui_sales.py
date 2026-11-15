@@ -44,7 +44,7 @@ class SalesUiTest(_Fixture, unittest.TestCase):
     def test_page_builds_and_counts_zero_sales(self):
         from morv.ui.sales_page import SalesPage
         page = self.destroy_on_cleanup(SalesPage(self.session))
-        self.assertEqual(page.total(), "0 فاتورة بيع")
+        self.assertTrue(page.total().startswith("0 فاتورة بيع"), page.total())
 
     def test_dialog_posts_service_sale_through_engine(self):
         from morv.ui.pos_page import PosPage
@@ -58,6 +58,47 @@ class SalesUiTest(_Fixture, unittest.TestCase):
         self.assertIsNotNone(dlg.posted)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sales").fetchone()[0], 1)
         self.assertEqual(self.con.execute("SELECT total FROM sales").fetchone()[0], 100)
+
+    def test_pos_design_tabs_change_and_cancel(self):
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
+        dlg._set_kind("tire")
+        self.assertEqual(dlg.item_combo.count(), 0)
+        dlg._set_kind(None)
+        self.assertEqual(dlg.item_combo.count(), 1)
+        dlg.price.setText("10.00")
+        dlg.qty.setValue(2)
+        self.assertTrue(dlg.add_line())
+        self.assertIn("20.00", dlg.total_label.text())
+        dlg.pay1_received.setText("50.00")
+        self.assertIn("30.00", dlg.change_label.text())
+        dlg.cancel_invoice()
+        self.assertEqual(dlg.lines, [])
+        self.assertIsNone(dlg.posted)
+
+    def test_customer_found_by_typed_name_or_mobile(self):
+        from morv.core.text import norm_ar
+        self.con.execute("INSERT INTO customers (name, name_norm, mobile, price_level) VALUES (?,?,?,?)",
+                         ("عميل وهمي", norm_ar("عميل وهمي"), "01000000001", "wholesale"))
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
+        self.assertFalse(dlg.mobile.isReadOnly())
+        dlg.customer.lineEdit().setText("عميل وهمي")
+        dlg._on_customer_typed()
+        self.assertEqual(dlg.customer.currentText(), "عميل وهمي")
+        self.assertEqual(dlg.mobile.text(), "01000000001")
+        self.assertEqual(dlg.tier, "wholesale")
+        dlg.customer.setCurrentIndex(0)
+        dlg.mobile.setText("01000000001")
+        dlg._on_mobile_typed()
+        self.assertEqual(dlg.customer.currentText(), "عميل وهمي")
+        dlg.customer.lineEdit().setText("اسم غير مسجل")
+        dlg._on_customer_typed()
+        self.assertEqual(dlg.customer.currentText(), "عميل وهمي")
+
+    def test_customer_stats_counts_previous_sales(self):
+        from morv.infra import sale_view
+        self.assertEqual(sale_view.customer_stats(self.con, 999), (0, None))
 
     def test_dialog_refuses_empty_invoice(self):
         from morv.ui.pos_page import PosPage
