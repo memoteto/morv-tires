@@ -1,4 +1,4 @@
-# تشخيص فشل pytest عند الخروج (docs/known-issues.md): اختبار واحد بصيغ تعديل تشخيصية على نسخة CI فقط (12 مرة).
+# تشخيص فشل pytest عند الخروج (docs/known-issues.md): اختبار واحد بإنهاء مبكر عند نقاط متتالية على نسخة CI فقط (12 مرة).
 # لا يخفي أي فشل: المهمة تفشل إن فشل أي تشغيل. يعمل على فروع diag/** فقط ولا يمس ci.yml.
 name: diag-pytest-exit
 
@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-        variant: [control, flush-deferred-delete, no-deleteLater]
+        variant: [control, cut1, cut2, cut3, cut4, cut5, cut6, cut7, cut8]
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
@@ -37,20 +37,22 @@ jobs:
         run: |
           python - <<'PY'
           variant = "${{ matrix.variant }}"
-          if variant == "flush-deferred-delete":
+          anchors = {
+              "cut1": '        dlg = ItemDialog(self.session, None)\n        self.assertIn("size"',
+              "cut2": '        dlg.set_kind("battery")\n',
+              "cut3": '        dlg.widgets["brand"].setText("Michelin")\n',
+              "cut4": '        dlg.widgets["price_retail"].setText("6450")\n',
+              "cut5": '        dlg.save()\n        self.assertIn("الفئة"',
+              "cut6": '        dlg.widgets["cat"].setCurrentText("ملاكي")\n',
+              "cut7": '        # بطارية بنفس النافذة\n',
+              "cut8": '        # خدمة\n',
+          }
+          if variant in anchors:
               p = "tests/test_ui_phase2.py"
               s = open(p, encoding="utf-8").read()
-              old = '        """تنظيف."""\n        self.con.close()'
-              assert old in s
-              new = ('        """تنظيف."""\n        from PySide6.QtCore import QEvent\n'
-                     '        self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)\n'
-                     '        self.app.processEvents()\n        self.con.close()')
-              open(p, "w", encoding="utf-8").write(s.replace(old, new, 1))
-          elif variant == "no-deleteLater":
-              p = "morv/ui/inventory_page.py"
-              s = open(p, encoding="utf-8").read()
-              assert "        old.deleteLater()\n" in s
-              open(p, "w", encoding="utf-8").write(s.replace("        old.deleteLater()\n", "        pass\n", 1))
+              start = s.index("def test_tabs_and_item_dialog_from_fields")
+              i = s.index(anchors[variant], start)
+              open(p, "w", encoding="utf-8").write(s[:i] + "        return\n" + s[i:])
           PY
           git diff --stat
       - name: تكرار الاختبار مع تسجيل رمز الخروج
