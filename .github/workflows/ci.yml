@@ -7,6 +7,19 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    # فحص Ruff فقط: يفشل عند أي خطأ، ولا يصلح الملفات تلقائيًا
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: تثبيت أدوات التطوير
+        run: python -m pip install -r requirements-dev.txt
+      - name: فحص Ruff
+        run: ruff check .
+
   test:
     strategy:
       fail-fast: false

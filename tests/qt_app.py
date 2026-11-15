@@ -10,7 +10,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication  # noqa: F401 — الاستيراد نفسه هو الفحص (توفر Qt)
     HAS_QT = True
 except ImportError:
     HAS_QT = False

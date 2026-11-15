@@ -1,0 +1,7 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# فحص الأخطاء الحقيقية فقط: أخطاء بايثون، والاستيرادات والمتغيرات الميتة، وأنماط bugbear المعروفة.
+select = ["E9", "F", "B"]
