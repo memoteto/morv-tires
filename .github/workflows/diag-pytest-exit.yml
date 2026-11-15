@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-        variant: [control, cut1, cut2, cut3, cut4, cut5, cut6, cut7, cut8]
+        variant: [control, destroy-dialogs, gc-collect-teardown, close-dialogs-only]
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
@@ -37,22 +37,24 @@ jobs:
         run: |
           python - <<'PY'
           variant = "${{ matrix.variant }}"
-          anchors = {
-              "cut1": '        dlg = ItemDialog(self.session, None)\n        self.assertIn("size"',
-              "cut2": '        dlg.set_kind("battery")\n',
-              "cut3": '        dlg.widgets["brand"].setText("Michelin")\n',
-              "cut4": '        dlg.widgets["price_retail"].setText("6450")\n',
-              "cut5": '        dlg.save()\n        self.assertIn("الفئة"',
-              "cut6": '        dlg.widgets["cat"].setCurrentText("ملاكي")\n',
-              "cut7": '        # بطارية بنفس النافذة\n',
-              "cut8": '        # خدمة\n',
-          }
-          if variant in anchors:
-              p = "tests/test_ui_phase2.py"
-              s = open(p, encoding="utf-8").read()
-              start = s.index("def test_tabs_and_item_dialog_from_fields")
-              i = s.index(anchors[variant], start)
-              open(p, "w", encoding="utf-8").write(s[:i] + "        return\n" + s[i:])
+          p = "tests/test_ui_phase2.py"
+          s = open(p, encoding="utf-8").read()
+          end = '        self.assertEqual(dlg3.saved.code, "SV-001")\n'
+          if variant == "destroy-dialogs":
+              add = ('        from PySide6.QtCore import QEvent\n'
+                     '        for d in (dlg, dlg2, dlg3):\n            d.deleteLater()\n'
+                     '        self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)\n        self.app.processEvents()\n')
+              assert end in s
+              s = s.replace(end, end + add, 1)
+          elif variant == "close-dialogs-only":
+              add = '        for d in (dlg, dlg2, dlg3):\n            d.close()\n        self.app.processEvents()\n'
+              assert end in s
+              s = s.replace(end, end + add, 1)
+          elif variant == "gc-collect-teardown":
+              old = '        """تنظيف."""\n        self.con.close()'
+              assert old in s
+              s = s.replace(old, '        """تنظيف."""\n        import gc\n        gc.collect()\n        self.con.close()', 1)
+          open(p, "w", encoding="utf-8").write(s)
           PY
           git diff --stat
       - name: تكرار الاختبار مع تسجيل رمز الخروج
