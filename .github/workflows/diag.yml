@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [shell_only]
+        variant: [pos]
     runs-on: windows-latest
     env:
       QT_QPA_PLATFORM: offscreen
@@ -25,22 +25,47 @@ jobs:
           set +e
           export MORV_DATA_DIR="$RUNNER_TEMP/morv_data"
           cat > "$RUNNER_TEMP/r.py" <<'PY'
-          import os, sys, unittest, faulthandler
+          import os, sys, tempfile, faulthandler
           faulthandler.enable()
           sys.path.insert(0, os.getcwd())
+          from pathlib import Path
           v = sys.argv[1]
-          ld = unittest.defaultTestLoader
-          allm = [f[:-3] for f in os.listdir("tests") if f.startswith("test_") and f.endswith(".py")]
-          ui = [m for m in allm if m.startswith("test_ui") or m == "test_theme"]
-          pick = {"full": allm, "shell_only": ["test_ui_shell"], "sales_only": ["test_ui_sales"],
-                  "ui_without_shell": [m for m in ui if m != "test_ui_shell"],
-                  "ui_without_sales": [m for m in ui if m != "test_ui_sales"]}[v]
-          suite = unittest.TestSuite(ld.loadTestsFromName("tests." + m) for m in pick)
-          r = unittest.TextTestRunner(verbosity=2).run(suite)
-          sys.stdout.flush(); sys.stderr.flush()
-          os._exit(0 if r.wasSuccessful() else 1)
+          tmp = Path(tempfile.mkdtemp()); os.environ["MORV_DATA_DIR"] = str(tmp)
+          from tests.qt_app import get_app
+          app = get_app()
+          from morv.infra import users
+          from morv.infra.db.bootstrap import open_main_db
+          from morv.ui.session import Session
+          from morv.ui import theme
+          con = open_main_db(tmp / "m.db")
+          u = users.create_user(con, None, "admin", "x", "Admin12345", "manager")
+          from morv.ui.pos_page import PosPage
+          from PySide6.QtGui import QShortcut
+          from PySide6.QtWidgets import QLineEdit
+          pages = [PosPage(Session(con, u)) for _ in range(3)]
+          for p in pages:
+              if v in ("no_shortcuts", "strip_all"):
+                  for sc in p.findChildren(QShortcut):
+                      sc.setParent(None); sc.deleteLater()
+              if v in ("no_actions", "strip_all"):
+                  for e in p.findChildren(QLineEdit):
+                      for a in e.actions(): e.removeAction(a)
+              if v in ("no_btn_layout", "strip_all"):
+                  lay = p.post_btn.layout()
+                  while lay.count():
+                      w = lay.takeAt(0).widget()
+                      if w: w.setParent(None); w.deleteLater()
+                  lay.deleteLater()
+          if v == "destroy":
+              for p in pages: p.deleteLater()
+          from PySide6.QtCore import QEvent
+          app.sendPostedEvents(None, QEvent.Type.DeferredDelete); app.processEvents()
+          theme.apply(app, True); app.processEvents()
+          con.close()
+          print("BUILT", v, flush=True)
+          os._exit(0)
           PY
-          for i in 1 2 3 4; do
-            python "$RUNNER_TEMP/r.py" ${{ matrix.variant }} > out.txt 2>&1; code=$?
-            echo "RESULT ${{ matrix.variant }} run$i exit=$code"; cat out.txt
+          for v in baseline no_shortcuts no_actions no_btn_layout strip_all destroy; do
+            n=0; for i in 1 2 3 4 5 6 7 8; do python "$RUNNER_TEMP/r.py" $v > out.txt 2>&1 || n=$((n+1)); done
+            echo "RESULT $v crashes=$n/8"; tail -3 out.txt
           done
