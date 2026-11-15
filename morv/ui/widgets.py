@@ -113,6 +113,16 @@ class Notice(QLabel):
         self.setVisible(bool(text))
 
 
+def dispose(widget, app) -> None:
+    """تدمير نافذة صراحةً قبل خروج العملية حتى لا تنهار Qt على Windows عند الإغلاق (انظر known-issues)."""
+    from PySide6.QtCore import QEvent
+    if widget is None:
+        return
+    widget.deleteLater()
+    app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    app.processEvents()
+
+
 def primary_button(text: str, icon_name: str | None = None) -> QPushButton:
     """زر الإجراء الرئيسي (أزرق) بأيقونة اختيارية."""
     b = QPushButton(text)

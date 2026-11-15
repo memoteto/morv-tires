@@ -73,6 +73,7 @@ jobs:
           $env:QT_QPA_PLATFORM = "offscreen"
           $p = Start-Process -FilePath "dist\MorvTires\MorvTires.exe" -ArgumentList "--smoke" -PassThru
           if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "البرنامج لم يُغلق خلال 60 ثانية" }
+          if ($p.ExitCode -ne 0) { throw "البرنامج خرج برمز $($p.ExitCode) (انهيار عند الإغلاق؟)" }
           $f = "$env:MORV_DATA_DIR\startup.txt"
           if (-not (Test-Path $f)) { throw "startup.txt غير موجود" }
           Get-Content $f

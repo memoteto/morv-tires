@@ -34,9 +34,37 @@ class ShellTest(unittest.TestCase):
     def window(self):
         """نافذة جديدة على الجلسة الحالية."""
         from morv.ui.shell import MainWindow
+        from morv.ui.widgets import dispose
         w = MainWindow(self.session, self.app)
         w.health_timer.stop()
+        self.addCleanup(dispose, w, self.app)
         return w
+
+    def test_live_window_exits_cleanly(self):
+        """نافذة كاملة تُدمَّر صراحةً ثم تخرج العملية برمز 0 (كانت تنهار على Windows عند الخروج)."""
+        import os
+        import subprocess
+        import sys
+        script = (
+            "import os, sys; sys.path.insert(0, os.getcwd())\n"
+            "from tests.qt_app import get_app\n"
+            "from pathlib import Path\n"
+            "app = get_app()\n"
+            "from morv.infra import users\n"
+            "from morv.infra.db.bootstrap import open_main_db\n"
+            "from morv.ui.session import Session\n"
+            "from morv.ui.shell import MainWindow\n"
+            "from morv.ui.widgets import dispose\n"
+            "con = open_main_db(Path(sys.argv[1]) / 'm.db')\n"
+            "u = users.create_user(con, None, 'admin', 'x', 'Admin12345', 'manager')\n"
+            "w = MainWindow(Session(con, u), app); w.health_timer.stop()\n"
+            "dispose(w, app); con.close()\n"
+            "sys.stdout.flush(); os._exit(0)\n")
+        root = Path(__file__).resolve().parent.parent
+        env = dict(os.environ, MORV_DATA_DIR=str(self.tmp / "sub"))
+        r = subprocess.run([sys.executable, "-c", script, str(self.tmp)], cwd=root, env=env,
+                           capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
 
     def test_rtl_and_pages(self):
         """الاتجاه RTL للتطبيق كله، ولكل عنصر في الشريط صفحة."""
