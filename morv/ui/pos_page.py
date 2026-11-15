@@ -4,7 +4,7 @@ from datetime import date
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
-                               QPushButton, QSpinBox, QTableView, QVBoxLayout, QWidget)
+                               QPushButton, QScrollArea, QSpinBox, QTableView, QVBoxLayout, QWidget)
 
 from morv.core import sales_rules
 from morv.core.money import MoneyError, fmt, parse_money
@@ -44,7 +44,13 @@ class PosPage(QWidget):
         main.setSpacing(14)
         main.addLayout(self._build_right_column(), 3)
         main.addLayout(self._build_left_column(), 2)
-        root.addLayout(main, 1)
+        content = QWidget()
+        content.setLayout(main)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(content)
+        root.addWidget(scroll, 1)
         root.addLayout(self._build_footer())
 
         self.refresh_items()
@@ -62,7 +68,7 @@ class PosPage(QWidget):
         title.setObjectName("cardTitle")
         h.addWidget(title)
         h.addStretch(1)
-        h.addWidget(muted("نقطة البيع · المخزن الرئيسي"))
+        h.addWidget(muted("المخزن الرئيسي"))
         return w
 
     def _build_footer(self) -> QHBoxLayout:
