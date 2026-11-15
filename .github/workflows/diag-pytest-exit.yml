@@ -1,4 +1,4 @@
-# تشخيص فشل pytest عند الخروج (docs/known-issues.md): كل ملف واجهة وحده 8 مرات، وصيغة بلا atexit.
+# تشخيص فشل pytest عند الخروج (docs/known-issues.md): كل اختبار من test_ui_phase2.py وحده 12 مرة.
 # لا يخفي أي فشل: المهمة تفشل إن فشل أي تشغيل. يعمل على فروع diag/** فقط ولا يمس ci.yml.
 name: diag-pytest-exit
 
@@ -12,13 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-        variant: [ui-phase1, ui-phase2, ui-shell, theme, all-ui-no-atexit]
-        include:
-          - {variant: ui-phase1, args: "tests/test_ui_phase1.py"}
-          - {variant: ui-phase2, args: "tests/test_ui_phase2.py"}
-          - {variant: ui-shell, args: "tests/test_ui_shell.py"}
-          - {variant: theme, args: "tests/test_theme.py"}
-          - {variant: all-ui-no-atexit, args: "tests/test_ui_phase1.py tests/test_ui_phase2.py tests/test_ui_shell.py tests/test_theme.py"}
+        node: ["CustomersPageTest::test_cashier_can_add_but_not_change_level", "CustomersPageTest::test_dialog_rejects_duplicate_and_saves", "CustomersPageTest::test_preview_opens_on_click_only", "CustomersPageTest::test_search_filters_rows", "SuppliersPageTest::test_cashier_read_only", "SuppliersPageTest::test_dialog_saves", "InventoryPageTest::test_fields_tab_toggle", "InventoryPageTest::test_scan_enter_opens_preview", "InventoryPageTest::test_tabs_and_item_dialog_from_fields", "ModalTest::test_fits_screen_and_footer_visible", "ShellPagesTest::test_real_pages_mounted"]
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
@@ -41,27 +35,16 @@ jobs:
       - name: إصدارات Qt المثبتة
         shell: bash
         run: python -m pip list 2>/dev/null | grep -i -E "pyside|shiboken|pytest" || true
-      - name: تعطيل خطّاف atexit في نسخة CI فقط (صيغة تشخيص لا إصلاح)
-        if: matrix.variant == 'all-ui-no-atexit'
-        shell: bash
-        run: |
-          python - <<'PY'
-          p = "tests/qt_app.py"
-          s = open(p, encoding="utf-8").read()
-          assert "atexit.register(_shutdown)" in s
-          open(p, "w", encoding="utf-8").write(s.replace("atexit.register(_shutdown)", "pass"))
-          PY
-          git diff --stat
       - name: تكرار pytest مع تسجيل رمز الخروج
         shell: bash
         run: |
           fails=0
-          for i in 1 2 3 4 5 6 7 8; do
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
             rc=0
-            python -X faulthandler -m pytest -q -p no:cacheprovider ${{ matrix.args }} > "out_$i.txt" 2>&1 || rc=$?
+            python -X faulthandler -m pytest -q -p no:cacheprovider tests/test_ui_phase2.py::${{ matrix.node }} > "out_$i.txt" 2>&1 || rc=$?
             tail -n 4 "out_$i.txt"
-            echo "ITER $i os=${{ matrix.os }} variant=${{ matrix.variant }} exit=$rc"
+            echo "ITER $i os=${{ matrix.os }} node=${{ matrix.node }} exit=$rc"
             if [ "$rc" -ne 0 ]; then fails=$((fails+1)); fi
           done
-          echo "FAILED_ITERATIONS=$fails of 8"
+          echo "FAILED_ITERATIONS=$fails of 12"
           exit "$fails"
