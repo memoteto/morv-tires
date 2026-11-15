@@ -235,7 +235,9 @@ class DueAndCollectUiTest(unittest.TestCase):
         self.assertEqual(last_month("2026-03-01"), "2026-02")
         dlg = InterestDialog(self.session)
         self.addCleanup(dlg.deleteLater)
-        dlg.period.setText("2026-12")
+        dlg.period.setText("2026-12")      # a month that has not arrived yet
+        self.assertFalse(dlg.post_btn.isEnabled())
+        dlg.period.setText("not-a-month")
         self.assertFalse(dlg.post_btn.isEnabled())
 
     def test_interest_button_needs_the_manage_permission(self):

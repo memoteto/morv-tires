@@ -38,9 +38,13 @@ class InterestDialog(Modal):
         self.refresh()
 
     def refresh(self, *_args) -> None:
+        month = self.period.text().strip()
         try:
-            rows = rec.pending(self.session.con, self.period.text().strip())
-        except Exception:      # noqa: BLE001 - a half-typed month must not break the view
+            rec.check_period(month)
+            rows = rec.pending(self.session.con, month)
+            self.notice.show_message("")
+        except rec.RecognitionError as e:
+            self.notice.show_message(str(e), "warn")
             rows = []
         self.total.setText(f"{ltr(fmt(sum(r[1] for r in rows)))} جنيه")
         self.rows.setText(ltr(str(len(rows))))

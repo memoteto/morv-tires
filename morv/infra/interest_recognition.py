@@ -25,7 +25,7 @@ class PostedRecognition:
     replayed: bool
 
 
-def _check_period(period: str) -> str:
+def check_period(period: str) -> str:
     text = (period or "").strip()
     try:
         date.fromisoformat(text + "-01")
@@ -54,7 +54,7 @@ def recognise(con: sqlite3.Connection, by, *, period: str, entry_date: str | Non
     """Posts one entry for the whole month, or writes nothing at all."""
     if by is None or not has_permission(con, by, "installments.manage"):
         raise RecognitionError("لا تملك صلاحية ترحيل قيد الفوائد")
-    month = _check_period(period)
+    month = check_period(period)
     last_day = _month_end(month)
     try:
         day = ledger.valid_date(entry_date or min(last_day, date.today().isoformat()), "تاريخ القيد")
