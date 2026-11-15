@@ -60,3 +60,9 @@ def get_invoice(con, invoice_id: int) -> InvoiceView:
         "FROM purchase_lines l JOIN items i ON i.id = l.item_id WHERE l.invoice_id = ? ORDER BY l.line_no",
         (invoice_id,))]
     return InvoiceView(h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7] or "", lines)
+
+
+def supplier_totals(con, supplier_id: int) -> tuple[int, int]:
+    """(عدد فواتير المورد المرحّلة، إجمالي مشترياتنا منه بالقرش)."""
+    return tuple(con.execute("SELECT count(*), coalesce(sum(total), 0) FROM purchase_invoices WHERE supplier_id = ?",
+                             (supplier_id,)).fetchone())
