@@ -39,10 +39,26 @@ jobs:
           from morv.ui import theme
           con = open_main_db(tmp / "m.db")
           u = users.create_user(con, None, "admin", "x", "Admin12345", "manager")
-          if v == "customers":
-              from morv.ui.customers_page import CustomersPage as PosPage
-          else:
-              from morv.ui.pos_page import PosPage
+          from PySide6.QtGui import QIcon
+          from PySide6.QtWidgets import QLineEdit as LE, QWidget as QW
+          import morv.ui.icons as ic, morv.infra.sale_view as sv
+          import morv.ui.pos_page as pp
+          if v == "no_icons":
+              ic.icon = lambda *a, **k: QIcon()
+          if v == "no_addaction":
+              pp.PosPage._trail_icon = staticmethod(lambda e, n: None)
+              _orig = pp.PosPage._items_card
+          if v == "no_stats":
+              sv.customer_stats = lambda con, cid: (0, None)
+          if v == "no_shortcut_cls":
+              pp.PosPage._shortcuts = lambda self: None
+          if v == "no_polish":
+              pp.PosPage._on_customer_changed = lambda self, *a: self._set_tier("retail")
+          if v == "no_btnlayout":
+              pp.QHBoxLayout = (lambda orig: (lambda *a: orig() if a and isinstance(a[0], pp.QPushButton) else orig(*a)))(pp.QHBoxLayout)
+          if v == "no_pixlabel":
+              pp.QLabel.setPixmap = lambda self, pm: None
+          from morv.ui.pos_page import PosPage
           from PySide6.QtGui import QShortcut
           from PySide6.QtWidgets import QLineEdit
           pages = [PosPage(Session(con, u)) for _ in range(3)]
@@ -50,14 +66,13 @@ jobs:
               for p in pages: p.deleteLater()
           from PySide6.QtCore import QEvent
           app.sendPostedEvents(None, QEvent.Type.DeferredDelete); app.processEvents()
-          if v != "no_theme":
+          if True:
               theme.apply(app, True); app.processEvents()
           con.close()
           print("BUILT", v, flush=True)
           os._exit(0)
           PY
-          for v in baseline no_theme customers old_pos; do
-            if [ "$v" = old_pos ]; then git fetch -q --depth=1 origin main && git show origin/main:morv/ui/pos_page.py > morv/ui/pos_page.py; fi
+          for v in baseline no_icons no_addaction no_stats no_shortcut_cls no_polish no_btnlayout no_pixlabel; do
             n=0; for i in 1 2 3 4 5 6 7 8; do python "$RUNNER_TEMP/r.py" $v > out.txt 2>&1 || n=$((n+1)); done
             echo "RESULT $v crashes=$n/8"; tail -3 out.txt
           done
