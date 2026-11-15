@@ -4,9 +4,9 @@ from datetime import date, datetime
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QPushButton, QScrollArea, QSpinBox, QTableView, QToolButton, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QCompleter, QFrame, QGridLayout, QHBoxLayout,
+                               QHeaderView, QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox, QTableView,
+                               QToolButton, QVBoxLayout, QWidget)
 
 from morv.core import sales_rules
 from morv.core.money import MoneyError, fmt, parse_money
@@ -147,10 +147,17 @@ class PosPage(QWidget):
         self.customer.addItem("عميل نقدي", ("", "retail", "", ""))
         for row in customers.search(self.session.con, "", limit=300):
             self.customer.addItem(row[1], (row[0], row[3], row[2] or "", (row[5] or "").strip()))
+        self.customer.setEditable(True)        # البحث بكتابة اسم العميل كما في التصميم
+        self.customer.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.customer.completer().setFilterMode(Qt.MatchFlag.MatchContains)
+        self.customer.completer().setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self.customer.lineEdit().setPlaceholderText("اكتب اسم العميل للبحث")
+        self.customer.lineEdit().addAction(icons.icon("user", ICON_MUTED, 18), QLineEdit.ActionPosition.LeadingPosition)
+        self.customer.lineEdit().editingFinished.connect(self._on_customer_typed)
         self.customer.currentIndexChanged.connect(self._on_customer_changed)
-        self.mobile = ltr_edit("—")
-        self.mobile.setReadOnly(True)
+        self.mobile = ltr_edit("ابحث برقم الموبايل")
         self._trail_icon(self.mobile, "phone")
+        self.mobile.editingFinished.connect(self._on_mobile_typed)
         self.plate = ltr_edit("رقم اللوحة")
         self._trail_icon(self.plate, "car")
         grid.addWidget(self._field("العميل *", self.customer), 1, 0, 1, 2)
@@ -545,7 +552,8 @@ class PosPage(QWidget):
     def _stamp(self) -> str:
         """تاريخ اليوم للفاتورة، ويحدّث حقل التاريخ والوقت المقفل."""
         now = datetime.now()
-        self.sale_date.setText(now.strftime("%Y-%m-%d  %H:%M"))
+        self.sale_date.setText(now.strftime("%Y-%m-%d %H:%M"))
+        self.sale_date.setCursorPosition(0)      # يبدأ العرض من أول التاريخ فلا يُقص أوله
         return date.today().isoformat()
 
     def _on_method_changed(self, *_args) -> None:
@@ -554,10 +562,34 @@ class PosPage(QWidget):
         self._refresh_change()
 
     # ---------- العميل والأصناف ----------
+    def _on_customer_typed(self) -> None:
+        """اسم مكتوب يطابق عميلًا يختاره، وإلا يعود الحقل لاسم العميل المختار."""
+        text = self.customer.lineEdit().text().strip()
+        idx = self.customer.findText(text, Qt.MatchFlag.MatchFixedString)
+        if idx >= 0:
+            self.customer.setCurrentIndex(idx)
+            return
+        if text:
+            self.notice.show_message(f"لا يوجد عميل مسجّل باسم «{text}»؛ أضفه من شاشة العملاء.", "warn")
+        self.customer.lineEdit().setText(self.customer.itemText(self.customer.currentIndex()))
+
+    def _on_mobile_typed(self) -> None:
+        """رقم موبايل مكتوب يختار العميل المسجّل به إن وُجد."""
+        digits = "".join(ch for ch in self.mobile.text() if ch.isdigit())
+        current = (self.customer.currentData() or ("", "", "", ""))[2]
+        if not digits or digits == current:
+            return
+        for i in range(1, self.customer.count()):
+            if self.customer.itemData(i)[2] == digits:
+                self.customer.setCurrentIndex(i)
+                self.notice.show_message("")
+                return
+        self.notice.show_message(f"لا يوجد عميل مسجّل بالرقم {ltr(digits)}.", "warn")
+
     def _on_customer_changed(self, *_args) -> None:
         """تغيير العميل يضبط فئة السعر والموبايل وشريط بياناته."""
         cid, level, mobile, vehicle = self.customer.currentData() or ("", "retail", "", "")
-        self.mobile.setText(ltr(mobile) if mobile else "")
+        self.mobile.setText(mobile or "")
         self.plate.setPlaceholderText(f"{vehicle} · رقم اللوحة" if vehicle else "رقم اللوحة")
         if cid:
             n, last = sale_view.customer_stats(self.session.con, cid)

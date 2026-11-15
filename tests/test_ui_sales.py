@@ -83,6 +83,27 @@ class SalesUiTest(unittest.TestCase):
         self.assertEqual(dlg.lines, [])
         self.assertIsNone(dlg.posted)
 
+    def test_customer_found_by_typed_name_or_mobile(self):
+        """كتابة اسم العميل أو موبايله تختاره وتملأ الموبايل وفئة السعر؛ الاسم غير المسجّل لا يُختار."""
+        from morv.core.text import norm_ar
+        self.con.execute("INSERT INTO customers (name, name_norm, mobile, price_level) VALUES (?,?,?,?)",
+                         ("عميل وهمي", norm_ar("عميل وهمي"), "01000000001", "wholesale"))
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
+        self.assertFalse(dlg.mobile.isReadOnly())
+        dlg.customer.lineEdit().setText("عميل وهمي")
+        dlg._on_customer_typed()
+        self.assertEqual(dlg.customer.currentText(), "عميل وهمي")
+        self.assertEqual(dlg.mobile.text(), "01000000001")
+        self.assertEqual(dlg.tier, "wholesale")
+        dlg.customer.setCurrentIndex(0)
+        dlg.mobile.setText("01000000001")
+        dlg._on_mobile_typed()
+        self.assertEqual(dlg.customer.currentText(), "عميل وهمي")
+        dlg.customer.lineEdit().setText("اسم غير مسجل")
+        dlg._on_customer_typed()
+        self.assertEqual(dlg.customer.currentText(), "عميل وهمي")
+
     def test_customer_stats_counts_previous_sales(self):
         """إحصاء العميل بلا فواتير: صفر وبلا تاريخ."""
         from morv.infra import sale_view
