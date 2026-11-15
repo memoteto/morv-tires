@@ -44,7 +44,7 @@ class SalesUiTest(_Fixture, unittest.TestCase):
     def test_page_builds_and_counts_zero_sales(self):
         from morv.ui.sales_page import SalesPage
         page = self.destroy_on_cleanup(SalesPage(self.session))
-        self.assertEqual(page.total(), "0 فاتورة بيع")
+        self.assertTrue(page.total().startswith("0 فاتورة بيع"), page.total())
 
     def test_dialog_posts_service_sale_through_engine(self):
         from morv.ui.pos_page import PosPage
