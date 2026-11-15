@@ -240,6 +240,8 @@ class ShellPagesTest(_Base):
         from morv.ui.suppliers_page import SuppliersPage
         w = MainWindow(self.session, self.app)
         w.health_timer.stop()
+        from morv.ui.widgets import dispose
+        self.addCleanup(dispose, w, self.app)
         self.assertIsInstance(w.pages["customers"], CustomersPage)
         self.assertIsInstance(w.pages["suppliers"], SuppliersPage)
         self.assertIsInstance(w.pages["inventory"], InventoryPage)

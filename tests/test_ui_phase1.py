@@ -251,12 +251,16 @@ class AppearanceTest(_Base):
         self.assertIn("Cairo", theme.available_fonts())
         w = MainWindow(self.session(), self.app)
         w.health_timer.stop()
+        from morv.ui.widgets import dispose
+        self.addCleanup(dispose, w, self.app)
         w.set_font("Cairo", 16)
         self.assertEqual(self.app.font().pixelSize(), 16)
         self.assertEqual(self.app.font().family(), "Cairo")
         self.assertEqual(settings.get(self.con, "ui.font_size"), "16")
         w2 = MainWindow(self.session(), self.app)
         w2.health_timer.stop()
+        from morv.ui.widgets import dispose
+        self.addCleanup(dispose, w2, self.app)
         self.assertEqual(self.app.font().family(), "Cairo")
         w.set_font(theme.DEFAULT_FONT, theme.DEFAULT_SIZE)
 
@@ -271,6 +275,8 @@ class ShellHealthTest(_Base):
         self.make_admin()
         w = MainWindow(self.session(), self.app)
         w.health_timer.stop()
+        from morv.ui.widgets import dispose
+        self.addCleanup(dispose, w, self.app)
         self.assertEqual(w.health_pill.objectName(), "pillDanger")
         backup.run_scheduled(self.con)
         w.refresh_health()
