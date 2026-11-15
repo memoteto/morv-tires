@@ -39,30 +39,25 @@ jobs:
           from morv.ui import theme
           con = open_main_db(tmp / "m.db")
           u = users.create_user(con, None, "admin", "x", "Admin12345", "manager")
-          from morv.ui.pos_page import PosPage
+          if v == "customers":
+              from morv.ui.customers_page import CustomersPage as PosPage
+          else:
+              from morv.ui.pos_page import PosPage
           from PySide6.QtGui import QShortcut
           from PySide6.QtWidgets import QLineEdit
           pages = [PosPage(Session(con, u)) for _ in range(3)]
-          from PySide6 import QtWidgets as W
-          kinds = {"no_combos": W.QComboBox, "no_view": W.QTableView, "no_spin": W.QSpinBox,
-                   "no_toolbtn": W.QToolButton, "no_pushbtn": W.QPushButton, "no_labels": W.QLabel,
-                   "no_edits": W.QLineEdit}
-          for p in pages:
-              if v in kinds:
-                  for w in p.findChildren(kinds[v]):
-                      if v == "no_edits" and isinstance(w.parent(), (W.QComboBox, W.QSpinBox)):
-                          continue
-                      w.setParent(None); w.deleteLater()
           if v == "destroy":
               for p in pages: p.deleteLater()
           from PySide6.QtCore import QEvent
           app.sendPostedEvents(None, QEvent.Type.DeferredDelete); app.processEvents()
-          theme.apply(app, True); app.processEvents()
+          if v != "no_theme":
+              theme.apply(app, True); app.processEvents()
           con.close()
           print("BUILT", v, flush=True)
           os._exit(0)
           PY
-          for v in baseline no_combos no_view no_spin no_toolbtn no_pushbtn no_labels no_edits; do
+          for v in baseline no_theme customers old_pos; do
+            if [ "$v" = old_pos ]; then git fetch -q --depth=1 origin main && git show origin/main:morv/ui/pos_page.py > morv/ui/pos_page.py; fi
             n=0; for i in 1 2 3 4 5 6 7 8; do python "$RUNNER_TEMP/r.py" $v > out.txt 2>&1 || n=$((n+1)); done
             echo "RESULT $v crashes=$n/8"; tail -3 out.txt
           done
