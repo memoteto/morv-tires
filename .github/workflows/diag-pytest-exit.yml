@@ -1,4 +1,4 @@
-# تشخيص فشل pytest عند الخروج (docs/known-issues.md): كل اختبار من test_ui_phase2.py وحده 12 مرة.
+# تشخيص فشل pytest عند الخروج (docs/known-issues.md): اختبار واحد بصيغ تعديل تشخيصية على نسخة CI فقط (12 مرة).
 # لا يخفي أي فشل: المهمة تفشل إن فشل أي تشغيل. يعمل على فروع diag/** فقط ولا يمس ci.yml.
 name: diag-pytest-exit
 
@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-        node: ["CustomersPageTest::test_cashier_can_add_but_not_change_level", "CustomersPageTest::test_dialog_rejects_duplicate_and_saves", "CustomersPageTest::test_preview_opens_on_click_only", "CustomersPageTest::test_search_filters_rows", "SuppliersPageTest::test_cashier_read_only", "SuppliersPageTest::test_dialog_saves", "InventoryPageTest::test_fields_tab_toggle", "InventoryPageTest::test_scan_enter_opens_preview", "InventoryPageTest::test_tabs_and_item_dialog_from_fields", "ModalTest::test_fits_screen_and_footer_visible", "ShellPagesTest::test_real_pages_mounted"]
+        variant: [control, flush-deferred-delete, no-deleteLater]
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
@@ -32,18 +32,36 @@ jobs:
       - name: مجلد بيانات مؤقت
         shell: bash
         run: echo "MORV_DATA_DIR=${RUNNER_TEMP}/morv_data" >> "$GITHUB_ENV"
-      - name: إصدارات Qt المثبتة
+      - name: تعديل تشخيصي على نسخة CI فقط
         shell: bash
-        run: python -m pip list 2>/dev/null | grep -i -E "pyside|shiboken|pytest" || true
-      - name: تكرار pytest مع تسجيل رمز الخروج
+        run: |
+          python - <<'PY'
+          variant = "${{ matrix.variant }}"
+          if variant == "flush-deferred-delete":
+              p = "tests/test_ui_phase2.py"
+              s = open(p, encoding="utf-8").read()
+              old = '        """تنظيف."""\n        self.con.close()'
+              assert old in s
+              new = ('        """تنظيف."""\n        from PySide6.QtCore import QEvent\n'
+                     '        self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)\n'
+                     '        self.app.processEvents()\n        self.con.close()')
+              open(p, "w", encoding="utf-8").write(s.replace(old, new, 1))
+          elif variant == "no-deleteLater":
+              p = "morv/ui/inventory_page.py"
+              s = open(p, encoding="utf-8").read()
+              assert "        old.deleteLater()\n" in s
+              open(p, "w", encoding="utf-8").write(s.replace("        old.deleteLater()\n", "        pass\n", 1))
+          PY
+          git diff --stat
+      - name: تكرار الاختبار مع تسجيل رمز الخروج
         shell: bash
         run: |
           fails=0
           for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
             rc=0
-            python -X faulthandler -m pytest -q -p no:cacheprovider tests/test_ui_phase2.py::${{ matrix.node }} > "out_$i.txt" 2>&1 || rc=$?
-            tail -n 4 "out_$i.txt"
-            echo "ITER $i os=${{ matrix.os }} node=${{ matrix.node }} exit=$rc"
+            python -X faulthandler -m pytest -q -p no:cacheprovider "tests/test_ui_phase2.py::InventoryPageTest::test_tabs_and_item_dialog_from_fields" > "out_$i.txt" 2>&1 || rc=$?
+            tail -n 3 "out_$i.txt"
+            echo "ITER $i os=${{ matrix.os }} variant=${{ matrix.variant }} exit=$rc"
             if [ "$rc" -ne 0 ]; then fails=$((fails+1)); fi
           done
           echo "FAILED_ITERATIONS=$fails of 12"
