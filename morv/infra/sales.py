@@ -63,9 +63,12 @@ def _check_items(con, lines: list) -> dict:
 
 def _check_customer(con, customer_id, payments: list) -> None:
     credit = sum(p.amount for p in payments if p.method == "credit")
+    instalment = sum(p.amount for p in payments if p.method == "installment")
     if customer_id is None:
         if credit:
             raise SaleError("البيع الآجل يحتاج عميلًا مسجلًا")
+        if instalment:
+            raise SaleError("البيع بالتقسيط يحتاج عميلًا مسجلًا")
         return
     row = con.execute("SELECT active, credit_limit FROM customers WHERE id=?", (customer_id,)).fetchone()
     if not row:
