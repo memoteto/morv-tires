@@ -146,7 +146,7 @@ class StockTabsTest(unittest.TestCase):
         self.assertEqual(shown[-1][0], "المطابقة")
         self.assertFalse(shown[-1][2])
         self.assertIn("متطابق", shown[-1][1])
-        self.con.execute("UPDATE stock_lots SET qty_on_hand = qty_on_hand + 1 WHERE item_id = ?", (self.battery,))
+        self.con.execute("UPDATE stock_lots SET qty_on_hand = qty_on_hand - 1 WHERE item_id = ?", (self.battery,))
         page.open_dialog(None)
         self.assertTrue(shown[-1][2])
         self.assertIn("فروق", shown[-1][1])
