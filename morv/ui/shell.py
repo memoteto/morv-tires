@@ -20,6 +20,7 @@ from morv.infra import backup, settings
 from morv.ui import icons, theme
 from morv.ui.customers_page import CustomersPage
 from morv.ui.inventory_page import InventoryPage
+from morv.ui.purchases_page import PurchasesPage
 from morv.ui.settings_page import SettingsPage
 from morv.ui.shell_placeholder import placeholder
 from morv.ui.suppliers_page import SuppliersPage
@@ -84,7 +85,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.pages = {}
         builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
-                    "inventory": InventoryPage}
+                    "inventory": InventoryPage, "purchases": PurchasesPage}
         for key, _title, _icon, phase in NAV:
             page = builders[key](session) if key in builders else placeholder(phase)
             self.pages[key] = page
