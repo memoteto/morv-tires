@@ -1,9 +1,9 @@
-"""شاشة الموردين: قائمة ومعاينة ونافذة إضافة/تعديل. الرصيد الافتتاحي وكشف الحساب في المرحلة 3."""
+"""شاشة الموردين: قائمة ومعاينة ونافذة إضافة/تعديل. الرصيد وكشف الحساب مع مرحلة الخزينة."""
 from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLineEdit, QPlainTextEdit, QSpinBox, QWidget
 
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
-from morv.infra import suppliers
+from morv.infra import purchase_view, suppliers
 from morv.infra.suppliers import Supplier
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
@@ -58,7 +58,10 @@ class SuppliersPage(ListPage):
             self.kv("بيانات التحويل", ltr(s.bank_info))
         if s.notes:
             self.kv("ملاحظات", s.notes)
-        self.preview_layout.addWidget(muted("الرصيد وفواتير الشراء تظهر هنا بعد المرحلة 3."))
+        if self.session.can("purchases.post") or self.session.can("items.cost_view"):
+            n, total = purchase_view.supplier_totals(self.session.con, s.id)
+            self.kv("فواتير الشراء", f"{ltr(str(n))} فاتورة · {ltr(fmt(total))} جنيه")
+        self.preview_layout.addWidget(muted("رصيد المورد وسداده يأتيان مع مرحلة الخزينة."))
         if self.can_edit():
             edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(s.id))
@@ -104,7 +107,7 @@ class SupplierDialog(Modal):
         f.addRow("العنوان", self.address)
         f.addRow("ملاحظات", self.notes)
         self.body.addLayout(f)
-        self.body.addWidget(muted("الرصيد السابق مع المورد يُدخل من «الأرصدة الافتتاحية» في المرحلة 3."))
+        self.body.addWidget(muted("الرصيد السابق مع المورد يُدخل مع مرحلة الخزينة."))
 
         self.more = QCheckBox("بيانات إضافية (اختيارية)")
         self.more.toggled.connect(lambda on: self.more_box.setVisible(on))

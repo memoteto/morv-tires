@@ -11,11 +11,11 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 from morv.core import validate
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
-from morv.infra import items
+from morv.infra import inventory, items
 from morv.infra.items import Item
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
-from morv.ui.shell_placeholder import placeholder
+from morv.ui.stock_pages import LotsPage, StockPage
 from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
 
 
@@ -30,13 +30,22 @@ class InventoryPage(QWidget):
         self.tabs = QTabWidget()
         self.items_tab = ItemsPage(session)
         self.tabs.addTab(self.items_tab, "الأصناف")
-        self.tabs.addTab(placeholder(3), "الدفعات (DOT)")
-        self.tabs.addTab(placeholder(3), "الجرد والتسويات")
+        self.lots_tab = LotsPage(session)
+        self.stock_tab = StockPage(session)
+        self.tabs.addTab(self.lots_tab, "الدفعات (DOT)")
+        self.tabs.addTab(self.stock_tab, "الجرد والتسويات")
+        self.tabs.currentChanged.connect(self._refresh_tab)
         lay.addWidget(self.tabs)
+
+    def _refresh_tab(self, _index: int) -> None:
+        """إعادة تحميل التبويب عند فتحه، فتظهر آخر فواتير الشراء دون إعادة تشغيل."""
+        page = self.tabs.currentWidget()
+        if page is not self.items_tab:
+            page.reload()
 
 
 class ItemsPage(ListPage):
-    """قائمة الأصناف. التكلفة والرصيد يأتيان في المرحلة 3 مع الدفعات."""
+    """قائمة الأصناف؛ الرصيد والقيمة في المعاينة."""
     title = "الأصناف"
     add_label = "صنف جديد"
     search_placeholder = "الاسم، الكود، المقاس (205/55R16) أو الباركود (F2)"
@@ -99,7 +108,11 @@ class ItemsPage(ListPage):
             self.kv(f.label, shown)
         if it.notes:
             self.kv("ملاحظات", it.notes)
-        self.preview_layout.addWidget(muted("الرصيد والدفعات والتكلفة تظهر هنا بعد المرحلة 3."))
+        if it.kind != "service":
+            self.kv("الرصيد", ltr(str(inventory.on_hand(self.session.con, it.id))))
+            if self.session.can("purchases.post") or self.session.can("items.cost_view"):
+                self.kv("القيمة الدفترية", ltr(fmt(inventory.book_value(self.session.con, it.id))))
+            self.preview_layout.addWidget(muted("تفاصيل الدفعات وDOT في تبويب «الدفعات (DOT)»."))
         if self.can_edit():
             edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(it.id))
