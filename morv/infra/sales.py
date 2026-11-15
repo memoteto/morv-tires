@@ -80,9 +80,14 @@ def _check_customer(con, customer_id, payments: list) -> None:
     if credit:
         if row[1] <= 0:
             raise SaleError("لهذا العميل حد ائتمان صفر؛ لا يُقبل آجل")
-        outstanding = con.execute(
+        sold = con.execute(
             "SELECT coalesce(sum(p.amount), 0) FROM sale_payments p JOIN sales s ON s.id = p.sale_id "
             "WHERE s.customer_id=? AND p.method='credit'", (customer_id,)).fetchone()[0]
+        # المرتجع المردود على الحساب يخفض المشغول من حد الائتمان
+        refunded = con.execute(
+            "SELECT coalesce(sum(r.total), 0) FROM sale_returns r JOIN sales s ON s.id = r.sale_id "
+            "WHERE s.customer_id=? AND r.refund_method='credit'", (customer_id,)).fetchone()[0]
+        outstanding = sold - refunded
         if outstanding + credit > row[1]:
             raise SaleError("يتجاوز الآجل حد ائتمان العميل")
 

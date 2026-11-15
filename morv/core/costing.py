@@ -32,6 +32,25 @@ def plan_fifo(layers, qty: int) -> list:
     return out
 
 
+def take_units(parts, done: int, qty: int) -> list:
+    """اقتطاع qty وحدة تبدأ بعد done من أجزاء [(مفتاح, كمية, قيمة)] بترتيبها.
+
+    القيمة تُقسَّم بفرق تراكمي، فمجموع اقتطاعات الجزء الواحد = قيمته بالضبط مهما تكرر الاقتطاع.
+    """
+    if qty <= 0 or done < 0:
+        raise ValueError("الكمية موجبة والمقتطع سابقًا غير سالب")
+    if done + qty > sum(q for _, q, _ in parts):
+        raise InsufficientStock("المطلوب أكبر مما صُرف فعلًا")
+    out, start = [], 0
+    for key, q, value in parts:
+        lo, hi = max(done, start), min(done + qty, start + q)
+        if hi > lo:
+            a, b = lo - start, hi - start
+            out.append((key, hi - lo, value * b // q - value * a // q))
+        start += q
+    return out
+
+
 def plan_lots(lots, qty: int) -> dict:
     """دفعات (id, رصيد) مرتبة بالأقدم تصنيعًا أولًا؛ يعيد {id: كمية} المقترح صرفها."""
     out, need = {}, qty
