@@ -12,6 +12,7 @@ from morv.core import security
 from morv.infra import backup, settings
 from morv.ui import icons, theme
 from morv.ui.customers_page import CustomersPage
+from morv.ui.installments_page import InstallmentsPage
 from morv.ui.inventory_page import InventoryPage
 from morv.ui.purchases_page import PurchasesPage
 from morv.ui.pos_page import PosPage
@@ -77,11 +78,13 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.pages = {}
         builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
-                    "inventory": InventoryPage, "purchases": PurchasesPage, "sales": SalesPage, "pos": PosPage}
+                    "inventory": InventoryPage, "purchases": PurchasesPage, "sales": SalesPage,
+                    "pos": PosPage, "installments": InstallmentsPage}
         for key, _title, _icon, phase in NAV:
             page = builders[key](session) if key in builders else placeholder(phase)
             self.pages[key] = page
             self.stack.addWidget(page)
+        self.pages["pos"].contract_needed.connect(self.open_contract)
         col.addWidget(self.stack, 1)
         row.addWidget(main, 1)
         self.setCentralWidget(root)
@@ -174,6 +177,10 @@ class MainWindow(QMainWindow):
         self.health_pill.setToolTip(text)
         self.health_pill.style().unpolish(self.health_pill)
         self.health_pill.style().polish(self.health_pill)
+
+    def open_contract(self, sale_id: int) -> None:
+        self.go_key("installments")
+        self.pages["installments"].open_form_for_sale(sale_id)
 
     def open_backup(self) -> None:
         self.go_key("settings")
