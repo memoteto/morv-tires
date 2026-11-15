@@ -3,15 +3,20 @@ import uuid
 from datetime import date
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout, QHeaderView,
-                               QLabel, QLineEdit, QPushButton, QSpinBox, QStackedWidget, QTableView, QVBoxLayout,
-                               QWidget)
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout,
+                               QHeaderView, QLabel, QLineEdit, QPushButton, QSpinBox, QStackedWidget, QTableView,
+                               QTabWidget, QVBoxLayout, QWidget)
 
 from morv.core import installments as calc
+from morv.core import reminders
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
-from morv.infra import installment_view, installments
+from morv.infra import installment_collections as collections
+from morv.infra import installment_view, installments, shop
 from morv.infra.installments import ContractError, Guarantor
+from morv.ui.collect_dialog import CollectDialog
 from morv.ui.listpage import ListPage, TupleModel
 from morv.ui.widgets import Notice, form, ltr_edit, muted, primary_button
 
@@ -24,8 +29,12 @@ class InstallmentsPage(QStackedWidget):
         super().__init__(parent)
         self.session = session
         self.list_page = ContractsPage(session, self)
+        self.due_page = DuePage(session)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self.list_page, "العقود")
+        self.tabs.addTab(self.due_page, "الأقساط")
         self.form_page = None
-        self.addWidget(self.list_page)
+        self.addWidget(self.tabs)
 
     def open_form(self, sale: tuple) -> None:
         if self.form_page is not None:
@@ -39,14 +48,16 @@ class InstallmentsPage(QStackedWidget):
         try:
             sale = installment_view.invoice_for_contract(self.session.con, sale_id)
         except LookupError as e:
-            self.setCurrentWidget(self.list_page)
+            self.setCurrentWidget(self.tabs)
             self.list_page.notice.show_message(str(e), "warn")
             return
         self.open_form(sale)
 
     def back_to_list(self, keep_id: int | None = None) -> None:
-        self.setCurrentWidget(self.list_page)
+        self.setCurrentWidget(self.tabs)
+        self.tabs.setCurrentWidget(self.list_page)
         self.list_page.reload(keep_id=keep_id)
+        self.due_page.refresh()
 
 
 class ContractsPage(ListPage):
@@ -347,3 +358,99 @@ class ContractForm(QWidget):
         finally:
             self._busy = False
             self.post_btn.setEnabled(True)
+
+
+class DuePage(QWidget):
+    def __init__(self, session, parent=None):
+        super().__init__(parent)
+        self.session = session
+        self.rows = []
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 12, 16, 12)
+        root.setSpacing(10)
+        self.notice = Notice()
+        self.count_label = muted("")
+        root.addWidget(self.count_label)
+        root.addWidget(self.notice)
+        self.model = TupleModel([
+            ("العقد", lambda r: ltr(r[2])),
+            ("العميل", lambda r: r[3]),
+            ("القسط", lambda r: ltr(str(r[5]))),
+            ("تاريخ الاستحقاق", lambda r: ltr(r[6])),
+            ("قيمة القسط", lambda r: ltr(fmt(r[7]))),
+            ("المتبقي", lambda r: ltr(fmt(r[8]))),
+            ("الحالة", lambda r: self._state(r[6])),
+        ])
+        self.view = QTableView()
+        self.view.setModel(self.model)
+        self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.view.setAlternatingRowColors(True)
+        self.view.verticalHeader().setVisible(False)
+        self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.view.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        root.addWidget(self.view, 1)
+        bar = QHBoxLayout()
+        self.collect_btn = primary_button("تحصيل قسط")
+        self.collect_btn.clicked.connect(self.collect)
+        self.remind_btn = QPushButton("تذكير واتساب")
+        self.remind_btn.clicked.connect(self.remind)
+        bar.addWidget(self.collect_btn)
+        bar.addWidget(self.remind_btn)
+        bar.addStretch(1)
+        root.addLayout(bar)
+        self.refresh()
+
+    @staticmethod
+    def _state(due_date: str) -> str:
+        late = reminders.late_days(due_date)
+        return f"متأخر {ltr(str(late))} يومًا" if late else "لم يحن"
+
+    def refresh(self) -> None:
+        self.rows = installment_view.due_instalments(self.session.con) if self.can_use() else []
+        self.model.reset_rows(self.rows)
+        self.count_label.setText(f"{len(self.rows)} قسط غير مسدَّد" if self.can_use()
+                                 else "لا تملك صلاحية الاطلاع على الأقساط")
+        self.collect_btn.setEnabled(self.session.can("installments.collect") and bool(self.rows))
+        self.remind_btn.setEnabled(bool(self.rows))
+
+    def can_use(self) -> bool:
+        return self.session.can("installments.manage") or self.session.can("installments.collect")
+
+    def selected(self):
+        idx = self.view.currentIndex()
+        if not idx.isValid():
+            self.notice.show_message("اختر قسطًا من الجدول أولًا.", "warn")
+            return None
+        return self.rows[idx.row()]
+
+    def collect(self) -> None:
+        row = self.selected()
+        if row is None:
+            return
+        left = collections.remaining(self.session.con, row[1])
+        dlg = CollectDialog(self.session, (row[2], row[1], row[3]), (row[5], row[8], row[6]), left, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.notice.show_message(f"تم التحصيل بالسند {dlg.posted.number}", "success")
+            self.refresh()
+
+    def remind(self) -> None:
+        row = self.selected()
+        if row is None:
+            return
+        text = reminders.render(reminders.LATE_TEMPLATE, {
+            reminders.CUSTOMER: row[3],
+            reminders.CONTRACT: row[2],
+            reminders.AMOUNT: fmt(row[8]),
+            reminders.DUE_DATE: row[6],
+            reminders.LATE_DAYS: str(reminders.late_days(row[6])),
+            reminders.SHOP: shop.load(self.session.con).name,
+        })
+        try:
+            link = reminders.wa_link(row[4], text)
+        except reminders.ReminderError as e:
+            self.notice.show_message(str(e))
+            return
+        QDesktopServices.openUrl(QUrl(link))
+        self.notice.show_message("فُتح واتساب برسالة التذكير؛ اضغط إرسال من هناك.", "success")

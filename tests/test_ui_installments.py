@@ -167,3 +167,63 @@ class PosToContractTest(unittest.TestCase):
         p.post()
         self.assertIsNone(p.posted)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sales").fetchone()[0], 0)
+
+
+@require_qt()
+class DueAndCollectUiTest(unittest.TestCase):
+    def setUp(self):
+        from morv.core.sales_rules import Payment
+        from morv.infra import installments, sales, users
+        from morv.infra.db.bootstrap import open_main_db
+        from morv.infra.sales import SaleLineIn
+        from morv.ui.session import Session
+        self.tmp = Path(tempfile.mkdtemp())
+        os.environ["MORV_DATA_DIR"] = str(self.tmp)
+        self.con = open_main_db(self.tmp / "morv_tires.db")
+        self.admin = users.create_user(self.con, None, "admin", "المدير", "Admin12345", "manager")
+        self.session = Session(self.con, self.admin)
+        self.app = get_app()
+        item = self.con.execute(
+            "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
+            "VALUES ('service','SV-1','خدمة','خدمه',1200000,1200000,1200000) RETURNING id").fetchone()[0]
+        self.cust = self.con.execute(
+            "INSERT INTO customers (name, name_norm, mobile, credit_limit) "
+            "VALUES ('عميل وهمي','عميل وهمي','01000000011',0) RETURNING id").fetchone()[0]
+        sale = sales.post_sale(self.con, self.admin, request_key="due-sale-key-1", customer_id=self.cust,
+                               lines=[SaleLineIn(item, 1, 1200000)],
+                               payments=[Payment("installment", 1200000)], sale_date="2026-11-10")
+        self.contract = installments.post_contract(
+            self.con, self.admin, request_key="due-contract-key-1", sale_id=sale.id, down=200000, rate_bp=1500,
+            months=10, first_due="2026-12-13", national_id=NID, down_method="cash", contract_date="2026-11-13")
+
+    def tearDown(self):
+        self.con.close()
+        os.environ.pop("MORV_DATA_DIR", None)
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def page(self):
+        from morv.ui.installments_page import InstallmentsPage
+        p = InstallmentsPage(self.session)
+        self.addCleanup(p.deleteLater)
+        return p
+
+    def test_due_tab_lists_every_unpaid_instalment(self):
+        p = self.page()
+        self.assertEqual(len(p.due_page.rows), 10)
+        self.assertIn("10 قسط غير مسدَّد", p.due_page.count_label.text())
+
+    def test_collecting_clears_the_oldest_instalment(self):
+        from morv.infra import installment_collections as coll
+        p = self.page()
+        p.due_page.view.selectRow(0)
+        row = p.due_page.selected()
+        coll.collect(self.con, self.admin, request_key="ui-collect-key-1", contract_id=row[1],
+                     amount=row[8], method="cash")
+        p.due_page.refresh()
+        self.assertEqual(len(p.due_page.rows), 9)
+
+    def test_reminder_needs_a_selected_row(self):
+        p = self.page()
+        p.due_page.view.clearSelection()
+        p.due_page.view.setCurrentIndex(p.due_page.view.model().index(-1, -1))
+        self.assertIsNone(p.due_page.selected())

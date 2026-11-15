@@ -74,3 +74,19 @@ def invoice_for_contract(con: sqlite3.Connection, sale_id: int) -> tuple:
     if not rows:
         raise LookupError("الفاتورة ليست بانتظار عقد تقسيط")
     return rows[0]
+
+
+def due_instalments(con: sqlite3.Connection, only_unpaid: bool = True) -> list[tuple]:
+    """Every instalment with its contract, customer and what is still owed on it, earliest due first."""
+    rows = con.execute(
+        "SELECT r.id, c.id, c.number, cu.name, coalesce(cu.mobile, ''), r.no, r.due_date, r.amount, "
+        "r.amount - coalesce((SELECT sum(a.amount) FROM installment_allocations a WHERE a.row_id = r.id), 0) "
+        "FROM installment_rows r JOIN installment_contracts c ON c.id = r.contract_id "
+        "JOIN customers cu ON cu.id = c.customer_id ORDER BY r.due_date, r.no").fetchall()
+    return [r for r in rows if r[8] > 0] if only_unpaid else rows
+
+
+def contract_collections(con: sqlite3.Connection, contract_id: int) -> list[tuple]:
+    return con.execute(
+        "SELECT number, collect_date, amount, method FROM installment_collections "
+        "WHERE contract_id=? ORDER BY id", (contract_id,)).fetchall()

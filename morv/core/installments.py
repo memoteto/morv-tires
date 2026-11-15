@@ -91,3 +91,21 @@ def _check_date(day: str) -> None:
         date.fromisoformat(day)
     except (TypeError, ValueError) as e:
         raise InstalmentError("تاريخ أول قسط غير صالح") from e
+
+
+def spread(outstanding, amount: int) -> list:
+    """Owner's rule: a collection pays the oldest instalment first, and may never exceed what is owed."""
+    if type(amount) is not int or amount <= 0:
+        raise InstalmentError("المبلغ المحصَّل عدد صحيح موجب")
+    total = sum(left for _, left in outstanding)
+    if amount > total:
+        raise InstalmentError("المبلغ أكبر من المتبقي على العقد")
+    out, left = [], amount
+    for row_id, owed in outstanding:
+        if left == 0:
+            break
+        take = min(left, owed)
+        if take > 0:
+            out.append((row_id, take))
+            left -= take
+    return out
