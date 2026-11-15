@@ -171,7 +171,7 @@ def set_active(con, by, customer_id: int, active: bool) -> None:
 
 def has_documents(con, customer_id: int) -> bool:
     """هل للعميل مستندات تمنع حذفه؟ يُوسَّع مع كل جدول جديد يشير إلى العملاء."""
-    return False
+    return con.execute("SELECT 1 FROM sales WHERE customer_id=? LIMIT 1", (customer_id,)).fetchone() is not None
 
 
 def delete(con, by, customer_id: int) -> None:

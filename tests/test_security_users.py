@@ -118,7 +118,7 @@ class UsersTest(unittest.TestCase):
         """المدير يملك كل الصلاحيات دائمًا، والكاشير ما سُمح له به فقط."""
         c = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
         self.assertEqual(users.permissions(self.con, self.admin), set(security.PERMISSIONS))
-        self.assertEqual(users.permissions(self.con, c), {"customers.manage"})   # افتراضي الكاشير
+        self.assertEqual(users.permissions(self.con, c), {"customers.manage", "sales.post"})   # افتراضي الكاشير
         users.set_permission(self.con, self.admin, c.id, "backup.restore", True)
         self.assertTrue(users.has_permission(self.con, c, "backup.restore"))
         users.set_permission(self.con, self.admin, c.id, "backup.restore", False)
