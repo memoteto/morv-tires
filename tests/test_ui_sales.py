@@ -65,6 +65,29 @@ class SalesUiTest(unittest.TestCase):
         self.assertEqual(self.con.execute("SELECT count(*) FROM sales").fetchone()[0], 1)
         self.assertEqual(self.con.execute("SELECT total FROM sales").fetchone()[0], 100)
 
+    def test_pos_design_tabs_change_and_cancel(self):
+        """تبويب الإطارات يخفي الخدمة، والباقي يُحسب من المستلم، والإلغاء يفرغ الفاتورة."""
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
+        dlg._set_kind("tire")
+        self.assertEqual(dlg.item_combo.count(), 0)
+        dlg._set_kind(None)
+        self.assertEqual(dlg.item_combo.count(), 1)
+        dlg.price.setText("10.00")
+        dlg.qty.setValue(2)
+        self.assertTrue(dlg.add_line())
+        self.assertIn("20.00", dlg.total_label.text())
+        dlg.pay1_received.setText("50.00")
+        self.assertIn("30.00", dlg.change_label.text())
+        dlg.cancel_invoice()
+        self.assertEqual(dlg.lines, [])
+        self.assertIsNone(dlg.posted)
+
+    def test_customer_stats_counts_previous_sales(self):
+        """إحصاء العميل بلا فواتير: صفر وبلا تاريخ."""
+        from morv.infra import sale_view
+        self.assertEqual(sale_view.customer_stats(self.con, 999), (0, None))
+
     def test_dialog_refuses_empty_invoice(self):
         """الترحيل بلا أسطر يُرفض ولا يُنشئ فاتورة."""
         from morv.ui.pos_page import PosPage

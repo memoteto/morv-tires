@@ -54,6 +54,12 @@ def count(con: sqlite3.Connection) -> int:
     return con.execute("SELECT count(*) FROM sales").fetchone()[0]
 
 
+def customer_stats(con: sqlite3.Connection, customer_id: int) -> tuple[int, str | None]:
+    """عدد فواتير العميل السابقة وتاريخ آخر فاتورة."""
+    r = con.execute("SELECT count(*), max(sale_date) FROM sales WHERE customer_id=?", (customer_id,)).fetchone()
+    return r[0], r[1]
+
+
 def get_sale(con: sqlite3.Connection, sale_id: int) -> SaleView:
     """فاتورة كاملة للمعاينة."""
     h = con.execute(
