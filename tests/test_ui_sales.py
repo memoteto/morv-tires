@@ -53,8 +53,8 @@ class SalesUiTest(unittest.TestCase):
 
     def test_dialog_posts_service_sale_through_engine(self):
         """فاتورة خدمة بدفع نقدي تُرحَّل عبر المحرك وتظهر في القاعدة."""
-        from morv.ui.sales_page import SaleDialog
-        dlg = self.destroy_on_cleanup(SaleDialog(self.session))
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
         dlg.item_search.setText("خدمة")
         self.assertEqual(dlg.item_combo.count(), 1)
         dlg.price.setText("1.00")
@@ -67,8 +67,8 @@ class SalesUiTest(unittest.TestCase):
 
     def test_dialog_refuses_empty_invoice(self):
         """الترحيل بلا أسطر يُرفض ولا يُنشئ فاتورة."""
-        from morv.ui.sales_page import SaleDialog
-        dlg = self.destroy_on_cleanup(SaleDialog(self.session))
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
         dlg.post()
         self.assertIsNone(dlg.posted)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sales").fetchone()[0], 0)
