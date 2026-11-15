@@ -48,11 +48,11 @@ class TupleModel(QAbstractTableModel):
         self.rows.extend(rows)
         self.endInsertRows()
 
-    def rowCount(self, parent=QModelIndex()) -> int:
+    def rowCount(self, parent=None) -> int:
         """عدد الصفوف."""
-        return 0 if parent.isValid() else len(self.rows)
+        return 0 if parent is not None and parent.isValid() else len(self.rows)
 
-    def columnCount(self, parent=QModelIndex()) -> int:
+    def columnCount(self, parent=None) -> int:
         """عدد الأعمدة."""
         return len(self.columns)
 

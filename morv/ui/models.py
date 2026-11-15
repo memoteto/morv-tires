@@ -46,11 +46,11 @@ class AuditModel(QAbstractTableModel):
             self.endInsertRows()
         return len(more)
 
-    def rowCount(self, parent=QModelIndex()) -> int:
+    def rowCount(self, parent=None) -> int:
         """عدد الصفوف المحمّلة."""
-        return 0 if parent.isValid() else len(self.rows)
+        return 0 if parent is not None and parent.isValid() else len(self.rows)
 
-    def columnCount(self, parent=QModelIndex()) -> int:
+    def columnCount(self, parent=None) -> int:
         """أربعة أعمدة."""
         return 4
 
@@ -84,11 +84,11 @@ class BackupsModel(QAbstractTableModel):
         self.items = backup.list_backups()
         self.endResetModel()
 
-    def rowCount(self, parent=QModelIndex()) -> int:
+    def rowCount(self, parent=None) -> int:
         """عدد النسخ."""
-        return 0 if parent.isValid() else len(self.items)
+        return 0 if parent is not None and parent.isValid() else len(self.items)
 
-    def columnCount(self, parent=QModelIndex()) -> int:
+    def columnCount(self, parent=None) -> int:
         """أربعة أعمدة."""
         return 4
 
