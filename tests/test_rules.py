@@ -9,7 +9,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "morv"
-ARABIC = re.compile(r"[؀-ۿ]")
 
 
 def py_files(*dirs: Path) -> list[Path]:
@@ -23,30 +22,36 @@ def code_lines(path: Path):
         yield no, line.split("#", 1)[0]
 
 
-class ArabicDocsTest(unittest.TestCase):
-    """كل ملف وكلاس ودالة يُشرح منطقه بالعربية."""
+class DocstringTest(unittest.TestCase):
+    """كل ملف وكلاس ودالة في الكود الإنتاجي له شرح موجز؛ اللغة غير مفروضة."""
 
-    def test_docstrings_are_arabic(self):
-        """يفحص الملفات في morv و tools و run.py. الدوال الخاصة مثل __init__ مستثناة
-        إلا إذا كان فيها منطق (أكثر من 3 أسطر)."""
+    MAX_FIRST_LINE = 120     # سطر الشرح الأول لا يتجاوز هذا الطول
+
+    def test_every_unit_has_short_docstring(self):
+        """يفحص morv و tools و run.py. مستثنى: __init__ الفارغ، والدوال السحرية القصيرة."""
         missing = []
         files = py_files(PKG, ROOT / "tools") + [ROOT / "run.py"]
         for f in files:
             tree = ast.parse(f.read_text(encoding="utf-8"))
             rel = f.relative_to(ROOT)
             is_empty_init = f.name == "__init__.py" and not tree.body
-            if not is_empty_init and not ARABIC.search(ast.get_docstring(tree) or ""):
-                missing.append(f"{rel}: الملف")
+            if not is_empty_init:
+                self._check(ast.get_docstring(tree), f"{rel}: الملف", missing)
             for node in ast.walk(tree):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                     continue
                 dunder = node.name.startswith("__") and node.name.endswith("__")
-                short = node.end_lineno - node.lineno < 3
-                if dunder and short:
+                if dunder and node.end_lineno - node.lineno < 3:
                     continue
-                if not ARABIC.search(ast.get_docstring(node) or ""):
-                    missing.append(f"{rel}:{node.lineno} {node.name}")
-        self.assertEqual(missing, [], "ينقصها شرح عربي:\n" + "\n".join(missing))
+                self._check(ast.get_docstring(node), f"{rel}:{node.lineno} {node.name}", missing)
+        self.assertEqual(missing, [], "شرح ناقص أو سطر أول طويل:\n" + "\n".join(missing))
+
+    def _check(self, doc, where, missing):
+        """إضافة الموضع إلى القائمة إن كان الشرح غائبًا أو سطره الأول طويلًا."""
+        if not doc or not doc.strip():
+            missing.append(where + " (لا شرح)")
+        elif len(doc.strip().splitlines()[0]) > self.MAX_FIRST_LINE:
+            missing.append(where + " (سطر أول طويل)")
 
 
 class LayersTest(unittest.TestCase):
