@@ -21,6 +21,7 @@ PERMISSIONS = {
     "items.prices": "تعديل أسعار البيع",
     "items.cost_view": "رؤية التكلفة والهامش",
     "purchases.post": "ترحيل فواتير الشراء واستلام البضاعة",
+    "sales.post": "ترحيل فواتير البيع",
     "stock.pick_lot": "اختيار دفعة DOT غير الأقدم عند الصرف",
     "users.manage": "المستخدمون والصلاحيات",
     "settings.edit": "الإعدادات العامة",
@@ -30,7 +31,7 @@ PERMISSIONS = {
 # الصلاحيات الافتراضية لكل دور (قالب يُطبَّق عند إنشاء المستخدم ويمكن تعديله بعدها)
 ROLE_DEFAULTS = {
     "manager": set(PERMISSIONS),
-    "cashier": {"customers.manage"},
+    "cashier": {"customers.manage", "sales.post"},
 }
 
 
