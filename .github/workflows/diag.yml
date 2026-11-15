@@ -41,6 +41,11 @@ jobs:
           u = users.create_user(con, None, "admin", "x", "Admin12345", "manager")
           import morv.ui.pos_page as pp
           from PySide6.QtWidgets import QWidget
+          if v.endswith("_noact"):
+              pp.QLineEdit.addAction = lambda *a, **k: None
+              v0 = v[:-6]
+          else:
+              v0 = v
           def part(sec):
               o = pp.PosPage.__new__(pp.PosPage)
               QWidget.__init__(o)
@@ -57,7 +62,7 @@ jobs:
               if sec == "header":
                   lay.addWidget(o._build_header()); lay.addLayout(o._build_hints())
               return o
-          pages = [part(v) for _ in range(3)] if v != "baseline" else [pp.PosPage(Session(con, u)) for _ in range(3)]
+          pages = [part(v0) for _ in range(3)] if v0 != "baseline" else [pp.PosPage(Session(con, u)) for _ in range(3)]
           if v == "destroy":
               for p in pages: p.deleteLater()
           from PySide6.QtCore import QEvent
@@ -68,7 +73,7 @@ jobs:
           print("BUILT", v, flush=True)
           os._exit(0)
           PY
-          for v in baseline invoice items summary payment header; do
+          for v in baseline baseline_noact invoice_noact items_noact; do
             n=0; for i in 1 2 3 4 5 6 7 8; do python "$RUNNER_TEMP/r.py" $v > out.txt 2>&1 || n=$((n+1)); done
             echo "RESULT $v crashes=$n/8"; tail -3 out.txt
           done
