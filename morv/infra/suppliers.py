@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from morv.core import validate
 from morv.core.text import norm_ar
+from morv.infra.db.connection import transaction
 from morv.infra.users import audit
 
 
@@ -64,14 +65,15 @@ def create(con, by, s: Supplier) -> Supplier:
     dup = _duplicate(con, s.mobile, None)
     if dup:
         raise SupplierError(f"يوجد مورد مسجّل بنفس الرقم: {dup}")
-    cur = con.execute(
-        "INSERT INTO suppliers (name, name_norm, mobile, phone2, contact_person, address, tax_id, notes, payment_days, "
-        "credit_limit, supplies, pay_method, commercial_reg, bank_info) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (s.name, norm_ar(s.name), s.mobile, s.phone2 or None, s.contact_person.strip() or None,
-         s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None, s.payment_days,
-         s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None))
-    s.id = cur.lastrowid
-    audit(con, by, "supplier.create", "supplier", s.id, f"{s.name} · {s.mobile}")
+    with transaction(con):
+        cur = con.execute(
+            "INSERT INTO suppliers (name, name_norm, mobile, phone2, contact_person, address, tax_id, notes, payment_days, "
+            "credit_limit, supplies, pay_method, commercial_reg, bank_info) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (s.name, norm_ar(s.name), s.mobile, s.phone2 or None, s.contact_person.strip() or None,
+             s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None, s.payment_days,
+             s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None))
+        s.id = cur.lastrowid
+        audit(con, by, "supplier.create", "supplier", s.id, f"{s.name} · {s.mobile}")
     return get(con, s.id)
 
 
@@ -81,21 +83,23 @@ def update(con, by, s: Supplier) -> Supplier:
     dup = _duplicate(con, s.mobile, s.id)
     if dup:
         raise SupplierError(f"يوجد مورد مسجّل بنفس الرقم: {dup}")
-    con.execute(
-        "UPDATE suppliers SET name=?, name_norm=?, mobile=?, phone2=?, contact_person=?, address=?, tax_id=?, notes=?, "
-        "payment_days=?, credit_limit=?, supplies=?, pay_method=?, commercial_reg=?, bank_info=?, "
-        "updated_at=strftime('%Y-%m-%d %H:%M:%S','now','localtime') WHERE id=?",
-        (s.name, norm_ar(s.name), s.mobile, s.phone2 or None, s.contact_person.strip() or None,
-         s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None, s.payment_days,
-         s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None, s.id))
-    audit(con, by, "supplier.update", "supplier", s.id, s.name)
+    with transaction(con):
+        con.execute(
+            "UPDATE suppliers SET name=?, name_norm=?, mobile=?, phone2=?, contact_person=?, address=?, tax_id=?, notes=?, "
+            "payment_days=?, credit_limit=?, supplies=?, pay_method=?, commercial_reg=?, bank_info=?, "
+            "updated_at=strftime('%Y-%m-%d %H:%M:%S','now','localtime') WHERE id=?",
+            (s.name, norm_ar(s.name), s.mobile, s.phone2 or None, s.contact_person.strip() or None,
+             s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None, s.payment_days,
+             s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None, s.id))
+        audit(con, by, "supplier.update", "supplier", s.id, s.name)
     return get(con, s.id)
 
 
 def set_active(con, by, supplier_id: int, active: bool) -> None:
     """إيقاف أو تفعيل."""
-    con.execute("UPDATE suppliers SET active=? WHERE id=?", (int(active), supplier_id))
-    audit(con, by, "supplier.activate" if active else "supplier.deactivate", "supplier", supplier_id)
+    with transaction(con):
+        con.execute("UPDATE suppliers SET active=? WHERE id=?", (int(active), supplier_id))
+        audit(con, by, "supplier.activate" if active else "supplier.deactivate", "supplier", supplier_id)
 
 
 def has_documents(con, supplier_id: int) -> bool:
@@ -108,8 +112,9 @@ def delete(con, by, supplier_id: int) -> None:
     if has_documents(con, supplier_id):
         raise SupplierError("للمورد مستندات مسجّلة؛ أوقفه بدل حذفه")
     s = get(con, supplier_id)
-    con.execute("DELETE FROM suppliers WHERE id=?", (supplier_id,))
-    audit(con, by, "supplier.delete", "supplier", supplier_id, f"{s.name} · {s.mobile}")
+    with transaction(con):
+        con.execute("DELETE FROM suppliers WHERE id=?", (supplier_id,))
+        audit(con, by, "supplier.delete", "supplier", supplier_id, f"{s.name} · {s.mobile}")
 
 
 def get(con, supplier_id: int) -> Supplier:

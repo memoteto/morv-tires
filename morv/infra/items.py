@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from morv.core import validate
 from morv.core.text import norm_ar, scanner_fix
+from morv.infra.db.connection import transaction
 from morv.infra.users import audit
 
 KINDS = {"tire": "إطار", "battery": "بطارية", "service": "خدمة"}
@@ -109,8 +110,9 @@ def set_field(con, by, kind: str, key: str, *, show=None, required=None, print_=
     if show is False:
         sets.append("required=0")          # المخفي لا يكون إلزاميًا
     if sets:
-        con.execute(f"UPDATE item_fields SET {', '.join(sets)} WHERE kind=? AND key=?", (*params, kind, key))
-        audit(con, by, "items.fields", "item_field", f"{kind}.{key}", ", ".join(sets))
+        with transaction(con):
+            con.execute(f"UPDATE item_fields SET {', '.join(sets)} WHERE kind=? AND key=?", (*params, kind, key))
+            audit(con, by, "items.fields", "item_field", f"{kind}.{key}", ", ".join(sets))
 
 
 def add_custom_field(con, by, kind: str, label: str, ftype: str, options: list | None = None) -> str:
@@ -125,10 +127,11 @@ def add_custom_field(con, by, kind: str, label: str, ftype: str, options: list |
     n = con.execute("SELECT count(*) FROM item_fields WHERE key LIKE 'custom_%'").fetchone()[0] + 1
     key = f"custom_{n}"
     order = con.execute("SELECT COALESCE(max(sort_order),0)+1 FROM item_fields WHERE kind=?", (kind,)).fetchone()[0]
-    con.execute("INSERT INTO item_fields (kind, key, label, example, ftype, options, show, required, sort_order) "
-                "VALUES (?,?,?,?,?,?,1,0,?)",
-                (kind, key, label, "", ftype, "|".join(o.strip() for o in options) if options else None, order))
-    audit(con, by, "items.fields.add", "item_field", f"{kind}.{key}", label)
+    with transaction(con):
+        con.execute("INSERT INTO item_fields (kind, key, label, example, ftype, options, show, required, sort_order) "
+                    "VALUES (?,?,?,?,?,?,1,0,?)",
+                    (kind, key, label, "", ftype, "|".join(o.strip() for o in options) if options else None, order))
+        audit(con, by, "items.fields.add", "item_field", f"{kind}.{key}", label)
     return key
 
 
@@ -213,8 +216,7 @@ def create(con, by, it: Item) -> Item:
     """إنشاء صنف مع خصائصه."""
     _clean(con, it)
     _unique_errors(con, it)
-    con.execute("BEGIN")
-    try:
+    with transaction(con):
         cur = con.execute(
             "INSERT INTO items (kind, code, barcode, name, name_norm, brand, model, price_retail, price_wholesale, price_super, "
             "min_qty, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -223,10 +225,6 @@ def create(con, by, it: Item) -> Item:
         it.id = cur.lastrowid
         _save_attrs(con, it.id, it.attrs)
         audit(con, by, "item.create", "item", it.id, f"{it.code} · {it.name}")
-        con.execute("COMMIT")
-    except Exception:
-        con.execute("ROLLBACK")
-        raise
     return get(con, it.id)
 
 
@@ -235,8 +233,7 @@ def update(con, by, it: Item) -> Item:
     _clean(con, it)
     _unique_errors(con, it)
     old = get(con, it.id)
-    con.execute("BEGIN")
-    try:
+    with transaction(con):
         con.execute(
             "UPDATE items SET kind=?, code=?, barcode=?, name=?, name_norm=?, brand=?, model=?, price_retail=?, price_wholesale=?, "
             "price_super=?, min_qty=?, notes=?, updated_at=strftime('%Y-%m-%d %H:%M:%S','now','localtime') WHERE id=?",
@@ -248,17 +245,14 @@ def update(con, by, it: Item) -> Item:
             detail += (f" · الأسعار {old.price_retail}/{old.price_wholesale}/{old.price_super} → "
                        f"{it.price_retail}/{it.price_wholesale}/{it.price_super}")
         audit(con, by, "item.update", "item", it.id, detail)
-        con.execute("COMMIT")
-    except Exception:
-        con.execute("ROLLBACK")
-        raise
     return get(con, it.id)
 
 
 def set_active(con, by, item_id: int, active: bool) -> None:
     """إيقاف صنف أو تفعيله (الموقوف لا يظهر في البيع)."""
-    con.execute("UPDATE items SET active=? WHERE id=?", (int(active), item_id))
-    audit(con, by, "item.activate" if active else "item.deactivate", "item", item_id)
+    with transaction(con):
+        con.execute("UPDATE items SET active=? WHERE id=?", (int(active), item_id))
+        audit(con, by, "item.activate" if active else "item.deactivate", "item", item_id)
 
 
 def has_documents(con, item_id: int) -> bool:
@@ -271,8 +265,9 @@ def delete(con, by, item_id: int) -> None:
     if has_documents(con, item_id):
         raise ItemError("للصنف حركات مسجّلة؛ أوقفه بدل حذفه")
     it = get(con, item_id)
-    con.execute("DELETE FROM items WHERE id=?", (item_id,))
-    audit(con, by, "item.delete", "item", item_id, f"{it.code} · {it.name}")
+    with transaction(con):
+        con.execute("DELETE FROM items WHERE id=?", (item_id,))
+        audit(con, by, "item.delete", "item", item_id, f"{it.code} · {it.name}")
 
 
 def get(con, item_id: int) -> Item:

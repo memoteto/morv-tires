@@ -11,9 +11,17 @@
 - نسخة يومية واحدة؛ الاحتفاظ بآخر 14 يومية، ونسخة لكل شهر لمدة 12 شهرًا.
 - اختبار استعادة تلقائي كل 7 أيام على أحدث نسخة.
 - تنبيه إن فشلت آخر نسخة، أو مرّ يومان بلا نسخة، أو 7 أيام بلا نسخة على الفلاشة.
+
+ثلاث ضمانات أُضيفت بعد مراجعة خارجية أثبتت أعطالها بالتجربة:
+1) تطابق المفتاح: لا تُشفَّر نسخة بمفتاح الجهاز إلا بعد التأكد أنه مفتاح حلقة هذه القاعدة
+   (ببصمة المفتاح). بدونه تخرج نسخة «ناجحة» لا تفتحها كلمة المرور ولا مفتاح الاسترداد.
+2) الاستعادة ذرية: الملف البديل يُجهَّز ويُفحص بجوار القاعدة ثم يحل محلها بعملية واحدة
+   (os.replace). أي فشل قبلها يترك قاعدة التشغيل كما هي تمامًا، ولا توجد لحظة فيها نصف ملف.
+3) مفتاح الجهاز يُحفظ ويُتحقق من قراءته قبل كتابة حلقة المفاتيح في القاعدة، لا بعدها.
 """
 import hashlib
 import json
+import os
 import re
 import shutil
 import sqlite3
@@ -25,12 +33,17 @@ from pathlib import Path
 from morv import APP_ID
 from morv.core.text import ltr
 from morv.infra import keystore, paths, settings, vault
+from morv.infra.db.connection import transaction
+from morv.infra.logs import log
 
 KINDS = ("manual", "daily", "pre_migration", "safety")
 KIND_LABELS = {"manual": "يدوية", "daily": "يومية", "pre_migration": "قبل تحديث البرنامج", "safety": "أمان قبل الاستعادة"}
 KEEP_DAILY = 14
 KEEP_MONTHLY = 12
 KEEP_OTHER = 5
+PROOF_CANDIDATES = 3      # أقصى عدد نسخ قديمة تُجرَّب لإثبات مفتاح الجهاز على حلقة بلا بصمة
+_RELINK_HINT = "أعد ربط الجهاز بكلمة مرور النسخ من الإعدادات ← النسخ الاحتياطي"
+_BUSY = "قاعدة البيانات مفتوحة في نافذة أو برنامج آخر؛ أغلقه ثم أعد المحاولة"
 RESTORE_TEST_DAYS = 7
 STALE_DAYS = 2
 USB_STALE_DAYS = 7
@@ -136,11 +149,42 @@ def _keyring(con) -> dict:
     return json.loads(raw)
 
 
-def setup_encryption(con, password: str, recovery_key: str) -> None:
-    """إعداد التشفير أول مرة: DEK جديد مغلّف بكلمة المرور وبمفتاح الاسترداد، ومحفوظ على الجهاز."""
+def _save_device_key(dek: bytes) -> str:
+    """حفظ مفتاح البيانات على الجهاز ثم قراءته للتأكد. يعيد اسم طريقة الحفظ.
+
+    الحفظ بلا تحقق لا يكفي: لو لم يُقرأ المفتاح كما كُتب لتوقف النسخ التلقائي لاحقًا دون سبب ظاهر.
+    """
+    try:
+        scheme = keystore.save_dek(dek)
+    except (OSError, keystore.KeystoreError) as e:
+        raise BackupError(f"تعذّر حفظ مفتاح الجهاز: {e}") from e
+    if keystore.load_dek() != dek:
+        raise BackupError("حُفظ مفتاح الجهاز لكن قراءته لم تطابق ما كُتب")
+    return scheme
+
+
+def prepare_keyring(password: str, recovery_key: str) -> tuple[dict, str]:
+    """الخطوة الأولى من إعداد التشفير، خارج القاعدة: مفتاح جديد محفوظ على الجهاز ومتحقَّق منه.
+
+    يعيد (حلقة المفاتيح، طريقة الحفظ) ليكتبهما المتصل في القاعدة بـ store_keyring داخل معاملته.
+    الترتيب مقصود: لو فشل حفظ مفتاح الجهاز لا يُكتب شيء في القاعدة، فلا تبقى قاعدة
+    «مُعدّة التشفير» بلا مفتاح يشغّل نسخها.
+    """
     dek, ring = vault.new_keyring(password, recovery_key)
+    return ring, _save_device_key(dek)
+
+
+def store_keyring(con, ring: dict, scheme: str) -> None:
+    """كتابة حلقة المفاتيح وطريقة الحفظ في الإعدادات (داخل معاملة المتصل)."""
     settings.put(con, "backup.keyring", json.dumps(ring))
-    settings.put(con, "backup.keystore_scheme", keystore.save_dek(dek))
+    settings.put(con, "backup.keystore_scheme", scheme)
+
+
+def setup_encryption(con, password: str, recovery_key: str) -> None:
+    """إعداد التشفير: مفتاح الجهاز أولًا (مع التحقق)، ثم الحلقة في القاعدة بمعاملة واحدة."""
+    ring, scheme = prepare_keyring(password, recovery_key)
+    with transaction(con):
+        store_keyring(con, ring, scheme)
 
 
 def device_dek(con) -> bytes | None:
@@ -148,18 +192,78 @@ def device_dek(con) -> bytes | None:
     return keystore.load_dek()
 
 
+def device_key_state(con) -> str:
+    """علاقة مفتاح الجهاز بهذه القاعدة: 'ok' أو 'missing' أو 'mismatch' أو 'unverified'.
+
+    unverified: حلقة قديمة بلا بصمة لم يُثبت مفتاحها بعد (يُثبت عند أول نسخة أو أول ربط).
+    """
+    dek = keystore.load_dek()
+    if dek is None:
+        return "missing"
+    m = vault.matches(_keyring(con), dek)
+    return "unverified" if m is None else ("ok" if m else "mismatch")
+
+
+def _prove_legacy_key(con, ring: dict, dek: bytes) -> bool:
+    """إثبات أن مفتاح الجهاز يخص حلقة قديمة بلا بصمة، دون كلمة مرور.
+
+    الطريقة: نسخة محلية سابقة مختومة بنفس تغليف الحلقة (نفس حقل pw أو rk) لا يفتحها إلا مفتاح
+    الحلقة. إن فتحها مفتاح الجهاز فهو المفتاح الصحيح، فتُكتب البصمة في الحلقة ولا يتكرر الإثبات.
+    """
+    tried = 0
+    for b in list_backups():
+        if not b.encrypted or tried >= PROOF_CANDIDATES:
+            continue
+        try:
+            their = vault.read_header(b.path)["keyring"]
+        except vault.VaultError:
+            continue
+        if their["pw"]["wrapped"] != ring["pw"]["wrapped"] and their["rk"]["wrapped"] != ring["rk"]["wrapped"]:
+            continue
+        tried += 1
+        if vault.opens_with(b.path, dek):
+            settings.put(con, "backup.keyring", json.dumps(vault.with_fingerprint(ring, dek)))
+            return True
+    return False
+
+
+def _checked_device_dek(con) -> bytes:
+    """مفتاح الجهاز بعد التأكد أنه مفتاح حلقة هذه القاعدة، وإلا BackupError.
+
+    هذا هو الحارس: بدونه، بعد استعادة نسخة من إعداد آخر، يختم البرنامج نسخًا بمفتاح قديم
+    وفي رأسها حلقة جديدة، فتُسجَّل ناجحة ولا يفتحها أي سر عند الحاجة.
+    """
+    dek = device_dek(con)
+    if dek is None:
+        raise BackupError(f"مفتاح الجهاز مفقود. {_RELINK_HINT}")
+    ring = _keyring(con)
+    ok = vault.matches(ring, dek)
+    if ok is None and not _prove_legacy_key(con, ring, dek):
+        raise BackupError(f"تعذّر التأكد أن مفتاح الجهاز يخص هذه البيانات. {_RELINK_HINT}")
+    if ok is False:
+        raise BackupError(f"مفتاح الجهاز لا يخص هذه البيانات (ربما بعد استعادة نسخة من إعداد آخر). {_RELINK_HINT}")
+    return dek
+
+
 def relink_device(con, secret: str) -> None:
-    """إعادة حفظ DEK على هذا الجهاز بكلمة المرور أو مفتاح الاسترداد (بعد إعادة تثبيت Windows مثلًا)."""
-    dek = vault.unlock(_keyring(con), secret)
-    settings.put(con, "backup.keystore_scheme", keystore.save_dek(dek))
+    """إعادة حفظ DEK على هذا الجهاز بكلمة المرور أو مفتاح الاسترداد (بعد إعادة تثبيت Windows مثلًا).
+
+    السر يثبت أن المفتاح يخص الحلقة، فتُكتب بصمته فيها إن كانت حلقة قديمة بلا بصمة.
+    """
+    ring = _keyring(con)
+    dek = vault.unlock(ring, secret)
+    scheme = _save_device_key(dek)
+    with transaction(con):
+        store_keyring(con, vault.with_fingerprint(ring, dek), scheme)
 
 
 def change_backup_password(con, current_secret: str, new_password: str) -> None:
     """تغيير كلمة مرور النسخ. النسخ القديمة تبقى تُفتح بالقديمة أو بمفتاح الاسترداد."""
     ring = _keyring(con)
     dek = vault.unlock(ring, current_secret)
-    settings.put(con, "backup.keyring", json.dumps(vault.rewrap_password(ring, dek, new_password)))
-    keystore.save_dek(dek)
+    scheme = _save_device_key(dek)
+    with transaction(con):
+        store_keyring(con, vault.rewrap_password(ring, dek, new_password), scheme)
 
 
 def regenerate_recovery_key(con, current_secret: str, new_recovery_key: str) -> None:
@@ -180,9 +284,13 @@ def _snapshot(con, dest: Path) -> None:
         target.close()
 
 
-def create_backup(con: sqlite3.Connection, kind: str = "manual", dest_dir=None, username: str = None) -> BackupResult:
+def create_backup(con: sqlite3.Connection, kind: str = "manual", dest_dir=None, username: str | None = None,
+                  plain: bool = False) -> BackupResult:
     """أخذ نسخة احتياطية مفحوصة؛ مشفّرة إن كان التشفير مُعدًّا وإلا عادية.
 
+    plain=True يفرض نسخة غير مشفّرة (.db) حتى لو كان التشفير مُعدًّا. يُستخدم فقط لنسخة ما قبل
+    الترقية حين يتعذر التشفير (مفتاح الجهاز مفقود مثلًا): تبقى محلية بجوار القاعدة غير المشفّرة
+    أصلًا، ولا تُنقل إلى الفلاشة.
     عند أي فشل يُحذف المؤقت ويُسجَّل الفشل ويُرفع BackupError.
     """
     if kind not in KINDS:
@@ -191,7 +299,7 @@ def create_backup(con: sqlite3.Connection, kind: str = "manual", dest_dir=None, 
     dest.mkdir(parents=True, exist_ok=True)
     started = _now_s()
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    encrypted = is_encryption_ready(con)
+    encrypted = is_encryption_ready(con) and not plain
     final = dest / f"morv_tires_{stamp}_{kind}{vault.EXT if encrypted else '.db'}"
     tmp = dest / f"{final.name}.snapshot"
     try:
@@ -200,9 +308,7 @@ def create_backup(con: sqlite3.Connection, kind: str = "manual", dest_dir=None, 
         if not ok:
             raise BackupError(detail)
         if encrypted:
-            dek = device_dek(con)
-            if dek is None:
-                raise BackupError("مفتاح الجهاز مفقود؛ أعد ربط الجهاز بكلمة مرور النسخ")
+            dek = _checked_device_dek(con)
             vault.seal(tmp, final, dek, _keyring(con), {"kind": kind, "db_detail": detail})
             tmp.unlink(missing_ok=True)
             detail += " · مشفّرة"
@@ -292,7 +398,7 @@ def usb_available(con) -> bool:
     return bool(d) and d.exists()
 
 
-def copy_to_usb(con, username: str = None) -> BackupResult:
+def copy_to_usb(con, username: str | None = None) -> BackupResult:
     """نسخ أحدث نسخة محلية إلى الفلاشة مع التحقق بالبصمة بعد النسخ."""
     started = _now_s()
     d = usb_dir(con)
@@ -324,7 +430,7 @@ def copy_to_usb(con, username: str = None) -> BackupResult:
 # ---------- اختبار الاستعادة والاستعادة الفعلية ----------
 
 def restore_test(con, backup_path, expected_sha256: str | None = None, *, secret: str | None = None,
-                 username: str = None) -> BackupResult:
+                 username: str | None = None) -> BackupResult:
     """اختبار أن نسخة تُفتح وتصلح للاستعادة، في مجلد مؤقت معزول دون لمس قاعدة التشغيل.
 
     إن أُعطيت البصمة المسجّلة تُقارن أولًا. المشفّرة تُفتح بمفتاح الجهاز، أو بسر
@@ -356,44 +462,133 @@ def restore_test(con, backup_path, expected_sha256: str | None = None, *, secret
     return result
 
 
-def restore_file(db_path, backup_path, secret: str | None = None, dek: bytes | None = None) -> Path:
+def _sidecars(db: Path) -> list[Path]:
+    """ملفا WAL وSHM المرافقان لملف قاعدة."""
+    return [Path(str(db) + suffix) for suffix in ("-wal", "-shm")]
+
+
+def _discard(path: Path) -> None:
+    """حذف ملف مؤقت ومرافقيه دون أن يفشل التنظيف نفسه."""
+    for f in (path, *_sidecars(path)):
+        try:
+            f.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _fsync(path: Path) -> None:
+    """إجبار النظام على كتابة ملف إلى القرص فعلًا قبل الاعتماد عليه."""
+    with open(path, "rb+") as f:
+        os.fsync(f.fileno())
+
+
+def _fsync_dir(folder: Path) -> None:
+    """تثبيت إعادة التسمية على القرص (Linux؛ على Windows غير متاح وغير لازم)."""
+    if os.name == "nt":
+        return
+    try:
+        fd = os.open(folder, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
+
+
+def _settle_live_db(db: Path) -> bool:
+    """دمج ملف WAL في ملف القاعدة الحالية قبل استبدالها. يعيد False إن كانت القاعدة تالفة.
+
+    بعد الدمج يحمل الملف الرئيسي كل البيانات، فتكون نسخة الأمان كاملة، ولا يبقى WAL قديم قد
+    يُطبَّق خطأً على الملف الجديد. إن كان اتصال آخر يمسك القاعدة تُرفض الاستعادة (BackupError).
+    """
+    try:
+        con = sqlite3.connect(db, timeout=2)
+        try:
+            busy = con.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0]
+        finally:
+            con.close()
+    except sqlite3.OperationalError as e:
+        if "locked" in str(e) or "busy" in str(e):
+            raise BackupError(_BUSY) from e
+        return False
+    except sqlite3.DatabaseError:
+        return False                      # ليست قاعدة مقروءة: تُحفظ كما هي ثم تُستبدل
+    wal = _sidecars(db)[0]
+    if busy or (wal.exists() and wal.stat().st_size > 0):
+        raise BackupError(_BUSY)
+    return True
+
+
+def _keep_damaged(db: Path, stamp: str) -> None:
+    """قاعدة تالفة لا تُقرأ: تُحفظ ملفاتها الخام جانبًا قبل الاستبدال (قد تفيد في استخراج يدوي)."""
+    sdir = db.parent / "backups"
+    sdir.mkdir(exist_ok=True)
+    for f in (db, *_sidecars(db)):
+        if f.exists():
+            shutil.copy2(f, sdir / f"damaged_{stamp}_{f.name}")
+
+
+def restore_file(db_path, backup_path, secret: str | None = None, dek: bytes | None = None) -> Path | None:
     """استبدال ملف قاعدة التشغيل بنسخة، بعد إغلاق كل الاتصالات بها. يعيد مسار نسخة الأمان.
 
-    الترتيب: فك النسخة في مؤقت وفحصها ← نسخة أمان من الملف الحالي (مشفّرة بنفس المفتاح إن وُجد)
-    ← استبدال الملف وحذف ملفات WAL. أي فشل قبل الاستبدال يترك قاعدة التشغيل كما هي.
+    الخطوات، وكلها قبل الاستبدال لا تلمس قاعدة التشغيل:
+      1) فك النسخة إلى ملف مؤقت بجوار القاعدة (نفس القرص، شرط الاستبدال الذري) وفحصه.
+      2) دمج WAL القاعدة الحالية، ثم نسخة أمان منها (مشفّرة بمفتاح النسخة المستعادة إن وُجد).
+      3) os.replace: الملف الجديد يحل محل القديم بعملية واحدة؛ إما القديم كاملًا أو الجديد كاملًا.
+    أي فشل في 1-3 يحذف المؤقت ويرفع الخطأ، والقاعدة كما كانت. بعد الاستبدال يُحفظ مفتاح
+    النسخة المستعادة على الجهاز (فهو مفتاح القاعدة الجديدة)؛ فشل هذا الحفظ لا يُعدّ فشل
+    استعادة، ويكشفه حارس تطابق المفتاح ويطلب إعادة الربط.
     """
     db = Path(db_path)
     src = Path(backup_path)
-    tmp = Path(tempfile.mkdtemp(prefix="morv_restore_"))
+    encrypted = src.suffix == vault.EXT
+    staged = db.with_name(db.name + ".restore-new")
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    safety = None
     try:
-        plain = tmp / "restore.db"
-        if src.suffix == vault.EXT:
-            header = vault.open_vault(src, plain, dek=dek, secret=secret)
+        _discard(staged)                                   # بقايا محاولة سابقة انقطعت
+        ring = None
+        if encrypted:
+            header = vault.open_vault(src, staged, dek=dek, secret=secret)
+            ring = header["keyring"]
             if dek is None:
-                dek = vault.unlock(header["keyring"], secret)
+                dek = vault.unlock(ring, secret)
         else:
-            shutil.copy2(src, plain)
-        ok, detail = verify_db_file(plain)
+            shutil.copyfile(src, staged)
+        ok, detail = verify_db_file(staged)
         if not ok:
             raise BackupError(detail)
-        safety = None
-        # قاعدة بلا مستخدمين (جهاز جديد أنشأها للتو) لا تستحق نسخة أمان
-        if db.exists() and _has_users(db):
-            stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            sdir = db.parent / "backups"
-            sdir.mkdir(exist_ok=True)
-            if dek is not None and src.suffix == vault.EXT:
-                safety = sdir / f"morv_tires_{stamp}_safety{vault.EXT}"
-                vault.seal(db, safety, dek, vault.read_header(src)["keyring"], {"kind": "safety"})
-            else:
-                safety = sdir / f"morv_tires_{stamp}_safety.db"
-                shutil.copy2(db, safety)
-        for suffix in ("-wal", "-shm"):
-            Path(str(db) + suffix).unlink(missing_ok=True)
-        shutil.copy2(plain, db)
-        return safety
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        for f in _sidecars(staged):
+            f.unlink(missing_ok=True)
+        _fsync(staged)
+        if db.exists():
+            if not _settle_live_db(db):
+                _keep_damaged(db, stamp)
+            elif _has_users(db):                           # قاعدة بلا مستخدمين (جهاز جديد) لا تستحق نسخة أمان
+                sdir = db.parent / "backups"
+                sdir.mkdir(exist_ok=True)
+                if encrypted:
+                    safety = sdir / f"morv_tires_{stamp}_safety{vault.EXT}"
+                    vault.seal(db, safety, dek, ring, {"kind": "safety"})
+                else:
+                    safety = sdir / f"morv_tires_{stamp}_safety.db"
+                    shutil.copy2(db, safety)
+            for f in _sidecars(db):                        # فارغة بعد الدمج، أو حُفظت مع التالفة
+                f.unlink(missing_ok=True)
+        os.replace(staged, db)
+    except BaseException as e:
+        _discard(staged)
+        if isinstance(e, (OSError, sqlite3.Error)):
+            raise BackupError(f"تعذّرت الاستعادة: {e}") from e
+        raise
+    _fsync_dir(db.parent)
+    if encrypted:
+        try:
+            _save_device_key(dek)
+        except BackupError as e:
+            log.warning("استُعيدت البيانات لكن تعذّر حفظ مفتاح الجهاز: %s", e)
+    return safety
 
 
 def _has_users(db_path) -> bool:
@@ -415,7 +610,7 @@ def _parse(ts: str) -> datetime | None:
     return datetime.strptime(ts, _TS) if ts else None
 
 
-def run_scheduled(con, username: str = None) -> list[str]:
+def run_scheduled(con, username: str | None = None) -> list[str]:
     """ما يُشغَّل تلقائيًا عند البدء والإغلاق: نسخة يومية، تنظيف، واختبار استعادة أسبوعي.
 
     يعيد قائمة بما حدث للسجل. لا يرفع استثناءات؛ الفشل يُسجَّل ويظهر في التنبيه.
@@ -450,6 +645,9 @@ def health(con) -> tuple[str, str]:
     """
     if not is_encryption_ready(con):
         return "danger", "النسخ الاحتياطي غير مُعدّ"
+    key_state = device_key_state(con)
+    if key_state == "mismatch":
+        return "danger", "مفتاح الجهاز لا يخص هذه البيانات؛ أعد ربط الجهاز من الإعدادات"
     last_run = con.execute("SELECT status, detail FROM backup_runs WHERE action='backup' AND kind IN ('daily','manual') "
                            "ORDER BY id DESC LIMIT 1").fetchone()
     if last_run and last_run[0] == "failed":
@@ -459,7 +657,7 @@ def health(con) -> tuple[str, str]:
         return "danger", "لم تُؤخذ نسخة احتياطية بعد"
     if datetime.now() - last_ok > timedelta(days=STALE_DAYS):
         return "danger", f"آخر نسخة احتياطية منذ {ltr(str((datetime.now() - last_ok).days))} أيام"
-    if device_dek(con) is None:
+    if key_state == "missing":
         return "warn", "مفتاح الجهاز مفقود؛ أعد ربط الجهاز من الإعدادات"
     if usb_dir(con):
         last_usb = _parse(settings.get(con, "backup.last_usb_at", ""))

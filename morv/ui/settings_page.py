@@ -3,7 +3,6 @@
 كل تبويب كلاس مستقل يأخذ الجلسة. التبويبات التي تحتاج صلاحية تُعرض للمخوَّل فقط.
 لا SQL هنا؛ كل شيء عبر morv.infra.
 """
-from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPixmap
@@ -14,7 +13,6 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, settings, shop, users, vault
-from morv.ui.login import ChangePasswordDialog
 from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
 from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, form, info, ltr_edit, muted,
@@ -609,7 +607,7 @@ class BackupTab(QWidget):
             return
         try:
             backup.change_backup_password(self.session.con, dlg.secret, dlg.new_secret)
-        except vault.VaultError as e:
+        except (vault.VaultError, backup.BackupError) as e:
             info(self, "خطأ", str(e), error=True)
             return
         users.audit(self.session.con, self.session.user, "backup.password")
@@ -623,7 +621,7 @@ class BackupTab(QWidget):
         key = security.new_recovery_key()
         try:
             backup.regenerate_recovery_key(self.session.con, dlg.secret, key)
-        except vault.VaultError as e:
+        except (vault.VaultError, backup.BackupError) as e:
             info(self, "خطأ", str(e), error=True)
             return
         users.audit(self.session.con, self.session.user, "backup.recovery_key")
@@ -637,7 +635,7 @@ class BackupTab(QWidget):
             return
         try:
             backup.relink_device(self.session.con, dlg.secret)
-        except vault.VaultError as e:
+        except (vault.VaultError, backup.BackupError) as e:
             info(self, "خطأ", str(e), error=True)
             return
         users.audit(self.session.con, self.session.user, "backup.relink")

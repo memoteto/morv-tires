@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 from morv.core import validate
 from morv.core.text import norm_ar
+from morv.infra.db.connection import transaction
 from morv.infra.users import audit
 
 TYPES = {"individual": "فرد", "workshop": "ورشة / مركز صيانة", "company": "شركة / أسطول", "trader": "تاجر"}
@@ -123,8 +124,7 @@ def create(con, by, c: Customer) -> Customer:
     dup = _duplicate(con, c.mobile, None)
     if dup:
         raise CustomerError(f"يوجد عميل مسجّل بنفس الرقم: {dup}")
-    con.execute("BEGIN")
-    try:
+    with transaction(con):
         cur = con.execute(
             "INSERT INTO customers (name, name_norm, mobile, mobile2, national_id, customer_type, price_level, credit_limit, "
             "credit_days, address, work_place, tax_id, notes, whatsapp_ok) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -134,10 +134,6 @@ def create(con, by, c: Customer) -> Customer:
         c.id = cur.lastrowid
         _save_vehicles(con, c.id, c.vehicles)
         audit(con, by, "customer.create", "customer", c.id, f"{c.name} · {c.mobile}")
-        con.execute("COMMIT")
-    except Exception:
-        con.execute("ROLLBACK")
-        raise
     return get(con, c.id)
 
 
@@ -148,8 +144,7 @@ def update(con, by, c: Customer) -> Customer:
     dup = _duplicate(con, c.mobile, c.id)
     if dup:
         raise CustomerError(f"يوجد عميل مسجّل بنفس الرقم: {dup}")
-    con.execute("BEGIN")
-    try:
+    with transaction(con):
         con.execute(
             "UPDATE customers SET name=?, name_norm=?, mobile=?, mobile2=?, national_id=?, customer_type=?, price_level=?, "
             "credit_limit=?, credit_days=?, address=?, work_place=?, tax_id=?, notes=?, whatsapp_ok=?, "
@@ -164,17 +159,14 @@ def update(con, by, c: Customer) -> Customer:
         if old.credit_limit != c.credit_limit:
             detail += f" · حد الآجل {old.credit_limit} → {c.credit_limit}"
         audit(con, by, "customer.update", "customer", c.id, detail)
-        con.execute("COMMIT")
-    except Exception:
-        con.execute("ROLLBACK")
-        raise
     return get(con, c.id)
 
 
 def set_active(con, by, customer_id: int, active: bool) -> None:
     """إيقاف عميل أو تفعيله (الموقوف لا يظهر في البيع)."""
-    con.execute("UPDATE customers SET active=? WHERE id=?", (int(active), customer_id))
-    audit(con, by, "customer.activate" if active else "customer.deactivate", "customer", customer_id)
+    with transaction(con):
+        con.execute("UPDATE customers SET active=? WHERE id=?", (int(active), customer_id))
+        audit(con, by, "customer.activate" if active else "customer.deactivate", "customer", customer_id)
 
 
 def has_documents(con, customer_id: int) -> bool:
@@ -187,8 +179,9 @@ def delete(con, by, customer_id: int) -> None:
     if has_documents(con, customer_id):
         raise CustomerError("للعميل مستندات مسجّلة؛ أوقفه بدل حذفه")
     c = get(con, customer_id)
-    con.execute("DELETE FROM customers WHERE id=?", (customer_id,))
-    audit(con, by, "customer.delete", "customer", customer_id, f"{c.name} · {c.mobile}")
+    with transaction(con):
+        con.execute("DELETE FROM customers WHERE id=?", (customer_id,))
+        audit(con, by, "customer.delete", "customer", customer_id, f"{c.name} · {c.mobile}")
 
 
 def get(con, customer_id: int) -> Customer:

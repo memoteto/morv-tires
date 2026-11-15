@@ -6,6 +6,7 @@
    يُفحص ذلك بفتح الملف للقراءة فقط، فلا يُلمس الملف الغريب أبدًا.
 """
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 from morv import APP_ID
@@ -19,6 +20,39 @@ ClosedDatabase = sqlite3.ProgrammingError
 
 class UnsafeDatabase(RuntimeError):
     """محاولة فتح قاعدة ليست تابعة للبرنامج — تُرفض دائمًا."""
+
+
+class NestedTransaction(RuntimeError):
+    """محاولة بدء معاملة داخل معاملة مفتوحة — خطأ برمجي يُكشف فورًا بدل أن يُفسد البيانات."""
+
+
+@contextmanager
+def transaction(con: sqlite3.Connection):
+    """معاملة واحدة: كل ما بداخل with يُحفظ كله أو لا يُحفظ منه شيء.
+
+    الاستعمال:
+        with transaction(con):
+            con.execute(...)
+            con.execute(...)
+
+    - تبدأ بـ BEGIN IMMEDIATE (حجز الكتابة من البداية، فلا تفشل المعاملة في منتصفها بسبب قفل).
+    - أي استثناء داخلها ← ROLLBACK ثم يُعاد رفع الاستثناء كما هو.
+    - النجاح ← COMMIT؛ وإن فشل COMMIT نفسه يُتراجع أيضًا، فلا يبقى الاتصال عالقًا داخل معاملة.
+    - التداخل ممنوع: دالة تفتح معاملة لا تُستدعى من داخل معاملة أخرى (NestedTransaction).
+
+    هذا هو الموضع الوحيد في البرنامج الذي يكتب BEGIN/COMMIT/ROLLBACK (عدا محرك الترقيات)،
+    واختبار آلي يمنع كتابتها في أي ملف آخر.
+    """
+    if con.in_transaction:
+        raise NestedTransaction("معاملة داخل معاملة: استدعِ الدالة من خارج transaction()")
+    con.execute("BEGIN IMMEDIATE")
+    try:
+        yield con
+        con.execute("COMMIT")
+    except BaseException:
+        if con.in_transaction:
+            con.execute("ROLLBACK")
+        raise
 
 
 def _apply_pragmas(con: sqlite3.Connection) -> None:
