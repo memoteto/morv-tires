@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [full, shell_only, sales_only, ui_without_shell, ui_without_sales]
+        variant: [shell_only]
     runs-on: windows-latest
     env:
       QT_QPA_PLATFORM: offscreen
@@ -22,6 +22,7 @@ jobs:
       - name: run
         shell: bash
         run: |
+          set +e
           export MORV_DATA_DIR="$RUNNER_TEMP/morv_data"
           cat > "$RUNNER_TEMP/r.py" <<'PY'
           import os, sys, unittest, faulthandler
@@ -35,11 +36,11 @@ jobs:
                   "ui_without_shell": [m for m in ui if m != "test_ui_shell"],
                   "ui_without_sales": [m for m in ui if m != "test_ui_sales"]}[v]
           suite = unittest.TestSuite(ld.loadTestsFromName("tests." + m) for m in pick)
-          r = unittest.TextTestRunner(verbosity=0).run(suite)
+          r = unittest.TextTestRunner(verbosity=2).run(suite)
           sys.stdout.flush(); sys.stderr.flush()
           os._exit(0 if r.wasSuccessful() else 1)
           PY
           for i in 1 2 3 4; do
             python "$RUNNER_TEMP/r.py" ${{ matrix.variant }} > out.txt 2>&1; code=$?
-            echo "RESULT ${{ matrix.variant }} run$i exit=$code"; tail -4 out.txt
+            echo "RESULT ${{ matrix.variant }} run$i exit=$code"; cat out.txt
           done
