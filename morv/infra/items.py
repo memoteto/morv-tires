@@ -234,6 +234,9 @@ def update(con, by, it: Item) -> Item:
     _unique_errors(con, it)
     old = get(con, it.id)
     with transaction(con):
+        # النوع يحدد حساب التكلفة والتخزين؛ لا يتغير بعد وجود حركات (الفحص داخل المعاملة منعًا للسباق)
+        if old.kind != it.kind and has_documents(con, it.id):
+            raise ItemError("لا يمكن تغيير نوع صنف له حركات؛ أنشئ صنفًا جديدًا")
         con.execute(
             "UPDATE items SET kind=?, code=?, barcode=?, name=?, name_norm=?, brand=?, model=?, price_retail=?, price_wholesale=?, "
             "price_super=?, min_qty=?, notes=?, updated_at=strftime('%Y-%m-%d %H:%M:%S','now','localtime') WHERE id=?",

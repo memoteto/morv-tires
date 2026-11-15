@@ -34,8 +34,8 @@ def post_entry(con: sqlite3.Connection, by, entry_date: str, source_type: str, s
         raise LedgerError("القيد غير متوازن")
     total = sum(d for _, d, _ in lines)
     cur = con.execute(
-        "INSERT INTO journal_entries (entry_date, source_type, source_id, memo, line_count, total, user_id) "
-        "VALUES (?,?,?,?,?,?,?)", (entry_date, source_type, source_id, memo, len(lines), total, by.id if by else None))
+        "INSERT INTO journal_entries (entry_date, source_type, source_id, memo, line_count, total, user_id, status) "
+        "VALUES (?,?,?,?,?,?,?,'open')", (entry_date, source_type, source_id, memo, len(lines), total, by.id if by else None))
     entry_id = cur.lastrowid
     try:
         for no, (acc, d, c) in enumerate(lines, start=1):
@@ -45,13 +45,18 @@ def post_entry(con: sqlite3.Connection, by, entry_date: str, source_type: str, s
         raise LedgerError(f"سطر قيد مرفوض: {e}") from e
     except sqlite3.DatabaseError as e:
         raise LedgerError(str(e)) from e
+    try:
+        con.execute("UPDATE journal_entries SET status='posted' WHERE id=?", (entry_id,))   # الترحيل بعد اكتمال السطور
+    except sqlite3.DatabaseError as e:
+        raise LedgerError(str(e)) from e
     audit(con, by, "journal.post", "journal_entry", entry_id, f"{source_type}#{source_id}")
     return entry_id
 
 
 def account_balance(con: sqlite3.Connection, code: str) -> int:
-    """رصيد حساب بالقرش = مجموع المدين - مجموع الدائن."""
-    return con.execute("SELECT coalesce(sum(debit) - sum(credit), 0) FROM journal_lines WHERE account_code=?",
+    """رصيد حساب بالقرش من القيود المرحّلة فقط = مجموع المدين - مجموع الدائن."""
+    return con.execute("SELECT coalesce(sum(l.debit) - sum(l.credit), 0) FROM journal_lines l "
+                       "JOIN journal_entries e ON e.id = l.entry_id WHERE e.status='posted' AND l.account_code=?",
                        (code,)).fetchone()[0]
 
 
@@ -66,3 +71,8 @@ def incomplete_entries(con: sqlite3.Connection) -> list:
     rows = con.execute("SELECT e.id FROM journal_entries e LEFT JOIN journal_lines l ON l.entry_id = e.id "
                        "GROUP BY e.id HAVING count(l.id) <> e.line_count")
     return [r[0] for r in rows]
+
+
+def open_entries(con: sqlite3.Connection) -> list:
+    """أرقام القيود العالقة في حالة open بعد انتهاء المعاملات (يجب أن تكون فارغة دائمًا)."""
+    return [r[0] for r in con.execute("SELECT id FROM journal_entries WHERE status='open'")]

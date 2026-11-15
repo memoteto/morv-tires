@@ -35,8 +35,8 @@ class PostedInvoice:
     replayed: bool
 
 
-def _clean_lines(con, lines) -> list:
-    """فحص الأسطر وتوحيد DOT؛ يعيد [(PurchaseLine نظيف, نوع الصنف)]."""
+def _shape_lines(lines) -> list:
+    """فحص شكل الأسطر وتوحيد DOT بلا قراءة قاعدة البيانات (يسبق كشف الطلب المكرر)."""
     if not lines:
         raise PurchaseError("الفاتورة بلا أسطر")
     out = []
@@ -45,6 +45,19 @@ def _clean_lines(con, lines) -> list:
             raise PurchaseError(f"السطر {i}: الكمية عدد صحيح موجب")
         if type(ln.unit_cost) is not int or ln.unit_cost <= 0:
             raise PurchaseError(f"السطر {i}: التكلفة بالقرش عدد صحيح موجب")
+        d = None
+        if ln.dot:
+            try:
+                d = dotmod.parse_dot(ln.dot)
+            except dotmod.DotError as e:
+                raise PurchaseError(f"السطر {i}: {e}") from e
+        out.append(PurchaseLine(ln.item_id, ln.qty, ln.unit_cost, d))
+    return out
+
+
+def _check_items(con, lines: list) -> None:
+    """فحص الأصناف من قاعدة البيانات لطلب جديد فقط: موجود، نشط، مخزَّن، وDOT للإطارات."""
+    for i, ln in enumerate(lines, start=1):
         row = con.execute("SELECT kind, active FROM items WHERE id=?", (ln.item_id,)).fetchone()
         if not row:
             raise PurchaseError(f"السطر {i}: الصنف غير موجود")
@@ -52,20 +65,12 @@ def _clean_lines(con, lines) -> list:
             raise PurchaseError(f"السطر {i}: الصنف موقوف")
         if row[0] not in ("tire", "battery"):
             raise PurchaseError(f"السطر {i}: الخدمات لا تُشترى ولا تُخزَّن")
-        d = ln.dot
-        if row[0] == "tire" and not d:
+        if row[0] == "tire" and not ln.dot:
             raise PurchaseError(f"السطر {i}: رمز DOT إلزامي للإطارات")
-        if d:
-            try:
-                d = dotmod.parse_dot(d)
-            except dotmod.DotError as e:
-                raise PurchaseError(f"السطر {i}: {e}") from e
-        out.append(PurchaseLine(ln.item_id, ln.qty, ln.unit_cost, d or None))
-    return out
 
 
 def _payload_hash(supplier_id, inv_no, inv_date, recv_date, lines) -> str:
-    """بصمة محتوى الطلب لكشف إعادة استخدام المفتاح مع محتوى مختلف."""
+    """بصمة محتوى الطلب لكشف إعادة استخدام المفتاح بمحتوى مختلف؛ الملاحظات خارجها عمدًا (ليست مالية)."""
     body = [supplier_id, inv_no, inv_date, recv_date, [[x.item_id, x.qty, x.unit_cost, x.dot] for x in lines]]
     return hashlib.sha256(json.dumps(body, ensure_ascii=False).encode("utf-8")).hexdigest()
 
@@ -91,7 +96,7 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
     except ledger.LedgerError as e:
         raise PurchaseError(str(e)) from e
     with transaction(con):
-        clean = _clean_lines(con, lines)
+        clean = _shape_lines(lines)
         h = _payload_hash(supplier_id, inv_no.casefold(), inv_date, recv_date, clean)
         old = con.execute("SELECT id, number, total, payload_hash FROM purchase_invoices WHERE request_key=?",
                           (key,)).fetchone()
@@ -99,6 +104,7 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
             if old[3] != h:
                 raise PurchaseError("مفتاح الطلب سبق استخدامه لفاتورة بمحتوى مختلف")
             return PostedInvoice(old[0], old[1], old[2], True)
+        _check_items(con, clean)        # بعد كشف التكرار: إيقاف صنف لاحقًا لا يمنع إعادة طلب سبق نجاحه
         sup = con.execute("SELECT active FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
         if not sup:
             raise PurchaseError("المورد غير موجود")

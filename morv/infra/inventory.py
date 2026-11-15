@@ -152,11 +152,21 @@ def reconcile(con: sqlite3.Connection) -> list:
     """مطابقة كاملة بين الدفعات والحركات والطبقات والتخصيصات والقيود؛ قائمة فارغة = متطابق."""
     bad = []
     q = con.execute
-    for r in q("SELECT i.item_id, i.lots, l.layers FROM "
-               "(SELECT item_id, sum(qty_on_hand) lots FROM stock_lots GROUP BY item_id) i "
-               "JOIN (SELECT item_id, sum(qty_remaining) layers FROM cost_layers GROUP BY item_id) l USING (item_id) "
-               "WHERE i.lots <> l.layers"):
+    # مجموعة الأصناف من الجانبين، فلا يفلت صنف موجود في جانب واحد فقط
+    for r in q("SELECT x.item_id, coalesce(l.q, 0), coalesce(c.q, 0) FROM "
+               "(SELECT item_id FROM stock_lots UNION SELECT item_id FROM cost_layers) x "
+               "LEFT JOIN (SELECT item_id, sum(qty_on_hand) q FROM stock_lots GROUP BY item_id) l USING (item_id) "
+               "LEFT JOIN (SELECT item_id, sum(qty_remaining) q FROM cost_layers GROUP BY item_id) c USING (item_id) "
+               "WHERE coalesce(l.q, 0) <> coalesce(c.q, 0)"):
         bad.append(f"صنف {r[0]}: رصيد الدفعات {r[1]} ≠ رصيد الطبقات {r[2]}")
+    for r in q("SELECT p.id FROM purchase_lines p WHERE "
+               "(SELECT count(*) FROM stock_lots WHERE purchase_line_id = p.id) <> 1 "
+               "OR (SELECT count(*) FROM cost_layers WHERE purchase_line_id = p.id) <> 1"):
+        bad.append(f"سطر شراء {r[0]}: ليس له دفعة وطبقة واحدة بالضبط")
+    for r in q("SELECT m.id FROM stock_movements m LEFT JOIN stock_lots l ON l.id = m.lot_id WHERE l.id IS NULL"):
+        bad.append(f"حركة {r[0]}: دفعتها غير موجودة")
+    for r in q("SELECT a.id FROM cost_allocations a LEFT JOIN cost_layers c ON c.id = a.layer_id WHERE c.id IS NULL"):
+        bad.append(f"تخصيص {r[0]}: طبقته غير موجودة")
     for r in q("SELECT l.id, l.qty_on_hand, coalesce(sum(m.qty), 0) FROM stock_lots l "
                "LEFT JOIN stock_movements m ON m.lot_id = l.id GROUP BY l.id "
                "HAVING l.qty_on_hand <> coalesce(sum(m.qty), 0)"):
@@ -179,6 +189,8 @@ def reconcile(con: sqlite3.Connection) -> list:
         bad.append(f"حساب المخزون {INVENTORY_ACCOUNT} = {ledger_value} ≠ قيمة الطبقات {book_value(con)}")
     for e in ledger.unbalanced_entries(con):
         bad.append(f"قيد {e} غير متوازن")
+    for e in ledger.open_entries(con):
+        bad.append(f"قيد {e}: عالق مفتوحًا لم يُرحَّل")
     for e in ledger.incomplete_entries(con):
         bad.append(f"قيد {e}: عدد السطور لا يطابق المعلن")
     return bad

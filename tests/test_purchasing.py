@@ -15,6 +15,7 @@ from morv.infra.db.connection import open_db, transaction
 from morv.infra.inventory import StockError
 from morv.infra.purchasing import PurchaseError, PurchaseLine
 
+EXPECTED_0006_CHECKSUM = "748a93ad78aacc6e3c5fc76a583091f2649be6fe6f945d234b46b81e958573d5"
 TABLES = ("journal_entries", "journal_lines", "purchase_invoices", "purchase_lines", "stock_lots",
           "cost_layers", "stock_movements", "stock_issues", "cost_allocations")
 
@@ -437,6 +438,170 @@ class PurchaseTest(Base):
         self.assertEqual(inventory.book_value(self.con), 0)
 
 
+class ItemKindLockTest(Base):
+    """نوع الصنف لا يتغير بعد وجود حركات، وبقية التعديلات تبقى مسموحة."""
+
+    def battery_attrs(self, it):
+        """تحويل كائن صنف إلى بطارية بحقولها الإلزامية."""
+        it.kind, it.brand = "battery", "ACDelco"
+        it.attrs = {"volt": "12V", "ah": "70", "cca": "640", "tech": "EFB", "box": "L3", "pol": "الموجب يمين",
+                    "dims": "278×175×190"}
+
+    def test_kind_change_blocked_after_purchase(self):
+        """tire→service وtire→battery مرفوضان بعد الشراء، ولا يتغير نوع الصنف ولا حساب التكلفة."""
+        self.buy(self.tire, 4, 100000, "2024")
+        for target in ("service", "battery"):
+            it = items.get(self.con, self.tire)
+            if target == "battery":
+                self.battery_attrs(it)
+            else:
+                it.kind, it.attrs = "service", {}
+            with self.assertRaises(items.ItemError, msg=target):
+                items.update(self.con, self.admin, it)
+        self.assertEqual(items.get(self.con, self.tire).kind, "tire")
+        inventory.issue(self.con, self.admin, self.tire, 1, source_type="s", source_id=1, source_line_id=1)
+        self.assertEqual((ledger.account_balance(self.con, "5110"), ledger.account_balance(self.con, "5120")),
+                         (100000, 0))
+
+    def test_other_edits_deactivate_and_free_kind_change_without_documents(self):
+        """تعديل الاسم والسعر وإيقاف الصنف مسموح بعد الشراء؛ وصنف بلا حركات يبقى تغيير نوعه كما كان."""
+        self.buy(self.tire, 4, 100000, "2024")
+        it = items.get(self.con, self.tire)
+        it.name, it.price_retail, it.brand = "اسم جديد", 777, "Michelin"
+        it.attrs = {"size": "205/55R16", "li": "91", "si": "V", "cat": "ملاكي", "cons": "Radial"}
+        self.assertEqual(items.update(self.con, self.admin, it).price_retail, 777)
+        items.set_active(self.con, self.admin, self.tire, False)
+        items.set_active(self.con, self.admin, self.tire, True)
+        fresh = items.get(self.con, self.tire2)         # بلا أي حركة
+        fresh.kind, fresh.attrs = "service", {}
+        self.assertEqual(items.update(self.con, self.admin, fresh).kind, "service")
+
+
+class ReplayAfterChangeTest(Base):
+    """إعادة طلب شراء سبق نجاحه تبقى تعيد الفاتورة الأصلية رغم تغيّر الأصناف أو المورد."""
+
+    def kw(self):
+        """طلب بسطرين ثابت."""
+        return dict(request_key="req-replay-1", supplier_id=self.sup, supplier_invoice_no="A1",
+                    invoice_date="2026-11-01", notes="n1",
+                    lines=[PurchaseLine(self.tire, 2, 100000, "2024"), PurchaseLine(self.battery, 1, 200000)])
+
+    def test_replay_after_item_deactivated_or_kind_changed_or_supplier_deactivated(self):
+        """الإعادة تنجح بعد إيقاف الصنف أو تغيير نوعه أو إيقاف المورد، دون أي كتابة جديدة."""
+        first = purchasing.post_invoice(self.con, self.admin, **self.kw())
+        before = self.counts()
+        self.con.execute("UPDATE items SET active=0 WHERE id=?", (self.battery,))
+        self.con.execute("UPDATE suppliers SET active=0 WHERE id=?", (self.sup,))
+        self.con.execute("UPDATE items SET kind='service' WHERE id=?", (self.battery,))
+        again = purchasing.post_invoice(self.con, self.admin, **self.kw())
+        self.assertEqual((again.id, again.replayed), (first.id, True))
+        self.assertEqual(self.counts(), before)
+        self.assertReconciled()
+
+    def test_different_content_with_same_key_still_rejected_after_change(self):
+        """نفس المفتاح بكمية أو DOT أو تاريخ أو رقم مورد مختلف يُرفض حتى بعد تغيّر الأصناف."""
+        purchasing.post_invoice(self.con, self.admin, **self.kw())
+        self.con.execute("UPDATE items SET active=0 WHERE id=?", (self.battery,))
+        before = self.counts()
+        variants = [dict(lines=[PurchaseLine(self.tire, 3, 100000, "2024"), PurchaseLine(self.battery, 1, 200000)]),
+                    dict(lines=[PurchaseLine(self.tire, 2, 100000, "2124"), PurchaseLine(self.battery, 1, 200000)]),
+                    dict(lines=[PurchaseLine(self.tire, 2, 100000, "2024")]),
+                    dict(invoice_date="2026-11-02"), dict(supplier_invoice_no="A2")]
+        for v in variants:
+            with self.assertRaises(PurchaseError, msg=str(v)):
+                purchasing.post_invoice(self.con, self.admin, **{**self.kw(), **v})
+        self.assertEqual(self.counts(), before)
+
+    def test_new_request_still_rejects_inactive_item(self):
+        """الصنف الموقوف يبقى مرفوضًا في طلب جديد بمفتاح جديد."""
+        self.con.execute("UPDATE items SET active=0 WHERE id=?", (self.tire,))
+        with self.assertRaises(PurchaseError):
+            purchasing.post_invoice(self.con, self.admin, **{**self.kw(), "request_key": "req-new-0002",
+                                                             "supplier_invoice_no": "B2"})
+
+    def test_notes_are_not_part_of_the_fingerprint(self):
+        """قرار موثّق: تغيير الملاحظات وحدها لا يُعد محتوى مختلفًا، وتبقى ملاحظة الفاتورة الأصلية."""
+        first = purchasing.post_invoice(self.con, self.admin, **self.kw())
+        again = purchasing.post_invoice(self.con, self.admin, **{**self.kw(), "notes": "ملاحظة أخرى"})
+        self.assertEqual((again.id, again.replayed), (first.id, True))
+        self.assertEqual(self.con.execute("SELECT notes FROM purchase_invoices").fetchone()[0], "n1")
+
+
+class ReconcileOneSidedTest(Base):
+    """المطابقة تكشف غياب البيانات من أحد الجانبين (عبث خارج الخدمات: FK مُطفأ والمحفّزات محذوفة)."""
+
+    def setUp(self):
+        """صنفان: الأول عليه رصيد، والثاني صُرف كله."""
+        super().setUp()
+        self.buy(self.tire, 3, 100000, "2024")
+        self.buy(self.tire2, 2, 50000, "2024")
+        inventory.issue(self.con, self.admin, self.tire2, 2, source_type="s", source_id=1, source_line_id=1)
+        self.assertReconciled()
+        self.con.execute("PRAGMA foreign_keys=OFF")
+        for (name,) in self.con.execute("SELECT name FROM sqlite_master WHERE type='trigger'").fetchall():
+            self.con.execute(f"DROP TRIGGER {name}")
+
+    def test_lots_missing_while_layers_and_ledger_agree(self):
+        """حذف دفعات صنف عليه رصيد (الطبقات والقيد متسقان) كان يمر بلا كشف؛ يُكشف الآن."""
+        self.con.execute("DELETE FROM stock_lots WHERE item_id=?", (self.tire,))
+        report = inventory.reconcile(self.con)
+        self.assertTrue(any("رصيد الدفعات 0" in x for x in report), report)
+
+    def test_lots_and_movements_both_missing(self):
+        """حذف الدفعات وحركاتها معًا: يكشفه فقدان دفعة سطر الشراء ورصيد الصنف."""
+        self.con.execute("DELETE FROM stock_movements WHERE item_id=?", (self.tire,))
+        self.con.execute("DELETE FROM stock_lots WHERE item_id=?", (self.tire,))
+        report = inventory.reconcile(self.con)
+        self.assertTrue(any("سطر شراء" in x for x in report), report)
+        self.assertTrue(any("رصيد الدفعات 0" in x for x in report), report)
+
+    def test_layers_missing_for_fully_issued_item(self):
+        """حذف طبقات صنف مصروف بالكامل: يكشفه سطر الشراء بلا طبقة وتخصيص بلا طبقة."""
+        self.con.execute("DELETE FROM cost_layers WHERE item_id=?", (self.tire2,))
+        report = inventory.reconcile(self.con)
+        self.assertTrue(any("سطر شراء" in x for x in report), report)
+        self.assertTrue(any("تخصيص" in x and "طبقته" in x for x in report), report)
+
+    def test_orphan_movement_detected(self):
+        """حركة بلا دفعة تُكشف."""
+        self.con.execute("DELETE FROM stock_lots WHERE item_id=?", (self.tire2,))
+        self.assertTrue(any("حركة" in x and "دفعتها" in x for x in inventory.reconcile(self.con)))
+
+
+class UpgradeTest(unittest.TestCase):
+    """الترقية 0007 فوق قاعدة بقيود مرحّلة سابقة: تبقى مرحّلة وأرصدتها كما هي، وملف 0006 لم يتغير."""
+
+    def test_upgrade_from_0006_keeps_posted_entries(self):
+        """قاعدة على 0006 فيها قيد، ثم تُطبَّق 0007: القيد القديم posted والرصيد ثابت وتُرفض إضافة سطر عليه."""
+        from morv.infra.db import migrator
+        d = Path(tempfile.mkdtemp())
+        try:
+            con = open_db(d / "old.db", create=True)
+            allm = migrator.load_migrations()
+            migrator.migrate(con, allm[:6])
+            self.assertEqual(migrator.current_version(con), 6)
+            with transaction(con):
+                e = con.execute("INSERT INTO journal_entries (entry_date, source_type, source_id, line_count, total) "
+                                "VALUES ('2026-11-01','t',1,2,100)").lastrowid
+                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,1,'1410',100,0)", (e,))
+                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,2,'2110',0,100)", (e,))
+            self.assertEqual(migrator.migrate(con, allm), [7])
+            self.assertEqual(con.execute("SELECT status FROM journal_entries").fetchone()[0], "posted")
+            self.assertEqual(ledger.account_balance(con, "1410"), 100)
+            with self.assertRaises(sqlite3.IntegrityError), transaction(con):
+                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,3,'1410',1,0)", (e,))
+            con.close()
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+    def test_0006_file_unchanged_since_pr_head(self):
+        """بصمة 0006 ثابتة (7151daa)؛ أي تغيير لاحق يكون بترقية جديدة."""
+        from morv.infra.db import migrator
+        m6 = migrator.load_migrations()[5]
+        self.assertEqual(m6.name, "purchasing")
+        self.assertEqual(m6.checksum, EXPECTED_0006_CHECKSUM)
+
+
 class ProtectionTest(Base):
     """حماية المستندات المرحّلة والقيود."""
 
@@ -499,34 +664,57 @@ class ProtectionTest(Base):
         self.assertEqual(ledger.account_balance(self.con, "1410"), before)
         self.assertReconciled()
 
+    def raw_entry(self, lines, source_id, post=True):
+        """بناء قيد بـ SQL مباشر داخل معاملة: رأس مفتوح ثم سطوره ثم (اختياريًا) الترحيل."""
+        with transaction(self.con):
+            eid = self.con.execute(
+                "INSERT INTO journal_entries (entry_date, source_type, source_id, line_count, total, status) "
+                "VALUES ('2026-11-01', 't', ?, 2, 100, 'open')", (source_id,)).lastrowid
+            for no, (acc, d, c) in enumerate(lines, start=1):
+                self.con.execute("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
+                                 "VALUES (?,?,?,?,?)", (eid, no, acc, d, c))
+            if post:
+                self.con.execute("UPDATE journal_entries SET status='posted' WHERE id=?", (eid,))
+        return eid
+
     def test_entry_must_balance_when_its_last_line_arrives(self):
-        """قيد يُبنى ذريًا: آخر سطر غير موازن للإجمالي المعلن يُلغي الإدراج، والمتوازن يُقبل."""
-        def build(second_credit):
-            """رأس بسطرين وإجمالي 100 ثم سطراه داخل معاملة واحدة."""
-            with transaction(self.con):
-                eid = self.con.execute(
-                    "INSERT INTO journal_entries (entry_date, source_type, source_id, line_count, total) "
-                    "VALUES ('2026-11-01', 't', 99, 2, 100)").lastrowid
-                self.con.execute("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
-                                 "VALUES (?,1,'1410',100,0)", (eid,))
-                self.con.execute("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
-                                 "VALUES (?,2,'2110',0,?)", (eid, second_credit))
+        """قيد يُبنى ذريًا: آخر سطر غير موازن للإجمالي المعلن يُلغي كل شيء، والمتوازن يُقبل ويُرحَّل."""
         before = self.counts()
         with self.assertRaises(sqlite3.IntegrityError):
-            build(99)
+            self.raw_entry([("1410", 100, 0), ("2110", 0, 99)], 99)
         self.assertEqual(self.counts(), before)             # المعاملة كلها تراجعت
-        build(100)
+        self.raw_entry([("1410", 100, 0), ("2110", 0, 100)], 99)
         self.assertEqual(self.counts()["journal_entries"], before["journal_entries"] + 1)
 
-    def test_reconcile_flags_entry_missing_lines(self):
-        """رأس قيد بقي بسطر واحد من اثنين (لو عبث أحد بالقاعدة) تكشفه المطابقة."""
-        with transaction(self.con):
-            eid = self.con.execute("INSERT INTO journal_entries (entry_date, source_type, source_id, line_count, "
-                                   "total) VALUES ('2026-11-01', 't', 98, 2, 100)").lastrowid
-            self.con.execute("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
-                             "VALUES (?,1,'1410',100,0)", (eid,))
-        self.assertEqual(ledger.incomplete_entries(self.con), [eid])
-        self.assertTrue(any("عدد السطور" in x for x in inventory.reconcile(self.con)))
+    def test_incomplete_entry_cannot_be_posted_or_affect_balances(self):
+        """قيد مفتوح بسطر من اثنين: لا يُرحَّل، ولو بقي مفتوحًا فلا يدخل الأرصدة ويكشفه reconcile."""
+        before_balance = ledger.account_balance(self.con, "1410")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.raw_entry([("1410", 100, 0)], 98)                        # محاولة ترحيل ناقص: تتراجع المعاملة
+        eid = self.raw_entry([("1410", 100, 0)], 97, post=False)          # يبقى مفتوحًا ويُحفظ
+        self.assertEqual(ledger.account_balance(self.con, "1410"), before_balance)
+        self.assertEqual(ledger.open_entries(self.con), [eid])
+        self.assertTrue(any("عالق" in x for x in inventory.reconcile(self.con)))
+        self.exec_fails(f"UPDATE journal_entries SET status='posted' WHERE id={eid}")
+
+    def test_posted_entry_is_sealed(self):
+        """القيد المرحّل: لا سطور جديدة، ولا تعديل لأي عمود، ولا إدراج رأس مرحّل مباشرة."""
+        self.exec_fails("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
+                        "VALUES (1, 3, '1410', 5, 0)")
+        self.exec_fails("UPDATE journal_entries SET memo = 'x' WHERE id = 1")
+        self.exec_fails("UPDATE journal_entries SET total = 1 WHERE id = 1")
+        self.exec_fails("UPDATE journal_entries SET status = 'open' WHERE id = 1")
+        self.exec_fails("INSERT INTO journal_entries (entry_date, source_type, source_id, line_count, total) "
+                        "VALUES ('2026-11-01', 't', 5, 2, 10)")
+        self.assertEqual(ledger.open_entries(self.con), [])
+        self.assertReconciled()
+
+    def test_post_entry_leaves_no_open_entries(self):
+        """البناء عبر post_entry يرحّل كل قيد، ولا يبقى مفتوح بعد النجاح ولا بعد الفشل."""
+        self.assertEqual(ledger.open_entries(self.con), [])
+        with self.assertRaises(ledger.LedgerError), transaction(self.con):
+            ledger.post_entry(self.con, self.admin, "2026-11-01", "t", 1, "m", [("14", 1, 0), ("2110", 0, 1)])
+        self.assertEqual(ledger.open_entries(self.con), [])
 
     def test_reconcile_detects_tampering(self):
         """لو عبث أحد بالرصيد (خارج الكود) تكشفه المطابقة."""
