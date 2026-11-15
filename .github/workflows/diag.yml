@@ -1,0 +1,45 @@
+# تشخيص مؤقت: رمز خروج 1 على Windows بعد نجاح الاختبارات (فرع pos-unified-design).
+name: diag
+on:
+  push:
+    branches: ["diag/*"]
+jobs:
+  diag:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [full, shell_only, sales_only, ui_without_shell, ui_without_sales]
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      MORV_REQUIRE_QT: "1"
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: python -m pip install -r requirements.txt
+      - name: run
+        shell: bash
+        run: |
+          export MORV_DATA_DIR="$RUNNER_TEMP/morv_data"
+          cat > "$RUNNER_TEMP/r.py" <<'PY'
+          import os, sys, unittest, faulthandler
+          faulthandler.enable()
+          sys.path.insert(0, os.getcwd())
+          v = sys.argv[1]
+          ld = unittest.defaultTestLoader
+          allm = [f[:-3] for f in os.listdir("tests") if f.startswith("test_") and f.endswith(".py")]
+          ui = [m for m in allm if m.startswith("test_ui") or m == "test_theme"]
+          pick = {"full": allm, "shell_only": ["test_ui_shell"], "sales_only": ["test_ui_sales"],
+                  "ui_without_shell": [m for m in ui if m != "test_ui_shell"],
+                  "ui_without_sales": [m for m in ui if m != "test_ui_sales"]}[v]
+          suite = unittest.TestSuite(ld.loadTestsFromName("tests." + m) for m in pick)
+          r = unittest.TextTestRunner(verbosity=0).run(suite)
+          sys.stdout.flush(); sys.stderr.flush()
+          os._exit(0 if r.wasSuccessful() else 1)
+          PY
+          for i in 1 2 3 4; do
+            python "$RUNNER_TEMP/r.py" ${{ matrix.variant }} > out.txt 2>&1; code=$?
+            echo "RESULT ${{ matrix.variant }} run$i exit=$code"; tail -4 out.txt
+          done
