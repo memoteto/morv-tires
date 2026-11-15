@@ -463,6 +463,32 @@ class ItemKindLockTest(Base):
         self.assertEqual((ledger.account_balance(self.con, "5110"), ledger.account_balance(self.con, "5120")),
                          (100000, 0))
 
+    def test_kind_is_read_inside_the_transaction_not_before(self):
+        """تغيير متزامن (نوع جديد + شراء) بين فتح المحرر والحفظ: التحديث يُرفض ولا يُعاد النوع القديم فوق الجديد."""
+        from contextlib import contextmanager
+        it = items.get(self.con, self.tire)             # حالة المحرر: tire
+        it.brand, it.attrs = "Michelin", {"size": "205/55R16", "li": "91", "si": "V", "cat": "ملاكي", "cons": "Radial"}
+        other, real, fired = open_db(self.path), items.transaction, []
+
+        @contextmanager
+        def racing(con):
+            """قبل حجز الكتابة يُنفَّذ تغيير متزامن من اتصال آخر: نوع الصنف يصير بطارية ثم يُشترى."""
+            if not fired:
+                fired.append(1)
+                other.execute("UPDATE items SET kind='battery' WHERE id=?", (self.tire,))
+                purchasing.post_invoice(other, self.admin, request_key="race-kind-1", supplier_id=self.sup,
+                                        supplier_invoice_no="RK-1", invoice_date="2026-11-01",
+                                        lines=[PurchaseLine(self.tire, 1, 100000)])
+            with real(con) as c:
+                yield c
+        try:
+            with mock.patch.object(items, "transaction", racing), self.assertRaises(items.ItemError):
+                items.update(self.con, self.admin, it)
+        finally:
+            other.close()
+        self.assertEqual(self.con.execute("SELECT kind FROM items WHERE id=?", (self.tire,)).fetchone()[0], "battery")
+        self.assertReconciled()
+
     def test_other_edits_deactivate_and_free_kind_change_without_documents(self):
         """تعديل الاسم والسعر وإيقاف الصنف مسموح بعد الشراء؛ وصنف بلا حركات يبقى تغيير نوعه كما كان."""
         self.buy(self.tire, 4, 100000, "2024")
@@ -562,6 +588,24 @@ class ReconcileOneSidedTest(Base):
         self.assertTrue(any("سطر شراء" in x for x in report), report)
         self.assertTrue(any("تخصيص" in x and "طبقته" in x for x in report), report)
 
+    def test_item_identity_mismatch_only_the_new_check_catches(self):
+        """دفعة وطبقة سطر شراء نُسبتا معًا إلى صنف آخر: أرصدة الأصناف والقيود تبقى متسقة، ولا يكشفها غير فحص الهوية."""
+        line = self.con.execute("SELECT purchase_line_id FROM stock_lots WHERE item_id=?", (self.tire,)).fetchone()[0]
+        self.con.execute("UPDATE stock_lots SET item_id=? WHERE purchase_line_id=?", (self.tire2, line))
+        self.con.execute("UPDATE cost_layers SET item_id=? WHERE purchase_line_id=?", (self.tire2, line))
+        report = inventory.reconcile(self.con)
+        self.assertEqual(len(report), 2, report)
+        self.assertTrue(all("≠ صنف سطر الشراء" in x for x in report), report)
+
+    def test_item_identity_mismatch_on_each_side_detected(self):
+        """اختلاف الهوية في الدفعة وحدها أو الطبقة وحدها يُكشف."""
+        line = self.con.execute("SELECT purchase_line_id FROM stock_lots WHERE item_id=?", (self.tire,)).fetchone()[0]
+        self.con.execute("UPDATE stock_lots SET item_id=? WHERE purchase_line_id=?", (self.tire2, line))
+        self.assertTrue(any(x.startswith("دفعة") and "≠ صنف سطر الشراء" in x for x in inventory.reconcile(self.con)))
+        self.con.execute("UPDATE stock_lots SET item_id=? WHERE purchase_line_id=?", (self.tire, line))
+        self.con.execute("UPDATE cost_layers SET item_id=? WHERE purchase_line_id=?", (self.tire2, line))
+        self.assertTrue(any(x.startswith("طبقة") and "≠ صنف سطر الشراء" in x for x in inventory.reconcile(self.con)))
+
     def test_orphan_movement_detected(self):
         """حركة بلا دفعة تُكشف."""
         self.con.execute("DELETE FROM stock_lots WHERE item_id=?", (self.tire2,))
@@ -572,7 +616,7 @@ class UpgradeTest(unittest.TestCase):
     """الترقية 0007 فوق قاعدة بقيود مرحّلة سابقة: تبقى مرحّلة وأرصدتها كما هي، وملف 0006 لم يتغير."""
 
     def test_upgrade_from_0006_keeps_posted_entries(self):
-        """قاعدة على 0006 فيها قيد، ثم تُطبَّق 0007: القيد القديم posted والرصيد ثابت وتُرفض إضافة سطر عليه."""
+        """قاعدة على 0006 فيها قيد، ثم تُطبَّق 0007 و0008: القيد القديم posted والرصيد ثابت وتُرفض إضافة سطر عليه."""
         from morv.infra.db import migrator
         d = Path(tempfile.mkdtemp())
         try:
@@ -585,7 +629,7 @@ class UpgradeTest(unittest.TestCase):
                                 "VALUES ('2026-11-01','t',1,2,100)").lastrowid
                 con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,1,'1410',100,0)", (e,))
                 con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,2,'2110',0,100)", (e,))
-            self.assertEqual(migrator.migrate(con, allm), [7])
+            self.assertEqual(migrator.migrate(con, allm), [7, 8])
             self.assertEqual(con.execute("SELECT status FROM journal_entries").fetchone()[0], "posted")
             self.assertEqual(ledger.account_balance(con, "1410"), 100)
             with self.assertRaises(sqlite3.IntegrityError), transaction(con):
@@ -715,6 +759,21 @@ class ProtectionTest(Base):
         with self.assertRaises(ledger.LedgerError), transaction(self.con):
             ledger.post_entry(self.con, self.admin, "2026-11-01", "t", 1, "m", [("14", 1, 0), ("2110", 0, 1)])
         self.assertEqual(ledger.open_entries(self.con), [])
+
+    def test_lot_and_layer_item_must_match_purchase_line(self):
+        """إدراج دفعة أو طبقة بصنف يخالف سطر الشراء مرفوض من القاعدة، والإدراج المطابق عبر الشراء يعمل."""
+        line = self.con.execute("SELECT id FROM purchase_lines").fetchone()[0]
+        for sql in (
+            "INSERT INTO stock_lots (ref_no, item_id, purchase_line_id, dot, mfg_key, received_date, qty_received, "
+            f"qty_on_hand, purchase_unit_cost) VALUES ('X', {self.tire2}, {line}, '2024', 2420, '2026-11-01', 1, 1, 1)",
+            "INSERT INTO cost_layers (item_id, purchase_line_id, received_date, qty_received, cost_total, "
+            f"qty_remaining, cost_remaining) VALUES ({self.tire2}, {line}, '2026-11-01', 1, 1, 1, 1)",
+        ):
+            with self.assertRaises(sqlite3.IntegrityError, msg=sql[:30]) as cm, transaction(self.con):
+                self.con.execute(sql)
+            self.assertIn("هوية الصنف", str(cm.exception))
+        self.buy(self.tire2, 1, 100000, "2024")
+        self.assertReconciled()
 
     def test_reconcile_detects_tampering(self):
         """لو عبث أحد بالرصيد (خارج الكود) تكشفه المطابقة."""

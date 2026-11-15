@@ -163,6 +163,10 @@ def reconcile(con: sqlite3.Connection) -> list:
                "(SELECT count(*) FROM stock_lots WHERE purchase_line_id = p.id) <> 1 "
                "OR (SELECT count(*) FROM cost_layers WHERE purchase_line_id = p.id) <> 1"):
         bad.append(f"سطر شراء {r[0]}: ليس له دفعة وطبقة واحدة بالضبط")
+    for table, label in (("stock_lots", "دفعة"), ("cost_layers", "طبقة")):
+        for r in q(f"SELECT t.id, t.item_id, p.item_id FROM {table} t JOIN purchase_lines p ON p.id = t.purchase_line_id "
+                   "WHERE t.item_id <> p.item_id"):
+            bad.append(f"{label} {r[0]}: الصنف {r[1]} ≠ صنف سطر الشراء {r[2]}")
     for r in q("SELECT m.id FROM stock_movements m LEFT JOIN stock_lots l ON l.id = m.lot_id WHERE l.id IS NULL"):
         bad.append(f"حركة {r[0]}: دفعتها غير موجودة")
     for r in q("SELECT a.id FROM cost_allocations a LEFT JOIN cost_layers c ON c.id = a.layer_id WHERE c.id IS NULL"):

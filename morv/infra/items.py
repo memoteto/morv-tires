@@ -232,9 +232,9 @@ def update(con, by, it: Item) -> Item:
     """تعديل صنف. تغيير الأسعار يُسجَّل بقيمه في المراجعة."""
     _clean(con, it)
     _unique_errors(con, it)
-    old = get(con, it.id)
     with transaction(con):
-        # النوع يحدد حساب التكلفة والتخزين؛ لا يتغير بعد وجود حركات (الفحص داخل المعاملة منعًا للسباق)
+        # النوع الحالي يُقرأ هنا بعد حجز الكتابة، لا قبلها، فلا يُبنى القرار على قراءة قديمة (سباق مع تعديل أو شراء متزامن)
+        old = get(con, it.id)
         if old.kind != it.kind and has_documents(con, it.id):
             raise ItemError("لا يمكن تغيير نوع صنف له حركات؛ أنشئ صنفًا جديدًا")
         con.execute(
