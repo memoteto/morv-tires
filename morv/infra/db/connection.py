@@ -1,10 +1,4 @@
-"""فتح قاعدة البيانات بأمان.
-
-حمايتان قبل أي كتابة:
-1) رفض ملف البرنامج القديم بالاسم (tire_shop_live.db).
-2) رفض أي قاعدة موجودة لا تحمل علامة البرنامج app_id = 'morv_tires'.
-   يُفحص ذلك بفتح الملف للقراءة فقط، فلا يُلمس الملف الغريب أبدًا.
-"""
+"""Safe database opening and the one transaction helper."""
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -14,35 +8,20 @@ from morv import APP_ID
 FORBIDDEN_NAMES = {"tire_shop_live.db"}
 
 
-# الاستثناء الذي ترفعه sqlite3 عند العمل على اتصال مغلق؛ تُعاد تسميته هنا حتى لا تستورد الواجهة sqlite3
+# sqlite3 raises this on a closed connection; renamed here so the UI need not import sqlite3
 ClosedDatabase = sqlite3.ProgrammingError
 
 
 class UnsafeDatabase(RuntimeError):
-    """محاولة فتح قاعدة ليست تابعة للبرنامج — تُرفض دائمًا."""
+    """A database file that is not this program's: always refused."""
 
 
 class NestedTransaction(RuntimeError):
-    """محاولة بدء معاملة داخل معاملة مفتوحة — خطأ برمجي يُكشف فورًا بدل أن يُفسد البيانات."""
+    """A transaction inside an open one: a bug, caught before it corrupts data."""
 
 
 @contextmanager
 def transaction(con: sqlite3.Connection):
-    """معاملة واحدة: كل ما بداخل with يُحفظ كله أو لا يُحفظ منه شيء.
-
-    الاستعمال:
-        with transaction(con):
-            con.execute(...)
-            con.execute(...)
-
-    - تبدأ بـ BEGIN IMMEDIATE (حجز الكتابة من البداية، فلا تفشل المعاملة في منتصفها بسبب قفل).
-    - أي استثناء داخلها ← ROLLBACK ثم يُعاد رفع الاستثناء كما هو.
-    - النجاح ← COMMIT؛ وإن فشل COMMIT نفسه يُتراجع أيضًا، فلا يبقى الاتصال عالقًا داخل معاملة.
-    - التداخل ممنوع: دالة تفتح معاملة لا تُستدعى من داخل معاملة أخرى (NestedTransaction).
-
-    هذا هو الموضع الوحيد في البرنامج الذي يكتب BEGIN/COMMIT/ROLLBACK (عدا محرك الترقيات)،
-    واختبار آلي يمنع كتابتها في أي ملف آخر.
-    """
     if con.in_transaction:
         raise NestedTransaction("معاملة داخل معاملة: استدعِ الدالة من خارج transaction()")
     con.execute("BEGIN IMMEDIATE")
@@ -56,22 +35,15 @@ def transaction(con: sqlite3.Connection):
 
 
 def _apply_pragmas(con: sqlite3.Connection) -> None:
-    """إعدادات SQLite المعتمدة بعد التجربة.
-
-    WAL: القراءة لا تنتظر الكتابة.
-    synchronous=FULL: لا تضيع آخر فاتورة محفوظة إذا انقطعت الكهرباء (لا نفترض وجود UPS).
-    foreign_keys=ON: يمنع ربط مستند بشيء غير موجود.
-    """
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA synchronous=FULL")
     con.execute("PRAGMA foreign_keys=ON")
     con.execute("PRAGMA temp_store=MEMORY")
-    con.execute("PRAGMA cache_size=-16000")   # حوالي 16 ميجابايت ذاكرة مؤقتة
+    con.execute("PRAGMA cache_size=-16000")   # about 16 MB of cache
     con.execute("PRAGMA busy_timeout=3000")
 
 
 def read_app_id(path: Path):
-    """قراءة علامة البرنامج من ملف موجود دون تعديله. يعيد None إن لم توجد."""
     ro = sqlite3.connect(f"file:{Path(path).as_posix()}?mode=ro", uri=True)
     try:
         row = ro.execute("SELECT v FROM app_meta WHERE k='app_id'").fetchone()
@@ -83,30 +55,23 @@ def read_app_id(path: Path):
 
 
 def _is_empty(path: Path) -> bool:
-    """هل الملف قاعدة SQLite فارغة تمامًا (بلا جداول)؟ يُفتح للقراءة فقط."""
     ro = sqlite3.connect(f"file:{Path(path).as_posix()}?mode=ro", uri=True)
     try:
         return ro.execute("SELECT count(*) FROM sqlite_master").fetchone()[0] == 0
     except sqlite3.DatabaseError:
-        return False      # ملف تالف أو ليس SQLite: لا نعتبره فارغًا ولا نلمسه
+        return False      # Corrupt, or not SQLite: never treated as empty, never touched
     finally:
         ro.close()
 
 
 def open_db(path, create: bool = False) -> sqlite3.Connection:
-    """فتح قاعدة البرنامج.
-
-    create=True يسمح بإنشاء ملف جديد فارغ (الترقيات تبني جداوله بعد ذلك).
-    القاعدة الموجودة تُفتح فقط إذا كانت تحمل علامة البرنامج.
-    المعاملات تُدار يدويًا (BEGIN/COMMIT) لذلك isolation_level=None.
-    """
     p = Path(path)
     if p.name.lower() in FORBIDDEN_NAMES:
         raise UnsafeDatabase(f"رفض فتح قاعدة البرنامج القديم: {p}")
     exists = p.exists() and p.stat().st_size > 0
     if not exists and not create:
         raise FileNotFoundError(p)
-    # ملف موجود بلا أي جداول = قاعدة جديدة فشل إنشاؤها سابقًا؛ يُسمح بإكمالها عند create فقط
+    # A file with no tables is a creation that failed before; only create may finish it
     if exists and read_app_id(p) != APP_ID and not (create and _is_empty(p)):
         raise UnsafeDatabase(f"هذه ليست قاعدة Morv Tires، تم الرفض: {p}")
     con = sqlite3.connect(p, isolation_level=None)

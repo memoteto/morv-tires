@@ -1,11 +1,4 @@
-"""تطبيق الثيم على البرنامج كله.
-
-القواعد التي أصلحت مشاكل البرنامج القديم (المراجعة الهندسية):
-- الألوان تُبنى في QPalette أولًا، فلا يتسرب الرمادي الافتراضي لنظام التشغيل.
-- ملف تنسيق QSS واحد للأشكال فقط، يُولَّد من tokens. هذا هو المكان الوحيد المسموح فيه
-  باستدعاء setStyleSheet في البرنامج كله.
-- اتجاه RTL يُضبط مرة واحدة على التطبيق، وكل التخطيطات تتبعه تلقائيًا.
-"""
+"""Apply the theme to the whole application."""
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -13,7 +6,7 @@ from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
 
 from morv.ui.tokens import DARK, LIGHT
 
-# خطوط عربية مفتوحة الترخيص (OFL) مضمّنة مع البرنامج، فلا يعتمد على ما في Windows
+# OFL Arabic fonts shipped with the app, so it never depends on what Windows has
 FONTS_DIR = Path(__file__).with_name("fonts")
 BUNDLED = {"IBM Plex Sans Arabic": ["IBMPlexSansArabic-Regular.ttf", "IBMPlexSansArabic-Bold.ttf"],
            "Cairo": ["Cairo-Variable.ttf"]}
@@ -25,7 +18,6 @@ _loaded = False
 
 
 def load_bundled_fonts() -> None:
-    """تسجيل الخطوط المضمّنة في Qt مرة واحدة."""
     global _loaded
     if _loaded:
         return
@@ -38,14 +30,12 @@ def load_bundled_fonts() -> None:
 
 
 def available_fonts() -> list[str]:
-    """الخطوط التي يمكن اختيارها على هذا الجهاز (المضمّنة دائمًا + ما وُجد من النظام)."""
     load_bundled_fonts()
     families = set(QFontDatabase.families())
     return [f for f in FONT_CHOICES if f in families or f in BUNDLED]
 
 
 def pick_font(px: int = DEFAULT_SIZE, family: str = DEFAULT_FONT) -> QFont:
-    """الخط المطلوب بحجم بالبكسل؛ إن لم يوجد يُؤخذ أول متاح."""
     load_bundled_fonts()
     families = set(QFontDatabase.families())
     if family not in families:
@@ -56,7 +46,6 @@ def pick_font(px: int = DEFAULT_SIZE, family: str = DEFAULT_FONT) -> QFont:
 
 
 def palette(t: dict) -> QPalette:
-    """لوحة ألوان Qt من ألوان التصميم، للحالتين النشطة وغير النشطة، ومع حالة التعطيل."""
     p = QPalette()
     roles = {
         QPalette.ColorRole.Window: "bg", QPalette.ColorRole.WindowText: "text",
@@ -76,7 +65,6 @@ def palette(t: dict) -> QPalette:
 
 
 def qss(t: dict) -> str:
-    """ملف التنسيق الوحيد للبرنامج. أسماء الكائنات (objectName) هي ما يربط العنصر بشكله."""
     return f"""
 QWidget#side {{ background:{t['side']}; }}
 QLabel#brand {{ color:#FFFFFF; font-size:{t['fs']+3}px; font-weight:700; }}
@@ -149,15 +137,10 @@ QToolTip {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['b
 
 
 def colors(dark: bool) -> dict:
-    """ألوان الثيم المطلوب."""
     return DARK if dark else LIGHT
 
 
 def apply(app, dark: bool = False, font_family: str = DEFAULT_FONT, font_size: int = DEFAULT_SIZE) -> dict:
-    """تطبيق الاتجاه والخط والألوان والتنسيق على التطبيق كله، ويعيد الألوان المستخدمة.
-
-    أحجام النصوص في QSS تُشتق من الحجم المختار حتى تكبر العناوين مع الخط.
-    """
     t = dict(colors(dark))
     t["fs"] = int(font_size)
     app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)

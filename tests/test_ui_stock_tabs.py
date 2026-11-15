@@ -1,4 +1,4 @@
-"""اختبارات تبويبي الدفعات (DOT) والجرد: العرض والتصفية والصلاحيات والمطابقة، ومعاينات الصنف والمورد بالأرقام الحقيقية."""
+"""Lots and stocktake tabs: display, filtering, permissions and previews."""
 import os
 import shutil
 import tempfile
@@ -10,10 +10,7 @@ from tests.qt_app import get_app, require_qt
 
 @require_qt()
 class StockTabsTest(unittest.TestCase):
-    """قاعدة مؤقتة ببيانات وهمية: مورد، إطاران، بطارية، وفاتورة بدفعتين DOT لإطار واحد."""
-
     def setUp(self):
-        """تجهيز وترحيل فاتورة ثم صرف قطعة."""
         from morv.infra import inventory, purchasing, users
         from morv.infra.db.bootstrap import open_main_db
         from morv.infra.purchasing import PurchaseLine
@@ -38,21 +35,17 @@ class StockTabsTest(unittest.TestCase):
         inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=1, source_line_id=1)
 
     def tearDown(self):
-        """تنظيف."""
         self.con.close()
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def item(self, kind, code, name, min_qty=0):
-        """صنف وهمي مباشرة بالجدول (بيانات اختبار فقط)."""
         return self.con.execute(
             "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super, min_qty) "
             "VALUES (?,?,?,?,100,100,100,?)", (kind, code, name, name, min_qty)).lastrowid
 
     def destroy_on_cleanup(self, widget):
-        """تدمير النافذة صراحةً قبل خروج العملية."""
         def _destroy():
-            """حذف النافذة وتفريغ الأحداث المؤجلة."""
             from PySide6.QtCore import QEvent
             widget.deleteLater()
             self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
@@ -61,17 +54,14 @@ class StockTabsTest(unittest.TestCase):
         return widget
 
     def lots_page(self, session=None):
-        """تبويب الدفعات."""
         from morv.ui.stock_pages import LotsPage
         return self.destroy_on_cleanup(LotsPage(session or self.session))
 
     def stock_page(self, session=None):
-        """تبويب الجرد."""
         from morv.ui.stock_pages import StockPage
         return self.destroy_on_cleanup(StockPage(session or self.session))
 
     def test_lots_oldest_dot_first_with_remaining(self):
-        """الدفعات بالأقدم تصنيعًا أولًا، والمتبقي بعد الصرف من الأقدم، وبلا زر إضافة."""
         page = self.lots_page()
         rows = page.model.rows
         tire_rows = [r for r in rows if r[3] == "TR-1"]
@@ -81,11 +71,10 @@ class StockTabsTest(unittest.TestCase):
         self.assertIn("8", page.count_label.text())     # 1 + 4 + 3
 
     def test_lots_filter_all_includes_exhausted_and_search_by_dot(self):
-        """«كل الدفعات» تُظهر المستنفدة، والبحث برمز DOT."""
         from morv.infra import inventory
         inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=2, source_line_id=1)
         page = self.lots_page()
-        self.assertEqual(page.model.rowCount(), 2)      # دفعة 2024 نفدت
+        self.assertEqual(page.model.rowCount(), 2)      # the 2024 lot is empty
         page.set_filter("all")
         self.assertEqual(page.model.rowCount(), 3)
         page.search.setText("2124")
@@ -93,7 +82,6 @@ class StockTabsTest(unittest.TestCase):
         self.assertEqual([r[4] for r in page.model.rows], ["2124"])
 
     def test_lot_preview_shows_movements(self):
-        """معاينة الدفعة تعرض الاستلام والصرف."""
         from PySide6.QtWidgets import QLabel
         page = self.lots_page()
         row = next(r for r in page.model.rows if r[4] == "2024")
@@ -103,7 +91,6 @@ class StockTabsTest(unittest.TestCase):
         self.assertTrue(any("صرف" in t for t in texts))
 
     def test_cashier_sees_quantities_but_not_costs(self):
-        """الكاشير يرى الدفعات والأرصدة، وعمود التكلفة والقيمة مخفيان."""
         lots = self.lots_page(self.cashier_session)
         self.assertEqual(lots.model.rowCount(), 3)
         self.assertTrue(all(r[8] is None for r in lots.model.rows))
@@ -112,10 +99,9 @@ class StockTabsTest(unittest.TestCase):
         self.assertTrue(all(r[6] is None for r in stock.model.rows))
         self.assertNotIn("القيمة", stock.count_label.text())
         self.assertFalse(stock.add_btn.isEnabled())
-        stock.open_dialog(None)      # بلا صلاحية: لا نافذة (لو فُتحت لتعلّق الاختبار)
+        stock.open_dialog(None)      # without permission there is no dialog, which would hang the test
 
     def test_stock_summary_quantities_and_value(self):
-        """الملخص: رصيد الإطار 5 بقيمة دفترية من طبقات FIFO، والبطارية 3، والإطار بلا رصيد يظهر وهو نشط."""
         from morv.infra import inventory
         page = self.stock_page()
         by_code = {r[2]: r for r in page.model.rows}
@@ -127,7 +113,6 @@ class StockTabsTest(unittest.TestCase):
         self.assertIn("جنيه", page.count_label.text())
 
     def test_stock_filters(self):
-        """بها رصيد، وتحت حد الطلب (الإطار الأول: 5 < 10)."""
         page = self.stock_page()
         page.set_filter("stock")
         self.assertEqual({r[2] for r in page.model.rows}, {"TR-1", "BT-1"})
@@ -135,7 +120,6 @@ class StockTabsTest(unittest.TestCase):
         self.assertEqual([r[2] for r in page.model.rows], ["TR-1"])
 
     def test_reconcile_button_reports_ok_and_problems(self):
-        """المطابقة سليمة تُعلن التطابق؛ وبعد تغيير رصيد دفعة دون حركة (التعديل مسموح للمحرك) تُعرض الفروق."""
         from morv.ui import stock_pages
         shown = []
         original = stock_pages.info
@@ -152,7 +136,6 @@ class StockTabsTest(unittest.TestCase):
         self.assertIn("فروق", shown[-1][1])
 
     def test_inventory_tabs_wired_and_refresh_on_open(self):
-        """التبويبان الحقيقيان داخل المخزون، ويُعاد تحميلهما عند فتحهما."""
         from morv.infra import inventory
         from morv.ui.inventory_page import InventoryPage
         from morv.ui.stock_pages import LotsPage, StockPage
@@ -161,10 +144,9 @@ class StockTabsTest(unittest.TestCase):
         self.assertIsInstance(page.tabs.widget(2), StockPage)
         inventory.issue(self.con, self.admin, self.battery, 3, source_type="t", source_id=3, source_line_id=1)
         page.tabs.setCurrentIndex(1)
-        self.assertEqual(len(page.lots_tab.model.rows), 2)      # دفعة البطارية نفدت وخرجت من «بها رصيد»
+        self.assertEqual(len(page.lots_tab.model.rows), 2)      # the battery lot is empty and leaves the in-stock filter
 
     def test_item_and_supplier_previews_show_real_numbers(self):
-        """معاينة الصنف تعرض الرصيد والقيمة، ومعاينة المورد عدد الفواتير والإجمالي."""
         from PySide6.QtWidgets import QLabel
         from morv.ui.inventory_page import ItemsPage
         from morv.ui.suppliers_page import SuppliersPage

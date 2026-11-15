@@ -1,5 +1,4 @@
-"""اختبارات النسخ المشفّر: الصندوق، ومفتاح الجهاز، والقفلان، والتلاعب، والفلاشة، والاحتفاظ،
-والاستعادة على «جهاز جديد» لا يعرف المفتاح."""
+"""Encrypted backup tests: vault, device key, both locks, tampering, USB, retention."""
 import os
 import shutil
 import tempfile
@@ -15,10 +14,7 @@ PW = "Morv-Tires-2026"
 
 
 class _Device(unittest.TestCase):
-    """جهاز وهمي: مجلد بيانات مستقل يحمل القاعدة ومفتاح الجهاز."""
-
     def setUp(self):
-        """مجلد جديد ومتغير البيئة يشير إليه."""
         self.dir = Path(tempfile.mkdtemp())
         os.environ["MORV_DATA_DIR"] = str(self.dir)
         self.con = open_main_db(self.dir / "morv_tires.db")
@@ -27,20 +23,16 @@ class _Device(unittest.TestCase):
         backup.setup_encryption(self.con, PW, self.rk)
 
     def tearDown(self):
-        """تنظيف."""
         self.con.close()
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
 class VaultTest(_Device):
-    """الصندوق المشفّر وحده."""
-
     def test_open_with_password_recovery_and_dek(self):
-        """النسخة تُفتح بالقفلين وبمفتاح الجهاز، وترفض السر الخطأ."""
         r = backup.create_backup(self.con, "manual")
         self.assertTrue(r.ok and r.path.suffix == vault.EXT)
-        self.assertNotIn(b"morv_tires", r.path.read_bytes()[200:])   # لا نص قاعدة ظاهر
+        self.assertNotIn(b"morv_tires", r.path.read_bytes()[200:])   # no readable database text
         out = self.dir / "plain.db"
         for secret in (PW, self.rk, self.rk.lower().replace("-", " ")):
             vault.open_vault(r.path, out, secret=secret)
@@ -50,7 +42,6 @@ class VaultTest(_Device):
             vault.open_vault(r.path, out, secret="wrong-password-1")
 
     def test_any_tamper_is_detected(self):
-        """قلب بايت واحد في أي موضع (رأس أو جسم) يُكتشف قبل كتابة أي شيء."""
         r = backup.create_backup(self.con, "manual")
         data = bytearray(r.path.read_bytes())
         for pos in (20, len(data) // 2, len(data) - 1):
@@ -66,7 +57,6 @@ class VaultTest(_Device):
         self.assertTrue(backup.restore_test(self.con, r.path).ok)
 
     def test_foreign_file_refused(self):
-        """ملف عشوائي ليس نسخة."""
         f = self.dir / "x.mtb"
         f.write_bytes(b"MORVBK1\n" + b"\x00\x00\x00\x02{}" + b"junk")
         with self.assertRaises(vault.VaultError):
@@ -77,10 +67,7 @@ class VaultTest(_Device):
 
 
 class KeysTest(_Device):
-    """تغيير كلمة المرور ومفتاح الاسترداد وإعادة ربط الجهاز."""
-
     def test_change_password_keeps_old_backups_openable(self):
-        """بعد التغيير: القديمة تُفتح بالقديمة أو بالاسترداد، والجديدة بالجديدة أو بالاسترداد."""
         old = backup.create_backup(self.con, "manual").path
         backup.change_backup_password(self.con, PW, "New-Password-77")
         new = backup.create_backup(self.con, "manual").path
@@ -95,7 +82,6 @@ class KeysTest(_Device):
             backup.change_backup_password(self.con, "wrong-secret-99", "x")
 
     def test_regenerate_recovery_key(self):
-        """مفتاح استرداد جديد يفتح النسخ الجديدة فقط، والقديم القديمة فقط."""
         old = backup.create_backup(self.con, "manual").path
         rk2 = security.new_recovery_key()
         backup.regenerate_recovery_key(self.con, PW, rk2)
@@ -107,7 +93,6 @@ class KeysTest(_Device):
             vault.open_vault(new, out, secret=self.rk)
 
     def test_relink_device_after_key_loss(self):
-        """ضياع مفتاح الجهاز يوقف النسخ التلقائي حتى يُعاد الربط بكلمة المرور."""
         keystore.forget_dek()
         self.assertIsNone(backup.device_dek(self.con))
         with self.assertRaisesRegex(backup.BackupError, "مفتاح الجهاز"):
@@ -117,14 +102,11 @@ class KeysTest(_Device):
 
 
 class ScheduleTest(_Device):
-    """اليومي والاحتفاظ والفلاشة والصحة."""
-
     def test_daily_once_and_prune(self):
-        """نسخة يومية واحدة في اليوم، والاحتفاظ يحذف ما زاد عن السياسة."""
         self.assertIn("نسخة يومية", backup.run_scheduled(self.con))
         self.assertNotIn("نسخة يومية", backup.run_scheduled(self.con))
         d = backup.list_backups()[0].path.parent
-        # 100 يومية وهمية (يناير-أبريل) بملفات فارغة؛ الاحتفاظ يقرأ الاسم فقط
+        # 100 fake dailies with empty files; retention reads the name only
         start = datetime(2026, 1, 1)
         for i in range(100):
             (d / f"morv_tires_{(start + timedelta(days=i)).strftime('%Y%m%d_%H%M%S')}_000000_daily.mtb").write_bytes(b"x")
@@ -133,22 +115,20 @@ class ScheduleTest(_Device):
         backup.prune(d)
         kept = backup.list_backups(d)
         dailies = [b for b in kept if b.kind == "daily"]
-        # 14 الأحدث (اليوم + أواخر مارس وأبريل) + آخر نسخة من يناير ومن فبراير
+        # the newest 14, plus the last backup of January and of February
         self.assertEqual(len(dailies), backup.KEEP_DAILY + 2)
         self.assertEqual(len([b for b in kept if b.kind == "manual"]), backup.KEEP_OTHER)
 
     def test_same_drive_warning(self):
-        """مجلد على نفس قرص البيانات يُكتشف (الفلاشة يجب أن تكون خارج الجهاز)."""
         self.assertTrue(backup.same_drive_as_data(self.dir / "fake_usb"))
 
     def test_usb_copy_and_health(self):
-        """النسخ للفلاشة يتحقق بالبصمة، والصحة تنتقل بين الحالات."""
-        self.assertEqual(backup.health(self.con)[0], "danger")        # لا نسخة بعد
+        self.assertEqual(backup.health(self.con)[0], "danger")        # no backup yet
         backup.run_scheduled(self.con)
         self.assertEqual(backup.health(self.con)[0], "ok")
         usb = self.dir / "usb"
         settings.put(self.con, "backup.usb_dir", str(usb))
-        self.assertEqual(backup.health(self.con)[0], "warn")          # فلاشة محددة ولم تُنسخ
+        self.assertEqual(backup.health(self.con)[0], "warn")          # a USB folder is set but nothing was copied
         with self.assertRaisesRegex(backup.BackupError, "غير موصولة"):
             backup.copy_to_usb(self.con)
         usb.mkdir()
@@ -156,14 +136,11 @@ class ScheduleTest(_Device):
         self.assertTrue(r.ok and r.path.parent == usb)
         self.assertEqual(backup.health(self.con)[0], "ok")
         settings.put(self.con, "backup.last_ok_at", "2020-01-01 00:00:00")
-        self.assertEqual(backup.health(self.con)[0], "danger")        # نسخة قديمة
+        self.assertEqual(backup.health(self.con)[0], "danger")        # an old backup
 
 
 class NewDeviceRestoreTest(unittest.TestCase):
-    """جهاز «أ» يأخذ نسخة على الفلاشة؛ جهاز «ب» فارغ يستعيدها بكلمة المرور ثم بمفتاح الاسترداد."""
-
     def setUp(self):
-        """جهاز أ ببيانات وهمية ونسخة على فلاشة."""
         self.a = Path(tempfile.mkdtemp())
         self.b = Path(tempfile.mkdtemp())
         self.usb = Path(tempfile.mkdtemp())
@@ -181,34 +158,31 @@ class NewDeviceRestoreTest(unittest.TestCase):
         con.close()
 
     def tearDown(self):
-        """تنظيف."""
         os.environ.pop("MORV_DATA_DIR", None)
         for d in (self.a, self.b, self.usb):
             shutil.rmtree(d, ignore_errors=True)
 
     def _restore_on_b(self, secret):
-        """تمثيل جهاز ب: مجلد فارغ بلا مفتاح، استعادة ثم فتح القاعدة ومطابقة البيانات."""
         shutil.rmtree(self.b, ignore_errors=True)
         self.b.mkdir()
         os.environ["MORV_DATA_DIR"] = str(self.b)
         self.assertIsNone(keystore.load_dek())
         f = next(self.usb.glob("*.mtb"))
-        open_main_db(self.b / "morv_tires.db").close()   # كما يفعل التطبيق: قاعدة فارغة قبل المعالج
+        open_main_db(self.b / "morv_tires.db").close()   # as the app does: an empty database before the wizard
         safety = backup.restore_file(self.b / "morv_tires.db", f, secret=secret)
-        self.assertIsNone(safety)                     # قاعدة فارغة لا تستحق نسخة أمان
+        self.assertIsNone(safety)                     # an empty database needs no safety copy
         con = open_main_db(self.b / "morv_tires.db")
         try:
             self.assertEqual(con.execute("SELECT username, display_name, role FROM users ORDER BY id").fetchall(),
                              self.expected)
             self.assertEqual(settings.get(con, "shop.name"), "مورف للإطارات")
             self.assertEqual(users.login(con, "karim", "Karim12345").display_name, "كريم")
-            backup.relink_device(con, secret)         # يعود النسخ التلقائي يعمل
+            backup.relink_device(con, secret)         # automatic backup works again
             self.assertTrue(backup.create_backup(con, "manual").ok)
         finally:
             con.close()
 
     def test_restore_with_password_then_with_recovery_key(self):
-        """الاستعادة بالقفلين على جهاز لا يعرف شيئًا، ورفض السر الخطأ دون إنشاء ملف."""
         self._restore_on_b(PW)
         self._restore_on_b(self.rk)
         shutil.rmtree(self.b, ignore_errors=True)
@@ -218,7 +192,6 @@ class NewDeviceRestoreTest(unittest.TestCase):
         self.assertFalse((self.b / "morv_tires.db").exists())
 
     def test_restore_over_existing_db_makes_safety_copy(self):
-        """الاستعادة فوق قاعدة قائمة تحفظ نسخة أمان مشفّرة منها أولًا، ويمكن فتح نسخة الأمان."""
         os.environ["MORV_DATA_DIR"] = str(self.b)
         con = open_main_db(self.b / "morv_tires.db")
         users.create_user(con, None, "other", "جهاز آخر", "Other12345", "manager")

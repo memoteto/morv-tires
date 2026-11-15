@@ -1,8 +1,4 @@
-"""حزمة برنامج Morv Tires.
-
-APP_NAME: الاسم الظاهر للمستخدم وأيضًا اسم مجلد البيانات.
-APP_ID: علامة تُكتب داخل قاعدة البيانات حتى لا يفتح البرنامج أي قاعدة غريبة.
-"""
+"""Morv Tires application package."""
 
 APP_NAME = "Morv Tires"
 APP_ID = "morv_tires"

@@ -1,7 +1,4 @@
-"""بيانات المحل (الاسم والهاتف والعنوان والشعار) في جدول الإعدادات.
-
-تُستخدم في ترويسة الفواتير والإيصالات لاحقًا، ولذلك تُفحص هنا مرة واحدة: الهاتف 11 رقمًا يبدأ بـ 01.
-"""
+"""Shop data (name, phone, address, logo) in the settings table."""
 import re
 import shutil
 from dataclasses import dataclass
@@ -17,29 +14,25 @@ _PHONE = re.compile(r"^01[0-9]{9}$")
 
 @dataclass
 class Shop:
-    """بيانات المحل كما تُعرض وتُطبع."""
     name: str = ""
     phone: str = ""
     address: str = ""
 
     @property
     def logo_path(self) -> Path | None:
-        """مسار الشعار إن وُجد."""
         p = paths.data_dir() / LOGO_FILE
         return p if p.exists() else None
 
 
 class ShopError(ValueError):
-    """بيانات محل غير صالحة، برسالة تصلح للعرض."""
+    """Invalid shop data, with a message fit to show."""
 
 
 def load(con) -> Shop:
-    """قراءة بيانات المحل."""
     return Shop(settings.get(con, "shop.name"), settings.get(con, "shop.phone"), settings.get(con, "shop.address"))
 
 
 def validate(name: str, phone: str) -> tuple[str, str]:
-    """فحص الاسم والهاتف، ويعيدهما منظّفين (الأرقام العربية تتحول إلى لاتينية)."""
     name = (name or "").strip()
     phone = to_latin((phone or "").strip()).replace(" ", "")
     if not name:
@@ -50,7 +43,6 @@ def validate(name: str, phone: str) -> tuple[str, str]:
 
 
 def check(name: str, phone: str, address: str) -> tuple[str, str, str]:
-    """فحص بيانات المحل كلها قبل أي كتابة. العنوان اختياري لكنه لا يكون رقمًا وحده."""
     name, phone = validate(name, phone)
     address = (address or "").strip()
     if address and to_latin(address).isdigit():
@@ -59,14 +51,12 @@ def check(name: str, phone: str, address: str) -> tuple[str, str, str]:
 
 
 def put(con, name: str, phone: str, address: str) -> None:
-    """كتابة بيانات محل مفحوصة (داخل معاملة المتصل)."""
     settings.put(con, "shop.name", name)
     settings.put(con, "shop.phone", phone)
     settings.put(con, "shop.address", address)
 
 
 def save(con, name: str, phone: str, address: str) -> Shop:
-    """حفظ بيانات المحل بعد فحصها، الثلاثة معًا في معاملة واحدة."""
     values = check(name, phone, address)
     with transaction(con):
         put(con, *values)
@@ -74,12 +64,10 @@ def save(con, name: str, phone: str, address: str) -> Shop:
 
 
 def save_logo(src_path) -> Path:
-    """نسخ ملف الشعار المختار إلى مجلد البيانات (PNG) حتى لا يعتمد البرنامج على مكانه الأصلي."""
     dest = paths.data_dir() / LOGO_FILE
     shutil.copyfile(src_path, dest)
     return dest
 
 
 def remove_logo() -> None:
-    """حذف الشعار."""
     (paths.data_dir() / LOGO_FILE).unlink(missing_ok=True)

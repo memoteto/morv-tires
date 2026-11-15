@@ -1,4 +1,4 @@
-"""قراءة فواتير البيع للقائمة والمعاينة: صفوف جاهزة للعرض، بلا كتابة."""
+"""Read-only views of posted sales for the list and the preview."""
 import sqlite3
 from dataclasses import dataclass
 
@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class SaleLineView:
-    """سطر في معاينة الفاتورة."""
     line_no: int
     item_name: str
     qty: int
@@ -18,7 +17,6 @@ class SaleLineView:
 
 @dataclass(frozen=True)
 class SaleView:
-    """فاتورة كاملة للمعاينة: رأسها وأسطرها ودفعاتها."""
     id: int
     number: str
     customer_name: str
@@ -34,12 +32,10 @@ class SaleView:
 
 
 def _like(query: str) -> str:
-    """نمط بحث LIKE من النص الحر."""
     return f"%{(query or '').strip()}%"
 
 
 def list_sales(con: sqlite3.Connection, query: str = "", limit: int = 300, offset: int = 0) -> list[tuple]:
-    """صفحة قائمة: (id, رقم، العميل، التاريخ، الإجمالي، وسائل الدفع). الترتيب الأحدث أولًا."""
     return con.execute(
         "SELECT s.id, s.number, coalesce(c.name, 'عميل نقدي'), s.sale_date, s.total, "
         "(SELECT group_concat(p.method, '، ') FROM sale_payments p WHERE p.sale_id = s.id) "
@@ -50,12 +46,10 @@ def list_sales(con: sqlite3.Connection, query: str = "", limit: int = 300, offse
 
 
 def count(con: sqlite3.Connection) -> int:
-    """عدد الفواتير المرحّلة."""
     return con.execute("SELECT count(*) FROM sales").fetchone()[0]
 
 
 def get_sale(con: sqlite3.Connection, sale_id: int) -> SaleView:
-    """فاتورة كاملة للمعاينة."""
     h = con.execute(
         "SELECT s.id, s.number, coalesce(c.name, 'عميل نقدي'), s.sale_date, s.subtotal, s.line_discount, "
         "s.invoice_discount, s.total, s.odometer, coalesce(s.vehicle_plate, '') "

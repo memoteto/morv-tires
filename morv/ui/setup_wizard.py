@@ -1,14 +1,4 @@
-"""معالج التشغيل الأول: يظهر مرة واحدة عندما لا يوجد مستخدمون في القاعدة.
-
-أول شاشة تعطي اختيارين:
-- «محل جديد»: بيانات المحل ← حساب المدير ← كلمة مرور النسخ ← مفتاح الاسترداد ← مراجعة.
-  عند الإنهاء تُنشأ البيانات في القاعدة وتُؤخذ أول نسخة مشفّرة.
-- «استعادة من نسخة احتياطية»: اختيار ملف .mtb وكلمة المرور أو مفتاح الاسترداد.
-  المعالج يتحقق من الملف والسر فقط، والاستبدال الفعلي يقوم به التطبيق بعد إغلاق القاعدة
-  (انظر morv.app.main) لأن الملف لا يُستبدل وهو مفتوح.
-
-مفتاح الاسترداد يظهر مرة واحدة، ولا يُحفظ في أي مكان، ولا يُكمل المعالج حتى يُعاد إدخاله كاملًا.
-"""
+"""First-run wizard, shown once while the database has no users."""
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -25,11 +15,7 @@ STEPS_RESTORE = ["البداية", "ملف النسخة"]
 
 
 class SetupWizard(QDialog):
-    """نافذة المعالج. بعد exec(): result_kind يكون 'new' أو 'restore'، وعند الاستعادة
-    restore_path و restore_secret جاهزان للتطبيق."""
-
     def __init__(self, con, parent=None):
-        """بناء الخطوات."""
         super().__init__(parent)
         self.con = con
         self.setWindowTitle(f"{APP_NAME} — الإعداد لأول مرة")
@@ -37,7 +23,7 @@ class SetupWizard(QDialog):
         self.result_kind = None
         self.restore_path = None
         self.restore_secret = None
-        self.first_backup_error = None   # نص فشل النسخة الأولى إن فشلت (الإعداد نفسه اكتمل)
+        self.first_backup_error = None   # Message if the first backup failed; setup itself still completed
         self.mode = "new"
         self.recovery_key = security.new_recovery_key()
 
@@ -90,9 +76,8 @@ class SetupWizard(QDialog):
         self._set_mode("new")
         self._show()
 
-    # ---------- الخطوات ----------
+    # ---------- Steps ----------
     def _set_mode(self, mode: str) -> None:
-        """تحديد المسار (جديد أو استعادة) وإعادة بناء قائمة الخطوات في الجانب."""
         self.mode = mode
         self.order = ["choice", "shop", "admin", "backup", "key", "review"] if mode == "new" else ["choice", "restore"]
         names = STEPS_NEW if mode == "new" else STEPS_RESTORE
@@ -106,7 +91,6 @@ class SetupWizard(QDialog):
             self.step_labels.append(lbl)
 
     def _show(self) -> None:
-        """عرض الخطوة الحالية وتحديث الجانب والأزرار."""
         key = self.order[self.index]
         self.stack.setCurrentWidget(self.pages[key])
         for i, lbl in enumerate(self.step_labels):
@@ -125,13 +109,11 @@ class SetupWizard(QDialog):
             self.key_box.setText(self.recovery_key)
 
     def back(self) -> None:
-        """خطوة للخلف."""
         if self.index > 0:
             self.index -= 1
             self._show()
 
     def next(self) -> None:
-        """التحقق من الخطوة الحالية ثم التقدم، أو الإنهاء في آخر خطوة."""
         key = self.order[self.index]
         error = getattr(self, f"_validate_{key}")()
         if error:
@@ -143,9 +125,8 @@ class SetupWizard(QDialog):
         self.index += 1
         self._show()
 
-    # ---------- الصفحات ----------
+    # ---------- Pages ----------
     def _page_choice(self) -> QWidget:
-        """الاختيار بين محل جديد واستعادة."""
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setSpacing(12)
@@ -157,7 +138,7 @@ class SetupWizard(QDialog):
         self.btn_restore = QPushButton("استعادة من نسخة احتياطية — من فلاشة أو جهاز سابق")
         for b, m in ((self.btn_new, "new"), (self.btn_restore, "restore")):
             b.setCheckable(True)
-            b.setObjectName("choice")           # المختار يتلون من theme.py
+            b.setObjectName("choice")           # the selected one is tinted by theme.py
             b.setMinimumHeight(56)
             b.clicked.connect(lambda _=False, mode=m: self._pick_mode(mode))
             lay.addWidget(b)
@@ -166,18 +147,15 @@ class SetupWizard(QDialog):
         return w
 
     def _pick_mode(self, mode: str) -> None:
-        """اختيار المسار."""
         self.btn_new.setChecked(mode == "new")
         self.btn_restore.setChecked(mode == "restore")
         self._set_mode(mode)
         self._show()
 
     def _validate_choice(self) -> str | None:
-        """لا شيء يُتحقق منه."""
         return None
 
     def _page_shop(self) -> QWidget:
-        """بيانات المحل."""
         w = QWidget()
         lay = QVBoxLayout(w)
         h = QLabel("بيانات المحل")
@@ -198,7 +176,6 @@ class SetupWizard(QDialog):
         return w
 
     def _validate_shop(self) -> str | None:
-        """فحص اسم المحل والهاتف."""
         try:
             shop.validate(self.shop_name.text(), self.shop_phone.text())
         except shop.ShopError as e:
@@ -206,7 +183,6 @@ class SetupWizard(QDialog):
         return None
 
     def _page_admin(self) -> QWidget:
-        """حساب المدير."""
         w = QWidget()
         lay = QVBoxLayout(w)
         h = QLabel("حساب المدير")
@@ -232,13 +208,11 @@ class SetupWizard(QDialog):
         return w
 
     def _strength(self, text: str) -> None:
-        """عرض قوة كلمة المرور أثناء الكتابة."""
         s = security.password_strength(text)
         self.admin_strength.setText(["", "ضعيفة", "متوسطة", "قوية", "قوية جدًا"][s] if text else
                                     "8 أحرف على الأقل، ويُفضّل خلط حروف وأرقام")
 
     def _validate_admin(self) -> str | None:
-        """فحص حساب المدير."""
         if not self.admin_name.text().strip():
             return "الاسم مطلوب"
         try:
@@ -252,7 +226,6 @@ class SetupWizard(QDialog):
         return None
 
     def _page_backup(self) -> QWidget:
-        """كلمة مرور النسخ ومجلد الفلاشة."""
         w = QWidget()
         lay = QVBoxLayout(w)
         h = QLabel("كلمة مرور النسخ الاحتياطي")
@@ -279,13 +252,11 @@ class SetupWizard(QDialog):
         return w
 
     def _pick_usb(self) -> None:
-        """اختيار مجلد الفلاشة."""
         d = QFileDialog.getExistingDirectory(self, "مجلد النسخ على الفلاشة")
         if d:
             self.usb_dir.setText(d)
 
     def _validate_backup(self) -> str | None:
-        """فحص كلمة مرور النسخ."""
         err = security.check_backup_password(self.bk_pw.text())
         if err:
             return err
@@ -296,7 +267,6 @@ class SetupWizard(QDialog):
         return None
 
     def _page_key(self) -> QWidget:
-        """عرض مفتاح الاسترداد وإعادة إدخاله."""
         w = QWidget()
         lay = QVBoxLayout(w)
         h = QLabel("مفتاح الاسترداد")
@@ -321,7 +291,6 @@ class SetupWizard(QDialog):
         return w
 
     def _validate_key(self) -> str | None:
-        """المفتاح المُعاد إدخاله يجب أن يطابق المعروض."""
         try:
             if security.normalize_recovery_key(self.key_confirm.text()) != self.recovery_key:
                 return "المفتاح غير مطابق — راجع ما كتبته"
@@ -330,7 +299,6 @@ class SetupWizard(QDialog):
         return None
 
     def _page_review(self) -> QWidget:
-        """المراجعة قبل الإنهاء."""
         w = QWidget()
         lay = QVBoxLayout(w)
         h = QLabel("مراجعة وإنهاء")
@@ -345,7 +313,6 @@ class SetupWizard(QDialog):
         return w
 
     def _fill_review(self) -> None:
-        """ملء جدول المراجعة من الحقول."""
         rows = [("اسم المحل", self.shop_name.text()), ("الهاتف", self.shop_phone.text()),
                 ("المدير", f"{self.admin_name.text()} · {self.admin_user.text()}"),
                 ("النسخ الاحتياطي", "يومي، مشفّر" + (f" + فلاشة: {self.usb_dir.text()}" if self.usb_dir.text() else " — بلا فلاشة")),
@@ -354,11 +321,9 @@ class SetupWizard(QDialog):
             f"<tr><td style='color:#888'>{k}</td><td><b>{v}</b></td></tr>" for k, v in rows) + "</table>")
 
     def _validate_review(self) -> str | None:
-        """لا شيء."""
         return None
 
     def _page_restore(self) -> QWidget:
-        """اختيار ملف النسخة والسر."""
         w = QWidget()
         lay = QVBoxLayout(w)
         h = QLabel("استعادة من نسخة احتياطية")
@@ -384,13 +349,11 @@ class SetupWizard(QDialog):
         return w
 
     def _pick_restore(self) -> None:
-        """اختيار ملف .mtb وعرض تاريخه."""
         p, _ = QFileDialog.getOpenFileName(self, "ملف النسخة الاحتياطية", "", "نسخة Morv Tires (*.mtb)")
         if p:
             self.set_restore_file(p)
 
     def set_restore_file(self, path: str) -> None:
-        """تعيين ملف الاستعادة (من الحوار أو من الاختبارات) وقراءة رأسه."""
         self.restore_file.setText(path)
         try:
             hdr = vault.read_header(path)
@@ -399,7 +362,6 @@ class SetupWizard(QDialog):
             self.restore_info.setText(str(e))
 
     def _validate_restore(self) -> str | None:
-        """التحقق أن الملف نسخة صحيحة وأن السر يفتحها، دون كتابة أي شيء."""
         p = self.restore_file.text()
         if not p or not Path(p).exists():
             return "اختر ملف النسخة"
@@ -410,9 +372,8 @@ class SetupWizard(QDialog):
             return str(e) if str(e) else "الملف ليس نسخة صالحة"
         return None
 
-    # ---------- الإنهاء ----------
+    # ---------- Finishing ----------
     def _finish(self) -> None:
-        """تنفيذ الإعداد: محل جديد يُكتب في القاعدة الآن؛ الاستعادة تُترك للتطبيق."""
         if self.mode == "restore":
             self.result_kind = "restore"
             self.restore_path = self.restore_file.text()
@@ -420,7 +381,7 @@ class SetupWizard(QDialog):
             self.accept()
             return
         try:
-            # كل الإعداد في معاملة واحدة: إما يكتمل كله أو لا يُكتب منه شيء (morv/infra/setup.py)
+            # All of setup in one transaction: it completes whole, or nothing is written
             admin = setup.run_first_setup(
                 self.con, shop_name=self.shop_name.text(), shop_phone=self.shop_phone.text(),
                 shop_address=self.shop_addr.text(), admin_username=self.admin_user.text(),
@@ -433,7 +394,7 @@ class SetupWizard(QDialog):
         try:
             backup.create_backup(self.con, "manual", username=admin.username)
         except backup.BackupError as e:
-            # الإعداد اكتمل؛ فشل النسخة الأولى لا يلغيه، ويظهر في تنبيه النسخ بعد الدخول
+            # Setup is done; a failed first backup does not undo it and shows in the backup notice
             self.first_backup_error = str(e)
         self.result_kind = "new"
         self.accept()

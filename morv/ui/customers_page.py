@@ -1,8 +1,4 @@
-"""شاشة العملاء: قائمة ببحث (الاسم/الموبايل/اللوحة)، ومعاينة بالضغط على الصف، ونافذة إضافة/تعديل.
-
-الرصيد وكشف الحساب والفاتورة تأتي في مراحلها؛ هنا بيانات العميل ومركباته فقط.
-الرقم القومي يُعرض مخفيًا إلا آخر 4 أرقام.
-"""
+"""Customers screen: searchable list, row preview, add and edit dialog."""
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QHBoxLayout, QLineEdit, QListWidget,
                                QPlainTextEdit, QPushButton, QSpinBox, QWidget)
 
@@ -17,7 +13,6 @@ from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, p
 
 
 class CustomersPage(ListPage):
-    """قائمة العملاء."""
     title = "العملاء"
     add_label = "عميل جديد"
     search_placeholder = "الاسم، الموبايل، أو رقم اللوحة (F2)"
@@ -33,21 +28,17 @@ class CustomersPage(ListPage):
     ]
 
     def can_edit(self) -> bool:
-        """صلاحية العملاء."""
         return self.session.can("customers.manage")
 
     def fetch(self, query, filter_key, offset):
-        """صفحة من البحث حسب الفلتر."""
         level = filter_key if filter_key in ("wholesale", "super") else None
         return customers.search(self.session.con, query, level=level, include_inactive=filter_key == "inactive",
                                 offset=offset)
 
     def total(self) -> str:
-        """العدّاد."""
         return f"{customers.count(self.session.con)} عميل نشط"
 
     def build_preview(self, row_id: int) -> None:
-        """تفاصيل العميل ومركباته وأزراره."""
         c = customers.get(self.session.con, row_id)
         self.heading(c.name, f"{customers.TYPES[c.customer_type]} · {customers.LEVELS[c.price_level]}" + ("" if c.active else " · موقوف"))
         if c.notes:
@@ -78,14 +69,12 @@ class CustomersPage(ListPage):
             self.actions(edit, toggle)
 
     def toggle_active(self, c: Customer) -> None:
-        """إيقاف أو تفعيل مع تأكيد."""
         verb = "إيقاف" if c.active else "تفعيل"
         if ask(self, verb, f"{verb} العميل «{c.name}»؟" + (" لن يظهر في البيع." if c.active else ""), danger=c.active):
             customers.set_active(self.session.con, self.session.user, c.id, not c.active)
             self.reload(keep_id=c.id)
 
     def open_dialog(self, row_id):
-        """نافذة إضافة أو تعديل."""
         if not self.can_edit():
             return
         dlg = CustomerDialog(self.session, customers.get(self.session.con, row_id) if row_id else None, self)
@@ -94,10 +83,7 @@ class CustomersPage(ListPage):
 
 
 class CustomerDialog(Modal):
-    """نافذة بيانات العميل. حقول التقسيط والآجل تحت مفتاح «بيانات إضافية»."""
-
     def __init__(self, session, c: Customer | None, parent=None):
-        """بناء النافذة وملء الحقول عند التعديل."""
         super().__init__("تعديل عميل" if c else "عميل جديد", parent, width=640)
         self.session = session
         self.c = c
@@ -112,7 +98,7 @@ class CustomerDialog(Modal):
         self.level = QComboBox()
         for k, v in customers.LEVELS.items():
             self.level.addItem(v, k)
-        self.level.setEnabled(session.user.is_manager or session.can("items.prices"))   # فئة السعر بصلاحية
+        self.level.setEnabled(session.user.is_manager or session.can("items.prices"))
         self.ctype = QComboBox()
         for k, v in customers.TYPES.items():
             self.ctype.addItem(v, k)
@@ -131,7 +117,6 @@ class CustomerDialog(Modal):
         f.addRow("ملاحظات", self.notes)
         lay.addLayout(f)
 
-        # المركبات
         vh = QHBoxLayout()
         vh.addWidget(muted("المركبات"), 1)
         add_v = QPushButton("إضافة مركبة")
@@ -146,7 +131,6 @@ class CustomerDialog(Modal):
         lay.addWidget(self.vlist)
         self._refresh_vehicles()
 
-        # بيانات إضافية
         self.more = QCheckBox("بيانات التقسيط والآجل")
         self.more.toggled.connect(lambda on: self.more_box.setVisible(on))
         lay.addWidget(self.more)
@@ -184,27 +168,23 @@ class CustomerDialog(Modal):
         self.name.setFocus()
 
     def _refresh_vehicles(self) -> None:
-        """إعادة رسم قائمة المركبات."""
         self.vlist.clear()
         for v in self.vehicles:
             self.vlist.addItem(" · ".join(x for x in (v.title, v.plate, ltr(v.tire_front) if v.tire_front else "") if x) or "مركبة")
 
     def add_vehicle(self) -> None:
-        """حوار مركبة جديدة."""
         dlg = VehicleDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.vehicles.append(dlg.vehicle)
             self._refresh_vehicles()
 
     def remove_vehicle(self) -> None:
-        """حذف المركبة المختارة من القائمة (يُحفظ مع العميل)."""
         i = self.vlist.currentRow()
         if i >= 0:
             del self.vehicles[i]
             self._refresh_vehicles()
 
     def save(self) -> None:
-        """جمع الحقول والحفظ."""
         try:
             limit = parse_money(self.limit.text()) if self.limit.text().strip() else 0
         except MoneyError as e:
@@ -223,10 +203,7 @@ class CustomerDialog(Modal):
 
 
 class VehicleDialog(Modal):
-    """حوار مركبة واحدة."""
-
     def __init__(self, parent=None):
-        """الحقول."""
         super().__init__("مركبة", parent, width=460)
         self.vehicle = None
         lay = self.body
@@ -250,7 +227,6 @@ class VehicleDialog(Modal):
         self.add_footer("إضافة", self.go)
 
     def go(self) -> None:
-        """تحقق بسيط ثم القبول."""
         if not any((self.make.text().strip(), self.model.text().strip(), self.plate.text().strip())):
             self.notice.show_message("اكتب الماركة أو الموديل أو رقم اللوحة على الأقل")
             return

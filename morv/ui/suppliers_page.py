@@ -1,4 +1,4 @@
-"""شاشة الموردين: قائمة ومعاينة ونافذة إضافة/تعديل. الرصيد وكشف الحساب مع مرحلة الخزينة."""
+"""Suppliers screen: list, preview and add or edit dialog."""
 from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLineEdit, QPlainTextEdit, QSpinBox, QWidget
 
 from morv.core.money import MoneyError, fmt, parse_money
@@ -11,7 +11,6 @@ from morv.ui.widgets import ask, danger_button, form, ltr_edit, muted, primary_b
 
 
 class SuppliersPage(ListPage):
-    """قائمة الموردين."""
     title = "الموردون"
     add_label = "مورد جديد"
     search_placeholder = "الاسم أو الموبايل (F2)"
@@ -27,19 +26,15 @@ class SuppliersPage(ListPage):
     ]
 
     def can_edit(self) -> bool:
-        """صلاحية الموردين."""
         return self.session.can("suppliers.manage")
 
     def fetch(self, query, filter_key, offset):
-        """صفحة من البحث."""
         return suppliers.search(self.session.con, query, include_inactive=filter_key == "inactive", offset=offset)
 
     def total(self) -> str:
-        """العدّاد."""
         return f"{suppliers.count(self.session.con)} مورد نشط"
 
     def build_preview(self, row_id: int) -> None:
-        """تفاصيل المورد."""
         s = suppliers.get(self.session.con, row_id)
         self.heading(s.name, suppliers.SUPPLIES[s.supplies] + ("" if s.active else " · موقوف"))
         self.kv("الموبايل", ltr(s.mobile))
@@ -70,14 +65,12 @@ class SuppliersPage(ListPage):
             self.actions(edit, toggle)
 
     def toggle_active(self, s: Supplier) -> None:
-        """إيقاف أو تفعيل مع تأكيد."""
         verb = "إيقاف" if s.active else "تفعيل"
         if ask(self, verb, f"{verb} المورد «{s.name}»؟", danger=s.active):
             suppliers.set_active(self.session.con, self.session.user, s.id, not s.active)
             self.reload(keep_id=s.id)
 
     def open_dialog(self, row_id):
-        """نافذة إضافة أو تعديل."""
         if not self.can_edit():
             return
         dlg = SupplierDialog(self.session, suppliers.get(self.session.con, row_id) if row_id else None, self)
@@ -86,10 +79,7 @@ class SuppliersPage(ListPage):
 
 
 class SupplierDialog(Modal):
-    """نافذة بيانات المورد: الأساسية ثم «بيانات إضافية» تحت مفتاح."""
-
     def __init__(self, session, s: Supplier | None, parent=None):
-        """بناء الحقول."""
         super().__init__("تعديل مورد" if s else "مورد جديد", parent, width=600)
         self.session, self.s, self.saved = session, s, None
         f = form()
@@ -157,7 +147,6 @@ class SupplierDialog(Modal):
         self.name.setFocus()
 
     def save(self) -> None:
-        """الحفظ."""
         try:
             limit = parse_money(self.limit.text()) if self.limit.text().strip() else 0
         except MoneyError as e:

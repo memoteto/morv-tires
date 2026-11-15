@@ -1,7 +1,4 @@
-"""مكونات واجهة مشتركة صغيرة، حتى لا تتكرر في كل شاشة ويبقى الشكل موحّدًا.
-
-لا SQL هنا؛ كل ما تحتاجه الشاشات من قاعدة البيانات يمر عبر morv.infra.
-"""
+"""Small shared UI pieces, so screens stay consistent."""
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QToolButton, QVBoxLayout, QWidget)
@@ -10,7 +7,6 @@ from morv.ui import icons
 
 
 def card(title: str | None = None) -> tuple[QFrame, QVBoxLayout]:
-    """بطاقة بإطار وعنوان اختياري، تعيد (البطاقة، تخطيطها الداخلي) لإضافة المحتوى."""
     box = QFrame()
     box.setObjectName("card")
     lay = QVBoxLayout(box)
@@ -24,7 +20,6 @@ def card(title: str | None = None) -> tuple[QFrame, QVBoxLayout]:
 
 
 def muted(text: str) -> QLabel:
-    """نص توضيحي باهت يلتف على أكثر من سطر."""
     lbl = QLabel(text)
     lbl.setObjectName("muted")
     lbl.setWordWrap(True)
@@ -32,7 +27,6 @@ def muted(text: str) -> QLabel:
 
 
 def form() -> QFormLayout:
-    """نموذج حقول موحّد: العناوين فوق الحقول عند الضيق، ومحاذاة تتبع اتجاه التطبيق."""
     f = QFormLayout()
     f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
     f.setLabelAlignment(Qt.AlignmentFlag.AlignLeading | Qt.AlignmentFlag.AlignVCenter)
@@ -42,19 +36,15 @@ def form() -> QFormLayout:
 
 
 def ltr_edit(placeholder: str = "") -> QLineEdit:
-    """حقل للقيم اللاتينية (هاتف، اسم دخول، كلمة مرور): اتجاهه يسار-يمين دائمًا."""
     e = QLineEdit()
     e.setPlaceholderText(placeholder)
-    # القيمة لاتينية فالحقل وحده يُعرض LTR؛ هذا ليس قلبًا لتخطيط، بل لمحتوى الحقل
+    # The value is Latin so the field alone runs LTR: field content, not layout
     e.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
     return e
 
 
 class PasswordEdit(QWidget):
-    """حقل كلمة مرور مع زر إظهار/إخفاء."""
-
     def __init__(self, placeholder: str = ""):
-        """بناء الحقل والزر."""
         super().__init__()
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -71,41 +61,32 @@ class PasswordEdit(QWidget):
         self.set_icon_color("#566173")
 
     def set_icon_color(self, color: str) -> None:
-        """تلوين أيقونة العين حسب الثيم."""
         self._color = color
         self._flip(self.toggle.isChecked())
 
     def _flip(self, show: bool) -> None:
-        """تبديل الإظهار والإخفاء."""
         self.edit.setEchoMode(QLineEdit.EchoMode.Normal if show else QLineEdit.EchoMode.Password)
         self.toggle.setIcon(icons.icon("eye_off" if show else "eye", self._color, 18))
         self.toggle.setToolTip("إخفاء كلمة المرور" if show else "إظهار كلمة المرور")
 
     def text(self) -> str:
-        """النص المكتوب."""
         return self.edit.text()
 
     def setText(self, value: str) -> None:
-        """تعيين النص (للاختبارات والمسح)."""
         self.edit.setText(value)
 
     def clear(self) -> None:
-        """مسح الحقل."""
         self.edit.clear()
 
 
 class Notice(QLabel):
-    """شريط رسالة داخل الشاشة: خطأ أو نجاح أو تحذير، يختفي حين لا توجد رسالة."""
-
     def __init__(self):
-        """يبدأ مخفيًا."""
         super().__init__()
         self.setWordWrap(True)
         self.setObjectName("noticeError")
         self.hide()
 
     def show_message(self, text: str, level: str = "error") -> None:
-        """عرض رسالة بمستوى: error أو success أو warn. التنسيق من theme.py حسب objectName."""
         self.setObjectName({"error": "noticeError", "success": "noticeSuccess", "warn": "noticeWarn"}[level])
         self.style().unpolish(self)
         self.style().polish(self)
@@ -114,7 +95,6 @@ class Notice(QLabel):
 
 
 def primary_button(text: str, icon_name: str | None = None) -> QPushButton:
-    """زر الإجراء الرئيسي (أزرق) بأيقونة اختيارية."""
     b = QPushButton(text)
     b.setObjectName("primary")
     if icon_name:
@@ -123,7 +103,6 @@ def primary_button(text: str, icon_name: str | None = None) -> QPushButton:
 
 
 def danger_button(text: str, icon_name: str | None = None) -> QPushButton:
-    """زر إجراء خطر (أحمر) مثل الاستعادة أو الإيقاف، بأيقونة اختيارية."""
     b = QPushButton(text)
     b.setObjectName("danger")
     if icon_name:
@@ -132,19 +111,16 @@ def danger_button(text: str, icon_name: str | None = None) -> QPushButton:
 
 
 def icon_button(text: str, icon_name: str, color: str = "#8792A3") -> QPushButton:
-    """زر عادي بأيقونة."""
     b = QPushButton(text)
     b.setIcon(icons.icon(icon_name, color, 18))
     return b
 
 
 def ask(parent, title: str, text: str, danger: bool = False) -> bool:
-    """سؤال نعم/لا بالنافذة الموحّدة (انظر morv.ui.modal)."""
     from morv.ui.modal import ask as _ask
     return _ask(parent, title, text, danger)
 
 
 def info(parent, title: str, text: str, error: bool = False) -> None:
-    """رسالة بالنافذة الموحّدة (انظر morv.ui.modal)."""
     from morv.ui.modal import info as _info
     _info(parent, title, text, error)

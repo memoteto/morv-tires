@@ -1,8 +1,4 @@
-"""صفحة الإعدادات بتبويباتها: المحل، المستخدمون والصلاحيات، سجل العمليات، الاختصارات، النسخ الاحتياطي.
-
-كل تبويب كلاس مستقل يأخذ الجلسة. التبويبات التي تحتاج صلاحية تُعرض للمخوَّل فقط.
-لا SQL هنا؛ كل شيء عبر morv.infra.
-"""
+"""Settings tabs: shop, users, audit log, shortcuts, backup."""
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPixmap
@@ -23,7 +19,6 @@ SHORTCUTS = [("Ctrl+B", "طي الشريط الجانبي أو فتحه"), ("Ctr
 
 
 def _table(model) -> QTableView:
-    """جدول موحّد: صف كامل عند الاختيار، بلا تحرير، وآخر عمود يتمدد."""
     v = QTableView()
     v.setModel(model)
     v.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -37,17 +32,14 @@ def _table(model) -> QTableView:
 
 
 class SettingsPage(QWidget):
-    """حاوية التبويبات."""
-
     def __init__(self, session):
-        """بناء التبويبات حسب الصلاحيات."""
         super().__init__()
         self.session = session
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 20, 24, 20)
         self.tabs = QTabWidget()
         self.shop_tab = None
-        if session.can("settings.edit"):      # الكاشير لا يرى بيانات المحل أصلًا (قرار المالك)
+        if session.can("settings.edit"):      # A cashier never sees shop data, by the owner's decision
             self.shop_tab = ShopTab(session)
             self.tabs.addTab(self.shop_tab, "المحل")
         if session.can("users.manage"):
@@ -57,7 +49,7 @@ class SettingsPage(QWidget):
             self.tabs.addTab(self.audit_tab, "سجل العمليات")
         self.fields_tab = None
         if session.can("settings.edit"):
-            from morv.ui.inventory_page import ItemFieldsTab   # استيراد محلي لتجنب الدوران
+            from morv.ui.inventory_page import ItemFieldsTab   # local import to avoid a cycle
             self.fields_tab = ItemFieldsTab(session)
             self.tabs.addTab(self.fields_tab, "حقول بطاقة الصنف")
         self.appearance_tab = AppearanceTab(session)
@@ -69,10 +61,7 @@ class SettingsPage(QWidget):
 
 
 class AppearanceTab(QWidget):
-    """الخط وحجمه والوضع الفاتح/الداكن؛ تُطبَّق فورًا على البرنامج كله وتُحفظ لكل الجهاز."""
-
     def __init__(self, session):
-        """بناء الاختيارات من القيم المحفوظة."""
         super().__init__()
         self.session = session
         lay = QVBoxLayout(self)
@@ -103,17 +92,13 @@ class AppearanceTab(QWidget):
         lay.addStretch(1)
 
     def apply(self) -> None:
-        """تطبيق الاختيار على النافذة الرئيسية."""
         win = self.window()
         if hasattr(win, "set_font"):
             win.set_font(self.family.currentText(), self.size.currentData())
 
 
 class ShopTab(QWidget):
-    """بيانات المحل والشعار."""
-
     def __init__(self, session):
-        """تحميل البيانات الحالية في الحقول."""
         super().__init__()
         self.session = session
         lay = QVBoxLayout(self)
@@ -156,7 +141,6 @@ class ShopTab(QWidget):
         self._show_logo()
 
     def _show_logo(self) -> None:
-        """عرض الشعار الحالي إن وُجد."""
         p = shop.Shop().logo_path
         if p:
             self.logo.setPixmap(QPixmap(str(p)).scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio,
@@ -166,19 +150,16 @@ class ShopTab(QWidget):
             self.logo.setText("لا شعار")
 
     def pick_logo(self) -> None:
-        """اختيار صورة الشعار ونسخها إلى مجلد البيانات."""
         p, _ = QFileDialog.getOpenFileName(self, "صورة الشعار", "", "صور (*.png *.jpg *.jpeg)")
         if p:
             shop.save_logo(p)
             self._show_logo()
 
     def remove_logo(self) -> None:
-        """حذف الشعار."""
         shop.remove_logo()
         self._show_logo()
 
     def save(self) -> None:
-        """حفظ البيانات بعد فحصها."""
         try:
             shop.save(self.session.con, self.name.text(), self.phone.text(), self.address.text())
         except shop.ShopError as e:
@@ -189,10 +170,7 @@ class ShopTab(QWidget):
 
 
 class UsersTab(QWidget):
-    """قائمة المستخدمين وتفاصيل المختار وصلاحياته."""
-
     def __init__(self, session):
-        """بناء القائمة والتفاصيل."""
         super().__init__()
         self.session = session
         self.current: users.User | None = None
@@ -247,7 +225,6 @@ class UsersTab(QWidget):
         self.reload()
 
     def reload(self, select_id: int | None = None) -> None:
-        """إعادة تحميل القائمة واختيار مستخدم."""
         self.users = users.list_users(self.session.con)
         self.list.blockSignals(True)
         self.list.clear()
@@ -262,7 +239,6 @@ class UsersTab(QWidget):
         self._select(idx)
 
     def _select(self, row: int) -> None:
-        """عرض تفاصيل المستخدم المختار."""
         if row < 0 or row >= len(self.users):
             return
         self.current = u = self.users[row]
@@ -280,7 +256,6 @@ class UsersTab(QWidget):
         self._loading = False
 
     def _role_changed(self, idx: int) -> None:
-        """تغيير الدور من القائمة."""
         if self._loading or not self.current:
             return
         role = self.role.itemData(idx)
@@ -297,19 +272,16 @@ class UsersTab(QWidget):
         self.reload(self.current.id)
 
     def _perm_changed(self, key: str, on: bool) -> None:
-        """تعديل صلاحية واحدة."""
         if self._loading or not self.current or self.current.is_manager:
             return
         users.set_permission(self.session.con, self.session.user, self.current.id, key, on)
 
     def new_user(self) -> None:
-        """حوار مستخدم جديد."""
         dlg = NewUserDialog(self.session, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.reload(dlg.created.id)
 
     def reset_password(self) -> None:
-        """تعيين كلمة مرور مؤقتة يُلزم المستخدم بتغييرها."""
         if not self.current:
             return
         dlg = TempPasswordDialog(self.session, self.current, self)
@@ -317,7 +289,6 @@ class UsersTab(QWidget):
             self.notice.show_message("تم تعيين كلمة مرور مؤقتة، وسيُطلب تغييرها عند أول دخول", "success")
 
     def toggle_active(self) -> None:
-        """إيقاف الحساب أو تفعيله."""
         if not self.current:
             return
         try:
@@ -329,10 +300,7 @@ class UsersTab(QWidget):
 
 
 class NewUserDialog(Modal):
-    """حوار إنشاء مستخدم."""
-
     def __init__(self, session, parent=None):
-        """الحقول: الاسم، اسم الدخول، كلمة مرور مؤقتة، الدور."""
         super().__init__("مستخدم جديد", parent, width=460)
         self.session = session
         self.created = None
@@ -354,7 +322,6 @@ class NewUserDialog(Modal):
         self.add_footer("حفظ", self.save)
 
     def save(self) -> None:
-        """إنشاء المستخدم."""
         try:
             self.created = users.create_user(self.session.con, self.session.user, self.username.text(),
                                              self.name.text(), self.password.text(), self.role.currentData(),
@@ -366,10 +333,7 @@ class NewUserDialog(Modal):
 
 
 class TempPasswordDialog(Modal):
-    """حوار كلمة مرور مؤقتة لمستخدم آخر."""
-
     def __init__(self, session, target, parent=None):
-        """حقل واحد."""
         super().__init__(f"كلمة مرور مؤقتة — {target.display_name}", parent, width=420)
         self.session, self.target = session, target
         f = form()
@@ -379,7 +343,6 @@ class TempPasswordDialog(Modal):
         self.add_footer("حفظ", self.save)
 
     def save(self) -> None:
-        """الحفظ مع إلزام التغيير."""
         try:
             users.set_password(self.session.con, self.session.user, self.target.id, self.password.text(), must_change=True)
         except users.AuthError as e:
@@ -389,10 +352,7 @@ class TempPasswordDialog(Modal):
 
 
 class AuditTab(QWidget):
-    """سجل العمليات."""
-
     def __init__(self, session):
-        """جدول وزر تحميل المزيد."""
         super().__init__()
         lay = QVBoxLayout(self)
         self.model = AuditModel(session.con)
@@ -410,10 +370,7 @@ class AuditTab(QWidget):
 
 
 class ShortcutsTab(QWidget):
-    """قائمة اختصارات لوحة المفاتيح الحالية؛ كل شاشة جديدة تضيف اختصاراتها هنا."""
-
     def __init__(self):
-        """بناء الجدول."""
         super().__init__()
         lay = QVBoxLayout(self)
         box, inner = card("اختصارات لوحة المفاتيح")
@@ -432,16 +389,12 @@ class ShortcutsTab(QWidget):
 
 
 class BackupTab(QWidget):
-    """النسخ الاحتياطي: الحالة، والعمليات، والقائمة، والفلاشة، والمفاتيح، والاستعادة."""
-
     def __init__(self, session):
-        """بناء الأجزاء."""
         super().__init__()
         self.session = session
         lay = QVBoxLayout(self)
         lay.setSpacing(12)
 
-        # بطاقات الحالة
         stats = QHBoxLayout()
         self.stat_local = self._stat("آخر نسخة على الجهاز")
         self.stat_usb = self._stat("نسخة الفلاشة")
@@ -452,7 +405,6 @@ class BackupTab(QWidget):
         self.health = Notice()
         lay.addWidget(self.health)
 
-        # الأزرار الرئيسية
         actions = QHBoxLayout()
         self.backup_btn = primary_button("نسخ الآن")
         self.backup_btn.clicked.connect(self.backup_now)
@@ -470,12 +422,10 @@ class BackupTab(QWidget):
         self.notice = Notice()
         lay.addWidget(self.notice)
 
-        # القائمة
         self.model = BackupsModel()
         self.view = _table(self.model)
         lay.addWidget(self.view, 1)
 
-        # الفلاشة والمفاتيح
         bottom = QHBoxLayout()
         usb_box, usb_inner = card("مجلد الفلاشة")
         urow = QHBoxLayout()
@@ -485,7 +435,7 @@ class BackupTab(QWidget):
         pick.clicked.connect(self.pick_usb)
         save = QPushButton("حفظ")
         save.clicked.connect(self.save_usb)
-        # تغيير مجلد الفلاشة وكلمة مرور النسخ للمدير فقط؛ الكاشير ينسخ ويختبر فقط
+        # Only a manager changes the USB folder and backup password; a cashier backs up and tests
         manager = session.user.is_manager
         for w in (self.usb_dir, pick, save):
             w.setEnabled(manager)
@@ -517,7 +467,6 @@ class BackupTab(QWidget):
 
     @staticmethod
     def _stat(title: str) -> tuple:
-        """بطاقة حالة صغيرة: (البطاقة، عنوان القيمة، النص الفرعي)."""
         box, inner = card()
         inner.addWidget(muted(title))
         value = QLabel("—")
@@ -528,7 +477,6 @@ class BackupTab(QWidget):
         return box, value, sub
 
     def refresh(self) -> None:
-        """تحديث البطاقات والتنبيه والقائمة."""
         con = self.session.con
         last_ok = settings.get(con, "backup.last_ok_at", "")
         self.stat_local[1].setText(ltr(last_ok[:16]) if last_ok else "لا نسخة بعد")
@@ -547,7 +495,6 @@ class BackupTab(QWidget):
         self.model.reload()
 
     def _selected(self) -> backup.BackupInfo | None:
-        """النسخة المختارة في الجدول (من التحديد الفعلي، ثم المؤشر الحالي)."""
         rows = self.view.selectionModel().selectedRows() if self.view.selectionModel() else []
         idx = rows[0] if rows else self.view.currentIndex()
         if not idx.isValid():
@@ -556,7 +503,6 @@ class BackupTab(QWidget):
         return self.model.items[idx.row()]
 
     def backup_now(self) -> None:
-        """نسخة يدوية."""
         try:
             r = backup.create_backup(self.session.con, "manual", username=self.session.user.username)
             self.notice.show_message(f"تمت النسخة: {r.path.name} · {r.detail}", "success")
@@ -565,7 +511,6 @@ class BackupTab(QWidget):
         self.refresh()
 
     def test_selected(self) -> None:
-        """اختبار استعادة النسخة المختارة في مكان معزول."""
         b = self._selected()
         if not b:
             return
@@ -574,7 +519,6 @@ class BackupTab(QWidget):
         self.refresh()
 
     def copy_usb(self) -> None:
-        """نسخ أحدث نسخة إلى الفلاشة."""
         try:
             r = backup.copy_to_usb(self.session.con, username=self.session.user.username)
             self.notice.show_message(f"نُسخت إلى الفلاشة: {r.path.name}", "success")
@@ -583,13 +527,11 @@ class BackupTab(QWidget):
         self.refresh()
 
     def pick_usb(self) -> None:
-        """اختيار مجلد الفلاشة."""
         d = QFileDialog.getExistingDirectory(self, "مجلد النسخ على الفلاشة")
         if d:
             self.usb_dir.setText(d)
 
     def save_usb(self) -> None:
-        """حفظ مجلد الفلاشة، مع تحذير إن كان على قرص النظام نفسه (لا يحمي من تعطّل الجهاز)."""
         folder = self.usb_dir.text().strip()
         if folder and backup.same_drive_as_data(folder):
             if not ask(self, "تنبيه", "هذا المجلد على نفس قرص الجهاز، فلو تعطّل الجهاز ضاعت النسخة معه. "
@@ -601,7 +543,6 @@ class BackupTab(QWidget):
         self.refresh()
 
     def change_password(self) -> None:
-        """تغيير كلمة مرور النسخ."""
         dlg = SecretDialog("تغيير كلمة مرور النسخ", "كلمة المرور الحالية أو مفتاح الاسترداد", new_password=True, parent=self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -614,7 +555,6 @@ class BackupTab(QWidget):
         self.notice.show_message("تم تغيير كلمة مرور النسخ. النسخ الجديدة تُفتح بها، والقديمة بالقديمة أو بمفتاح الاسترداد.", "success")
 
     def new_recovery_key(self) -> None:
-        """مفتاح استرداد جديد (مدير فقط) يُعرض مرة واحدة."""
         dlg = SecretDialog("مفتاح استرداد جديد", "كلمة مرور النسخ الحالية", parent=self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -629,7 +569,6 @@ class BackupTab(QWidget):
         self.notice.show_message("أُنشئ مفتاح استرداد جديد. المفتاح القديم يفتح النسخ القديمة فقط.", "success")
 
     def relink(self) -> None:
-        """إعادة حفظ مفتاح الجهاز بعد ضياعه."""
         dlg = SecretDialog("إعادة ربط الجهاز", "كلمة مرور النسخ أو مفتاح الاسترداد", parent=self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -643,7 +582,6 @@ class BackupTab(QWidget):
         self.refresh()
 
     def restore_selected(self) -> None:
-        """استعادة النسخة المختارة بعد تأكيد مزدوج، ثم يعيد التطبيق تشغيل نفسه."""
         b = self._selected()
         if not b:
             return
@@ -655,10 +593,7 @@ class BackupTab(QWidget):
 
 
 class SecretDialog(Modal):
-    """حوار يطلب سرًا (وكلمة مرور جديدة اختياريًا)."""
-
     def __init__(self, title: str, label: str, new_password: bool = False, parent=None):
-        """بناء الحقول."""
         super().__init__(title, parent, width=460)
         self.secret = ""
         self.new_secret = ""
@@ -676,7 +611,6 @@ class SecretDialog(Modal):
         self.add_footer("متابعة", self.go)
 
     def go(self) -> None:
-        """التحقق المحلي ثم القبول."""
         if self.with_new:
             err = security.check_backup_password(self.new.text())
             if err:
@@ -691,13 +625,10 @@ class SecretDialog(Modal):
 
 
 class ShowKeyDialog(Modal):
-    """عرض مفتاح استرداد جديد مرة واحدة مع إعادة الإدخال للتأكيد."""
-
     def __init__(self, key: str, parent=None):
-        """بناء الحوار."""
         super().__init__("مفتاح الاسترداد الجديد", parent, width=580)
         self.key = key
-        self.close_btn.hide()          # لا يُغلق إلا بتأكيد الكتابة
+        self.close_btn.hide()          # closes only once the typed confirmation matches
         lay = self.body
         box = QLabel(key)
         box.setObjectName("keybox")
@@ -713,11 +644,9 @@ class ShowKeyDialog(Modal):
         self.footer.show()
 
     def reject(self) -> None:
-        """لا إغلاق بـ Esc قبل التأكيد."""
         self.notice.show_message("أعد كتابة المفتاح للتأكيد قبل الإغلاق")
 
     def go(self) -> None:
-        """لا يُغلق إلا بمطابقة المفتاح."""
         try:
             if security.normalize_recovery_key(self.confirm.text()) != self.key:
                 raise ValueError("المفتاح غير مطابق")
@@ -728,10 +657,7 @@ class ShowKeyDialog(Modal):
 
 
 class RestoreConfirmDialog(Modal):
-    """تأكيد الاستعادة: كلمة مرور الدخول للمستخدم الحالي + كتابة كلمة «استعادة»."""
-
     def __init__(self, session, b, parent=None):
-        """بناء الحوار."""
         super().__init__(f"استعادة نسخة {b.at.strftime('%Y-%m-%d %H:%M')}", parent, width=540)
         self.session = session
         self.secret = None
@@ -751,7 +677,6 @@ class RestoreConfirmDialog(Modal):
         self.add_footer("حفظ نسخة أمان ثم الاستعادة", self.go).setObjectName("danger")
 
     def go(self) -> None:
-        """التحقق من كلمة المرور والكلمة."""
         if self.word.text().strip() != "استعادة":
             self.notice.show_message("اكتب كلمة «استعادة» للتأكيد")
             return
@@ -760,5 +685,5 @@ class RestoreConfirmDialog(Modal):
         except users.AuthError as e:
             self.notice.show_message(str(e))
             return
-        self.secret = None   # النسخة المحلية تُفتح بمفتاح الجهاز؛ لا تحتاج سرًا
+        self.secret = None   # A local backup opens with the device key and needs no secret
         self.accept()

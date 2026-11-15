@@ -1,9 +1,4 @@
-"""الأصناف وخصائصها وإعداد حقول بطاقة الصنف (طبقة قاعدة البيانات).
-
-الصنف له أعمدة ثابتة يعتمد عليها البيع (النوع، الكود، الباركود، الاسم، الأسعار الثلاثة)
-وخصائص حسب نوعه (المقاس، الأمبير...) تُحفظ في item_attrs بمفتاح الحقل.
-الحقول الظاهرة والإلزامية تُقرأ من item_fields التي يضبطها المدير من الإعدادات.
-"""
+"""Items, their attributes and item-card field setup (database layer)."""
 import sqlite3
 from dataclasses import dataclass, field
 
@@ -18,12 +13,11 @@ FIXED_KEYS = {"name", "code", "barcode", "brand", "model", "price_retail", "pric
 
 
 class ItemError(ValueError):
-    """بيانات صنف مرفوضة، برسالة تصلح للعرض."""
+    """Item data refused, with a message fit to show."""
 
 
 @dataclass
 class Field:
-    """حقل في بطاقة الصنف كما يضبطه المدير."""
     kind: str
     key: str
     label: str
@@ -40,7 +34,6 @@ class Field:
 
 @dataclass
 class Item:
-    """صنف كامل."""
     id: int | None
     kind: str
     code: str
@@ -57,10 +50,9 @@ class Item:
     attrs: dict = field(default_factory=dict)
 
 
-# ---------- إعداد الحقول ----------
+# ---------- Field setup ----------
 
 def fields(con, kind: str) -> list[Field]:
-    """حقول نوع معين (المشتركة ثم الخاصة) بترتيب العرض."""
     rows = con.execute(
         "SELECT kind, key, label, example, ftype, options, show, required, print, filter, builtin, sort_order "
         "FROM item_fields WHERE kind IN ('common', ?) ORDER BY CASE kind WHEN 'common' THEN 0 ELSE 1 END, sort_order",
@@ -69,12 +61,11 @@ def fields(con, kind: str) -> list[Field]:
                   bool(r[6]), bool(r[7]), bool(r[8]), bool(r[9]), bool(r[10]), r[11]) for r in rows]
 
 
-# حقول مشتركة لا معنى لها للخدمة (بلا مخزون ولا ماركة)
+# Shared fields that mean nothing for a service: no stock, no brand
 SERVICE_HIDDEN = ("brand", "model", "min_qty", "origin", "loc", "war", "cond")
 
 
 def visible_fields(con, kind: str) -> list[Field]:
-    """الحقول الظاهرة لنوع، مع استبعاد ما لا ينطبق على الخدمة (المكان الوحيد لهذا المنطق)."""
     out = [f for f in fields(con, kind) if f.show]
     if kind == "service":
         out = [f for f in out if f.key not in SERVICE_HIDDEN]
@@ -82,7 +73,6 @@ def visible_fields(con, kind: str) -> list[Field]:
 
 
 def all_fields(con) -> list[Field]:
-    """كل الحقول لكل الأنواع (لشاشة الإعداد)."""
     out = []
     seen = set()
     for kind in ("common", *KINDS):
@@ -94,7 +84,6 @@ def all_fields(con) -> list[Field]:
 
 
 def set_field(con, by, kind: str, key: str, *, show=None, required=None, print_=None, filter_=None) -> None:
-    """تعديل إعدادات حقل. الحقول المقفلة (builtin) تبقى ظاهرة وإلزامية دائمًا."""
     r = con.execute("SELECT builtin, show FROM item_fields WHERE kind=? AND key=?", (kind, key)).fetchone()
     if not r:
         raise ItemError("حقل غير معروف")
@@ -106,9 +95,9 @@ def set_field(con, by, kind: str, key: str, *, show=None, required=None, print_=
             sets.append(f"{col}=?")
             params.append(int(val))
     if required:
-        sets.append("show=1")              # الإلزامي ظاهر بالضرورة
+        sets.append("show=1")              # Required implies visible
     if show is False:
-        sets.append("required=0")          # المخفي لا يكون إلزاميًا
+        sets.append("required=0")          # Hidden cannot be required
     if sets:
         with transaction(con):
             con.execute(f"UPDATE item_fields SET {', '.join(sets)} WHERE kind=? AND key=?", (*params, kind, key))
@@ -116,7 +105,6 @@ def set_field(con, by, kind: str, key: str, *, show=None, required=None, print_=
 
 
 def add_custom_field(con, by, kind: str, label: str, ftype: str, options: list | None = None) -> str:
-    """إضافة حقل مخصص (نص أو رقم أو قائمة). يعيد مفتاحه."""
     if kind not in ("common", *KINDS) or ftype not in ("text", "num", "sel", "bool"):
         raise ItemError("نوع الحقل غير معروف")
     label = (label or "").strip()
@@ -135,10 +123,9 @@ def add_custom_field(con, by, kind: str, label: str, ftype: str, options: list |
     return key
 
 
-# ---------- الأصناف ----------
+# ---------- Items ----------
 
 def _clean(con, it: Item) -> Item:
-    """فحص الصنف حسب الحقول المفعّلة والإلزامية لنوعه، وتنظيف قيمه."""
     if it.kind not in KINDS:
         raise ItemError("نوع الصنف غير معروف")
     it.name = (it.name or "").strip()
@@ -152,7 +139,7 @@ def _clean(con, it: Item) -> Item:
         raise ItemError("الكود الداخلي مطلوب")
     if it.price_retail <= 0:
         raise ItemError("سعر القطاعي مطلوب وأكبر من صفر")
-    # الأسعار الأدنى تأخذ ما فوقها إن تُركت فارغة (كما في التصميم)
+    # Lower tiers inherit the tier above when left empty, as in the design
     it.price_wholesale = it.price_wholesale or it.price_retail
     it.price_super = it.price_super or it.price_wholesale
     if min(it.price_retail, it.price_wholesale, it.price_super) <= 0:
@@ -195,14 +182,12 @@ def _clean(con, it: Item) -> Item:
 
 
 def _save_attrs(con, item_id: int, attrs: dict) -> None:
-    """استبدال خصائص الصنف."""
     con.execute("DELETE FROM item_attrs WHERE item_id=?", (item_id,))
     con.executemany("INSERT INTO item_attrs (item_id, field_key, value) VALUES (?,?,?)",
                     [(item_id, k, v) for k, v in attrs.items()])
 
 
 def _unique_errors(con, it: Item) -> None:
-    """رسائل واضحة لتكرار الكود أو الباركود بدل خطأ SQLite العام."""
     r = con.execute("SELECT name FROM items WHERE code=? COLLATE NOCASE AND id IS NOT ?", (it.code, it.id)).fetchone()
     if r:
         raise ItemError(f"الكود مستخدم للصنف: {r[0]}")
@@ -213,7 +198,6 @@ def _unique_errors(con, it: Item) -> None:
 
 
 def create(con, by, it: Item) -> Item:
-    """إنشاء صنف مع خصائصه."""
     _clean(con, it)
     _unique_errors(con, it)
     with transaction(con):
@@ -229,11 +213,10 @@ def create(con, by, it: Item) -> Item:
 
 
 def update(con, by, it: Item) -> Item:
-    """تعديل صنف. تغيير الأسعار يُسجَّل بقيمه في المراجعة."""
     _clean(con, it)
     _unique_errors(con, it)
     with transaction(con):
-        # النوع الحالي يُقرأ هنا بعد حجز الكتابة، لا قبلها، فلا يُبنى القرار على قراءة قديمة (سباق مع تعديل أو شراء متزامن)
+        # Kind is read after the write lock, not before, so no decision rests on a stale read
         old = get(con, it.id)
         if old.kind != it.kind and has_documents(con, it.id):
             raise ItemError("لا يمكن تغيير نوع صنف له حركات؛ أنشئ صنفًا جديدًا")
@@ -252,19 +235,16 @@ def update(con, by, it: Item) -> Item:
 
 
 def set_active(con, by, item_id: int, active: bool) -> None:
-    """إيقاف صنف أو تفعيله (الموقوف لا يظهر في البيع)."""
     with transaction(con):
         con.execute("UPDATE items SET active=? WHERE id=?", (int(active), item_id))
         audit(con, by, "item.activate" if active else "item.deactivate", "item", item_id)
 
 
 def has_documents(con, item_id: int) -> bool:
-    """هل للصنف حركات (شراء أو دفعات)؟ يُوسَّع في المرحلة 4 بالبيع."""
     return con.execute("SELECT 1 FROM purchase_lines WHERE item_id=? LIMIT 1", (item_id,)).fetchone() is not None
 
 
 def delete(con, by, item_id: int) -> None:
-    """حذف فعلي لصنف بلا حركات."""
     if has_documents(con, item_id):
         raise ItemError("للصنف حركات مسجّلة؛ أوقفه بدل حذفه")
     it = get(con, item_id)
@@ -274,7 +254,6 @@ def delete(con, by, item_id: int) -> None:
 
 
 def get(con, item_id: int) -> Item:
-    """صنف برقمه مع خصائصه."""
     con.row_factory = sqlite3.Row
     r = con.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
     con.row_factory = None
@@ -287,23 +266,17 @@ def get(con, item_id: int) -> Item:
 
 
 def by_barcode(con, code: str) -> Item | None:
-    """صنف بالباركود بعد تصحيح الماسح، أو بالكود الداخلي."""
     c = scanner_fix(validate.to_latin((code or "").strip()))
     r = con.execute("SELECT id FROM items WHERE active=1 AND (barcode=? OR code=? COLLATE NOCASE)", (c, c)).fetchone()
     return get(con, r[0]) if r else None
 
 
 def next_seq(con, kind: str) -> int:
-    """الرقم التسلسلي التالي لكود مقترح من نوع معين."""
     return con.execute("SELECT count(*)+1 FROM items WHERE kind=?", (kind,)).fetchone()[0]
 
 
 def search(con, query: str = "", kind: str | None = None, include_inactive: bool = False,
            limit: int = 300, offset: int = 0) -> list[tuple]:
-    """بحث القائمة: (id, kind, code, name, spec, price_retail, price_wholesale, price_super, min_qty, active).
-
-    spec: المقاس للإطار، والأمبير للبطارية. البحث يطابق الاسم الموحّد أو الكود أو الباركود أو المقاس.
-    """
     q = (query or "").strip()
     where, params = [], []
     if not include_inactive:
@@ -325,5 +298,4 @@ def search(con, query: str = "", kind: str | None = None, include_inactive: bool
 
 
 def count(con) -> int:
-    """عدد الأصناف النشطة."""
     return con.execute("SELECT count(*) FROM items WHERE active=1").fetchone()[0]

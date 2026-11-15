@@ -1,4 +1,4 @@
-"""شاشة فواتير البيع والمرتجعات: قائمة الفواتير المرحّلة ومعاينتها. الفواتير الجديدة تُنشأ من نقطة البيع."""
+"""Sales invoices and returns: list and preview; new invoices come from the POS."""
 from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import sale_view
@@ -8,7 +8,6 @@ PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة", "transfer": "تحو�
 
 
 class SalesPage(ListPage):
-    """قائمة فواتير البيع المرحّلة. الفاتورة لا تُعدَّل بعد الترحيل؛ التصحيح بمستند عكسي في إصدار لاحق."""
     title = "فواتير البيع والمرتجعات"
     add_label = "فاتورة جديدة من نقطة البيع"
     search_placeholder = "رقم الفاتورة، اسم العميل، أو الموبايل (F2)"
@@ -21,27 +20,22 @@ class SalesPage(ListPage):
     ]
 
     def can_edit(self) -> bool:
-        """لا تُنشأ فواتير من هذه الشاشة؛ الإنشاء من نقطة البيع."""
         return False
 
     def can_view(self) -> bool:
-        """القائمة لمن يرحّل فواتير البيع فقط."""
         return self.session.can("sales.post")
 
     def fetch(self, query, filter_key, offset):
-        """صفحة من القائمة؛ فارغة لمن لا يملك صلاحية الاطلاع."""
         if not self.can_view():
             return []
         return sale_view.list_sales(self.session.con, query, offset=offset)
 
     def total(self) -> str:
-        """العدّاد، أو سبب غياب القائمة."""
         if not self.can_view():
             return "لا تملك صلاحية الاطلاع على فواتير البيع"
         return f"{sale_view.count(self.session.con)} فاتورة بيع"
 
     def build_preview(self, row_id: int) -> None:
-        """تفاصيل الفاتورة وأسطرها ووسائل دفعها."""
         inv = sale_view.get_sale(self.session.con, row_id)
         self.heading(inv.number, f"العميل: {inv.customer_name}")
         self.kv("تاريخ الفاتورة", ltr(inv.sale_date))
@@ -59,6 +53,5 @@ class SalesPage(ListPage):
                     f"{ltr(str(ln.qty))} × {ltr(fmt(ln.unit_price))} = {ltr(fmt(ln.net_total))}")
 
     def open_dialog(self, row_id):
-        """صف موجود: معاينته فقط."""
         if row_id is not None:
             self.show_preview_id(row_id)

@@ -1,26 +1,4 @@
-"""صندوق النسخة الاحتياطية المشفّرة (ملف .mtb = Morv Tires Backup).
-
-الفكرة بقفلين ومفتاح واحد:
-- مفتاح البيانات (DEK): 32 بايت عشوائية هو الذي يشفّر ملف قاعدة البيانات بـ AES-256-GCM.
-  GCM يكشف أي تلاعب أو تلف في الملف عند الفتح.
-- يُحفظ DEK داخل كل ملف نسخة مرتين، مغلّفًا:
-  (أ) بمفتاح مشتق من كلمة مرور النسخ (scrypt بطيء عمدًا ضد التخمين).
-  (ب) بمفتاح مشتق من مفتاح الاسترداد (24 رمزًا عشوائيًا).
-  فأي نسخة تُفتح على أي جهاز بكلمة المرور أو بمفتاح الاسترداد، ولا تحتاج الجهاز القديم.
-
-شكل الملف: MAGIC ثم طول الرأس (4 بايت) ثم الرأس JSON ثم جسم مشفّر واحد.
-الرأس يدخل في حساب GCM كبيانات مصادقة (AAD) فلا يمكن تعديله دون كشف.
-
-«حلقة المفاتيح» (keyring): الجزء من الرأس الذي يحمل التغليفين، تُحفظ في الإعدادات
-وتُعاد كتابتها في كل نسخة جديدة. تغيير كلمة المرور = تغليف جديد لنفس DEK.
-
-بصمة المفتاح (fp): تجزئة لـ DEK تُحفظ في الحلقة. بها يتأكد البرنامج، دون كلمة مرور، أن
-مفتاح الجهاز هو نفسه المفتاح الذي تغلّفه الحلقة قبل أن يشفّر به نسخة؛ وإلا خرجت نسخة لا
-يفتحها أي سر. الحلقات القديمة بلا بصمة تبقى صالحة للفتح، وتُضاف لها البصمة عند أول إثبات.
-
-كل قراءة لملف تمر على قارئ رأس واحد (_read_header) يفحص الأطوال والحقول، فأي ملف مقطوع
-أو تالف يخرج بـ VaultError برسالة مفهومة، لا بخطأ داخلي.
-"""
+"""Encrypted backup vault (.mtb file)."""
 import base64
 import binascii
 import hashlib
@@ -39,22 +17,20 @@ from morv.core.security import normalize_recovery_key
 
 MAGIC = b"MORVBK1\n"
 EXT = ".mtb"
-_KDF = dict(n=2 ** 15, r=8, p=1)   # نحو 100-200ms على جهاز المحل؛ يُحفظ في الرأس لفتحه لاحقًا
-_MAX_HEADER = 64 * 1024            # الرأس الحقيقي أقل من 2KB؛ طول أكبر من هذا يعني ملفًا تالفًا
-_GCM_TAG = 16                      # أقصر جسم مشفّر ممكن هو وسم GCM وحده
+_KDF = dict(n=2 ** 15, r=8, p=1)   # About 100-200ms on the shop machine; stored in the header to reopen later
+_MAX_HEADER = 64 * 1024            # A real header is under 2KB; anything longer means a corrupt file
+_GCM_TAG = 16                      # The shortest possible body is the GCM tag alone
 
 
 class VaultError(RuntimeError):
-    """ملف تالف، أو ليس نسخة Morv Tires، أو كلمة مرور/مفتاح خطأ."""
+    """Corrupt file, not a Morv Tires backup, or a wrong password or key."""
 
 
 def _b64(b: bytes) -> str:
-    """بايتات إلى نص للرأس."""
     return base64.b64encode(b).decode("ascii")
 
 
 def _unb64(s: str) -> bytes:
-    """نص الرأس إلى بايتات. نص غير صالح يعني رأسًا تالفًا."""
     try:
         return base64.b64decode(s, validate=True)
     except (binascii.Error, ValueError, TypeError) as e:
@@ -62,12 +38,10 @@ def _unb64(s: str) -> bytes:
 
 
 def fingerprint(dek: bytes) -> str:
-    """بصمة مفتاح البيانات: تجزئة لا تكشف المفتاح، تكفي للتأكد أن مفتاحين متطابقان."""
     return hashlib.sha256(b"morv_tires_dek_fingerprint_v1" + dek).hexdigest()[:32]
 
 
 def _check_ring(ring) -> dict:
-    """التأكد أن الحلقة تحمل الحقول اللازمة للفتح، وإلا VaultError."""
     try:
         kdf = ring["kdf"]
         ok = all(isinstance(kdf[k], int) and kdf[k] > 0 for k in ("n", "r", "p"))
@@ -80,13 +54,11 @@ def _check_ring(ring) -> dict:
 
 
 def _derive(secret: str, salt: bytes, kdf: dict) -> bytes:
-    """مفتاح تغليف 32 بايت من سر نصي (كلمة مرور أو مفتاح استرداد) بـ scrypt."""
     return hashlib.scrypt(secret.encode("utf-8"), salt=salt, dklen=32,
                           n=kdf["n"], r=kdf["r"], p=kdf["p"], maxmem=256 * 1024 * 1024)
 
 
 def _wrap(dek: bytes, secret: str, kdf: dict) -> dict:
-    """تغليف DEK بسر: ملح جديد + nonce جديد + النص المشفر."""
     salt = secrets.token_bytes(16)
     nonce = secrets.token_bytes(12)
     kek = _derive(secret, salt, kdf)
@@ -94,23 +66,21 @@ def _wrap(dek: bytes, secret: str, kdf: dict) -> dict:
 
 
 def _unwrap(entry: dict, secret: str, kdf: dict) -> bytes:
-    """فك تغليف DEK بسر. يرفع VaultError إن كان السر خطأ."""
     try:
         kek = _derive(secret, _unb64(entry["salt"]), kdf)
-    except (ValueError, MemoryError) as e:      # معاملات scrypt عُبث بها
+    except (ValueError, MemoryError) as e:      # scrypt parameters were tampered with
         raise VaultError("رأس الملف تالف") from e
     try:
         return AESGCM(kek).decrypt(_unb64(entry["nonce"]), _unb64(entry["wrapped"]), b"dek")
     except InvalidTag as e:
         raise VaultError("كلمة المرور أو مفتاح الاسترداد غير صحيح") from e
-    except ValueError as e:                     # طول nonce غير صحيح
+    except ValueError as e:                     # wrong nonce length
         raise VaultError("رأس الملف تالف") from e
 
 
-# ---------- حلقة المفاتيح ----------
+# ---------- Keyring ----------
 
 def new_keyring(password: str, recovery_key: str) -> tuple[bytes, dict]:
-    """إنشاء DEK جديد وتغليفه بكلمة المرور وبمفتاح الاسترداد. يعيد (DEK، حلقة المفاتيح)."""
     dek = secrets.token_bytes(32)
     ring = {
         "kdf": dict(_KDF),
@@ -123,14 +93,12 @@ def new_keyring(password: str, recovery_key: str) -> tuple[bytes, dict]:
 
 
 def with_fingerprint(ring: dict, dek: bytes) -> dict:
-    """نسخة من الحلقة فيها بصمة هذا المفتاح (لحلقات أُنشئت قبل إضافة البصمة)."""
     out = dict(ring)
     out["fp"] = fingerprint(dek)
     return out
 
 
 def matches(ring: dict, dek: bytes) -> bool | None:
-    """هل هذا المفتاح هو مفتاح الحلقة؟ True/False، أو None إن كانت الحلقة قديمة بلا بصمة."""
     fp = ring.get("fp")
     if not fp:
         return None
@@ -138,21 +106,18 @@ def matches(ring: dict, dek: bytes) -> bool | None:
 
 
 def rewrap_password(ring: dict, dek: bytes, new_password: str) -> dict:
-    """حلقة جديدة بنفس DEK وكلمة مرور جديدة (مفتاح الاسترداد كما هو)."""
     out = with_fingerprint(ring, dek)
     out["pw"] = _wrap(dek, new_password, ring["kdf"])
     return out
 
 
 def rewrap_recovery(ring: dict, dek: bytes, new_recovery_key: str) -> dict:
-    """حلقة جديدة بنفس DEK ومفتاح استرداد جديد (كلمة المرور كما هي)."""
     out = with_fingerprint(ring, dek)
     out["rk"] = _wrap(dek, normalize_recovery_key(new_recovery_key), ring["kdf"])
     return out
 
 
 def unlock(ring: dict, secret: str) -> bytes:
-    """استخراج DEK من حلقة بكلمة المرور أو بمفتاح الاسترداد (يجرّب الاثنين)."""
     _check_ring(ring)
     try:
         return _unwrap(ring["pw"], secret, ring["kdf"])
@@ -165,13 +130,9 @@ def unlock(ring: dict, secret: str) -> bytes:
     return _unwrap(ring["rk"], rk, ring["kdf"])
 
 
-# ---------- كتابة الملف وقراءته ----------
+# ---------- Reading and writing the file ----------
 
 def seal(plain_path, out_path, dek: bytes, ring: dict, meta: dict | None = None) -> dict:
-    """تشفير ملف قاعدة بيانات إلى ملف .mtb. يعيد الرأس المكتوب.
-
-    يُكتب أولًا إلى .part ثم يُعاد تسميته، فلا يبقى ملف ناقص باسم نهائي لو انقطعت الكهرباء.
-    """
     src = Path(plain_path)
     out = Path(out_path)
     data = src.read_bytes()
@@ -199,12 +160,6 @@ def seal(plain_path, out_path, dek: bytes, ring: dict, meta: dict | None = None)
 
 
 def _read_header(f) -> tuple[dict, bytes]:
-    """قراءة رأس ملف .mtb من ملف مفتوح وفحصه. يعيد (الرأس، بايتاته كما كُتبت).
-
-    هذا هو الموضع الوحيد الذي يفسّر بداية الملف. كل ما لا يطابق الشكل المتوقع (ملف مقطوع،
-    طول غير معقول، JSON تالف، حقول ناقصة) يرفع VaultError. البايتات الخام تُعاد لأنها
-    تدخل في فحص GCM كما هي.
-    """
     if f.read(len(MAGIC)) != MAGIC:
         raise VaultError("الملف ليس نسخة احتياطية من Morv Tires")
     raw_len = f.read(4)
@@ -229,7 +184,6 @@ def _read_header(f) -> tuple[dict, bytes]:
 
 
 def read_header(vault_path) -> dict:
-    """قراءة رأس ملف .mtb دون فك التشفير (للعرض في القائمة والتحقق أنه ملفنا)."""
     try:
         with open(vault_path, "rb") as f:
             return _read_header(f)[0]
@@ -238,7 +192,6 @@ def read_header(vault_path) -> dict:
 
 
 def opens_with(vault_path, dek: bytes) -> bool:
-    """هل يفتح هذا المفتاح جسم النسخة؟ فحص في الذاكرة لا يكتب شيئًا على القرص."""
     try:
         with open(vault_path, "rb") as f:
             header, hdr = _read_header(f)
@@ -250,11 +203,6 @@ def opens_with(vault_path, dek: bytes) -> bool:
 
 
 def open_vault(vault_path, out_plain_path, *, dek: bytes | None = None, secret: str | None = None) -> dict:
-    """فك ملف .mtb إلى ملف قاعدة بيانات عادي. يعيد الرأس.
-
-    يُفتح إما بـ DEK مباشرة (مفتاح الجهاز للعمليات التلقائية) أو بسر (كلمة المرور أو
-    مفتاح الاسترداد). أي تلف أو تلاعب في الملف يرفع VaultError قبل كتابة أي شيء.
-    """
     try:
         with open(vault_path, "rb") as f:
             header, hdr = _read_header(f)

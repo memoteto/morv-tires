@@ -1,4 +1,4 @@
-"""فاتورة الشراء واستلام البضاعة: ترحيل واحد ذري ينشئ الدفعات الفعلية وطبقات FIFO والقيد."""
+"""Purchase invoice: one atomic post creating lots, FIFO layers and the entry."""
 import hashlib
 import json
 import sqlite3
@@ -9,17 +9,16 @@ from morv.infra import ledger
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, has_permission
 
-INVENTORY_ACCOUNT = "1410"     # مخزون الإطارات والبطاريات
-SUPPLIERS_ACCOUNT = "2110"     # الموردون
+INVENTORY_ACCOUNT = "1410"     # tyre and battery stock
+SUPPLIERS_ACCOUNT = "2110"     # suppliers
 
 
 class PurchaseError(ValueError):
-    """فاتورة شراء مرفوضة، برسالة تصلح للعرض."""
+    """Purchase invoice refused, with a message fit to show."""
 
 
 @dataclass(frozen=True)
 class PurchaseLine:
-    """سطر شراء: صنف وكمية وتكلفة الوحدة بالقرش، ورمز DOT (إلزامي للإطارات)."""
     item_id: int
     qty: int
     unit_cost: int
@@ -28,7 +27,6 @@ class PurchaseLine:
 
 @dataclass(frozen=True)
 class PostedInvoice:
-    """نتيجة الترحيل؛ replayed=True إن كان الطلب مكررًا فأُعيد المستند الأصلي دون تكرار."""
     id: int
     number: str
     total: int
@@ -36,7 +34,6 @@ class PostedInvoice:
 
 
 def _shape_lines(lines) -> list:
-    """فحص شكل الأسطر وتوحيد DOT بلا قراءة قاعدة البيانات (يسبق كشف الطلب المكرر)."""
     if not lines:
         raise PurchaseError("الفاتورة بلا أسطر")
     out = []
@@ -56,7 +53,6 @@ def _shape_lines(lines) -> list:
 
 
 def _check_items(con, lines: list) -> None:
-    """فحص الأصناف من قاعدة البيانات لطلب جديد فقط: موجود، نشط، مخزَّن، وDOT للإطارات."""
     for i, ln in enumerate(lines, start=1):
         row = con.execute("SELECT kind, active FROM items WHERE id=?", (ln.item_id,)).fetchone()
         if not row:
@@ -70,7 +66,6 @@ def _check_items(con, lines: list) -> None:
 
 
 def _payload_hash(supplier_id, inv_no, inv_date, recv_date, lines) -> str:
-    """بصمة محتوى الطلب لكشف إعادة استخدام المفتاح بمحتوى مختلف؛ الملاحظات خارجها عمدًا (ليست مالية)."""
     body = [supplier_id, inv_no, inv_date, recv_date, [[x.item_id, x.qty, x.unit_cost, x.dot] for x in lines]]
     return hashlib.sha256(json.dumps(body, ensure_ascii=False).encode("utf-8")).hexdigest()
 
@@ -78,10 +73,6 @@ def _payload_hash(supplier_id, inv_no, inv_date, recv_date, lines) -> str:
 def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: int, supplier_invoice_no: str,
                  invoice_date: str, lines: list, received_date: str | None = None,
                  notes: str | None = None) -> PostedInvoice:
-    """ترحيل فاتورة شراء كاملة في معاملة واحدة: كلها تُحفظ أو لا يُحفظ منها شيء.
-
-    request_key يُولَّد مرة لكل نموذج؛ تكرار ترحيله بنفس المحتوى يعيد الفاتورة الأصلية بلا تكرار.
-    """
     if by is None or not has_permission(con, by, "purchases.post"):
         raise PurchaseError("لا تملك صلاحية ترحيل فواتير الشراء")
     key = (request_key or "").strip()
@@ -104,7 +95,7 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
             if old[3] != h:
                 raise PurchaseError("مفتاح الطلب سبق استخدامه لفاتورة بمحتوى مختلف")
             return PostedInvoice(old[0], old[1], old[2], True)
-        _check_items(con, clean)        # بعد كشف التكرار: إيقاف صنف لاحقًا لا يمنع إعادة طلب سبق نجاحه
+        _check_items(con, clean)        # After the replay check: deactivating an item later must not block a replayed request
         sup = con.execute("SELECT active FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
         if not sup:
             raise PurchaseError("المورد غير موجود")
@@ -133,7 +124,6 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
 
 
 def _receive_line(con, by, inv_id: int, number: str, no: int, ln: PurchaseLine, recv_date: str) -> None:
-    """سطر واحد: يُنشئ السطر ثم الدفعة الفعلية وحركة الاستلام وطبقة التكلفة."""
     total = ln.qty * ln.unit_cost
     line_id = con.execute(
         "INSERT INTO purchase_lines (invoice_id, line_no, item_id, dot, qty, unit_cost, line_total) VALUES (?,?,?,?,?,?,?)",

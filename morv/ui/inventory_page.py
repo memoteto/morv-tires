@@ -1,9 +1,4 @@
-"""شاشة المخزون بتبويباتها: الأصناف، والدفعات والجرد (المرحلة 3).
-إعداد حقول بطاقة الصنف في «الإعدادات» (للمدير؛ يُستخدم نادرًا — قرار المالك).
-
-نافذة الصنف تُبنى من إعداد الحقول: كل حقل ظاهر يصير عنصر إدخال بنوعه (نص/رقم/قائمة/نعم-لا/مقاس)،
-والإلزامي يُعلَّم بنجمة ويُفحص في طبقة البيانات لا في الواجهة فقط.
-"""
+"""Stock screen tabs: items, lots and stocktake."""
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLineEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget,
                                QVBoxLayout, QWidget)
@@ -20,10 +15,7 @@ from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, p
 
 
 class InventoryPage(QWidget):
-    """حاوية تبويبات المخزون."""
-
     def __init__(self, session):
-        """بناء التبويبات حسب الصلاحيات."""
         super().__init__()
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 16, 24, 16)
@@ -38,14 +30,12 @@ class InventoryPage(QWidget):
         lay.addWidget(self.tabs)
 
     def _refresh_tab(self, _index: int) -> None:
-        """إعادة تحميل التبويب عند فتحه، فتظهر آخر فواتير الشراء دون إعادة تشغيل."""
         page = self.tabs.currentWidget()
         if page is not self.items_tab:
             page.reload()
 
 
 class ItemsPage(ListPage):
-    """قائمة الأصناف؛ الرصيد والقيمة في المعاينة."""
     title = "الأصناف"
     add_label = "صنف جديد"
     search_placeholder = "الاسم، الكود، المقاس (205/55R16) أو الباركود (F2)"
@@ -63,31 +53,25 @@ class ItemsPage(ListPage):
     ]
 
     def __init__(self, session):
-        """بناء الصفحة مع تهيئة الصفوف قبل أول بحث."""
         super().__init__(session)
         self.search.returnPressed.connect(self.scan_enter)
 
     def can_edit(self) -> bool:
-        """صلاحية الأصناف."""
         return self.session.can("items.manage")
 
     def fetch(self, query, filter_key, offset):
-        """صفحة من البحث حسب النوع."""
         kind = filter_key if filter_key in items.KINDS else None
         return items.search(self.session.con, query, kind=kind, include_inactive=filter_key == "inactive", offset=offset)
 
     def total(self) -> str:
-        """العدّاد."""
         return f"{items.count(self.session.con)} صنف نشط"
 
     def scan_enter(self) -> None:
-        """Enter في البحث: إن طابق النص باركودًا أو كودًا فتح معاينته مباشرة (مسار الماسح الضوئي)."""
         it = items.by_barcode(self.session.con, self.search.text())
         if it:
             self.show_preview_id(it.id)
 
     def build_preview(self, row_id: int) -> None:
-        """تفاصيل الصنف وخصائصه الظاهرة."""
         it = items.get(self.session.con, row_id)
         self.heading(it.name, f"{items.KINDS[it.kind]} · {ltr(it.code)}" + ("" if it.active else " · موقوف"))
         if it.barcode:
@@ -121,14 +105,12 @@ class ItemsPage(ListPage):
             self.actions(edit, toggle)
 
     def toggle_active(self, it: Item) -> None:
-        """إيقاف أو تفعيل مع تأكيد."""
         verb = "إيقاف" if it.active else "تفعيل"
         if ask(self, verb, f"{verb} الصنف «{it.name}»؟" + (" لن يظهر في البيع." if it.active else ""), danger=it.active):
             items.set_active(self.session.con, self.session.user, it.id, not it.active)
             self.reload(keep_id=it.id)
 
     def open_dialog(self, row_id):
-        """نافذة إضافة أو تعديل."""
         if not self.can_edit():
             return
         dlg = ItemDialog(self.session, items.get(self.session.con, row_id) if row_id else None, self)
@@ -137,15 +119,9 @@ class ItemsPage(ListPage):
 
 
 class ItemDialog(Modal):
-    """نافذة الصنف المبنية من إعداد الحقول.
-
-    الترتيب كما في التصميم: حقول النوع (المقاس...) أولًا، ثم الماركة والموديل والباركود، ثم الاسم
-    والكود (يُقترحان تلقائيًا من البيانات ويمكن تعديلهما)، ثم الأسعار وحد الطلب، ثم الباقي.
-    """
     FIRST = ("brand", "model", "barcode", "name", "code", "price_retail", "price_wholesale", "price_super", "min_qty")
 
     def __init__(self, session, it: Item | None, parent=None):
-        """بناء النافذة؛ تغيير النوع يعيد بناء الحقول."""
         super().__init__("تعديل صنف" if it else "صنف جديد", parent, width=700)
         self.session, self.it, self.saved = session, it, None
         kinds = QHBoxLayout()
@@ -168,10 +144,9 @@ class ItemDialog(Modal):
         self.set_kind(it.kind if it else "tire")
         if it:
             for b in self.kind_buttons.values():
-                b.setEnabled(False)      # النوع لا يتغير بعد الإنشاء
+                b.setEnabled(False)      # Kind is fixed once created
 
     def _ordered_fields(self, kind: str) -> list:
-        """حقول النوع أولًا، ثم المشتركة بالترتيب المعتمد، ثم بقية المشتركة."""
         all_f = items.visible_fields(self.session.con, kind)
         specific = [f for f in all_f if f.kind != "common"]
         common = {f.key: f for f in all_f if f.kind == "common"}
@@ -179,7 +154,6 @@ class ItemDialog(Modal):
         return specific + head + list(common.values())
 
     def set_kind(self, kind: str) -> None:
-        """إعادة بناء الحقول للنوع المختار."""
         self.kind = kind
         for k, b in self.kind_buttons.items():
             b.setChecked(k == kind)
@@ -232,7 +206,6 @@ class ItemDialog(Modal):
         self._suggest()
 
     def _value(self, key: str) -> str:
-        """قيمة حقل كنص."""
         w = self.widgets.get(key)
         if w is None:
             return ""
@@ -245,7 +218,6 @@ class ItemDialog(Modal):
         return w.text()
 
     def suggestions(self) -> tuple[str, str]:
-        """(الاسم، الكود) المقترحان من البيانات الحالية."""
         attrs = {k: self._value(k) for k in ("size", "li", "si", "ah")}
         if attrs.get("size"):
             try:
@@ -257,7 +229,6 @@ class ItemDialog(Modal):
         return name, code
 
     def _suggest(self, *_args) -> None:
-        """عرض المقترح كنص باهت داخل حقلي الاسم والكود وهما فارغان."""
         if "name" not in self.widgets:
             return
         name, code = self.suggestions()
@@ -266,7 +237,6 @@ class ItemDialog(Modal):
             self.widgets["code"].setPlaceholderText(code)
 
     def save(self) -> None:
-        """جمع القيم والحفظ؛ الاسم والكود الفارغان يأخذان المقترح."""
         try:
             prices = [parse_money(self._value(k)) if self._value(k).strip() else 0
                       for k in ("price_retail", "price_wholesale", "price_super")]
@@ -287,11 +257,9 @@ class ItemDialog(Modal):
 
 
 class ItemFieldsTab(QWidget):
-    """إعداد حقول بطاقة الصنف: إظهار/إلزامي/طباعة/فلتر لكل حقل، وإضافة حقل مخصص."""
     COLS = ["الحقل", "مثال", "إظهار", "إلزامي", "في الطباعة", "فلتر بحث"]
 
     def __init__(self, session):
-        """بناء الجدول لكل نوع."""
         super().__init__()
         self.session = session
         lay = QVBoxLayout(self)
@@ -322,7 +290,6 @@ class ItemFieldsTab(QWidget):
         self.reload()
 
     def reload(self) -> None:
-        """إعادة ملء الجدول. الخلايا القابلة للتبديل مربعات اختيار في الخلية نفسها (لا عناصر مضمّنة)."""
         self._loading = True
         kind = self.kind.currentData()
         rows = [f for f in items.fields(self.session.con, kind) if f.kind == kind]
@@ -343,7 +310,6 @@ class ItemFieldsTab(QWidget):
         self._loading = False
 
     def on_change(self, cell: QTableWidgetItem) -> None:
-        """حفظ التبديل فورًا."""
         if self._loading or cell.column() < 2:
             return
         key = self.table.item(cell.row(), 0).data(Qt.ItemDataRole.UserRole)
@@ -356,7 +322,6 @@ class ItemFieldsTab(QWidget):
         self.reload()
 
     def add_custom(self) -> None:
-        """حوار حقل مخصص."""
         dlg = CustomFieldDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             try:
@@ -367,10 +332,7 @@ class ItemFieldsTab(QWidget):
 
 
 class CustomFieldDialog(Modal):
-    """حوار حقل مخصص: الاسم والنوع والاختيارات."""
-
     def __init__(self, parent=None):
-        """الحقول."""
         super().__init__("حقل مخصص", parent, width=440)
         self.label = self.ftype = ""
         self.options = []
@@ -389,7 +351,6 @@ class CustomFieldDialog(Modal):
         self.add_footer("إضافة", self.go)
 
     def go(self) -> None:
-        """جمع القيم."""
         self.label = self.name.text()
         self.ftype = self.type.currentData()
         self.options = [o for o in self.opts.text().split("|") if o.strip()]

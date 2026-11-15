@@ -1,4 +1,4 @@
-"""قواعد فاتورة البيع الصافية: توزيع الخصم على السطور، وخريطة الحسابات، وفحص الدفع. بلا قاعدة بيانات."""
+"""Pure sale rules: discount allocation, account map, payment checks."""
 from dataclasses import dataclass
 
 REVENUE_ACCOUNT = {"tire": "4110", "battery": "4120", "service": "4130"}
@@ -7,12 +7,11 @@ MAX_PAYMENT_METHODS = 2
 
 
 class SaleRuleError(ValueError):
-    """قاعدة بيع مخالفة، برسالة تصلح للعرض."""
+    """Broken sale rule, with a message fit to show."""
 
 
 @dataclass(frozen=True)
 class Payment:
-    """دفعة: الوسيلة، والمبلغ المطبّق على الفاتورة، والمبلغ المستلم للنقد (لحساب الباقي)، والمرجع."""
     method: str
     amount: int
     received: int | None = None
@@ -20,7 +19,6 @@ class Payment:
 
 
 def allocate(bases: list[int], amount: int) -> list[int]:
-    """توزيع amount على bases بالتناسب، بطريقة أكبر البواقي، فيكون المجموع دقيقًا بالقرش."""
     total = sum(bases)
     if amount < 0 or amount > total:
         raise SaleRuleError("الخصم أكبر من قيمة السطور")
@@ -35,7 +33,6 @@ def allocate(bases: list[int], amount: int) -> list[int]:
 
 
 def check_payments(total: int, payments: list) -> None:
-    """فحص الدفع: وسيلة معروفة، لا تتكرر، حتى وسيلتين، ومجموعها يساوي الإجمالي بالضبط."""
     if not payments:
         raise SaleRuleError("أضف طريقة دفع")
     if len(payments) > MAX_PAYMENT_METHODS:

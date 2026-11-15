@@ -1,11 +1,4 @@
-"""العملاء ومركباتهم (طبقة قاعدة البيانات).
-
-قواعد ثابتة:
-- الموبايل فريد؛ عند التكرار تُرفض العملية وتُذكر رسالة الخطأ اسم العميل الموجود.
-- لا حذف لعميل له مستندات لاحقًا؛ الإيقاف هو الطريق. الحذف الفعلي مسموح ما دام بلا مستندات
-  (في هذه المرحلة لا مستندات بعد، والفحص يُوسَّع مع كل جدول يشير إلى العميل).
-- البحث بالاسم العربي الموحّد (norm_ar) أو الموبايل أو رقم اللوحة.
-"""
+"""Customers and their vehicles (database layer)."""
 import sqlite3
 from dataclasses import dataclass, field
 
@@ -19,12 +12,11 @@ LEVELS = {"retail": "قطاعي", "wholesale": "جملة", "super": "جملة ا
 
 
 class CustomerError(ValueError):
-    """بيانات عميل مرفوضة، برسالة تصلح للعرض."""
+    """Customer data refused, with a message fit to show."""
 
 
 @dataclass
 class Vehicle:
-    """مركبة عميل."""
     make: str = ""
     model: str = ""
     year: int | None = None
@@ -37,13 +29,11 @@ class Vehicle:
 
     @property
     def title(self) -> str:
-        """وصف قصير: الماركة والموديل والسنة."""
         return " ".join(str(p) for p in (self.make, self.model, self.year) if p)
 
 
 @dataclass
 class Customer:
-    """عميل كامل البيانات."""
     id: int | None
     name: str
     mobile: str
@@ -63,7 +53,6 @@ class Customer:
 
 
 def _rows(con, sql, params=()):
-    """تنفيذ استعلام وإرجاع صفوف بأسماء الأعمدة."""
     con.row_factory = sqlite3.Row
     try:
         return con.execute(sql, params).fetchall()
@@ -72,7 +61,6 @@ def _rows(con, sql, params=()):
 
 
 def _from_row(r) -> Customer:
-    """صف إلى Customer (بلا مركبات)."""
     return Customer(r["id"], r["name"], r["mobile"], r["mobile2"] or "", r["national_id"] or "",
                     r["customer_type"], r["price_level"], r["credit_limit"], r["credit_days"],
                     r["address"] or "", r["work_place"] or "", r["tax_id"] or "", r["notes"] or "",
@@ -80,7 +68,6 @@ def _from_row(r) -> Customer:
 
 
 def _clean(c: Customer) -> Customer:
-    """فحص البيانات وتنظيفها قبل الحفظ."""
     c.name = (c.name or "").strip()
     if not c.name:
         raise CustomerError("اسم العميل مطلوب")
@@ -98,13 +85,11 @@ def _clean(c: Customer) -> Customer:
 
 
 def _duplicate(con, mobile: str, excluding: int | None) -> str | None:
-    """اسم العميل الذي يحمل نفس الموبايل، أو None."""
     r = con.execute("SELECT name FROM customers WHERE mobile=? AND id IS NOT ?", (mobile, excluding)).fetchone()
     return r[0] if r else None
 
 
 def _save_vehicles(con, customer_id: int, vehicles: list) -> None:
-    """استبدال مركبات العميل بالقائمة المعطاة (قائمة صغيرة؛ الاستبدال أبسط من المزامنة)."""
     con.execute("DELETE FROM customer_vehicles WHERE customer_id=?", (customer_id,))
     for v in vehicles:
         if not any((v.make, v.model, v.plate)):
@@ -119,7 +104,6 @@ def _save_vehicles(con, customer_id: int, vehicles: list) -> None:
 
 
 def create(con, by, c: Customer) -> Customer:
-    """إنشاء عميل مع مركباته في معاملة واحدة."""
     _clean(c)
     dup = _duplicate(con, c.mobile, None)
     if dup:
@@ -138,7 +122,6 @@ def create(con, by, c: Customer) -> Customer:
 
 
 def update(con, by, c: Customer) -> Customer:
-    """تعديل عميل ومركباته. تغيير فئة السعر يُسجَّل في المراجعة لأنه يؤثر في أسعار البيع."""
     _clean(c)
     old = get(con, c.id)
     dup = _duplicate(con, c.mobile, c.id)
@@ -163,19 +146,16 @@ def update(con, by, c: Customer) -> Customer:
 
 
 def set_active(con, by, customer_id: int, active: bool) -> None:
-    """إيقاف عميل أو تفعيله (الموقوف لا يظهر في البيع)."""
     with transaction(con):
         con.execute("UPDATE customers SET active=? WHERE id=?", (int(active), customer_id))
         audit(con, by, "customer.activate" if active else "customer.deactivate", "customer", customer_id)
 
 
 def has_documents(con, customer_id: int) -> bool:
-    """هل للعميل مستندات تمنع حذفه؟ يُوسَّع مع كل جدول جديد يشير إلى العملاء."""
     return False
 
 
 def delete(con, by, customer_id: int) -> None:
-    """حذف فعلي، مسموح فقط لعميل بلا مستندات."""
     if has_documents(con, customer_id):
         raise CustomerError("للعميل مستندات مسجّلة؛ أوقفه بدل حذفه")
     c = get(con, customer_id)
@@ -185,7 +165,6 @@ def delete(con, by, customer_id: int) -> None:
 
 
 def get(con, customer_id: int) -> Customer:
-    """عميل برقمه مع مركباته."""
     rows = _rows(con, "SELECT * FROM customers WHERE id=?", (customer_id,))
     if not rows:
         raise CustomerError("العميل غير موجود")
@@ -198,10 +177,6 @@ def get(con, customer_id: int) -> Customer:
 
 def search(con, query: str = "", level: str | None = None, include_inactive: bool = False,
            limit: int = 300, offset: int = 0) -> list[tuple]:
-    """بحث القائمة: (id, name, mobile, price_level, customer_type, first_vehicle, active).
-
-    النص يُطابق الاسم الموحّد أو الموبايل أو رقم اللوحة. النتائج بترتيب الاسم، صفحة صفحة.
-    """
     q = (query or "").strip()
     where, params = [], []
     if not include_inactive:
@@ -223,5 +198,4 @@ def search(con, query: str = "", level: str | None = None, include_inactive: boo
 
 
 def count(con) -> int:
-    """عدد العملاء النشطين."""
     return con.execute("SELECT count(*) FROM customers WHERE active=1").fetchone()[0]

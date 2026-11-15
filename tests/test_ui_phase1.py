@@ -1,4 +1,4 @@
-"""اختبارات شاشات المرحلة 1 بلا شاشة: معالج التشغيل الأول، والدخول، والإعدادات، وتنبيه النسخ."""
+"""Offscreen phase 1 screens: setup wizard, login, settings, backup notice."""
 import os
 import shutil
 import tempfile
@@ -9,15 +9,12 @@ from tests.qt_app import get_app, require_qt
 
 PW_LOGIN = "Admin12345"
 PW_BACKUP = "Morv-Backup-2026"
-LONG_LOGIN = "OwnerLogin2026xx"   # 16 حرفًا: لاختبار رفض تطابق كلمة النسخ مع كلمة الدخول
+LONG_LOGIN = "OwnerLogin2026xx"   # 16 characters, to test that the backup password may not equal the login one
 
 
 @require_qt()
 class _Base(unittest.TestCase):
-    """قاعدة مؤقتة ومجلد بيانات مستقل لكل اختبار."""
-
     def setUp(self):
-        """تجهيز."""
         from morv.infra.db.bootstrap import open_main_db
         self.tmp = Path(tempfile.mkdtemp())
         os.environ["MORV_DATA_DIR"] = str(self.tmp)
@@ -25,13 +22,11 @@ class _Base(unittest.TestCase):
         self.app = get_app()
 
     def tearDown(self):
-        """تنظيف."""
         self.con.close()
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def make_admin(self):
-        """مدير جاهز وتشفير مُعدّ."""
         from morv.core import security
         from morv.infra import backup, shop, users
         shop.save(self.con, "مورف للإطارات", "01000000000", "")
@@ -41,26 +36,22 @@ class _Base(unittest.TestCase):
         return self.admin
 
     def session(self, user=None):
-        """جلسة على المستخدم."""
         from morv.ui.session import Session
         return Session(self.con, user or self.admin)
 
 
 class WizardTest(_Base):
-    """معالج التشغيل الأول."""
-
     def test_new_shop_full_flow(self):
-        """كل خطوة ترفض الناقص وتقبل الصحيح، وفي النهاية مدير وتشفير ونسخة أولى."""
         from morv.infra import backup, users
         from morv.ui.setup_wizard import SetupWizard
         w = SetupWizard(self.con)
         self.assertEqual(w.order[w.index], "choice")
         w.next()
         self.assertEqual(w.order[w.index], "shop")
-        w.next()                                   # ناقص
+        w.next()                                   # incomplete
         self.assertIn("اسم المحل", w.notice.text())
         w.shop_name.setText("مورف للإطارات")
-        w.shop_phone.setText("٠١٠٠٠٠٠٠٠٠٠")         # أرقام عربية تُقبل
+        w.shop_phone.setText("٠١٠٠٠٠٠٠٠٠٠")         # Arabic digits are accepted
         w.next()
         self.assertEqual(w.order[w.index], "admin")
         w.admin_name.setText("صاحب المحل")
@@ -75,7 +66,7 @@ class WizardTest(_Base):
         w.bk_pw2.setText("short1")
         w.next()
         self.assertIn("12", w.notice.text())
-        w.bk_pw.setText(LONG_LOGIN)                # نفس كلمة الدخول مرفوضة (وهي 16 حرفًا فتتجاوز فحص الطول)
+        w.bk_pw.setText(LONG_LOGIN)                # the login password is refused here, and is long enough to pass the length check
         w.bk_pw2.setText(LONG_LOGIN)
         w.next()
         self.assertIn("مختلفة", w.notice.text())
@@ -91,7 +82,7 @@ class WizardTest(_Base):
         w.next()
         self.assertEqual(w.order[w.index], "review")
         self.assertIn("مورف للإطارات", w.review.text())
-        w.next()                                   # إنهاء
+        w.next()                                   # finish
         self.assertEqual(w.result_kind, "new")
         self.assertEqual(users.count_users(self.con), 1)
         self.assertTrue(backup.is_encryption_ready(self.con))
@@ -99,7 +90,6 @@ class WizardTest(_Base):
         self.assertEqual(users.login(self.con, "admin", LONG_LOGIN).role, "manager")
 
     def test_restore_branch_validates_secret(self):
-        """مسار الاستعادة: ملف من جهاز آخر، سر خطأ مرفوض، سر صحيح يُقبل دون كتابة شيء."""
         from morv.infra import backup, vault
         from morv.ui.setup_wizard import SetupWizard
         self.make_admin()
@@ -125,7 +115,7 @@ class WizardTest(_Base):
             self.assertEqual(w.result_kind, "restore")
             self.assertEqual(w.restore_path, str(src))
             con2.close()
-            # الاستبدال الفعلي كما يفعله التطبيق
+            # the real swap, as the app does it
             backup.restore_file(other / "morv_tires.db", w.restore_path, secret=w.restore_secret)
             con2 = open_main_db(other / "morv_tires.db")
             from morv.infra import users
@@ -138,10 +128,7 @@ class WizardTest(_Base):
 
 
 class LoginTest(_Base):
-    """شاشة الدخول."""
-
     def test_login_dialog(self):
-        """القائمة تعرض النشطين فقط، والخطأ يُعرض، والصحيح يقبل."""
         from morv.infra import users
         from morv.ui.login import LoginDialog
         self.make_admin()
@@ -160,27 +147,23 @@ class LoginTest(_Base):
 
 
 class SettingsTest(_Base):
-    """صفحة الإعدادات."""
-
     def test_tabs_by_permission(self):
-        """المدير يرى 7 تبويبات، والكاشير 3 فقط وبلا زر استعادة."""
         from morv.infra import users
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
         k = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
-        admin_page = SettingsPage(self.session())        # تبقى في متغير وإلا حذفها Qt مع تبويباتها
-        self.assertEqual(admin_page.tabs.count(), 7)     # المحل، المستخدمون، السجل، الحقول، المظهر، الاختصارات، النسخ
+        admin_page = SettingsPage(self.session())        # kept in a variable, or Qt takes it and its tabs away
+        self.assertEqual(admin_page.tabs.count(), 7)     # shop, users, log, fields, appearance, shortcuts, backup
         self.assertIsNotNone(admin_page.fields_tab)
         p = SettingsPage(self.session(k))
-        self.assertEqual(p.tabs.count(), 3)               # المظهر والاختصارات والنسخ فقط
-        self.assertIsNone(p.shop_tab)                     # لا يرى بيانات المحل أصلًا
+        self.assertEqual(p.tabs.count(), 3)               # appearance, shortcuts and backup only
+        self.assertIsNone(p.shop_tab)                     # never sees shop data at all
         self.assertFalse(p.backup_tab.restore_btn.isVisibleTo(p))
-        self.assertFalse(p.backup_tab.pw_btn.isVisibleTo(p))      # كلمة مرور النسخ للمدير فقط
+        self.assertFalse(p.backup_tab.pw_btn.isVisibleTo(p))      # the backup password is for a manager only
         self.assertFalse(p.backup_tab.usb_dir.isEnabled())
         self.assertTrue(p.backup_tab.backup_btn.isEnabled())
 
     def test_users_tab_actions(self):
-        """إنشاء مستخدم من الحوار، وتعديل صلاحية، وحماية آخر مدير تظهر رسالتها."""
         from morv.infra import users
         from morv.ui.settings_page import NewUserDialog, SettingsPage
         self.make_admin()
@@ -197,12 +180,11 @@ class SettingsTest(_Base):
         tab.checks["backup.restore"].setChecked(True)
         self.assertTrue(users.has_permission(self.con, dlg.created, "backup.restore"))
         tab.reload(self.admin.id)
-        tab.role.setCurrentIndex(1)               # تحويل آخر مدير إلى كاشير
+        tab.role.setCurrentIndex(1)               # turning the last manager into a cashier
         self.assertIn("مدير واحد", tab.notice.text())
         self.assertEqual(users.get_user(self.con, self.admin.id).role, "manager")
 
     def test_backup_tab(self):
-        """نسخ الآن يضيف صفًا، واختبار الصف المختار ينجح، والبطاقات تتحدث."""
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
         page = SettingsPage(self.session())
@@ -211,7 +193,7 @@ class SettingsTest(_Base):
         tab.backup_now()
         self.assertEqual(tab.model.rowCount(), 1)
         self.assertIn("تمت النسخة", tab.notice.text())
-        # selectRow في RTL على جدول غير معروض يختار عمودًا بعرض الحشو فيفشل؛ نختار عبر نموذج التحديد مباشرة
+        # selectRow on a hidden RTL table picks a padding-width column and fails; select through the model
         from PySide6.QtCore import QItemSelectionModel
         flags = QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows
         tab.view.selectionModel().setCurrentIndex(tab.model.index(0, 0), flags)
@@ -220,7 +202,6 @@ class SettingsTest(_Base):
         self.assertNotEqual(tab.stat_test[1].text(), "لم يُجرَ بعد")
 
     def test_shop_tab_save(self):
-        """حفظ بيانات المحل مع رفض الهاتف الخطأ."""
         from morv.infra import shop
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
@@ -239,10 +220,7 @@ class SettingsTest(_Base):
 
 
 class AppearanceTest(_Base):
-    """تبويب المظهر."""
-
     def test_font_applies_and_persists(self):
-        """تغيير الخط والحجم يُطبَّق على التطبيق ويُحفظ، والخطان المضمّنان متاحان دائمًا."""
         from morv.infra import settings
         from morv.ui import theme
         from morv.ui.shell import MainWindow
@@ -262,10 +240,7 @@ class AppearanceTest(_Base):
 
 
 class ShellHealthTest(_Base):
-    """تنبيه النسخ في الشريط العلوي."""
-
     def test_pill_and_open_backup(self):
-        """قبل أي نسخة التنبيه خطر، وبعد النسخة سليم، والضغط يفتح تبويب النسخ."""
         from morv.infra import backup
         from morv.ui.shell import MainWindow
         self.make_admin()

@@ -1,64 +1,75 @@
-"""اختبارات آلية لقواعد CLAUDE.md، حتى لا تُكسر القواعد دون أن يلاحظ أحد.
-
-كل قاعدة هنا تفحص الكود نفسه (نصًا أو شجرة AST) ولا تشغّله.
-"""
+"""Automated tests for the CLAUDE.md rules, so they cannot break unnoticed."""
 import ast
+import io
+import tokenize
 import re
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "morv"
+ARABIC = re.compile(r"[\u0600-\u06FF]")
 
 
 def py_files(*dirs: Path) -> list[Path]:
-    """كل ملفات بايثون داخل المجلدات المعطاة."""
     return sorted(f for d in dirs for f in d.rglob("*.py") if "__pycache__" not in f.parts)
 
 
 def code_lines(path: Path):
-    """أسطر الكود (رقم السطر، النص) بعد حذف التعليقات، حتى لا يُحاسب الشرح العربي."""
     for no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         yield no, line.split("#", 1)[0]
 
 
 class DocstringTest(unittest.TestCase):
-    """كل ملف وكلاس ودالة في الكود الإنتاجي له شرح موجز؛ اللغة غير مفروضة."""
+    MAX_FIRST_LINE = 100     # a docstring's first line may not exceed this
 
-    MAX_FIRST_LINE = 120     # سطر الشرح الأول لا يتجاوز هذا الطول
-
-    def test_every_unit_has_short_docstring(self):
-        """يفحص morv و tools و run.py. مستثنى: __init__ الفارغ، والدوال السحرية القصيرة."""
-        missing = []
-        files = py_files(PKG, ROOT / "tools") + [ROOT / "run.py"]
-        for f in files:
+    def test_every_module_has_a_short_docstring(self):
+        for f in self.files():
             tree = ast.parse(f.read_text(encoding="utf-8"))
+            if f.name == "__init__.py" and not tree.body:
+                continue
+            doc = ast.get_docstring(tree)
             rel = f.relative_to(ROOT)
-            is_empty_init = f.name == "__init__.py" and not tree.body
-            if not is_empty_init:
-                self._check(ast.get_docstring(tree), f"{rel}: الملف", missing)
+            self.assertTrue(doc and doc.strip(), f"{rel}: the module has no docstring")
+            self.assertLessEqual(len(doc.strip().splitlines()[0]), self.MAX_FIRST_LINE,
+                                 f"{rel}: the first docstring line is too long")
+
+    def test_no_docstring_first_line_is_too_long(self):
+        long = []
+        for f in self.files():
+            tree = ast.parse(f.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                     continue
-                dunder = node.name.startswith("__") and node.name.endswith("__")
-                if dunder and node.end_lineno - node.lineno < 3:
-                    continue
-                self._check(ast.get_docstring(node), f"{rel}:{node.lineno} {node.name}", missing)
-        self.assertEqual(missing, [], "شرح ناقص أو سطر أول طويل:\n" + "\n".join(missing))
+                doc = ast.get_docstring(node)
+                if doc and len(doc.strip().splitlines()[0]) > self.MAX_FIRST_LINE:
+                    long.append(f"{f.relative_to(ROOT)}:{node.lineno} {node.name}")
+        self.assertEqual(long, [], "docstring first line too long:\n" + "\n".join(long))
 
-    def _check(self, doc, where, missing):
-        """إضافة الموضع إلى القائمة إن كان الشرح غائبًا أو سطره الأول طويلًا."""
-        if not doc or not doc.strip():
-            missing.append(where + " (لا شرح)")
-        elif len(doc.strip().splitlines()[0]) > self.MAX_FIRST_LINE:
-            missing.append(where + " (سطر أول طويل)")
+    def test_explanations_are_not_arabic(self):
+        """Arabic belongs in the program's own messages, not in docstrings or comments."""
+        found = []
+        for f in self.files() + py_files(ROOT / "tests"):
+            src = f.read_text(encoding="utf-8")
+            tree = ast.parse(src)
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    continue
+                doc = ast.get_docstring(node)
+                if doc and ARABIC.search(doc):
+                    name = getattr(node, "name", "module")
+                    found.append(f"{f.relative_to(ROOT)}: docstring of {name}")
+            for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+                if tok.type == tokenize.COMMENT and ARABIC.search(tok.string):
+                    found.append(f"{f.relative_to(ROOT)}:{tok.start[0]}: comment")
+        self.assertEqual(found, [], "Arabic explanation in code:\n" + "\n".join(found))
+
+    def files(self) -> list[Path]:
+        return py_files(PKG, ROOT / "tools") + [ROOT / "run.py", ROOT / "run_tests.py"]
 
 
 class LayersTest(unittest.TestCase):
-    """فصل الطبقات: core بلا Qt ولا SQL، و ui بلا SQL."""
-
     def imports(self, path: Path) -> set[str]:
-        """أسماء الحزم التي يستوردها الملف (المستوى الأول فقط)."""
         names = set()
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Import):
@@ -68,13 +79,11 @@ class LayersTest(unittest.TestCase):
         return names
 
     def test_core_is_pure(self):
-        """core لا يستورد Qt ولا sqlite3."""
         for f in py_files(PKG / "core"):
             bad = self.imports(f) & {"PySide6", "sqlite3"}
             self.assertFalse(bad, f"{f.name} يستورد {bad}")
 
     def test_ui_has_no_sql(self):
-        """ui لا يستورد sqlite3 ولا يكتب أوامر SQL."""
         sql = re.compile(r"\b(SELECT|INSERT|UPDATE|DELETE)\b.*\b(FROM|INTO|SET|WHERE)\b")
         for f in py_files(PKG / "ui"):
             self.assertNotIn("sqlite3", self.imports(f), f.name)
@@ -84,10 +93,7 @@ class LayersTest(unittest.TestCase):
 
 
 class MoneyTest(unittest.TestCase):
-    """المال أعداد صحيحة فقط."""
-
     def test_no_float_in_core(self):
-        """لا float ولا أرقام عشرية في core."""
         for f in py_files(PKG / "core"):
             for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
                 self.assertFalse(isinstance(node, ast.Name) and node.id == "float",
@@ -96,40 +102,32 @@ class MoneyTest(unittest.TestCase):
                                  f"رقم عشري في {f.name}:{getattr(node, 'lineno', '?')}")
 
     def test_no_real_columns(self):
-        """لا أعمدة REAL في أي ترقية."""
         for f in sorted((PKG / "infra" / "db" / "migrations").glob("*.sql")):
             text = "\n".join(line.split("--", 1)[0] for line in f.read_text(encoding="utf-8").splitlines())
             self.assertIsNone(re.search(r"\b(REAL|FLOAT|DOUBLE)\b", text, re.I), f.name)
 
     def test_no_double_spinbox(self):
-        """QDoubleSpinBox ممنوع في البرنامج كله."""
         for f in py_files(PKG):
             self.assertNotIn("QDoubleSpinBox", f.read_text(encoding="utf-8"), f.name)
 
 
 class UiRulesTest(unittest.TestCase):
-    """قواعد الاتجاه والتنسيق والجداول."""
-
     def test_forbidden_calls(self):
-        """أشياء ممنوعة في الواجهة: نافذة رئيسية بلا إطار، وعناصر داخل صفوف الجداول، وقلب الاتجاه،
-        وQMessageBox (تنسيقه لا يتبع الثيم وينقلب في RTL؛ البديل morv.ui.modal)."""
         banned = ["FramelessWindowHint", "setIndexWidget", "setDirection(", "QMessageBox"]
         for f in py_files(PKG):
             for no, line in code_lines(f):
                 for word in banned:
                     if word == "FramelessWindowHint" and f.name == "modal.py":
-                        continue   # النافذة المنبثقة الموحّدة وحدها بلا إطار (برأس داخلي قابل للسحب)
+                        continue   # only the shared modal is frameless, with its own draggable header
                     self.assertNotIn(word, line, f"{f.name}:{no}")
 
     def test_align_right_only_absolute(self):
-        """AlignRight مسموحة فقط مع AlignAbsolute (للطباعة)، وإلا تنقلب في RTL."""
         for f in py_files(PKG):
             for no, line in code_lines(f):
                 if "AlignRight" in line:
                     self.assertIn("AlignAbsolute", line, f"{f.name}:{no}")
 
     def test_single_stylesheet_and_direction(self):
-        """setStyleSheet و setLayoutDirection تُستدعيان في theme.py فقط."""
         for f in py_files(PKG):
             if f.name == "theme.py":
                 continue

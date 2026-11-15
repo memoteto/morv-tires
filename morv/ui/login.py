@@ -1,9 +1,4 @@
-"""شاشة الدخول: اختيار المستخدم من قائمة منسدلة وكتابة كلمة المرور.
-
-لا يوجد «نسيت كلمة المرور» (قرار المالك): المدير يعيّن كلمة مرور جديدة من الإعدادات.
-القفل بعد 5 محاولات خاطئة يُنفَّذ في morv.infra.users، وهنا تُعرض رسالته فقط.
-إن كان على المستخدم تغيير كلمة مروره (حساب جديد) يُطلب منه ذلك قبل الدخول.
-"""
+"""Login screen: pick a user and type the password."""
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QVBoxLayout
 
@@ -16,10 +11,7 @@ from morv.ui.widgets import Notice, PasswordEdit, form, muted, primary_button
 
 
 class LoginDialog(QDialog):
-    """نافذة الدخول. بعد exec() الناجح يكون self.user هو المستخدم الداخل."""
-
     def __init__(self, con, parent=None):
-        """بناء النافذة وتحميل المستخدمين النشطين."""
         super().__init__(parent)
         self.con = con
         self.user = None
@@ -33,7 +25,7 @@ class LoginDialog(QDialog):
         name.setObjectName("pageTitle")
         name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(name)
-        sub = QLabel("اختر المستخدم وأدخل كلمة المرور")   # بلا التفاف: كان يتراكب على سطرين
+        sub = QLabel("اختر المستخدم وأدخل كلمة المرور")   # No wrapping: it used to overlap on two lines
         sub.setObjectName("muted")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(sub)
@@ -68,7 +60,6 @@ class LoginDialog(QDialog):
         self.password.edit.setFocus()
 
     def try_login(self) -> None:
-        """محاولة الدخول وعرض الرسالة عند الفشل."""
         if self.combo.currentIndex() < 0:
             self.notice.show_message("لا يوجد مستخدم نشط")
             return
@@ -91,10 +82,7 @@ class LoginDialog(QDialog):
 
 
 class ChangePasswordDialog(Modal):
-    """تغيير كلمة مرور المستخدم الحالي (إجباري عند أول دخول، أو اختياري من الإعدادات)."""
-
     def __init__(self, con, user, current: str | None = None, forced: bool = False, parent=None):
-        """current: كلمة المرور الحالية إن عُرفت (بعد الدخول مباشرة) فلا تُطلب مرة أخرى."""
         super().__init__("تغيير كلمة المرور", parent, width=440)
         self.con, self.user, self.current = con, user, current
         lay = self.body
@@ -112,7 +100,6 @@ class ChangePasswordDialog(Modal):
         self.add_footer("حفظ", self.save)
 
     def save(self) -> None:
-        """التحقق والحفظ."""
         if self.new.text() != self.new2.text():
             self.notice.show_message("كلمتا المرور غير متطابقتين")
             return

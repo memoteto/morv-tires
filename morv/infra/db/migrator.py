@@ -1,13 +1,4 @@
-"""ترقيات قاعدة البيانات.
-
-كل تغيير في الجداول يُكتب في ملف SQL مرقّم داخل مجلد migrations، مثل 0001_foundation.sql.
-عند فتح البرنامج:
-1) يُقرأ رقم آخر ترقية مطبّقة من جدول schema_migrations.
-2) إن وُجدت ترقيات جديدة وكانت القاعدة فيها بيانات، تُؤخذ نسخة احتياطية أولًا.
-3) تُطبّق كل ترقية داخل معاملة واحدة: إما تنجح كاملة أو لا يتغير شيء.
-4) تُحفظ بصمة (sha256) كل ملف مطبّق. لو تغيّر ملف بعد تطبيقه يرفض البرنامج العمل،
-   لأن ذلك يعني أن نسختين من البرنامج ترى جداول مختلفة.
-"""
+"""Database migrations."""
 import hashlib
 import re
 import sqlite3
@@ -27,12 +18,11 @@ _BOOTSTRAP = """CREATE TABLE IF NOT EXISTS schema_migrations (
 
 
 class MigrationError(RuntimeError):
-    """فشل في الترقيات: ملف بلا ترتيب صحيح، أو ملف تغيّر بعد تطبيقه، أو خطأ SQL."""
+    """Migration failed: bad order, a changed file, or an SQL error."""
 
 
 @dataclass(frozen=True)
 class Migration:
-    """ملف ترقية واحد: رقمه واسمه ونصه وبصمته."""
     version: int
     name: str
     sql: str
@@ -40,12 +30,10 @@ class Migration:
 
 
 def _checksum(sql: str) -> str:
-    """بصمة الملف بعد توحيد نهايات الأسطر، حتى لا تختلف بين Windows وLinux."""
     return hashlib.sha256(sql.replace("\r\n", "\n").encode("utf-8")).hexdigest()
 
 
 def load_migrations(folder: Path = MIGRATIONS_DIR) -> list:
-    """قراءة ملفات الترقية بالترتيب والتأكد أن أرقامها متتالية تبدأ من 1 بلا فجوات."""
     found = []
     for f in sorted(folder.glob("*.sql")):
         m = _NAME.match(f.name)
@@ -60,7 +48,6 @@ def load_migrations(folder: Path = MIGRATIONS_DIR) -> list:
 
 
 def applied(con: sqlite3.Connection) -> dict:
-    """الترقيات المطبّقة على هذه القاعدة: {الرقم: البصمة}."""
     has = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").fetchone()
     if not has:
         return {}
@@ -68,13 +55,11 @@ def applied(con: sqlite3.Connection) -> dict:
 
 
 def current_version(con: sqlite3.Connection) -> int:
-    """رقم آخر ترقية مطبّقة، أو 0 لقاعدة جديدة."""
     done = applied(con)
     return max(done) if done else 0
 
 
 def pending(con: sqlite3.Connection, migrations=None) -> list:
-    """الترقيات التي لم تُطبّق بعد، مع رفض أي ملف تغيّرت بصمته بعد تطبيقه."""
     migrations = migrations if migrations is not None else load_migrations()
     done = applied(con)
     by_version = {m.version: m for m in migrations}
@@ -87,11 +72,6 @@ def pending(con: sqlite3.Connection, migrations=None) -> list:
 
 
 def migrate(con: sqlite3.Connection, migrations=None, before_apply=None) -> list:
-    """تطبيق الترقيات الجديدة بالترتيب، ويعيد قائمة أرقام ما طُبّق.
-
-    before_apply: دالة تُستدعى مرة واحدة قبل التطبيق إذا كانت القاعدة غير جديدة
-    (تُستخدم لأخذ نسخة احتياطية قبل الترقية).
-    """
     todo = pending(con, migrations)
     if not todo:
         return []
@@ -100,8 +80,8 @@ def migrate(con: sqlite3.Connection, migrations=None, before_apply=None) -> list
     done = []
     for mig in todo:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # الترقية ذرية: النص كله داخل معاملة واحدة تبقى مفتوحة بعده، ثم فحص، ثم COMMIT.
-        # القيم المدمجة آمنة: الرقم عدد، والاسم مطابق لنمط حروف صغيرة، والبصمة ست عشرية.
+        # A migration is atomic: the whole script in one transaction, then the check, then COMMIT.
+        # The inlined values are safe: a number, a lower-case name, a hex checksum.
         script = (
             "BEGIN IMMEDIATE;\n" + _BOOTSTRAP + "\n" + mig.sql + "\n"
             f"INSERT INTO schema_migrations (version, name, checksum, applied_at) "
@@ -109,8 +89,8 @@ def migrate(con: sqlite3.Connection, migrations=None, before_apply=None) -> list
         )
         try:
             con.executescript(script)
-            # ترقية تعيد بناء جدول قد تترك صفوفًا تشير إلى ما لم يعد موجودًا دون أن يعترض SQLite
-            # أثناءها؛ الفحص قبل COMMIT يحوّل ذلك إلى فشل يُتراجع عنه بدل بيانات معطوبة.
+            # A table rebuild can leave rows pointing at what is gone without SQLite objecting;
+            # the check before COMMIT turns that into a rollback instead of corrupt data.
             broken = con.execute("PRAGMA foreign_key_check").fetchall()
             if broken:
                 tables = "، ".join(sorted({r[0] for r in broken}))
