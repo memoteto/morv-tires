@@ -63,3 +63,63 @@ class SalesUiTest(unittest.TestCase):
         dlg.post()
         self.assertIsNone(dlg.posted)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sales").fetchone()[0], 0)
+
+
+@require_qt()
+class SaleReturnUiTest(SalesUiTest):
+    def setUp(self):
+        super().setUp()
+        from morv.core.sales_rules import Payment
+        from morv.infra import sales
+        from morv.infra.sales import SaleLineIn
+        item = self.con.execute("SELECT id FROM items").fetchone()[0]
+        self.sale = sales.post_sale(self.con, self.admin, request_key="ui-return-key-1", customer_id=None,
+                                    lines=[SaleLineIn(item, 2, 100)],
+                                    payments=[Payment("cash", 200, received=200)], sale_date="2026-11-10")
+
+    def dialog(self):
+        from morv.infra import sale_view
+        from morv.ui.sale_return_dialog import SaleReturnDialog
+        con = self.session.con
+        return self.destroy_on_cleanup(SaleReturnDialog(
+            self.session, sale_view.get_sale(con, self.sale.id), sale_view.returnable_lines(con, self.sale.id),
+            sale_view.refund_methods(con, self.sale.id)))
+
+    def test_dialog_posts_a_return_and_shows_its_value(self):
+        dlg = self.dialog()
+        self.assertEqual(dlg.line_combo.count(), 1)
+        dlg.qty.setValue(1)
+        self.assertTrue(dlg.add_line())
+        self.assertEqual(dlg.model.rows[0][4], 100)
+        dlg.reason.setCurrentText("عيب في الصنف")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM sale_returns").fetchone()[0], 1)
+
+    def test_dialog_refuses_empty_and_short_reason(self):
+        dlg = self.dialog()
+        dlg.post()
+        self.assertIsNone(dlg.posted)
+        dlg.qty.setValue(1)
+        dlg.add_line()
+        dlg.reason.setCurrentText("لا")
+        dlg.post()
+        self.assertIsNone(dlg.posted)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM sale_returns").fetchone()[0], 0)
+
+    def test_available_shrinks_after_a_line_is_added(self):
+        dlg = self.dialog()
+        dlg.qty.setValue(2)
+        dlg.add_line()
+        self.assertEqual(dlg.line_combo.count(), 0)
+        self.assertFalse(dlg.add_btn.isEnabled())
+
+    def test_page_shows_return_button_only_with_permission(self):
+        from morv.infra import users
+        from morv.ui.sales_page import SalesPage
+        from morv.ui.session import Session
+        page = self.destroy_on_cleanup(SalesPage(self.session))
+        self.assertTrue(page.can_return())
+        cashier = users.create_user(self.con, self.admin, "cash1", "كاشير", "Cash12345", "cashier")
+        other = self.destroy_on_cleanup(SalesPage(Session(self.con, cashier)))
+        self.assertFalse(other.can_return())

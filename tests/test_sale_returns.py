@@ -7,7 +7,7 @@ from pathlib import Path
 
 from morv.core import costing
 from morv.core.sales_rules import Payment
-from morv.infra import inventory, purchasing, sale_returns, sales, users
+from morv.infra import inventory, purchasing, sale_returns, sale_view, sales, users
 from morv.infra.db.bootstrap import open_main_db
 from morv.infra.purchasing import PurchaseLine
 from morv.infra.sale_returns import ReturnError, ReturnLineIn
@@ -194,6 +194,22 @@ class SaleReturnsTest(unittest.TestCase):
                     "UPDATE sale_return_lines SET qty = 9", "DELETE FROM sale_return_lines"):
             with self.assertRaises(sqlite3.DatabaseError):
                 self.con.execute(sql)
+
+
+    def test_views_show_returns_and_what_is_left(self):
+        self.ret([ReturnLineIn(self.line_id(), 1, "sound")])
+        row = sale_view.list_sales(self.con, "")[0]
+        self.assertEqual(row[6], 200000)
+        inv = sale_view.get_sale(self.con, self.sale.id)
+        self.assertEqual(inv.returned, 200000)
+        self.assertEqual(len(inv.returns), 1)
+        line = sale_view.returnable_lines(self.con, self.sale.id)[0]
+        self.assertEqual((line.sold, line.returned, line.available), (3, 1, 2))
+        self.assertEqual(sale_view.refund_methods(self.con, self.sale.id), ["cash"])
+
+    def test_untouched_sale_shows_no_return(self):
+        self.assertEqual(sale_view.list_sales(self.con, "")[0][6], 0)
+        self.assertEqual(sale_view.get_sale(self.con, self.sale.id).returned, 0)
 
 
 class TakeUnitsTest(unittest.TestCase):
