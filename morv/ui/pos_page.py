@@ -2,7 +2,7 @@
 import uuid
 from datetime import date, datetime
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QCompleter, QFrame, QGridLayout, QHBoxLayout,
                                QHeaderView, QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox, QTableView,
@@ -21,9 +21,10 @@ ITEM_CHOICES = 50
 PRICE_COLUMN = {"retail": 5, "wholesale": 6, "super": 7}      # where the tier price sits in an items.search row
 TIER_LABELS = {"retail": "قطاعي (تجزئة)", "wholesale": "جملة", "super": "جملة الجملة"}
 TIER_SHORT = {"retail": "قطاعي", "wholesale": "جملة", "super": "جملة الجملة"}
-PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة"}
+PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
+                  "installment": "تقسيط"}
 PAYMENT_HINTS = {"cash": "استلام نقدية وحساب الباقي", "card": "يلزم رقم الإيصال", "transfer": "يلزم رقم المرجع",
-                 "wallet": "يلزم رقم المرجع"}
+                 "wallet": "يلزم رقم المرجع", "installment": "يُفتح العقد بعد الاعتماد"}
 KIND_TABS = (("الكل", None), ("إطارات", "tire"), ("بطاريات", "battery"), ("خدمات", "service"))
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
 ICON_MUTED = "#8792A3"
@@ -31,6 +32,8 @@ ICON_PRIMARY = "#1F5FD6"
 
 
 class PosPage(QWidget):
+    contract_needed = Signal(int)
+
     def __init__(self, session, parent=None):
         super().__init__(parent)
         self.session = session
@@ -338,14 +341,14 @@ class PosPage(QWidget):
         method_row.addWidget(self.pay1_method, 1)
         method_row.addWidget(self._kbd("F8"))
         body.addLayout(method_row)
-        # The design offers these two beside the cash methods; the engine posts credit but the screen
-        # does not expose it yet, and instalments are phase 5.
+        # The design offers credit beside the cash methods; the engine posts it but the screen
+        # does not expose it yet. Instalments are a method of their own above.
         deferred_row = QHBoxLayout()
         deferred_row.addWidget(self._deferred_button("آجل", "customers"), 1)
-        deferred_row.addWidget(self._deferred_button("تقسيط", "installments"), 1)
         body.addLayout(deferred_row)
 
         pbox = QFrame()
+        self.pay_box = pbox
         pbox.setObjectName("payBox")
         pb = QVBoxLayout(pbox)
         pb.setContentsMargins(12, 12, 12, 12)
@@ -382,6 +385,9 @@ class PosPage(QWidget):
         c.addWidget(self.change_label)
         pb.addWidget(change)
         body.addWidget(pbox)
+        self.instalment_hint = muted("يُرحَّل كامل المبلغ على حساب التقسيط، ثم يُعتمد العقد ويُحصَّل المقدم.")
+        self.instalment_hint.setVisible(False)
+        body.addWidget(self.instalment_hint)
 
         self.split_btn = QPushButton("تقسيم الدفع على وسيلتين")
         self.split_btn.setObjectName("link")
@@ -542,7 +548,14 @@ class PosPage(QWidget):
         return date.today().isoformat()
 
     def _on_method_changed(self, *_args) -> None:
-        self.pay1_ref.setVisible(self.pay1_method.currentData() != "cash")
+        on_instalments = self.pay1_method.currentData() == "installment"
+        self.pay1_ref.setVisible(not on_instalments and self.pay1_method.currentData() != "cash")
+        # A contract covers the whole invoice, so there is nothing received and nothing to split
+        self.pay_box.setVisible(not on_instalments)
+        self.split_btn.setVisible(not on_instalments)
+        if on_instalments:
+            self.split_btn.setChecked(False)
+        self.instalment_hint.setVisible(on_instalments)
         self._refresh_change()
 
     # ---------- Customer and items ----------
@@ -696,6 +709,8 @@ class PosPage(QWidget):
 
     # ---------- Payment and posting ----------
     def _payments(self, total: int) -> list:
+        if self.pay1_method.currentData() == "installment":
+            return [sales_rules.Payment(method="installment", amount=total)]
         first = sales_rules.Payment(
             method=self.pay1_method.currentData(),
             amount=parse_money(self.pay1_amount.text()) if self.pay1_amount.text().strip() else total,
@@ -738,8 +753,12 @@ class PosPage(QWidget):
         except Exception as e:      # Any unexpected failure: the engine is atomic, so nothing half-written remains
             self._fail(f"تعذّر الترحيل ولم يُحفظ شيء ({type(e).__name__}). أعد المحاولة أو راجع السجل.")
         else:
+            on_instalments = self.pay1_method.currentData() == "installment"
+            sale_id = self.posted.id
             self._reset_after_post()
             self.notice.show_message(f"تم ترحيل الفاتورة رقم {self.posted.number}", "success")
+            if on_instalments:
+                self.contract_needed.emit(sale_id)
         finally:
             self._busy = False
             self.post_btn.setEnabled(True)

@@ -67,3 +67,10 @@ def invoices_without_contract(con: sqlite3.Connection) -> list[tuple]:
         "WHERE EXISTS (SELECT 1 FROM sale_payments p WHERE p.sale_id = s.id AND p.method = 'installment') "
         "AND NOT EXISTS (SELECT 1 FROM installment_contracts c WHERE c.sale_id = s.id) "
         "ORDER BY s.id DESC").fetchall()
+
+
+def invoice_for_contract(con: sqlite3.Connection, sale_id: int) -> tuple:
+    rows = [r for r in invoices_without_contract(con) if r[0] == sale_id]
+    if not rows:
+        raise LookupError("الفاتورة ليست بانتظار عقد تقسيط")
+    return rows[0]

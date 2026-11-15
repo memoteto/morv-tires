@@ -84,6 +84,7 @@ class MainWindow(QMainWindow):
             page = builders[key](session) if key in builders else placeholder(phase)
             self.pages[key] = page
             self.stack.addWidget(page)
+        self.pages["pos"].contract_needed.connect(self.open_contract)
         col.addWidget(self.stack, 1)
         row.addWidget(main, 1)
         self.setCentralWidget(root)
@@ -176,6 +177,10 @@ class MainWindow(QMainWindow):
         self.health_pill.setToolTip(text)
         self.health_pill.style().unpolish(self.health_pill)
         self.health_pill.style().polish(self.health_pill)
+
+    def open_contract(self, sale_id: int) -> None:
+        self.go_key("installments")
+        self.pages["installments"].open_form_for_sale(sale_id)
 
     def open_backup(self) -> None:
         self.go_key("settings")

@@ -35,6 +35,15 @@ class InstallmentsPage(QStackedWidget):
         self.addWidget(self.form_page)
         self.setCurrentWidget(self.form_page)
 
+    def open_form_for_sale(self, sale_id: int) -> None:
+        try:
+            sale = installment_view.invoice_for_contract(self.session.con, sale_id)
+        except LookupError as e:
+            self.setCurrentWidget(self.list_page)
+            self.list_page.notice.show_message(str(e), "warn")
+            return
+        self.open_form(sale)
+
     def back_to_list(self, keep_id: int | None = None) -> None:
         self.setCurrentWidget(self.list_page)
         self.list_page.reload(keep_id=keep_id)
