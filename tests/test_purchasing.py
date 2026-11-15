@@ -15,7 +15,7 @@ from morv.infra.db.connection import open_db, transaction
 from morv.infra.inventory import StockError
 from morv.infra.purchasing import PurchaseError, PurchaseLine
 
-EXPECTED_0006_CHECKSUM = "748a93ad78aacc6e3c5fc76a583091f2649be6fe6f945d234b46b81e958573d5"
+EXPECTED_0006_CHECKSUM = "a6d3207860e8c700d10f3802102ebb65679168656423d9d21d7da0dfc2c49107"   # بصمة النسخة الأولى (1511acb) المطبّقة على القواعد القائمة
 TABLES = ("journal_entries", "journal_lines", "purchase_invoices", "purchase_lines", "stock_lots",
           "cost_layers", "stock_movements", "stock_issues", "cost_allocations")
 
@@ -613,10 +613,10 @@ class ReconcileOneSidedTest(Base):
 
 
 class UpgradeTest(unittest.TestCase):
-    """الترقية 0007 فوق قاعدة بقيود مرحّلة سابقة: تبقى مرحّلة وأرصدتها كما هي، وملف 0006 لم يتغير."""
+    """الترقية 0007 فوق قاعدة بنسخة 0006 الأولى المطبّقة فعلًا: البيانات تبقى وتُعبَّأ الأعمدة الجديدة، وملف 0006 لم يتغير."""
 
-    def test_upgrade_from_0006_keeps_posted_entries(self):
-        """قاعدة على 0006 فيها قيد، ثم تُطبَّق 0007 و0008: القيد القديم posted والرصيد ثابت وتُرفض إضافة سطر عليه."""
+    def test_upgrade_from_original_0006_keeps_data(self):
+        """قاعدة على 0006 الأصلية فيها قيد وصرف قديمان، ثم 0007 و0008: لا فقد، تعبئة الأعمدة، حماية جديدة، وفاتورة جديدة تعمل."""
         from morv.infra.db import migrator
         d = Path(tempfile.mkdtemp())
         try:
@@ -624,22 +624,50 @@ class UpgradeTest(unittest.TestCase):
             allm = migrator.load_migrations()
             migrator.migrate(con, allm[:6])
             self.assertEqual(migrator.current_version(con), 6)
+            con.execute("INSERT INTO suppliers (name, name_norm, mobile) VALUES ('مورد وهمي','مورد وهمي','01000000001')")
+            item = con.execute("INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
+                               "VALUES ('tire','TR-1','TR-1','TR-1',100,100,100)").lastrowid
             with transaction(con):
-                e = con.execute("INSERT INTO journal_entries (entry_date, source_type, source_id, line_count, total) "
-                                "VALUES ('2026-11-01','t',1,2,100)").lastrowid
-                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,1,'1410',100,0)", (e,))
-                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,2,'2110',0,100)", (e,))
+                e1 = con.execute("INSERT INTO journal_entries (entry_date, source_type, source_id) "
+                                 "VALUES ('2026-11-01','legacy',1)").lastrowid
+                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,1,'1110',100,0)", (e1,))
+                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,2,'3100',0,100)", (e1,))
+                e2 = con.execute("INSERT INTO journal_entries (entry_date, source_type, source_id) "
+                                 "VALUES ('2026-11-02','legacy',2)").lastrowid
+                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,1,'1110',50,0)", (e2,))
+                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,2,'3100',0,30)", (e2,))
+                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,3,'4110',0,20)", (e2,))
+                con.execute("INSERT INTO stock_issues (item_id, qty, cost_total, source_type, source_id, journal_entry_id) "
+                            "VALUES (?,1,100,'legacy',1,?)", (item, e1))
+            before = con.execute("SELECT id, entry_date, source_type, source_id FROM journal_entries ORDER BY id").fetchall()
             self.assertEqual(migrator.migrate(con, allm), [7, 8])
-            self.assertEqual(con.execute("SELECT status FROM journal_entries").fetchone()[0], "posted")
-            self.assertEqual(ledger.account_balance(con, "1410"), 100)
+            self.assertEqual(con.execute("SELECT id, entry_date, source_type, source_id FROM journal_entries ORDER BY id").fetchall(), before)
+            self.assertEqual(con.execute("SELECT status, line_count, total FROM journal_entries ORDER BY id").fetchall(),
+                             [("posted", 2, 100), ("posted", 3, 50)])
+            self.assertEqual(con.execute("SELECT id, source_line_id FROM stock_issues").fetchall(), [(1, 1)])
+            self.assertEqual(ledger.account_balance(con, "1110"), 150)
+            self.assertEqual(con.execute("SELECT count(*) FROM journal_lines").fetchone()[0], 5)
+            self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
             with self.assertRaises(sqlite3.IntegrityError), transaction(con):
-                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,3,'1410',1,0)", (e,))
+                con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,4,'1110',1,0)", (e1,))
+            with self.assertRaises(sqlite3.IntegrityError), transaction(con):
+                con.execute("UPDATE journal_entries SET memo = 'x' WHERE id = ?", (e1,))
+            with self.assertRaises(sqlite3.IntegrityError), transaction(con):
+                con.execute("INSERT INTO stock_issues (item_id, qty, cost_total, source_type, source_id, source_line_id, journal_entry_id) "
+                            "VALUES (?,1,1,'legacy',1,1,?)", (item, e2))
+            admin = users.create_user(con, None, "admin", "المدير", "Admin12345", "manager")
+            sup = con.execute("SELECT id FROM suppliers").fetchone()[0]
+            purchasing.post_invoice(con, admin, request_key="key-up-1", supplier_id=sup, supplier_invoice_no="S-1",
+                                    invoice_date="2026-11-03", lines=[PurchaseLine(item, 2, 100000, "2324")])
+            self.assertEqual(ledger.account_balance(con, "1410"), 200000)
+            self.assertEqual(ledger.unbalanced_entries(con), [])
+            self.assertEqual(ledger.incomplete_entries(con), [])
             con.close()
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
     def test_0006_file_unchanged_since_pr_head(self):
-        """بصمة 0006 ثابتة (7151daa)؛ أي تغيير لاحق يكون بترقية جديدة."""
+        """بصمة 0006 ثابتة كما طُبّقت على القواعد القائمة (1511acb)؛ أي تغيير لاحق يكون بترقية جديدة."""
         from morv.infra.db import migrator
         m6 = migrator.load_migrations()[5]
         self.assertEqual(m6.name, "purchasing")

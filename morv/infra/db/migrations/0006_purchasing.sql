@@ -9,8 +9,6 @@ CREATE TABLE journal_entries (
   source_type TEXT NOT NULL CHECK (length(source_type) > 0),
   source_id   INTEGER NOT NULL,
   memo        TEXT,
-  line_count  INTEGER NOT NULL CHECK (line_count >= 2),   -- يُعلَن مع الرأس؛ السطور تُقفل عند اكتمال عددها
-  total       INTEGER NOT NULL CHECK (total > 0),          -- إجمالي المدين = إجمالي الدائن
   user_id     INTEGER REFERENCES users(id),
   posted_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime'))
 );
@@ -27,21 +25,6 @@ CREATE TABLE journal_lines (
   UNIQUE (entry_id, line_no)
 );
 CREATE INDEX journal_lines_account ON journal_lines(account_code);
-
--- القيد يُبنى ذريًا: رأس بعدد سطور وإجمالي معلنين، ثم سطوره. بعد اكتمال العدد لا يُقبل سطر إضافي،
--- ومع آخر سطر يجب أن يتساوى المدين والدائن مع الإجمالي المعلن وإلا يُلغى الإدراج.
-CREATE TRIGGER journal_lines_sealed BEFORE INSERT ON journal_lines
-WHEN (SELECT count(*) FROM journal_lines WHERE entry_id = NEW.entry_id)
-     >= (SELECT line_count FROM journal_entries WHERE id = NEW.entry_id)
-BEGIN SELECT RAISE(ABORT, 'القيد مكتمل: لا تُضاف سطور بعد ترحيله'); END;
-CREATE TRIGGER journal_lines_balanced AFTER INSERT ON journal_lines
-WHEN (SELECT count(*) FROM journal_lines WHERE entry_id = NEW.entry_id)
-     = (SELECT line_count FROM journal_entries WHERE id = NEW.entry_id)
- AND ((SELECT sum(debit) FROM journal_lines WHERE entry_id = NEW.entry_id)
-        <> (SELECT total FROM journal_entries WHERE id = NEW.entry_id)
-   OR (SELECT sum(credit) FROM journal_lines WHERE entry_id = NEW.entry_id)
-        <> (SELECT total FROM journal_entries WHERE id = NEW.entry_id))
-BEGIN SELECT RAISE(ABORT, 'القيد غير متوازن'); END;
 
 CREATE TRIGGER journal_lines_postable BEFORE INSERT ON journal_lines
 WHEN (SELECT postable * active FROM accounts WHERE code = NEW.account_code) IS NOT 1
@@ -115,12 +98,10 @@ CREATE TABLE stock_issues (
   qty         INTEGER NOT NULL CHECK (qty > 0),
   cost_total  INTEGER NOT NULL CHECK (cost_total > 0),
   source_type TEXT NOT NULL CHECK (length(source_type) > 0),
-  source_id   INTEGER NOT NULL,                              -- المستند (فاتورة البيع مثلًا)
-  source_line_id INTEGER NOT NULL,                           -- سطر الصنف داخل المستند
+  source_id   INTEGER NOT NULL,
   journal_entry_id INTEGER NOT NULL UNIQUE REFERENCES journal_entries(id),
   user_id     INTEGER REFERENCES users(id),
-  at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
-  UNIQUE (source_type, source_id, source_line_id)            -- سطر المصدر يُصرف مرة واحدة فقط
+  at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime'))
 );
 
 -- الحركة الفعلية على دفعة: استلام (+) أو صرف (-).
