@@ -83,7 +83,8 @@ class InstallmentsUiTest(unittest.TestCase):
         f.national_id.setText(NID)
         f.post()
         self.assertIsNotNone(f.posted)
-        self.assertIs(p.currentWidget(), p.list_page)
+        self.assertIs(p.currentWidget(), p.tabs)
+        self.assertIs(p.tabs.currentWidget(), p.list_page)
         self.assertEqual(self.con.execute("SELECT count(*) FROM installment_contracts").fetchone()[0], 1)
         self.assertNotIn("فاتورة بلا عقد", p.list_page.total())
 
