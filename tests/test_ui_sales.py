@@ -8,8 +8,7 @@ from pathlib import Path
 from tests.qt_app import get_app, require_qt
 
 
-@require_qt()
-class SalesUiTest(unittest.TestCase):
+class _Fixture:
     def setUp(self):
         from morv.infra import users
         from morv.infra.db.bootstrap import open_main_db
@@ -39,6 +38,9 @@ class SalesUiTest(unittest.TestCase):
         self.addCleanup(_destroy)
         return widget
 
+
+@require_qt()
+class SalesUiTest(_Fixture, unittest.TestCase):
     def test_page_builds_and_counts_zero_sales(self):
         from morv.ui.sales_page import SalesPage
         page = self.destroy_on_cleanup(SalesPage(self.session))
@@ -66,7 +68,7 @@ class SalesUiTest(unittest.TestCase):
 
 
 @require_qt()
-class SaleReturnUiTest(SalesUiTest):
+class SaleReturnUiTest(_Fixture, unittest.TestCase):
     def setUp(self):
         super().setUp()
         from morv.core.sales_rules import Payment
