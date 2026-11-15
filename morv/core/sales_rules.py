@@ -2,7 +2,8 @@
 from dataclasses import dataclass
 
 REVENUE_ACCOUNT = {"tire": "4110", "battery": "4120", "service": "4130"}
-PAYMENT_ACCOUNT = {"cash": "1110", "card": "1220", "transfer": "1210", "wallet": "1230", "credit": "1310"}
+PAYMENT_ACCOUNT = {"cash": "1110", "card": "1220", "transfer": "1210", "wallet": "1230", "credit": "1310",
+                   "installment": "1320"}
 MAX_PAYMENT_METHODS = 2
 
 

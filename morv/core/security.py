@@ -17,6 +17,7 @@ PERMISSIONS = {
     "purchases.post": "ترحيل فواتير الشراء واستلام البضاعة",
     "sales.post": "ترحيل فواتير البيع",
     "sales.return": "ترحيل مرتجعات البيع",
+    "installments.manage": "اعتماد عقود التقسيط",
     "stock.pick_lot": "اختيار دفعة DOT غير الأقدم عند الصرف",
     "users.manage": "المستخدمون والصلاحيات",
     "settings.edit": "الإعدادات العامة",
