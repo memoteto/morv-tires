@@ -1,4 +1,4 @@
-"""اختبارات قراءة المخزون للعرض (بلا واجهة): الدفعات والملخص والإجماليات والمطابقة مع المحرك."""
+"""Stock read-model tests: lots, summary, totals and engine agreement."""
 import os
 import shutil
 import tempfile
@@ -11,10 +11,7 @@ from morv.infra.purchasing import PurchaseLine
 
 
 class StockViewTest(unittest.TestCase):
-    """استعلامات العرض تطابق المحرك."""
-
     def setUp(self):
-        """فاتورة بدفعتين DOT وبطارية، ثم صرف."""
         self.dir = Path(tempfile.mkdtemp())
         os.environ["MORV_DATA_DIR"] = str(self.dir)
         self.con = open_main_db(self.dir / "m.db")
@@ -33,13 +30,11 @@ class StockViewTest(unittest.TestCase):
         inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=1, source_line_id=1)
 
     def tearDown(self):
-        """تنظيف."""
         self.con.close()
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def test_lots_order_and_filters(self):
-        """الأقدم تصنيعًا أولًا، والمستنفدة تُستثنى افتراضيًا، والبحث بـ DOT والمرجع."""
         rows = stock_view.lots(self.con)
         self.assertEqual([(r[3], r[4], r[7]) for r in rows], [("BT-1", None, 3), ("TR-1", "2024", 1), ("TR-1", "2124", 4)])
         inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=2, source_line_id=1)
@@ -49,12 +44,10 @@ class StockViewTest(unittest.TestCase):
         self.assertEqual(len(stock_view.lots(self.con, "PI-000001/3", in_stock_only=False)), 1)
 
     def test_movements(self):
-        """حركات الدفعة: استلام ثم صرف."""
         lot = self.con.execute("SELECT id FROM stock_lots WHERE dot='2024'").fetchone()[0]
         self.assertEqual([(m[0], m[1]) for m in stock_view.lot_movements(self.con, lot)], [("receipt", 2), ("issue", -1)])
 
     def test_summary_matches_engine(self):
-        """الملخص يطابق on_hand وbook_value، والخدمات خارجه، وفلتر حد الطلب."""
         rows = {r[2]: r for r in stock_view.summary(self.con)}
         self.assertEqual(set(rows), {"TR-1", "BT-1"})
         for code, item in (("TR-1", self.tire), ("BT-1", self.battery)):
@@ -65,6 +58,5 @@ class StockViewTest(unittest.TestCase):
         self.assertEqual(inventory.reconcile(self.con), [])
 
     def test_supplier_totals(self):
-        """عدد فواتير المورد وإجماليها."""
         self.assertEqual(purchase_view.supplier_totals(self.con, self.sup), (1, 4 * 100000 + 2 * 90000 + 3 * 50000))
         self.assertEqual(purchase_view.supplier_totals(self.con, 999), (0, 0))

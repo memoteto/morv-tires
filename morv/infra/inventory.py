@@ -1,8 +1,4 @@
-"""رصيد الدفعات الفعلية وطبقات FIFO: الصرف، والقيمة الدفترية، ومطابقة الدفاتر.
-
-الدفعات (ما على الرف وDOT) منفصلة عن الطبقات (التكلفة المحاسبية): تكلفة الصرف من أقدم طبقة
-مهما كانت الدفعة المختارة. صرف الدفعة غير الأقدم تصنيعًا يحتاج صلاحية وسببًا مسجلًا.
-"""
+"""Physical lots and FIFO layers: issuing, book value, ledger reconciliation."""
 import sqlite3
 from dataclasses import dataclass
 from datetime import date
@@ -17,12 +13,11 @@ INVENTORY_ACCOUNT = "1410"
 
 
 class StockError(ValueError):
-    """صرف مرفوض: رصيد غير كافٍ أو دفعة غير صالحة أو سبب ناقص."""
+    """Issue refused: short balance, invalid lot, or a missing reason."""
 
 
 @dataclass(frozen=True)
 class IssueResult:
-    """نتيجة الصرف: رقمه، وتكلفته FIFO، وما صُرف من الدفعات والطبقات."""
     issue_id: int
     cost_total: int
     lot_picks: tuple
@@ -30,13 +25,11 @@ class IssueResult:
 
 
 def _lots(con, item_id: int) -> list:
-    """دفعات الصنف التي فيها رصيد، من الأقدم تصنيعًا (بلا DOT آخرًا) ثم الأقدم استلامًا."""
     return con.execute("SELECT id, qty_on_hand FROM stock_lots WHERE item_id=? AND qty_on_hand > 0 "
                        "ORDER BY mfg_key IS NULL, mfg_key, received_date, id", (item_id,)).fetchall()
 
 
 def suggest_lots(con, item_id: int, qty: int) -> dict:
-    """الصرف المقترح {دفعة: كمية} من الأقدم تصنيعًا."""
     try:
         return costing.plan_lots(_lots(con, item_id), qty)
     except costing.InsufficientStock as e:
@@ -45,7 +38,6 @@ def suggest_lots(con, item_id: int, qty: int) -> dict:
 
 def issue(con: sqlite3.Connection, by, item_id: int, qty: int, *, source_type: str, source_id: int,
           source_line_id: int, picks: dict | None = None, reason: str | None = None, issue_date: str | None = None) -> IssueResult:
-    """صرف في معاملة مستقلة (انظر issue_in_tx للاستدعاء من معاملة مستند أكبر)."""
     with transaction(con):
         return issue_in_tx(con, by, item_id, qty, source_type=source_type, source_id=source_id,
                            source_line_id=source_line_id, picks=picks, reason=reason, issue_date=issue_date)
@@ -53,11 +45,6 @@ def issue(con: sqlite3.Connection, by, item_id: int, qty: int, *, source_type: s
 
 def issue_in_tx(con: sqlite3.Connection, by, item_id: int, qty: int, *, source_type: str, source_id: int,
                 source_line_id: int, picks: dict | None = None, reason: str | None = None, issue_date: str | None = None) -> IssueResult:
-    """صرف qty من صنف داخل معاملة المتصل: حركات الدفعات + تخصيص FIFO + قيد التكلفة معًا.
-
-    picks={دفعة: كمية} اختياري؛ غيابه يعني اتباع المقترح. أي اختيار يخالف المقترح يلزمه
-    صلاحية stock.pick_lot وسبب.
-    """
     if not con.in_transaction:
         raise StockError("الصرف يجب أن يكون داخل معاملة")
     if by is None:
@@ -113,7 +100,6 @@ def issue_in_tx(con: sqlite3.Connection, by, item_id: int, qty: int, *, source_t
 
 
 def _check_picks(con, item_id: int, qty: int, picks: dict) -> dict:
-    """التحقق من اختيار الدفعات: تتبع الصنف، وكل كمية موجبة ضمن رصيدها، ومجموعها = qty."""
     out = {}
     for lot_id, q in picks.items():
         if type(q) is not int or q <= 0:
@@ -130,12 +116,10 @@ def _check_picks(con, item_id: int, qty: int, picks: dict) -> dict:
 
 
 def on_hand(con, item_id: int) -> int:
-    """الرصيد الفعلي للصنف من دفعاته."""
     return con.execute("SELECT coalesce(sum(qty_on_hand), 0) FROM stock_lots WHERE item_id=?", (item_id,)).fetchone()[0]
 
 
 def book_value(con, item_id: int | None = None) -> int:
-    """القيمة الدفترية بالقرش من طبقات التكلفة (لصنف أو للمخزون كله)."""
     if item_id is None:
         return con.execute("SELECT coalesce(sum(cost_remaining), 0) FROM cost_layers").fetchone()[0]
     return con.execute("SELECT coalesce(sum(cost_remaining), 0) FROM cost_layers WHERE item_id=?",
@@ -143,16 +127,14 @@ def book_value(con, item_id: int | None = None) -> int:
 
 
 def list_lots(con, item_id: int) -> list:
-    """دفعات الصنف: المرجع وDOT والمتبقي وتكلفة الشراء التاريخية (وليست قيمة دفترية)."""
     return con.execute("SELECT id, ref_no, dot, received_date, qty_received, qty_on_hand, purchase_unit_cost "
                        "FROM stock_lots WHERE item_id=? ORDER BY mfg_key IS NULL, mfg_key, id", (item_id,)).fetchall()
 
 
 def reconcile(con: sqlite3.Connection) -> list:
-    """مطابقة كاملة بين الدفعات والحركات والطبقات والتخصيصات والقيود؛ قائمة فارغة = متطابق."""
     bad = []
     q = con.execute
-    # مجموعة الأصناف من الجانبين، فلا يفلت صنف موجود في جانب واحد فقط
+    # Items from both sides, so one present on a single side cannot slip through
     for r in q("SELECT x.item_id, coalesce(l.q, 0), coalesce(c.q, 0) FROM "
                "(SELECT item_id FROM stock_lots UNION SELECT item_id FROM cost_layers) x "
                "LEFT JOIN (SELECT item_id, sum(qty_on_hand) q FROM stock_lots GROUP BY item_id) l USING (item_id) "

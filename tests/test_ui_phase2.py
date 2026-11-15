@@ -1,4 +1,4 @@
-"""اختبارات شاشات المرحلة 2 بلا شاشة: العملاء والموردون والمخزون، والمعاينة بالضغط فقط، والصلاحيات."""
+"""Offscreen phase 2 screens: customers, suppliers, stock and permissions."""
 import os
 import shutil
 import tempfile
@@ -10,10 +10,7 @@ from tests.qt_app import get_app, require_qt
 
 @require_qt()
 class _Base(unittest.TestCase):
-    """قاعدة مؤقتة ومدير وكاشير."""
-
     def setUp(self):
-        """تجهيز."""
         from morv.infra import users
         from morv.infra.db.bootstrap import open_main_db
         from morv.ui.session import Session
@@ -27,15 +24,12 @@ class _Base(unittest.TestCase):
         self.app = get_app()
 
     def tearDown(self):
-        """تنظيف."""
         self.con.close()
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def destroy_on_cleanup(self, widget):
-        """تسجيل تدمير نافذة صراحةً قبل خروج العملية (بقاء نوافذ الصنف حيّة كان ينهار عند الإغلاق)."""
         def _destroy():
-            """حذف النافذة وتفريغ الأحداث المؤجلة."""
             from PySide6.QtCore import QEvent
             widget.deleteLater()
             self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
@@ -45,10 +39,7 @@ class _Base(unittest.TestCase):
 
 
 class CustomersPageTest(_Base):
-    """شاشة العملاء."""
-
     def test_preview_opens_on_click_only(self):
-        """المعاينة مخفية افتراضيًا، تفتح بالضغط على صف، وتُغلق بالزر."""
         from morv.infra import customers
         from morv.infra.customers import Customer
         from morv.ui.customers_page import CustomersPage
@@ -62,7 +53,6 @@ class CustomersPageTest(_Base):
         self.assertFalse(page.preview.isVisibleTo(page))
 
     def test_search_filters_rows(self):
-        """البحث يصفّي القائمة بالاسم الموحّد وبالموبايل."""
         from morv.infra import customers
         from morv.infra.customers import Customer
         from morv.ui.customers_page import CustomersPage
@@ -77,7 +67,6 @@ class CustomersPageTest(_Base):
         self.assertEqual([r[1] for r in page.model.rows], ["محمد"])
 
     def test_dialog_rejects_duplicate_and_saves(self):
-        """نافذة العميل تعرض خطأ التكرار ثم تحفظ عند التصحيح، مع مركبة."""
         from morv.infra import customers
         from morv.infra.customers import Customer, Vehicle
         from morv.ui.customers_page import CustomerDialog
@@ -95,7 +84,6 @@ class CustomersPageTest(_Base):
         self.assertEqual(len(customers.search(self.con, "7310")), 1)
 
     def test_cashier_can_add_but_not_change_level(self):
-        """الكاشير يضيف عملاء (افتراضي دوره) لكن فئة السعر معطّلة له."""
         from morv.ui.customers_page import CustomerDialog, CustomersPage
         page = CustomersPage(self.cashier_session)
         self.assertTrue(page.add_btn.isEnabled())
@@ -104,17 +92,13 @@ class CustomersPageTest(_Base):
 
 
 class SuppliersPageTest(_Base):
-    """شاشة الموردين."""
-
     def test_cashier_read_only(self):
-        """الكاشير بلا صلاحية الموردين لا يرى زر الإضافة مفعّلًا."""
         from morv.ui.suppliers_page import SuppliersPage
         cashier_page, admin_page = SuppliersPage(self.cashier_session), SuppliersPage(self.session)
         self.assertFalse(cashier_page.add_btn.isEnabled())
         self.assertTrue(admin_page.add_btn.isEnabled())
 
     def test_dialog_saves(self):
-        """حفظ مورد من النافذة."""
         from morv.ui.suppliers_page import SupplierDialog
         dlg = SupplierDialog(self.session, None)
         dlg.name.setText("شركة الإطارات")
@@ -124,18 +108,15 @@ class SuppliersPageTest(_Base):
 
 
 class InventoryPageTest(_Base):
-    """شاشة المخزون."""
-
     def test_tabs_and_item_dialog_from_fields(self):
-        """التبويبات حسب الصلاحية، ونافذة الصنف تُبنى من الحقول وتفرض الإلزامي."""
         from morv.infra import items
         from morv.ui.inventory_page import InventoryPage, ItemDialog
-        admin_page = InventoryPage(self.session)            # تبقى في متغير وإلا حذفها Qt مع تبويباتها
+        admin_page = InventoryPage(self.session)            # kept in a variable, or Qt takes it and its tabs away
         cashier_page = InventoryPage(self.cashier_session)
-        self.assertEqual(admin_page.tabs.count(), 3)        # حقول البطاقة انتقلت إلى الإعدادات
+        self.assertEqual(admin_page.tabs.count(), 3)        # card fields moved into settings
         self.assertEqual(cashier_page.tabs.count(), 3)
         dlg = self.destroy_on_cleanup(ItemDialog(self.session, None))
-        self.assertIn("size", dlg.widgets)          # حقل الإطار
+        self.assertIn("size", dlg.widgets)          # the tyre field
         dlg.set_kind("battery")
         self.assertIn("ah", dlg.widgets)
         self.assertNotIn("size", dlg.widgets)
@@ -145,14 +126,14 @@ class InventoryPageTest(_Base):
         dlg.widgets["size"].setText("205/55r16")
         dlg.widgets["li"].setText("91")
         dlg.widgets["si"].setCurrentText("V")
-        # الاسم والكود يُقترحان تلقائيًا كنص باهت، ويُقبلان عند الحفظ إن تُركا فارغين
+        # name and code are suggested as placeholder text and accepted when left empty
         self.assertEqual(dlg.widgets["name"].placeholderText(), "إطار Michelin Primacy 4 205/55R16 91V")
         self.assertEqual(dlg.widgets["code"].placeholderText(), "TR-2055516-MI")
         keys = list(dlg.widgets)
-        self.assertLess(keys.index("size"), keys.index("name"))   # حقول النوع قبل المشتركة
+        self.assertLess(keys.index("size"), keys.index("name"))   # kind fields come before the shared ones
         dlg.widgets["price_retail"].setText("6450")
         dlg.save()
-        self.assertIn("الفئة", dlg.notice.text())     # إلزامي ناقص
+        self.assertIn("الفئة", dlg.notice.text())     # a required field is missing
         dlg.widgets["cat"].setCurrentText("ملاكي")
         dlg.widgets["cons"].setCurrentText("Radial")
         dlg.save()
@@ -160,7 +141,7 @@ class InventoryPageTest(_Base):
         self.assertEqual(dlg.saved.price_retail, 645000)
         self.assertEqual(dlg.saved.code, "TR-2055516-MI")
         self.assertEqual(items.count(self.con), 1)
-        # بطارية بنفس النافذة
+        # a battery in the same dialog
         dlg2 = self.destroy_on_cleanup(ItemDialog(self.session, None))
         dlg2.set_kind("battery")
         dlg2.widgets["brand"].setText("Varta")
@@ -174,7 +155,7 @@ class InventoryPageTest(_Base):
         dlg2.widgets["price_retail"].setText("4200")
         dlg2.save()
         self.assertEqual(dlg2.saved.name, "بطارية Varta 70 أمبير")
-        # خدمة
+        # a service
         dlg3 = self.destroy_on_cleanup(ItemDialog(self.session, None))
         dlg3.set_kind("service")
         dlg3.widgets["name"].setText("تركيب إطار")
@@ -183,7 +164,6 @@ class InventoryPageTest(_Base):
         self.assertEqual(dlg3.saved.code, "SV-001")
 
     def test_scan_enter_opens_preview(self):
-        """Enter في البحث بباركود يفتح معاينة الصنف مباشرة."""
         from morv.infra import items
         from morv.infra.items import Item
         from morv.ui.inventory_page import ItemsPage
@@ -194,12 +174,11 @@ class InventoryPageTest(_Base):
         self.assertTrue(page.preview.isVisibleTo(page))
 
     def test_fields_tab_toggle(self):
-        """تبديل إظهار حقل من الجدول يُحفظ، والمقفل يرفض."""
         from morv.infra import items
         from morv.ui.inventory_page import ItemFieldsTab
         from PySide6.QtCore import Qt
         tab = ItemFieldsTab(self.session)
-        tab.kind.setCurrentIndex(1)   # الإطار
+        tab.kind.setCurrentIndex(1)   # the tyre
         row = next(i for i in range(tab.table.rowCount()) if tab.table.item(i, 0).data(Qt.ItemDataRole.UserRole) == "season")
         tab.table.item(row, 2).setCheckState(Qt.CheckState.Unchecked)
         self.assertFalse(next(f for f in items.fields(self.con, "tire") if f.key == "season").show)
@@ -208,11 +187,7 @@ class InventoryPageTest(_Base):
 
 
 class ModalTest(_Base):
-    """النافذة المنبثقة الموحّدة."""
-
     def test_fits_screen_and_footer_visible(self):
-        """خطأ من تجربة المالك: نافذة الصنف كانت أطول من الشاشة فاختفى زر الحفظ. الآن تتقيد بالشاشة
-        ويبقى التذييل ظاهرًا والجسم يتمرر."""
         from PySide6.QtCore import Qt
         from PySide6.QtGui import QGuiApplication
         from morv.ui.inventory_page import ItemDialog
@@ -223,17 +198,14 @@ class ModalTest(_Base):
             self.app.processEvents()
             self.assertLessEqual(dlg.height(), avail - 60)
             self.assertTrue(dlg.footer.isVisibleTo(dlg))
-            self.assertTrue(dlg.windowFlags() & Qt.WindowType.FramelessWindowHint)   # بلا شريط عنوان من النظام
+            self.assertTrue(dlg.windowFlags() & Qt.WindowType.FramelessWindowHint)   # without an OS title bar
             dlg.close()
             dlg.deleteLater()
         self.app.processEvents()
 
 
 class ShellPagesTest(_Base):
-    """الصفحات الحقيقية مربوطة في الشريط."""
-
     def test_real_pages_mounted(self):
-        """العملاء والموردون والمخزون صفحات حقيقية لا لافتات."""
         from morv.ui.customers_page import CustomersPage
         from morv.ui.inventory_page import InventoryPage
         from morv.ui.shell import MainWindow

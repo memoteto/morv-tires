@@ -1,4 +1,4 @@
-"""اختبارات هيكل النافذة: الاتجاه، والتنقل، وحفظ الثيم وطي الشريط."""
+"""Shell tests: direction, navigation, theme persistence, sidebar collapse."""
 import shutil
 import tempfile
 import unittest
@@ -9,10 +9,7 @@ from tests.qt_app import get_app, require_qt
 
 @require_qt()
 class ShellTest(unittest.TestCase):
-    """النافذة الرئيسية على قاعدة وهمية مؤقتة."""
-
     def setUp(self):
-        """قاعدة جديدة في مجلد مؤقت لكل اختبار، ومدير داخل."""
         import os
         from morv.infra import users
         from morv.infra.db.bootstrap import open_main_db
@@ -25,33 +22,29 @@ class ShellTest(unittest.TestCase):
         self.app = get_app()
 
     def tearDown(self):
-        """إغلاق القاعدة وحذف المجلد المؤقت."""
         import os
         self.con.close()
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def window(self):
-        """نافذة جديدة على الجلسة الحالية."""
         from morv.ui.shell import MainWindow
         w = MainWindow(self.session, self.app)
         w.health_timer.stop()
         return w
 
     def test_rtl_and_pages(self):
-        """الاتجاه RTL للتطبيق كله، ولكل عنصر في الشريط صفحة."""
         from PySide6.QtCore import Qt
         from morv.ui.shell import NAV
         w = self.window()
         self.assertEqual(self.app.layoutDirection(), Qt.LayoutDirection.RightToLeft)
         self.assertEqual(w.stack.count(), len(NAV))
         self.assertEqual(w.nav.count(), len(NAV))
-        self.assertIn("settings", [k for k, *_ in NAV])  # النسخ الاحتياطي داخل الإعدادات
+        self.assertIn("settings", [k for k, *_ in NAV])  # backup lives inside settings
         from PySide6.QtWidgets import QStatusBar
-        self.assertIsNone(w.findChild(QStatusBar))  # شريط الحالة كان يقطع الشريط الجانبي
+        self.assertIsNone(w.findChild(QStatusBar))  # the status bar used to cut the sidebar off
 
     def test_navigation(self):
-        """اختيار صفحة يغيّر المحتوى والعنوان."""
         w = self.window()
         w.go_key("settings")
         self.assertEqual(w.title.text(), "الإعدادات")
@@ -60,7 +53,6 @@ class ShellTest(unittest.TestCase):
             w.go_key("not_a_page")
 
     def test_theme_persists(self):
-        """الثيم المختار يُحفظ ويعود عند فتح نافذة جديدة."""
         from morv.infra import settings
         w = self.window()
         self.assertFalse(w.dark)
@@ -69,10 +61,9 @@ class ShellTest(unittest.TestCase):
         self.assertTrue(self.window().dark)
 
     def test_sidebar_collapse_persists(self):
-        """طي الشريط يغيّر العرض ويخفي النصوص ويُحفظ."""
         from morv.infra import settings
         from morv.ui.shell import SIDE_NARROW, SIDE_WIDE
-        settings.put(self.con, "ui.sidebar_collapsed", "0")   # شاشة CI ضيقة فيبدأ مطويًا افتراضيًا
+        settings.put(self.con, "ui.sidebar_collapsed", "0")   # the CI screen is narrow, so it starts collapsed
         w = self.window()
         self.assertEqual(w.side.width(), SIDE_WIDE)
         w.toggle_sidebar()
@@ -82,14 +73,7 @@ class ShellTest(unittest.TestCase):
 
 
 class NavDataTest(unittest.TestCase):
-    """بيانات الشريط الجانبي (لا تحتاج Qt)."""
-
     def test_nav_entries(self):
-        """مفاتيح وأسماء وأيقونات فريدة، وكل أيقونة مرسومة فعلًا.
-
-        خطأ سابق: أيقونة الإعدادات كانت تشبه أيقونة الشمس (زر الوضع الفاتح)،
-        فلا يُسمح لعنصر في الشريط باستخدام أيقونات الشريط العلوي.
-        """
         import ast
         from pathlib import Path
         src = (Path(__file__).resolve().parent.parent / "morv" / "ui").joinpath

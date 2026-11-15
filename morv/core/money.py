@@ -1,46 +1,29 @@
-"""المبالغ المالية بالقرش.
-
-القاعدة: كل مبلغ في البرنامج عدد صحيح (int) بالقرش، والجنيه = 100 قرش.
-لا يُستخدم float أبدًا، لأن الكسور العشرية في الحاسب غير دقيقة
-(مثلًا 0.1 + 0.2 لا تساوي 0.3 بالضبط)، وهذا يُفسد الحسابات بمرور الوقت.
-
-الإدخال يقبل الأرقام اللاتينية والعربية (١٢٣)، والإخراج دائمًا بأرقام لاتينية.
-"""
+"""Money as integer piasters."""
 import re
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
-# جدول تحويل الأرقام العربية والفارسية وفواصلها إلى مقابلها اللاتيني
+# Arabic and Persian digits and separators mapped to Latin
 _DIGITS = str.maketrans(
     "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹٫٬",
     "01234567890123456789.,",
 )
 
 
-# شكل المبلغ المقبول: إشارة سالبة اختيارية، ثم جزء صحيح (أرقام متصلة أو مجموعات آلاف
-# مفصولة بفاصلة كل ثلاث خانات بالضبط)، ثم كسر اختياري بعد النقطة. [0-9] وليس \d
-# لأن \d تقبل أرقام لغات أخرى لا نعرف كيف نحسبها.
+# Accepted shape: optional minus, an integer part (plain digits, or thousands
+# groups of exactly three), then an optional fraction. [0-9] and not \d,
+# because \d accepts digits we cannot weigh.
 _AMOUNT = re.compile(r"^(?P<sign>-)?(?P<int>[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)?(?:\.(?P<frac>[0-9]*))?$")
 
 
 class MoneyError(ValueError):
-    """خطأ في مبلغ مُدخل: فارغ، أو ليس رقمًا، أو فيه أكثر من خانتين عشريتين."""
+    """Bad money input: empty, not a number, or more than two decimals."""
 
 
 def to_latin(text: str) -> str:
-    """تحويل الأرقام العربية (١٢٣) والفاصلة العشرية العربية (٫) إلى لاتينية."""
     return str(text).translate(_DIGITS)
 
 
 def parse_money(text) -> int:
-    """تحويل نص مبلغ إلى قروش، بقبول صارم حتى لا يُفهم مبلغ على غير ما قصده كاتبه.
-
-    المقبول: '1234' و'1234.5' و'1,234.50' و'١٬٢٣٤٫٥٠' و'.5' ← قروش صحيحة.
-    المرفوض برسالة (MoneyError):
-    - الفاصلة في غير موضع الآلاف مثل '1,50' (قد يقصد بها كاتبها 1.50 فتُقرأ 150 جنيهًا).
-    - المسافات داخل الرقم مثل '1 2'، والصيغة العلمية '1e5'، و'Infinity' و'NaN'.
-    - النص الفارغ، وأكثر من خانتين عشريتين.
-    - العدد الصحيح المباشر (int) لأنه غامض: جنيه أم قرش؟
-    """
     if isinstance(text, int):
         raise MoneyError("مرّر المبلغ نصًا؛ العدد الصحيح غامض (جنيه أم قرش؟)")
     s = to_latin(text).strip()
@@ -60,7 +43,6 @@ def parse_money(text) -> int:
 
 
 def fmt(minor: int) -> str:
-    """عرض قروش كمبلغ مقروء: 123450 ← '1,234.50' و -500 ← '-5.00'."""
     if not isinstance(minor, int):
         raise MoneyError("fmt تقبل قروشًا (int) فقط")
     sign = "-" if minor < 0 else ""
@@ -69,11 +51,6 @@ def fmt(minor: int) -> str:
 
 
 def percent_of(minor: int, rate: str, rounding=ROUND_HALF_UP) -> int:
-    """حساب نسبة مئوية من مبلغ وتقريبها لأقرب قرش.
-
-    rate نص مثل '15' أو '12.5' (وليس float).
-    طريقة التقريب معامل منفصل لأنها قرار محاسبي يمكن تغييره.
-    """
     try:
         r = Decimal(to_latin(rate).strip())
     except InvalidOperation as e:

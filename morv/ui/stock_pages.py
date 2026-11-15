@@ -1,4 +1,4 @@
-"""تبويبا المخزون الأخيران: الدفعات (DOT) وحركاتها، والجرد والمطابقة؛ عرض فقط، والتسويات مؤجلة بقرار السياسة."""
+"""Stock tabs: lots with their movements, and stocktake. Read-only."""
 from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import inventory, stock_view
@@ -9,12 +9,10 @@ MOVE_LABELS = {"receipt": "استلام", "issue": "صرف"}
 
 
 def _cost_ok(session) -> bool:
-    """التكلفة والقيمة لمن يرحّل المشتريات أو يرى التكلفة فقط."""
     return session.can("purchases.post") or session.can("items.cost_view")
 
 
 class LotsPage(ListPage):
-    """دفعات الإطارات والبطاريات: DOT والمتبقي والتكلفة الأصلية، مع حركات كل دفعة في المعاينة."""
     title = "الدفعات (DOT)"
     search_placeholder = "الصنف، الكود، رمز DOT، أو مرجع الدفعة (F2)"
     filters = [("stock", "بها رصيد"), ("all", "كل الدفعات")]
@@ -29,28 +27,23 @@ class LotsPage(ListPage):
     ]
 
     def __init__(self, session):
-        """بناء الصفحة وإخفاء زر الإضافة (الدفعات تُنشأ بالاستلام فقط)."""
         super().__init__(session)
         self.add_btn.hide()
 
     def can_edit(self) -> bool:
-        """لا إضافة ولا تعديل: الدفعة تنشأ من فاتورة الشراء."""
         return False
 
     def fetch(self, query, filter_key, offset):
-        """صفحة من الدفعات؛ التكلفة تُحجب عمن لا يملك صلاحيتها."""
         rows = stock_view.lots(self.session.con, query, in_stock_only=filter_key == "stock", offset=offset)
         if _cost_ok(self.session):
             return rows
         return [r[:8] + (None,) for r in rows]
 
     def total(self) -> str:
-        """العدّاد."""
         qty, _value = stock_view.totals(self.session.con)
         return f"إجمالي الرصيد على الرف: {qty}"
 
     def build_preview(self, row_id: int) -> None:
-        """تفاصيل الدفعة وحركاتها."""
         row = next(r for r in self.model.rows if r[0] == row_id)
         self.heading(row[2], f"الدفعة {ltr(row[1])}")
         self.kv("رمز DOT", ltr(row[4]) if row[4] else "—")
@@ -65,7 +58,6 @@ class LotsPage(ListPage):
 
 
 class StockPage(ListPage):
-    """الجرد والمطابقة: رصيد كل صنف وقيمته الدفترية، وزر مطابقة الدفعات مع التكلفة والقيود. التسويات غير مفعّلة بعد."""
     title = "الجرد والتسويات"
     add_label = "تشغيل المطابقة"
     add_icon = "check"
@@ -81,24 +73,20 @@ class StockPage(ListPage):
     ]
 
     def can_edit(self) -> bool:
-        """زر المطابقة لمن يرى التكلفة (نتائجها تكشف القيم)."""
         return _cost_ok(self.session)
 
     def fetch(self, query, filter_key, offset):
-        """صفحة من الملخص؛ القيمة تُحجب عمن لا يملك صلاحية التكلفة."""
         rows = stock_view.summary(self.session.con, query, filter_key, offset=offset)
         if _cost_ok(self.session):
             return rows
         return [r[:6] + (None,) + r[7:] for r in rows]
 
     def total(self) -> str:
-        """العدّاد: الكمية، والقيمة لمن يملك صلاحيتها."""
         qty, value = stock_view.totals(self.session.con)
         text = f"إجمالي الرصيد: {qty}"
         return text + f" · القيمة الدفترية: {fmt(value)} جنيه" if _cost_ok(self.session) else text
 
     def build_preview(self, row_id: int) -> None:
-        """دفعات الصنف التي بها رصيد، بالأقدم تصنيعًا أولًا (ترتيب الصرف المقترح)."""
         row = next(r for r in self.model.rows if r[0] == row_id)
         self.heading(row[1], f"{ltr(row[2])} · الرصيد {ltr(str(row[4]))}")
         lots = [lot for lot in inventory.list_lots(self.session.con, row_id) if lot[5] > 0]
@@ -110,7 +98,6 @@ class StockPage(ListPage):
         self.preview_layout.addWidget(muted("تسويات الجرد (زيادة أو نقص أو تلف) غير مفعّلة بعد؛ تُضاف مع دفتر التسويات."))
 
     def open_dialog(self, row_id):
-        """زر «تشغيل المطابقة»: يعرض نتيجتها (متطابق أو قائمة الفروق)."""
         if row_id is not None or not self.can_edit():
             return
         problems = inventory.reconcile(self.session.con)

@@ -1,4 +1,4 @@
-"""اختبارات حقن الأعطال للعيوب الستة التي أثبتتها المراجعة الخارجية، ولكل عيب اختبار دائم."""
+"""Fault-injection tests: one permanent test per defect found in review."""
 import json
 import os
 import shutil
@@ -18,10 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class _Device(unittest.TestCase):
-    """جهاز وهمي بقاعدة مُعدّة التشفير ومجلد بيانات معزول."""
-
     def setUp(self):
-        """قاعدة جديدة بمدير ونسخة مشفّرة."""
         self.dir = Path(tempfile.mkdtemp())
         os.environ["MORV_DATA_DIR"] = str(self.dir)
         self.db = self.dir / "morv_tires.db"
@@ -31,58 +28,46 @@ class _Device(unittest.TestCase):
         backup.setup_encryption(self.con, PW, self.rk)
 
     def tearDown(self):
-        """تنظيف المجلد ومتغير البيئة."""
         self.con.close()
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
 class Defect6MoneyParse(unittest.TestCase):
-    """العيب 6: التحويل الصارم للمبالغ."""
-
     def test_accepts_valid_forms(self):
-        """الصيغ الصحيحة بالأرقام اللاتينية والعربية تعطي القروش الصحيحة."""
         self.assertEqual(parse_money("1,234.50"), 123450)
         self.assertEqual(parse_money("١٬٢٣٤٫٥٠"), 123450)
         self.assertEqual(parse_money(".5"), 50)
 
     def test_rejects_misparsed_inputs(self):
-        """الإدخالات التي كانت تُفهم خطأً أو تُسرّب خطأً داخليًا ترفض برسالة MoneyError."""
         for bad in ("1,50", "1 2", "1e5", "Infinity", "NaN", "1.234", "1,23,456", ""):
             with self.subTest(value=bad), self.assertRaises(MoneyError):
                 parse_money(bad)
 
 
 class Defect5VaultHeader(_Device):
-    """العيب 5: الملف المقطوع يرفع VaultError لا خطأ داخلي."""
-
     def test_truncated_files_raise_vault_error(self):
-        """ملف مقطوع عند كل طول تقريبًا لا يسرّب struct.error ولا غيره."""
         f = next(Path(backup.create_backup(self.con, "manual").path).parent.glob("*.mtb"))
         data = f.read_bytes()
         cut = self.dir / "cut.mtb"
         header_end = 8 + 4 + int.from_bytes(data[8:12], "big")
-        for n in (0, 3, 9, 11, 20, header_end - 1):          # داخل الرأس: يرفضه قارئ الرأس
+        for n in (0, 3, 9, 11, 20, header_end - 1):          # inside the header: the header reader refuses it
             with self.subTest(header_cut=n):
                 cut.write_bytes(data[:n])
                 with self.assertRaises(vault.VaultError):
                     vault.read_header(cut)
         for n in (0, 3, 9, 11, 20, header_end - 1, header_end + 5, len(data) // 2, len(data) - 1):
-            with self.subTest(length=n):                      # كل الأطوال: يرفضها الفتح
+            with self.subTest(length=n):                      # every length: opening refuses it
                 cut.write_bytes(data[:n])
                 with self.assertRaises(vault.VaultError):
                     vault.open_vault(cut, self.dir / "out.db", secret=PW)
 
 
 class Defect1AtomicRestore(_Device):
-    """العيب 1: فشل الاستعادة في أي خطوة يترك قاعدة التشغيل بايتًا بايتًا كما كانت."""
-
     def _backup_file(self):
-        """نسخة مشفّرة من حالة سليمة."""
         return Path(backup.create_backup(self.con, "manual").path)
 
     def test_failed_replace_leaves_db_byte_identical(self):
-        """فشل الاستبدال نفسه (os.replace) لا يغيّر ملف القاعدة."""
         f = self._backup_file()
         users.create_user(self.con, None, "later", "لاحق", "Later12345", "cashier")
         self.con.close()
@@ -95,7 +80,6 @@ class Defect1AtomicRestore(_Device):
         self.con = open_main_db(self.db)
 
     def test_bad_backup_leaves_db_byte_identical(self):
-        """نسخة تالفة (بعد فك التشفير) ترفض قبل أي لمس للقاعدة."""
         f = self._backup_file()
         self.con.close()
         before = self.db.read_bytes()
@@ -106,7 +90,6 @@ class Defect1AtomicRestore(_Device):
         self.con = open_main_db(self.db)
 
     def test_successful_restore_replaces_and_keeps_safety_copy(self):
-        """الاستعادة الناجحة تستبدل الملف وتترك نسخة أمان مشفّرة."""
         f = self._backup_file()
         users.create_user(self.con, None, "later", "لاحق", "Later12345", "cashier")
         self.con.close()
@@ -118,10 +101,7 @@ class Defect1AtomicRestore(_Device):
 
 
 class Defect2KeyGuard(_Device):
-    """العيب 2: لا تُختم نسخة بمفتاح لا يخص حلقة هذه القاعدة."""
-
     def test_mismatched_device_key_refuses_backup(self):
-        """مفتاح جهاز غريب ← رفض النسخة، ولا ملف .mtb جديد."""
         before = {p.name for p in backup.list_backups()}
         keystore.save_dek(os.urandom(32))
         with self.assertRaises(backup.BackupError):
@@ -130,28 +110,24 @@ class Defect2KeyGuard(_Device):
         self.assertEqual(backup.health(self.con)[0], "danger")
 
     def test_relink_with_secret_restores_backups(self):
-        """إعادة الربط بالسر تعيد النسخ دون تغيير الحلقة."""
         keystore.save_dek(os.urandom(32))
         backup.relink_device(self.con, PW)
         self.assertTrue(backup.create_backup(self.con, "manual").ok)
 
     def _strip_fingerprint(self):
-        """تحويل الحلقة إلى شكل ما قبل البصمة (قاعدة المالك القائمة)."""
         raw = json.loads(settings.get(self.con, "backup.keyring"))
         raw.pop("fp", None)
         settings.put(self.con, "backup.keyring", json.dumps(raw))
         return raw
 
     def test_legacy_ring_is_proved_by_an_old_backup(self):
-        """حلقة بلا بصمة تُثبت بنسخة سابقة مختومة بنفس التغليف، ثم تكتسب بصمتها."""
-        backup.create_backup(self.con, "manual")                  # نسخة قبل فقدان البصمة
+        backup.create_backup(self.con, "manual")                  # a backup from before the fingerprint was lost
         raw = self._strip_fingerprint()
         self.assertIsNone(vault.matches(raw, keystore.load_dek()))
         self.assertTrue(backup.create_backup(self.con, "manual").ok)
         self.assertIn("fp", json.loads(settings.get(self.con, "backup.keyring")))
 
     def test_legacy_ring_without_proof_refuses_with_hint(self):
-        """حلقة بلا بصمة ولا نسخة تثبتها ← رفض برسالة إعادة الربط، لا نسخة مختومة خطأً."""
         before = {p.name for p in backup.list_backups()}
         self._strip_fingerprint()
         with self.assertRaisesRegex(backup.BackupError, "إعادة الربط|أعد ربط"):
@@ -160,10 +136,7 @@ class Defect2KeyGuard(_Device):
 
 
 class Defect3ResumableSetup(_Device):
-    """العيب 3: الإعداد لا يترك حالة نصف مُعدّة، ويُستكمل دون مدير مكرر."""
-
     def test_failed_device_key_leaves_nothing_written(self):
-        """فشل حفظ مفتاح الجهاز ← لا مستخدم ولا علامة اكتمال ولا حلقة."""
         con = open_main_db(self.dir / "fresh.db")
         try:
             with mock.patch("morv.infra.keystore.save_dek", side_effect=keystore.KeystoreError("مرفوض")):
@@ -176,7 +149,6 @@ class Defect3ResumableSetup(_Device):
             con.close()
 
     def test_resume_reuses_admin_and_completes(self):
-        """مدير من محاولة منقطعة يُستعمل من جديد، فلا يتكرر المدير."""
         con = open_main_db(self.dir / "resume.db")
         try:
             users.create_user(con, None, "admin", "قديم", "Old123456", "manager")
@@ -188,7 +160,6 @@ class Defect3ResumableSetup(_Device):
             con.close()
 
     def test_completed_setup_refuses_second_run(self):
-        """الإعداد المكتمل لا يُعاد."""
         con = open_main_db(self.dir / "twice.db")
         try:
             setup.run_first_setup(con, **self._args())
@@ -198,7 +169,6 @@ class Defect3ResumableSetup(_Device):
             con.close()
 
     def test_migration_0005_marks_existing_database_complete(self):
-        """قاعدة قائمة فيها مستخدم وحلقة تُعدّ مكتملة بالترقية 0005، وقاعدة بلا حلقة لا."""
         sql = (ROOT / "morv/infra/db/migrations/0005_setup_flag.sql").read_text(encoding="utf-8")
         self.con.execute("DELETE FROM settings WHERE key='setup.completed_at'")
         self.con.executescript(sql)
@@ -207,22 +177,18 @@ class Defect3ResumableSetup(_Device):
         try:
             bare.execute("DELETE FROM settings WHERE key='setup.completed_at'")
             bare.executescript(sql)
-            self.assertFalse(setup.is_complete(bare))       # لا مستخدم ولا حلقة
+            self.assertFalse(setup.is_complete(bare))       # no user and no keyring
         finally:
             bare.close()
 
     def _args(self):
-        """بيانات إعداد وهمية كاملة."""
         return dict(shop_name="محل اختبار", shop_phone="01000000000", shop_address="",
                     admin_username="owner", admin_name="المالك", admin_password="Owner12345",
                     backup_password="Backup-Pass-2026", recovery_key=security.new_recovery_key())
 
 
 class Defect4Transactions(_Device):
-    """العيب 4: فشل داخل معاملة يتراجع عنها، ولا يبقى الاتصال عالقًا."""
-
     def test_failed_role_change_rolls_back_and_connection_recovers(self):
-        """فشل سجل المراجعة في set_role يتراجع عن التغيير ويعود الاتصال صالحًا."""
         cashier = users.create_user(self.con, None, "karim", "كريم", "Karim12345", "cashier")
         admin = users.get_user(self.con, 1)
         with mock.patch("morv.infra.users.audit", side_effect=RuntimeError("فشل مُحاكى")):
@@ -230,10 +196,9 @@ class Defect4Transactions(_Device):
                 users.set_role(self.con, admin, cashier.id, "manager")
         self.assertFalse(self.con.in_transaction)
         self.assertEqual(users.get_user(self.con, cashier.id).role, "cashier")
-        users.create_user(self.con, None, "next", "التالي", "Next12345", "cashier")   # يجب أن يعمل
+        users.create_user(self.con, None, "next", "التالي", "Next12345", "cashier")   # must work
 
     def test_nested_transaction_is_refused(self):
-        """معاملة داخل معاملة ممنوعة صراحة."""
         with self.assertRaises(NestedTransaction):
             with transaction(self.con):
                 with transaction(self.con):
@@ -241,10 +206,9 @@ class Defect4Transactions(_Device):
         self.assertFalse(self.con.in_transaction)
 
     def test_no_manual_transaction_statements_outside_connection(self):
-        """لا يكتب أي ملف BEGIN/COMMIT/ROLLBACK يدويًا خارج مدير المعاملات."""
         offenders = []
         for f in (ROOT / "morv").rglob("*.py"):
-            # connection.py يعرّف المدير، وmigrator.py يدير ترقيات مكتوبة نصيًا داخل معاملة واحدة
+            # connection.py defines the helper, and migrator.py runs scripted migrations in one transaction
             if f.name in ("connection.py", "migrator.py") or "__pycache__" in f.parts:
                 continue
             text = f.read_text(encoding="utf-8")

@@ -1,4 +1,4 @@
-"""مرتجع البيع: مستند عكسي ذري يكتب المرتجع وقيده وإعادة المخزون معًا. الفاتورة الأصلية لا تُمَس."""
+"""Sales return: one atomic reversing document; the invoice is never touched."""
 import hashlib
 import json
 import sqlite3
@@ -15,12 +15,11 @@ from morv.infra.users import audit, has_permission
 
 
 class ReturnError(ValueError):
-    """مرتجع مرفوض، برسالة تصلح للعرض."""
+    """Sales return refused, with a message fit to show."""
 
 
 @dataclass(frozen=True)
 class ReturnLineIn:
-    """سطر مرتجع: سطر الفاتورة الأصلي، والكمية، وحالة القطعة."""
     sale_line_id: int
     qty: int
     condition: str = "sound"
@@ -28,7 +27,6 @@ class ReturnLineIn:
 
 @dataclass(frozen=True)
 class PostedReturn:
-    """نتيجة الترحيل؛ replayed=True إن كان الطلب مكررًا فأُعيد المرتجع الأصلي دون تكرار."""
     id: int
     number: str
     total: int
@@ -36,14 +34,12 @@ class PostedReturn:
 
 
 def _payload_hash(sale_id, day, lines, refund_method, reason) -> str:
-    """بصمة محتوى الطلب لكشف إعادة استخدام المفتاح بمحتوى مختلف؛ الملاحظات خارجها عمدًا."""
     body = [sale_id, day, refund_method, reason,
             [[x.sale_line_id, x.qty, x.condition] for x in lines]]
     return hashlib.sha256(json.dumps(body, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
 def _refund_method(con, sale_id: int, asked) -> str:
-    """طريقة الرد: المطلوبة إن كانت من وسائل دفع الفاتورة، وإلا وسيلتها الوحيدة."""
     methods = [r[0] for r in con.execute(
         "SELECT method FROM sale_payments WHERE sale_id=? ORDER BY id", (sale_id,))]
     if asked:
@@ -56,7 +52,6 @@ def _refund_method(con, sale_id: int, asked) -> str:
 
 
 def _sale_line(con, sale_id: int, line_id: int) -> tuple:
-    """سطر الفاتورة مع نوع صنفه وما سبق إرجاعه منه."""
     row = con.execute(
         "SELECT l.id, l.line_no, l.item_id, l.qty, l.net_total, i.kind FROM sale_lines l "
         "JOIN items i ON i.id = l.item_id WHERE l.id=? AND l.sale_id=?", (line_id, sale_id)).fetchone()
@@ -68,7 +63,6 @@ def _sale_line(con, sale_id: int, line_id: int) -> tuple:
 
 
 def _issue_parts(con, sale_id: int, line_id: int) -> tuple:
-    """أجزاء صرف السطر: طبقات التكلفة بترتيبها، ودفعات المخزون بترتيبها."""
     issue = con.execute("SELECT id FROM stock_issues WHERE source_type='sale' AND source_id=? AND source_line_id=?",
                         (sale_id, line_id)).fetchone()
     if not issue:
@@ -83,7 +77,6 @@ def _issue_parts(con, sale_id: int, line_id: int) -> tuple:
 def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, lines: list, reason: str,
                 refund_method: str | None = None, return_date: str | None = None,
                 notes: str | None = None) -> PostedReturn:
-    """ترحيل مرتجع بيع كامل في معاملة واحدة: المستند وقيده وعودة المخزون معًا أو لا شيء."""
     if by is None or not has_permission(con, by, "sales.return"):
         raise ReturnError("لا تملك صلاحية ترحيل مرتجعات البيع")
     key = (request_key or "").strip()
@@ -171,7 +164,7 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
                 "INSERT INTO sale_return_lines (return_id, line_no, sale_line_id, qty, condition, value, cost) "
                 "VALUES (?,?,?,?,?,?,?)", (return_id, no, ln.sale_line_id, qty, ln.condition, value, cost))
             if ln.condition != "sound":
-                continue                                  # المعيب لا يعود لرصيد البيع ولا لطبقته
+                continue                                  # defective returns neither to sellable stock nor to its layer
             for lot_id, q, _ in lot_take:
                 con.execute("UPDATE stock_lots SET qty_on_hand = qty_on_hand + ? WHERE id=?", (q, lot_id))
                 con.execute("INSERT INTO stock_movements (item_id, lot_id, kind, qty, return_line_id, user_id) "

@@ -1,4 +1,4 @@
-"""شاشة نقطة البيع: فاتورة بيع جديدة داخل الشاشة نفسها (لا نافذة منبثقة)، ترحّل عبر محرك المبيعات."""
+"""Point of sale: the whole sale invoice in the screen, posted by the sales engine."""
 import uuid
 from datetime import date
 
@@ -15,23 +15,20 @@ from morv.ui.listpage import TupleModel
 from morv.ui.widgets import Notice, form, ltr_edit, muted, primary_button
 
 ITEM_CHOICES = 50
-PRICE_COLUMN = {"retail": 5, "wholesale": 6, "super": 7}      # موضع سعر الشريحة في صف items.search
+PRICE_COLUMN = {"retail": 5, "wholesale": 6, "super": 7}      # where the tier price sits in an items.search row
 TIER_LABELS = {"retail": "قطاعي (تجزئة)", "wholesale": "جملة", "super": "جملة الجملة"}
 PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة"}
 
 
 class PosPage(QWidget):
-    """نقطة البيع: بيانات العميل والمركبة والأصناف والملخص والدفع في شاشة واحدة، والعناصر غير المبنية معطّلة."""
-
     def __init__(self, session, parent=None):
-        """بناء الشاشة وتحميل الأصناف والعملاء."""
         super().__init__(parent)
         self.session = session
         self.posted = None
         self.lines: list[SaleLineIn] = []
         self._names: list[str] = []
         self._busy = False
-        self._request_key = uuid.uuid4().hex     # مفتاح واحد لكل فاتورة: إعادة الضغط لا تكرر الفاتورة
+        self._request_key = uuid.uuid4().hex     # One key per invoice: pressing again cannot duplicate it
         self.tier = "retail"
 
         root = QVBoxLayout(self)
@@ -58,9 +55,8 @@ class PosPage(QWidget):
         if not items.search(self.session.con, "", limit=1):
             self.notice.show_message("لا توجد أصناف نشطة؛ أضف أصنافًا من شاشة المخزون أولًا.", "warn")
 
-    # ---------- الهيكل ----------
+    # ---------- Layout ----------
     def _build_header(self) -> QFrame:
-        """عنوان الشاشة وسطر المخزن."""
         w = QFrame()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 0, 0, 0)
@@ -72,7 +68,6 @@ class PosPage(QWidget):
         return w
 
     def _build_footer(self) -> QHBoxLayout:
-        """أزرار الترحيل والعناصر المؤجلة."""
         bar = QHBoxLayout()
         for label in ("تعليق الفاتورة", "معاينة الطباعة", "حفظ كمسودة"):
             bar.addWidget(self._deferred_button(label))
@@ -83,7 +78,6 @@ class PosPage(QWidget):
         return bar
 
     def _build_right_column(self) -> QVBoxLayout:
-        """الجهة اليمنى: بيانات الفاتورة والعميل، ثم الأصناف والأسطر."""
         col = QVBoxLayout()
         col.setSpacing(10)
 
@@ -161,7 +155,6 @@ class PosPage(QWidget):
         return col
 
     def _build_left_column(self) -> QVBoxLayout:
-        """الجهة اليسرى: ملخص الفاتورة ثم طرق الدفع."""
         col = QVBoxLayout()
         col.setSpacing(10)
 
@@ -208,9 +201,8 @@ class PosPage(QWidget):
         col.addStretch(1)
         return col
 
-    # ---------- أدوات بناء ----------
+    # ---------- Builders ----------
     def _row(self, *widgets) -> QFrame:
-        """صف أفقي لعناصر متجاورة."""
         w = QFrame()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 0, 0, 0)
@@ -220,7 +212,6 @@ class PosPage(QWidget):
         return w
 
     def _tier_row(self) -> QFrame:
-        """فئة السعر كأزرار متبادلة؛ الاختيار يحدّد سعر الوحدة للصنف المختار."""
         w = QFrame()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 0, 0, 0)
@@ -236,7 +227,6 @@ class PosPage(QWidget):
         return w
 
     def _set_tier(self, key: str) -> None:
-        """تغيير فئة السعر ثم تحديث سعر الصنف المختار."""
         self.tier = key
         for k, b in self.tier_buttons.items():
             b.setChecked(k == key)
@@ -244,14 +234,12 @@ class PosPage(QWidget):
 
     @staticmethod
     def _deferred_button(label: str) -> QPushButton:
-        """زر لعنصر غير مبني بعد: معطّل مع عبارة «قريبًا» كما في التصميم."""
         b = QPushButton(f"{label} — قريبًا")
         b.setEnabled(False)
         return b
 
     @staticmethod
     def _method_combo(first_blank: bool) -> QComboBox:
-        """قائمة وسيلة دفع مدعومة في المحرك فقط؛ الثانية تبدأ بخانة «لا» تعني عدم وجود وسيلة ثانية."""
         c = QComboBox()
         if first_blank:
             c.addItem("— لا —", None)
@@ -259,14 +247,12 @@ class PosPage(QWidget):
             c.addItem(label, key)
         return c
 
-    # ---------- العميل والأصناف ----------
+    # ---------- Customer and items ----------
     def _on_customer_changed(self, *_args) -> None:
-        """تغيير العميل يضبط فئة السعر حسب شريحته."""
         data = self.customer.currentData()
         self._set_tier(data[1] if data and data[1] else "retail")
 
     def refresh_items(self, *_args) -> None:
-        """تحديث قائمة اختيار الصنف حسب نص البحث."""
         q = self.item_search.text()
         rows = []
         for kind in ("tire", "battery", "service"):
@@ -280,7 +266,6 @@ class PosPage(QWidget):
         self._on_item_changed()
 
     def _on_item_changed(self, *_args) -> None:
-        """يملأ سعر الوحدة من فئة السعر المختارة للصنف."""
         r = self.item_combo.currentData()
         if r is None:
             self.price.clear()
@@ -288,9 +273,8 @@ class PosPage(QWidget):
         cents = r[PRICE_COLUMN[self.tier]] or r[5]
         self.price.setText(f"{cents // 100}.{cents % 100:02d}")
 
-    # ---------- الأسطر ----------
+    # ---------- Lines ----------
     def add_line(self) -> bool:
-        """التحقق من مدخلات السطر ثم إضافته؛ يعيد True عند الإضافة، وإلا يعرض الخطأ ويترك المدخلات."""
         r = self.item_combo.currentData()
         if r is None:
             return self._fail("اختر صنفًا للسطر.")
@@ -312,7 +296,6 @@ class PosPage(QWidget):
         return True
 
     def remove_selected(self) -> None:
-        """حذف السطر المختار من الفاتورة قبل الترحيل."""
         idx = self.view.currentIndex()
         if not idx.isValid():
             self.notice.show_message("اختر سطرًا من الجدول أولًا.", "warn")
@@ -322,18 +305,15 @@ class PosPage(QWidget):
         self._refresh_lines()
 
     def _refresh_lines(self) -> None:
-        """إعادة عرض الأسطر والإجمالي ورسالة الفاتورة الفارغة."""
         self.lines_model.reset_rows([(i, self._names[i - 1], ln.qty, ln.unit_price, ln.line_discount)
                                      for i, ln in enumerate(self.lines, start=1)])
         self.empty_label.setVisible(not self.lines)
         self._refresh_total()
 
     def subtotal_minor(self) -> int:
-        """مجموع الأسطر قبل خصومها بالقرش."""
         return sum(ln.qty * ln.unit_price for ln in self.lines)
 
     def total_minor(self) -> int:
-        """الإجمالي بعد خصم الأسطر وخصم الفاتورة، بالقرش، كما يحسبه المحرك."""
         line_disc = sum(ln.line_discount for ln in self.lines)
         try:
             inv_disc = parse_money(self.invoice_disc.text() or "0")
@@ -342,18 +322,15 @@ class PosPage(QWidget):
         return self.subtotal_minor() - line_disc - inv_disc
 
     def _refresh_total(self, *_args) -> None:
-        """نصوص الملخص: قبل الخصم، والنهائي."""
         self.subtotal_label.setText(f"{ltr(fmt(self.subtotal_minor()))} جنيه")
         self.total_label.setText(f"{ltr(fmt(self.total_minor()))} جنيه")
 
     def _fail(self, text: str) -> bool:
-        """عرض خطأ في شريط الرسائل؛ يعيد False ليسهل الخروج."""
         self.notice.show_message(text)
         return False
 
-    # ---------- الدفع والترحيل ----------
+    # ---------- Payment and posting ----------
     def _payments(self, total: int) -> list:
-        """وسائل الدفع من النموذج؛ الفارغ من المبلغ يأخذ الباقي."""
         first = sales_rules.Payment(
             method=self.pay1_method.currentData(),
             amount=parse_money(self.pay1_amount.text()) if self.pay1_amount.text().strip() else total,
@@ -367,7 +344,6 @@ class PosPage(QWidget):
         return out
 
     def post(self) -> None:
-        """فحص الفاتورة ثم الترحيل عبر المحرك؛ أي رفض يُعرض بنصه ولا يُحفظ شيء، وتبقى المدخلات."""
         if self._busy:
             return
         if not self.lines:
@@ -393,7 +369,7 @@ class PosPage(QWidget):
                 notes=self.note.text().strip() or None)
         except (SaleError, sales_rules.SaleRuleError) as e:
             self._fail(f"لم تُرحَّل الفاتورة: {e}")
-        except Exception as e:      # أي عطل غير متوقع: المحرك ذري فلا يبقى شيء ناقص
+        except Exception as e:      # Any unexpected failure: the engine is atomic, so nothing half-written remains
             self._fail(f"تعذّر الترحيل ولم يُحفظ شيء ({type(e).__name__}). أعد المحاولة أو راجع السجل.")
         else:
             self._reset_after_post()
@@ -403,7 +379,6 @@ class PosPage(QWidget):
             self.post_btn.setEnabled(True)
 
     def _reset_after_post(self) -> None:
-        """فاتورة جديدة فارغة بعد الترحيل، بمفتاح طلب جديد."""
         self._request_key = uuid.uuid4().hex
         self.lines.clear()
         self._names.clear()

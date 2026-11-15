@@ -1,7 +1,4 @@
-"""قواعد التحقق من البيانات الأساسية: الموبايل المصري، والرقم القومي، ومقاس الإطار، وتوليد اسم وكود الصنف.
-
-كلها دوال نقية بلا قاعدة بيانات ولا واجهة، لذلك تُختبر بالكامل بلا Qt.
-"""
+"""Master-data validation: mobile, national id, tyre size, item name and code."""
 import re
 from datetime import date
 
@@ -9,11 +6,11 @@ from morv.core.money import to_latin
 
 _MOBILE = re.compile(r"^01[0-9]{9}$")
 _NID = re.compile(r"^[23][0-9]{13}$")
-# مقاس متري مثل 205/55R16 أو 205/55ZR16، ومقاس بوصة مثل 7.50R16
+# Metric size like 205/55R16 or 205/55ZR16, and inch size like 7.50R16
 _SIZE_METRIC = re.compile(r"^(\d{3})/(\d{2})Z?R(\d{2}(?:\.5)?)$")
 _SIZE_INCH = re.compile(r"^(\d{1,2}\.\d{2})R(\d{2}(?:\.5)?)$")
 
-# محافظات مصر في الرقم القومي (الخانتان 8 و9)
+# Egyptian governorates in the national id, digits 8 and 9
 _GOVERNORATES = {
     "01", "02", "03", "04", "11", "12", "13", "14", "15", "16", "17", "18", "19", "21", "22", "23",
     "24", "25", "26", "27", "28", "29", "31", "32", "33", "34", "35", "88",
@@ -21,11 +18,10 @@ _GOVERNORATES = {
 
 
 class ValidationError(ValueError):
-    """بيانات غير صالحة، برسالة تصلح للعرض."""
+    """Invalid data, with a message fit to show."""
 
 
 def mobile(text: str, required: bool = True) -> str:
-    """موبايل مصري: 11 رقمًا يبدأ بـ 01. يقبل الأرقام العربية والفراغات ويعيده لاتينيًا نظيفًا."""
     s = to_latin(text or "").replace(" ", "").replace("-", "")
     if not s:
         if required:
@@ -37,11 +33,6 @@ def mobile(text: str, required: bool = True) -> str:
 
 
 def national_id(text: str) -> str:
-    """الرقم القومي المصري (اختياري): 14 رقمًا، يبدأ بقرن 2 أو 3، وفيه تاريخ ميلاد صحيح ورمز محافظة معروف.
-
-    يعيد الرقم نظيفًا أو نصًا فارغًا إن لم يُدخل. لا يوجد معادلة تحقق رسمية منشورة للخانة الأخيرة،
-    فلا نتحقق منها.
-    """
     s = to_latin(text or "").replace(" ", "")
     if not s:
         return ""
@@ -61,15 +52,10 @@ def national_id(text: str) -> str:
 
 
 def mask_national_id(nid: str) -> str:
-    """عرض الرقم القومي مخفيًا إلا آخر 4 أرقام."""
     return f"**********{nid[-4:]}" if nid else ""
 
 
 def tire_size(text: str) -> dict:
-    """تحليل مقاس الإطار إلى (width, aspect, rim) بعد توحيده بحروف كبيرة بلا فراغات.
-
-    مثال: '205/55r16' → {'size': '205/55R16', 'width': '205', 'aspect': '55', 'rim': '16'}.
-    """
     s = to_latin(text or "").upper().replace(" ", "")
     m = _SIZE_METRIC.match(s)
     if m:
@@ -81,7 +67,6 @@ def tire_size(text: str) -> dict:
 
 
 def suggest_item_name(kind: str, brand: str, model: str, attrs: dict) -> str:
-    """اسم الصنف كما يظهر في الفاتورة، مولّدًا من البيانات (يمكن للمستخدم تعديله)."""
     brand = (brand or "").strip()
     model = (model or "").strip()
     if kind == "tire":
@@ -95,13 +80,8 @@ def suggest_item_name(kind: str, brand: str, model: str, attrs: dict) -> str:
 
 
 def suggest_item_code(kind: str, brand: str, attrs: dict, seq: int) -> str:
-    """كود داخلي مقترح بحروف لاتينية فقط (يصلح للباركود والماسح):
-
-    إطار: TR-2055516-MI (المقاس + أول حرفين من الماركة اللاتينية)، بطارية: BT-70-ACD،
-    خدمة: SV-003. إن كانت الماركة عربية يُستخدم رقم تسلسلي بدل حروفها.
-    """
     b = re.sub(r"[^A-Z0-9]", "", (brand or "").upper())
-    tail = lambda n: b[:n] if b else f"{seq:03d}"   # noqa: E731 — تعبير قصير محلي
+    tail = lambda n: b[:n] if b else f"{seq:03d}"   # noqa: E731 - a short local expression
     if kind == "tire":
         size = re.sub(r"[^0-9]", "", attrs.get("size", "") or "")
         return f"TR-{size or '0'}-{tail(2)}"

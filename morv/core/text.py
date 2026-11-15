@@ -1,23 +1,22 @@
-"""معالجة النصوص العربية: البحث، والماسح الضوئي، واتجاه الكتابة."""
+"""Arabic text: search normalisation, barcode scanning, writing direction."""
 import re
 
 from .money import to_latin
 
-# توحيد أشكال الحروف حتى يجد الكاشير «إطار» إذا كتب «اطار»
+# Fold letter shapes, so a search typed without hamza still finds the word
 _MAP = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا", "ة": "ه", "ى": "ي",
                       "ؤ": "و", "ئ": "ي", "ـ": None})
-# علامات التشكيل (الفتحة والضمة...) تُحذف من نص البحث
+# Diacritics are dropped from search text
 _HARAKAT = re.compile("[ً-ْٰ]")
 
 
 def norm_ar(text: str) -> str:
-    """تجهيز نص للبحث: أرقام لاتينية، بلا تشكيل، حروف موحّدة، حروف صغيرة، ومسافات مفردة."""
     s = _HARAKAT.sub("", to_latin(text or "")).translate(_MAP).lower()
     return " ".join(s.split())
 
 
-# الماسح الضوئي يكتب كأنه لوحة مفاتيح. لو كان Windows على اللوحة العربية،
-# يصل الكود «T000123» بالشكل «ف000123». هذا الجدول يعيد كل حرف لمفتاحه اللاتيني.
+# A scanner types like a keyboard: on an Arabic layout a code arrives as Arabic
+# letters, so this table maps every letter back to its Latin key.
 _AR101 = {
     "ض": "q", "ص": "w", "ث": "e", "ق": "r", "ف": "t", "غ": "y", "ع": "u", "ه": "i", "خ": "o", "ح": "p",
     "ش": "a", "س": "s", "ي": "d", "ب": "f", "ل": "g", "ا": "h", "ت": "j", "ن": "k", "م": "l",
@@ -27,20 +26,14 @@ _AR101 = {
 
 
 def scanner_fix(code: str) -> str:
-    """إصلاح كود قرأه الماسح واللوحة العربية مفعّلة: يعيد الحروف لاتينية كبيرة والأرقام لاتينية."""
-    s = to_latin(code or "").strip().replace("لا", "b")  # «لا» حرف واحد على مفتاح B
+    s = to_latin(code or "").strip().replace("لا", "b")  # One Arabic ligature sits alone on the B key
     return "".join(_AR101.get(ch, ch) for ch in s).upper()
 
 
-LRI, PDI = "\u2066", "\u2069"   # تُكتب بالرمز لا بالحرف نفسه: الحرف غير مرئي ويضيع عند النسخ واللصق
-RLM = "\u200f"   # علامة اتجاه عربي: تجعل اتجاه الفقرة من اليمين دون أن تظهر
+LRI, PDI = "\u2066", "\u2069"   # Written as an escape: the character is invisible and is lost on copy and paste
+RLM = "\u200f"   # Right-to-left mark: sets paragraph direction without showing
 
 
 def ltr(value) -> str:
-    """عزل قيمة لاتينية (تاريخ، موبايل، مقاس، '59 MB') داخل نص عربي.
-
-    بدون العزل قد تنقلب الأرقام والوحدات عند العرض، مثل «MB 59» بدل «59 MB».
-    العلامتان المضافتان غير مرئيتين.
-    """
     s = str(value)
     return s if not s else f"{LRI}{s}{PDI}"

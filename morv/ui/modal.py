@@ -1,11 +1,4 @@
-"""النافذة المنبثقة الموحّدة للبرنامج (بلا شريط عنوان من نظام التشغيل، كما في التصميم المعتمد).
-
-لماذا ملف واحد: هذا هو المكان الوحيد المسموح فيه بنافذة بلا إطار، وكل ما يتعلق بها هنا:
-- رأس داخلي فيه العنوان وزر إغلاق، ويُسحب به لتحريك النافذة.
-- الجسم داخل منطقة تمرير، والارتفاع الأقصى مقيد بارتفاع الشاشة، حتى لا يخرج زر «حفظ» خارج
-  شاشة 1366×768 (خطأ ظهر في تجربة المالك).
-- أزرار التذييل ثابتة أسفل النافذة لا تتحرك مع التمرير. Esc يغلق. Ctrl+S يضغط الزر الرئيسي.
-"""
+"""The one modal window of the app, without an OS title bar."""
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractScrollArea, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
@@ -16,18 +9,15 @@ from morv.ui.widgets import Notice, primary_button
 
 
 class Modal(QDialog):
-    """نافذة منبثقة موحّدة. الوارثون يبنون المحتوى في self.body ويستدعون add_footer()."""
-
     def __init__(self, title: str, parent=None, width: int = 560):
-        """بناء الرأس والجسم القابل للتمرير والتذييل."""
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setModal(True)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)   # لتظهر الزوايا المستديرة
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)   # so the rounded corners show
         self.setObjectName("modal")
         self._drag: QPoint | None = None
         screen = QGuiApplication.primaryScreen()
-        if screen:                       # لا تتجاوز عرض الشاشة المتاح
+        if screen:                       # never wider than the available screen
             width = min(width, screen.availableGeometry().width() - 40)
         self.setFixedWidth(width)
 
@@ -61,7 +51,7 @@ class Modal(QDialog):
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # يفضّل حجم المحتوى، ثم يقيده الارتفاع الأقصى فيظهر شريط التمرير
+        # Prefers the content size; the maximum height then brings the scrollbar
         self.scroll.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
         body_widget = QWidget()
         body_widget.setObjectName("modalBody")
@@ -86,14 +76,13 @@ class Modal(QDialog):
         self.footer.hide()
         col.addWidget(self.footer)
 
-        # الارتفاع الأقصى: شاشة المستخدم ناقص هامش، فتظهر الأزرار دائمًا ويتمرر الجسم
+        # Maximum height is the screen minus a margin, so the buttons always show
         screen = QGuiApplication.primaryScreen()
         if screen:
             self.setMaximumHeight(screen.availableGeometry().height() - 60)
         QShortcut(QKeySequence("Esc"), self, activated=self.reject)
 
     def add_footer(self, primary_text: str, on_primary, secondary_text: str = "إلغاء") -> QPushButton:
-        """زر رئيسي (Ctrl+S) وزر إلغاء في التذييل الثابت. يعيد الزر الرئيسي."""
         btn = primary_button(primary_text)
         btn.clicked.connect(on_primary)
         QShortcut(QKeySequence("Ctrl+S"), self, activated=on_primary)
@@ -105,30 +94,25 @@ class Modal(QDialog):
         return btn
 
     def add_footer_widget(self, w) -> None:
-        """عنصر إضافي في التذييل (زر ثالث مثلًا)."""
         self.footer_layout.insertWidget(self.footer_layout.count() - 1, w)
         self.footer.show()
 
-    # ---------- السحب من الرأس ----------
+    # ---------- Dragging by the header ----------
     def mousePressEvent(self, e) -> None:
-        """بدء السحب إن كان الضغط على الرأس."""
         if e.button() == Qt.MouseButton.LeftButton and self.header.geometry().contains(e.position().toPoint()):
             self._drag = e.globalPosition().toPoint() - self.frameGeometry().topLeft()
         super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e) -> None:
-        """تحريك النافذة أثناء السحب."""
         if self._drag is not None and e.buttons() & Qt.MouseButton.LeftButton:
             self.move(e.globalPosition().toPoint() - self._drag)
         super().mouseMoveEvent(e)
 
     def mouseReleaseEvent(self, e) -> None:
-        """إنهاء السحب."""
         self._drag = None
         super().mouseReleaseEvent(e)
 
     def showEvent(self, e) -> None:
-        """توسيط النافذة فوق النافذة الأم (أو الشاشة) عند الظهور."""
         super().showEvent(e)
         self.adjustSize()
         anchor = self.parentWidget().window() if self.parentWidget() else None
@@ -137,10 +121,7 @@ class Modal(QDialog):
 
 
 class Confirm(Modal):
-    """سؤال نعم/لا."""
-
     def __init__(self, title: str, text: str, parent=None, danger: bool = False, yes_text: str = "نعم"):
-        """بناء السؤال."""
         super().__init__(title, parent, width=460)
         lbl = QLabel(text)
         lbl.setWordWrap(True)
@@ -151,10 +132,7 @@ class Confirm(Modal):
 
 
 class Message(Modal):
-    """رسالة معلومات أو خطأ بزر «حسنًا»."""
-
     def __init__(self, title: str, text: str, parent=None, error: bool = False):
-        """بناء الرسالة."""
         super().__init__(title, parent, width=460)
         n = Notice()
         n.show_message(text, "error" if error else "success")
@@ -166,10 +144,8 @@ class Message(Modal):
 
 
 def ask(parent, title: str, text: str, danger: bool = False) -> bool:
-    """سؤال نعم/لا بالنافذة الموحّدة. يعيد True عند الموافقة."""
     return Confirm(title, text, parent, danger).exec() == QDialog.DialogCode.Accepted
 
 
 def info(parent, title: str, text: str, error: bool = False) -> None:
-    """رسالة بالنافذة الموحّدة."""
     Message(title, text, parent, error).exec()

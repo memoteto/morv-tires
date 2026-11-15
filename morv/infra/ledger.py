@@ -1,4 +1,4 @@
-"""ترحيل القيود المحاسبية المتوازنة وقراءة أرصدة الحسابات (يُستدعى من داخل معاملة المتصل)."""
+"""Post balanced journal entries and read balances, inside the caller's transaction."""
 import sqlite3
 from datetime import date
 
@@ -6,11 +6,10 @@ from morv.infra.users import audit
 
 
 class LedgerError(ValueError):
-    """قيد مرفوض: غير متوازن أو بمبلغ أو حساب غير صالح."""
+    """Entry refused: unbalanced, or an invalid amount or account."""
 
 
 def valid_date(text, what: str = "التاريخ") -> str:
-    """التحقق من تاريخ بصيغة YYYY-MM-DD وأنه ليس في المستقبل."""
     try:
         d = date.fromisoformat(str(text))
     except ValueError as e:
@@ -22,7 +21,6 @@ def valid_date(text, what: str = "التاريخ") -> str:
 
 def post_entry(con: sqlite3.Connection, by, entry_date: str, source_type: str, source_id: int,
                memo: str, lines: list) -> int:
-    """ترحيل قيد؛ lines = [(حساب, مدين, دائن)] بالقرش. يشترط معاملة مفتوحة وتوازن المدين والدائن."""
     if not con.in_transaction:
         raise LedgerError("ترحيل القيد يجب أن يكون داخل معاملة")
     if len(lines) < 2:
@@ -46,7 +44,7 @@ def post_entry(con: sqlite3.Connection, by, entry_date: str, source_type: str, s
     except sqlite3.DatabaseError as e:
         raise LedgerError(str(e)) from e
     try:
-        con.execute("UPDATE journal_entries SET status='posted' WHERE id=?", (entry_id,))   # الترحيل بعد اكتمال السطور
+        con.execute("UPDATE journal_entries SET status='posted' WHERE id=?", (entry_id,))   # Post only once every line is written
     except sqlite3.DatabaseError as e:
         raise LedgerError(str(e)) from e
     audit(con, by, "journal.post", "journal_entry", entry_id, f"{source_type}#{source_id}")
@@ -54,25 +52,21 @@ def post_entry(con: sqlite3.Connection, by, entry_date: str, source_type: str, s
 
 
 def account_balance(con: sqlite3.Connection, code: str) -> int:
-    """رصيد حساب بالقرش من القيود المرحّلة فقط = مجموع المدين - مجموع الدائن."""
     return con.execute("SELECT coalesce(sum(l.debit) - sum(l.credit), 0) FROM journal_lines l "
                        "JOIN journal_entries e ON e.id = l.entry_id WHERE e.status='posted' AND l.account_code=?",
                        (code,)).fetchone()[0]
 
 
 def unbalanced_entries(con: sqlite3.Connection) -> list:
-    """أرقام القيود التي لا يتساوى مدينها ودائنها (يجب أن تكون فارغة دائمًا)."""
     rows = con.execute("SELECT entry_id FROM journal_lines GROUP BY entry_id HAVING sum(debit) <> sum(credit)")
     return [r[0] for r in rows]
 
 
 def incomplete_entries(con: sqlite3.Connection) -> list:
-    """أرقام القيود التي عدد سطورها الفعلي لا يطابق المعلن في رأسها (يجب أن تكون فارغة دائمًا)."""
     rows = con.execute("SELECT e.id FROM journal_entries e LEFT JOIN journal_lines l ON l.entry_id = e.id "
                        "GROUP BY e.id HAVING count(l.id) <> e.line_count")
     return [r[0] for r in rows]
 
 
 def open_entries(con: sqlite3.Connection) -> list:
-    """أرقام القيود العالقة في حالة open بعد انتهاء المعاملات (يجب أن تكون فارغة دائمًا)."""
     return [r[0] for r in con.execute("SELECT id FROM journal_entries WHERE status='open'")]

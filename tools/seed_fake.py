@@ -1,10 +1,4 @@
-"""بيانات وهمية للاختبار وقياس الأداء (لا تُستخدم أبدًا على قاعدة حقيقية).
-
-    python tools/seed_fake.py [customers=3000] [items=1500] [suppliers=200]
-
-تكتب في قاعدة مجلد البيانات الحالي (MORV_DATA_DIR إن ضُبط). ترفض قاعدة فيها عملاء مسبقًا
-حتى لا تختلط ببيانات حقيقية.
-"""
+"""Fake data for testing and performance runs. Never for a real database."""
 import random
 import sys
 from pathlib import Path
@@ -19,7 +13,6 @@ SIZES = ["175/70R13", "185/65R15", "195/65R15", "205/55R16", "215/60R16", "225/4
 
 
 def seed(con, by, n_customers=3000, n_items=1500, n_suppliers=200, rng=None) -> None:
-    """إدخال البيانات الوهمية عبر طبقات infra نفسها (بنفس التحقق الذي يمر به المستخدم)."""
     from morv.infra import customers, items, suppliers
     from morv.infra.customers import Customer, Vehicle
     from morv.infra.items import Item
@@ -27,7 +20,7 @@ def seed(con, by, n_customers=3000, n_items=1500, n_suppliers=200, rng=None) -> 
     rng = rng or random.Random(7)
     if customers.count(con):
         raise SystemExit("القاعدة فيها عملاء؛ لا تُزرع بيانات وهمية فوق بيانات حقيقية")
-    # كل إنشاء معاملة مستقلة (كما في التشغيل)؛ نوقف مزامنة القرص مؤقتًا لأن البيانات وهمية
+    # One transaction per create, as in real use; disk sync is off because the data is fake
     con.execute("PRAGMA synchronous=OFF")
     try:
         for i in range(n_customers):
@@ -60,7 +53,6 @@ def seed(con, by, n_customers=3000, n_items=1500, n_suppliers=200, rng=None) -> 
 
 
 def main() -> int:
-    """تشغيل من سطر الأوامر."""
     from morv.infra import users
     from morv.infra.db.bootstrap import open_main_db
     args = [int(a) for a in sys.argv[1:]]

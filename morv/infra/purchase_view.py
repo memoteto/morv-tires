@@ -1,4 +1,4 @@
-"""قراءة فواتير الشراء المرحّلة للعرض فقط (قائمة وتفاصيل)؛ لا كتابة هنا."""
+"""Read-only views of posted purchase invoices."""
 from dataclasses import dataclass
 
 from morv.core.text import norm_ar
@@ -6,7 +6,6 @@ from morv.core.text import norm_ar
 
 @dataclass(frozen=True)
 class InvoiceLine:
-    """سطر فاتورة للعرض: الصنف والكود ورمز DOT والكمية والتكلفة بالقرش."""
     line_no: int
     item_name: str
     item_code: str
@@ -18,7 +17,6 @@ class InvoiceLine:
 
 @dataclass(frozen=True)
 class InvoiceView:
-    """فاتورة شراء مرحّلة بأسطرها للعرض."""
     id: int
     number: str
     supplier_name: str
@@ -31,7 +29,6 @@ class InvoiceView:
 
 
 def list_invoices(con, query: str = "", limit: int = 300, offset: int = 0) -> list[tuple]:
-    """قائمة الفواتير الأحدث أولًا: (id, number, supplier_name, supplier_invoice_no, invoice_date, total)."""
     q = (query or "").strip()
     where, params = "", []
     if q:
@@ -44,12 +41,10 @@ def list_invoices(con, query: str = "", limit: int = 300, offset: int = 0) -> li
 
 
 def count(con) -> int:
-    """عدد الفواتير المرحّلة."""
     return con.execute("SELECT count(*) FROM purchase_invoices").fetchone()[0]
 
 
 def get_invoice(con, invoice_id: int) -> InvoiceView:
-    """فاتورة مرحّلة بأسطرها؛ تُرفع KeyError إن لم توجد."""
     h = con.execute(
         "SELECT p.id, p.number, s.name, p.supplier_invoice_no, p.invoice_date, p.received_date, p.total, p.notes "
         "FROM purchase_invoices p JOIN suppliers s ON s.id = p.supplier_id WHERE p.id = ?", (invoice_id,)).fetchone()
@@ -63,6 +58,5 @@ def get_invoice(con, invoice_id: int) -> InvoiceView:
 
 
 def supplier_totals(con, supplier_id: int) -> tuple[int, int]:
-    """(عدد فواتير المورد المرحّلة، إجمالي مشترياتنا منه بالقرش)."""
     return tuple(con.execute("SELECT count(*), coalesce(sum(total), 0) FROM purchase_invoices WHERE supplier_id = ?",
                              (supplier_id,)).fetchone())

@@ -1,10 +1,4 @@
-"""تشغيل Morv Tires من الكود المصدري.
-
-    python run.py           تشغيل عادي
-    python run.py --smoke   فتح ثم إغلاق تلقائي (اختبار سريع)
-
-وهو أيضًا الملف الذي يبني منه PyInstaller ملف MorvTires.exe.
-"""
+"""Run Morv Tires from source."""
 import sys
 from pathlib import Path
 

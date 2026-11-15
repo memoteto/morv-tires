@@ -1,11 +1,4 @@
-"""هيكل النافذة الرئيسية: شريط جانبي قابل للطي، وشريط علوي، ومساحة الصفحات.
-
-الصفحات غير المبنية بعد لافتة تقول أي مرحلة ستبنيها؛ الصفحة الحقيقية تحل محلها في مرحلتها
-دون تغيير الهيكل. الشريط العلوي يحمل تنبيه النسخ الاحتياطي (يُحدَّث كل دقيقة).
-
-الثيم وحالة طي الشريط تُحفظ في جدول settings عبر morv.infra.settings، فتعود كما تركها
-المستخدم عند فتح البرنامج مرة أخرى.
-"""
+"""Main window shell: collapsible sidebar, top bar and the page area."""
 from datetime import date
 
 from PySide6.QtCore import QSize, Qt, QTimer
@@ -28,16 +21,16 @@ from morv.ui.shell_placeholder import placeholder
 from morv.ui.suppliers_page import SuppliersPage
 from morv.ui.widgets import ask
 
-SIDE_WIDE = 244     # عرض الشريط الجانبي مفتوحًا
-SIDE_NARROW = 72    # عرضه مطويًا (أيقونات فقط)
+SIDE_WIDE = 244     # sidebar width when open
+SIDE_NARROW = 72    # sidebar width when collapsed to icons
 
-# (المفتاح، الاسم الظاهر، الأيقونة، المرحلة التي تبني الصفحة) بترتيب ظهورها في الشريط.
-# قائمة مسطحة بلا مجموعات ولا فواصل (قرار المالك: لا زحمة في الشريط).
-# - «المبيعات» صفحتها قائمة فواتير البيع والمرتجعات.
-# - «المشتريات» فيها فاتورة الشراء وقائمة فواتير الشراء؛ مرتجع الشراء مؤجل للإصدار التالي.
-# - «المخزون» فيها تبويبات: الأصناف، الدفعات (DOT)، الجرد والتسويات.
-# - «الإعدادات» فيها النسخ الاحتياطي.
-# أرقام المراحل كما في مستند الخطة (0 = مبنية).
+# (key, label, icon, the phase that builds the page), in sidebar order.
+# A flat list, no groups or separators, by the owner's decision.
+# - Sales shows the invoice and return list.
+# - Purchases holds the invoice and its list; purchase returns wait for the next release.
+# - Stock has tabs: items, DOT lots, stocktake.
+# - Settings holds backup.
+# Phase numbers as in the plan document; 0 means built.
 NAV = [
     ("home", "الرئيسية", "home", 6),
     ("pos", "نقطة البيع", "pos", 4),
@@ -54,23 +47,20 @@ NAV = [
 
 
 class MainWindow(QMainWindow):
-    """النافذة الرئيسية. تستخدم إطار نظام التشغيل العادي (بلا نافذة بلا إطار)."""
-
     def __init__(self, session, app: QApplication):
-        """بناء النافذة واسترجاع الثيم وحالة الشريط المحفوظة."""
         super().__init__()
         self.session = session
         con = self.con = session.con
         self.app = app
         self.dark = settings.get(con, "ui.theme", "light") == "dark"
         screen = QGuiApplication.primaryScreen().availableGeometry()
-        # الشريط يبدأ مطويًا تلقائيًا على الشاشات الضيقة (أقل من 1200 بكسل منطقي)
+        # The sidebar starts collapsed on narrow screens, under 1200 logical pixels
         self.collapsed = settings.get(con, "ui.sidebar_collapsed", "1" if screen.width() < 1200 else "0") == "1"
         self.colors = self.apply_theme()
         self.setWindowTitle(APP_NAME)
-        # لا شريط حالة: كان يمتد بعرض النافذة ويقطع الشريط الجانبي من الأسفل.
-        # رقم الإصدار يظهر تلميحًا عند وضع الماوس على اسم البرنامج.
-        # الحد الأدنى نسبي للشاشة حتى لا تخرج النافذة عنها على الشاشات الصغيرة أو التكبير العالي
+        # No status bar: it spanned the window and cut the sidebar off at the bottom.
+        # The version shows as a tooltip on the application name.
+        # The minimum follows the screen, so the window fits small screens and high scaling
         self.setMinimumSize(min(1024, screen.width() - 40), min(640, screen.height() - 80))
 
         root = QWidget()
@@ -106,9 +96,8 @@ class MainWindow(QMainWindow):
         self.health_timer.timeout.connect(self.refresh_health)
         self.health_timer.start(60_000)
 
-    # ---------- البناء ----------
+    # ---------- Building ----------
     def _build_side(self) -> QWidget:
-        """الشريط الجانبي: زر الطي واسم البرنامج في الأعلى، ثم قائمة الشاشات."""
         self.side = QWidget()
         self.side.setObjectName("side")
         lay = QVBoxLayout(self.side)
@@ -139,7 +128,6 @@ class MainWindow(QMainWindow):
         return self.side
 
     def _build_topbar(self) -> QWidget:
-        """الشريط العلوي: عنوان الصفحة، وتنبيه النسخ الاحتياطي، والمستخدم، والثيم، والخروج."""
         bar = QWidget()
         bar.setObjectName("topbar")
         bar.setFixedHeight(60)
@@ -173,14 +161,12 @@ class MainWindow(QMainWindow):
         return bar
 
     def _shortcuts(self) -> None:
-        """اختصارات لوحة المفاتيح العامة (قائمتها في تبويب الاختصارات)."""
         QShortcut(QKeySequence("Ctrl+B"), self, activated=self.toggle_sidebar)
         QShortcut(QKeySequence("Ctrl+D"), self, activated=self.toggle_theme)
         QShortcut(QKeySequence("Ctrl+L"), self, activated=self.logout)
         QShortcut(QKeySequence("Ctrl+Q"), self, activated=self.close)
 
     def refresh_health(self) -> None:
-        """تحديث تنبيه النسخ الاحتياطي في الشريط العلوي."""
         level, text = backup.health(self.con)
         self.health_pill.setText({"ok": "النسخ الاحتياطي سليم", "warn": "تنبيه النسخ الاحتياطي",
                                   "danger": "خلل في النسخ الاحتياطي"}[level])
@@ -190,18 +176,15 @@ class MainWindow(QMainWindow):
         self.health_pill.style().polish(self.health_pill)
 
     def open_backup(self) -> None:
-        """الانتقال إلى تبويب النسخ الاحتياطي داخل الإعدادات."""
         self.go_key("settings")
         page = self.pages["settings"]
         page.tabs.setCurrentWidget(page.backup_tab)
         page.backup_tab.refresh()
 
     def logout(self) -> None:
-        """تسجيل الخروج والعودة إلى شاشة الدخول."""
         self.session.on_logout()
 
     def closeEvent(self, event) -> None:
-        """عند الإغلاق: النسخ المجدول، واقتراح نسخة للفلاشة إن كانت موصولة ولم تُنسخ اليوم."""
         if backup.is_encryption_ready(self.con):
             backup.run_scheduled(self.con, self.session.user.username)
             last_usb = settings.get(self.con, "backup.last_usb_at", "")[:10]
@@ -214,9 +197,8 @@ class MainWindow(QMainWindow):
                     pass
         super().closeEvent(event)
 
-    # ---------- السلوك ----------
+    # ---------- Behaviour ----------
     def go(self, row: int) -> None:
-        """عرض الصفحة المختارة من الشريط وتحديث العنوان."""
         if row < 0:
             return
         self.stack.setCurrentIndex(row)
@@ -225,7 +207,6 @@ class MainWindow(QMainWindow):
             self.refresh_health()
 
     def go_key(self, key: str) -> None:
-        """الانتقال إلى صفحة بمفتاحها (مثل 'settings')، للاستخدام من أي مكان في البرنامج."""
         for i, entry in enumerate(NAV):
             if entry[0] == key:
                 self.nav.setCurrentRow(i)
@@ -233,45 +214,39 @@ class MainWindow(QMainWindow):
         raise KeyError(key)
 
     def apply_theme(self) -> dict:
-        """تطبيق الثيم بالخط والحجم المحفوظين."""
         family = settings.get(self.con, "ui.font_family", theme.DEFAULT_FONT)
         size = int(settings.get(self.con, "ui.font_size", str(theme.DEFAULT_SIZE)))
         return theme.apply(self.app, self.dark, family, size)
 
     def set_font(self, family: str, size: int) -> None:
-        """تغيير الخط والحجم فورًا وحفظهما (من تبويب المظهر)."""
         settings.put(self.con, "ui.font_family", family)
         settings.put(self.con, "ui.font_size", str(size))
         self.colors = self.apply_theme()
         self._refresh_icons()
 
     def toggle_theme(self) -> None:
-        """التبديل بين الفاتح والداكن وحفظ الاختيار."""
         self.dark = not self.dark
         self.colors = self.apply_theme()
         settings.put(self.con, "ui.theme", "dark" if self.dark else "light")
         self._refresh_icons()
 
     def toggle_sidebar(self) -> None:
-        """طي الشريط الجانبي أو فتحه وحفظ الحالة."""
         self.collapsed = not self.collapsed
         settings.put(self.con, "ui.sidebar_collapsed", "1" if self.collapsed else "0")
         self._apply_collapse()
         self._refresh_icons()
 
     def _apply_collapse(self) -> None:
-        """تطبيق حالة الطي: مطويًا تختفي النصوص وتبقى الأيقونات، والاسم يظهر كتلميح."""
         self.side.setFixedWidth(SIDE_NARROW if self.collapsed else SIDE_WIDE)
         self.brand.setVisible(not self.collapsed)
         for i, entry in enumerate(NAV):
             self.nav.item(i).setText("" if self.collapsed else entry[1])
 
     def _refresh_icons(self) -> None:
-        """إعادة تلوين الأيقونات بعد تغيير الثيم أو الطي."""
         c = self.colors
         for i, entry in enumerate(NAV):
             self.nav.item(i).setIcon(icons.icon(entry[2], c["side_text"]))
-        # السهم يشير لاتجاه الحركة: مطويًا يُفتح نحو اليسار، مفتوحًا يُطوى نحو اليمين
+        # The arrow points where it will move: open to the left, collapse to the right
         self.side_toggle.setIcon(icons.icon("expand" if self.collapsed else "collapse", c["side_text"]))
         self.side_toggle.setToolTip("فتح الشريط" if self.collapsed else "طي الشريط")
         self.theme_button.setIcon(icons.icon("sun" if self.dark else "moon", c["text"], 18))

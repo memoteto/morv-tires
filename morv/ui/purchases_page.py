@@ -1,4 +1,4 @@
-"""شاشة المشتريات: قائمة فواتير الشراء المرحّلة ومعاينتها، ونافذة إنشاء فاتورة شراء وترحيلها."""
+"""Purchases screen: posted invoice list with preview, and a new-invoice dialog."""
 import uuid
 from datetime import date
 
@@ -15,11 +15,10 @@ from morv.ui.listpage import TupleModel, ListPage
 from morv.ui.modal import Modal
 from morv.ui.widgets import form, ltr_edit, muted
 
-ITEM_CHOICES = 50          # أقصى عدد أصناف في قائمة الاختيار (يضيّقه البحث)
+ITEM_CHOICES = 50          # most items in the picker; search narrows it
 
 
 class PurchasesPage(ListPage):
-    """قائمة فواتير الشراء المرحّلة. الفاتورة لا تُعدَّل بعد الترحيل؛ التصحيح بمستند عكسي في إصدار لاحق."""
     title = "المشتريات"
     add_label = "فاتورة شراء جديدة"
     search_placeholder = "رقم الفاتورة، المورد، أو رقم فاتورة المورد (F2)"
@@ -32,27 +31,22 @@ class PurchasesPage(ListPage):
     ]
 
     def can_edit(self) -> bool:
-        """صلاحية ترحيل فواتير الشراء."""
         return self.session.can("purchases.post")
 
     def can_view(self) -> bool:
-        """التكلفة بيانات حساسة: تظهر لمن يرحّل الفواتير أو يرى التكلفة فقط."""
         return self.session.can("purchases.post") or self.session.can("items.cost_view")
 
     def fetch(self, query, filter_key, offset):
-        """صفحة من القائمة؛ فارغة لمن لا يملك صلاحية الاطلاع."""
         if not self.can_view():
             return []
         return purchase_view.list_invoices(self.session.con, query, offset=offset)
 
     def total(self) -> str:
-        """العدّاد، أو سبب غياب القائمة."""
         if not self.can_view():
             return "لا تملك صلاحية الاطلاع على فواتير الشراء"
         return f"{purchase_view.count(self.session.con)} فاتورة شراء"
 
     def build_preview(self, row_id: int) -> None:
-        """تفاصيل الفاتورة وأسطرها."""
         inv = purchase_view.get_invoice(self.session.con, row_id)
         self.heading(inv.number, f"المورد: {inv.supplier_name}")
         self.kv("رقم فاتورة المورد", ltr(inv.supplier_invoice_no))
@@ -67,7 +61,6 @@ class PurchasesPage(ListPage):
                     f"{ltr(str(ln.qty))} × {ltr(fmt(ln.unit_cost))} = {ltr(fmt(ln.line_total))}{dot}")
 
     def open_dialog(self, row_id):
-        """صف موجود: معاينته (لا تعديل بعد الترحيل). بلا صف: نافذة فاتورة جديدة."""
         if row_id is not None:
             self.show_preview_id(row_id)
             return
@@ -79,19 +72,16 @@ class PurchasesPage(ListPage):
 
 
 class PurchaseDialog(Modal):
-    """نافذة فاتورة شراء: المورد والرأس، ثم إدخال الأسطر، ثم الترحيل بزر واحد عبر محرك المشتريات."""
-
     def __init__(self, session, parent=None):
-        """بناء الرأس وإدخال الأسطر وجدول الأسطر والإجمالي."""
         super().__init__("فاتورة شراء جديدة", parent, width=960)
         self.session = session
         self.posted = None
         self.lines: list[PurchaseLine] = []
         self._names: list[str] = []
         self._busy = False
-        self._request_key = uuid.uuid4().hex     # مفتاح واحد للنموذج: إعادة الضغط لا تكرر الفاتورة
+        self._request_key = uuid.uuid4().hex     # One key per form: pressing again cannot duplicate the invoice
 
-        # ---- رأس الفاتورة ----
+        # ---- Invoice header ----
         f = form()
         self.supplier = QComboBox()
         for row in suppliers.search(session.con, "", limit=300):
@@ -108,7 +98,7 @@ class PurchaseDialog(Modal):
         f.addRow("ملاحظات", self.notes)
         self.body.addLayout(f)
 
-        # ---- إدخال سطر ----
+        # ---- Line entry ----
         entry = QFrame()
         entry.setObjectName("card")
         col = QVBoxLayout(entry)
@@ -142,7 +132,7 @@ class PurchaseDialog(Modal):
         col.addWidget(self.dot_hint)
         self.body.addWidget(entry)
 
-        # ---- جدول الأسطر ----
+        # ---- Line table ----
         self.lines_model = TupleModel([
             ("#", lambda r: ltr(str(r[0]))),
             ("الصنف", lambda r: r[1]),
@@ -178,9 +168,8 @@ class PurchaseDialog(Modal):
         if not self.supplier.count():
             self.notice.show_message("لا يوجد موردون نشطون؛ أضف مورّدًا من شاشة الموردين أولًا.", "warn")
 
-    # ---------- الأصناف ----------
+    # ---------- Items ----------
     def refresh_items(self, *_args) -> None:
-        """تحديث قائمة اختيار الصنف حسب نص البحث (إطارات وبطاريات فقط؛ الخدمات لا تُشترى)."""
         q = self.item_search.text()
         rows = []
         for kind in ("tire", "battery"):
@@ -192,7 +181,6 @@ class PurchaseDialog(Modal):
         self._on_item_changed()
 
     def _on_item_changed(self, *_args) -> None:
-        """تلميح DOT حسب نوع الصنف المختار."""
         data = self.item_combo.currentData()
         if data is None:
             self.dot_hint.setText("لا أصناف مطابقة.")
@@ -201,9 +189,8 @@ class PurchaseDialog(Modal):
         else:
             self.dot_hint.setText("رمز DOT اختياري للبطاريات.")
 
-    # ---------- الأسطر ----------
+    # ---------- Lines ----------
     def add_line(self) -> bool:
-        """التحقق من مدخلات السطر ثم إضافته؛ يعيد True عند الإضافة، وإلا يعرض الخطأ ويترك المدخلات."""
         data = self.item_combo.currentData()
         if data is None:
             return self._fail("اختر صنفًا للسطر.")
@@ -232,7 +219,6 @@ class PurchaseDialog(Modal):
         return True
 
     def remove_selected(self) -> None:
-        """حذف السطر المختار من المسودة (قبل الترحيل فقط)."""
         idx = self.view.currentIndex()
         if not idx.isValid():
             self.notice.show_message("اختر سطرًا من الجدول أولًا.", "warn")
@@ -242,27 +228,22 @@ class PurchaseDialog(Modal):
         self._refresh_lines()
 
     def _refresh_lines(self) -> None:
-        """إعادة عرض الأسطر والإجمالي."""
         self.lines_model.reset_rows([(i, self._names[i - 1], ln.dot, ln.qty, ln.unit_cost)
                                      for i, ln in enumerate(self.lines, start=1)])
         self._refresh_total()
 
     def total_minor(self) -> int:
-        """إجمالي المسودة بالقرش."""
         return sum(ln.qty * ln.unit_cost for ln in self.lines)
 
     def _refresh_total(self) -> None:
-        """نص الإجمالي."""
         self.total_label.setText(f"الإجمالي: {ltr(fmt(self.total_minor()))} جنيه")
 
     def _fail(self, text: str) -> bool:
-        """عرض خطأ في شريط الرسائل؛ يعيد False ليسهل الخروج."""
         self.notice.show_message(text)
         return False
 
-    # ---------- الترحيل ----------
+    # ---------- Posting ----------
     def post(self) -> None:
-        """فحص الرأس ثم الترحيل عبر المحرك؛ أي رفض يُعرض بنصه ولا يُحفظ شيء، وتبقى المدخلات."""
         if self._busy:
             return
         supplier_id = self.supplier.currentData()
@@ -284,7 +265,7 @@ class PurchaseDialog(Modal):
                 lines=list(self.lines), notes=self.notes.toPlainText())
         except PurchaseError as e:
             self._fail(f"لم تُرحَّل الفاتورة: {e}")
-        except Exception as e:      # أي عطل غير متوقع: المحرك ذري فلا يبقى شيء ناقص
+        except Exception as e:      # Any unexpected failure: the engine is atomic, so nothing half-written remains
             self._fail(f"تعذّر الترحيل ولم يُحفظ شيء ({type(e).__name__}). أعد المحاولة أو راجع السجل.")
         else:
             self.accept()

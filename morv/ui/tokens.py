@@ -1,8 +1,4 @@
-"""ألوان نظام التصميم المعتمد v1.0 (فاتح وداكن).
-
-كل لون في الواجهة يأتي من هنا فقط. لتغيير لون في البرنامج كله عدّله في هذا الملف.
-border_strong (حدود الحقول) أغمق من التصميم الأصلي ليصل تباينه مع الأبيض إلى 3:1 على الأقل.
-"""
+"""Approved design-system colours v1.0, light and dark."""
 
 LIGHT = dict(
     bg="#F3F5F9", surface="#FFFFFF", surface2="#F6F8FB", border="#E1E6EE", border_strong="#8792A3",

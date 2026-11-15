@@ -1,28 +1,20 @@
-"""بناء MorvTires.exe بأداة PyInstaller بوضع onedir (مجلد فيه الملف التنفيذي ومكتباته).
-
-لماذا onedir وليس ملفًا واحدًا: الملف الواحد يفك نفسه في مجلد مؤقت عند كل تشغيل فيبطئ
-البدء، وبرامج الحماية تشتبه فيه أكثر.
-
-الاستخدام:  python tools/build_exe.py
-الناتج:    dist/MorvTires/MorvTires.exe
-"""
+"""Build MorvTires.exe with PyInstaller in onedir mode."""
 import shutil
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# وحدات Qt لا يستخدمها البرنامج؛ استبعادها يصغّر الحجم
+# Qt modules the app never uses; excluding them shrinks the build
 EXCLUDES = ["PySide6.QtNetwork", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtOpenGL",
             "PySide6.QtDBus", "PySide6.QtTest", "PySide6.QtConcurrent", "PySide6.QtSql",
             "PySide6.QtXml", "tkinter", "unittest", "pydoc"]
 
-# ملفات تُحذف بعد البناء: OpenGL البرمجي (20 ميجابايت) لا يحتاجه برنامج ويدجتس عادي
+# Deleted after the build: software OpenGL, 20 MB a plain widgets app never needs
 DROP_AFTER = ["opengl32sw.dll"]
 
 
 def main() -> int:
-    """تشغيل PyInstaller ثم حذف الملفات غير اللازمة وطباعة الحجم النهائي."""
     import PyInstaller.__main__
 
     sep = ";" if sys.platform == "win32" else ":"

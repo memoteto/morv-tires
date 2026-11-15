@@ -1,4 +1,4 @@
-"""اختبارات شاشة المشتريات بلا شاشة: القائمة والمعاينة والصلاحيات، ونافذة الفاتورة والتحقق والترحيل والتكامل مع المحرك."""
+"""Offscreen purchases screen: list, preview, permissions and the invoice dialog."""
 import os
 import shutil
 import tempfile
@@ -10,10 +10,7 @@ from tests.qt_app import get_app, require_qt
 
 @require_qt()
 class PurchasesUiTest(unittest.TestCase):
-    """قاعدة مؤقتة بمدير وكاشير ومورد وأصناف وهمية."""
-
     def setUp(self):
-        """تجهيز."""
         from morv.infra import users
         from morv.infra.db.bootstrap import open_main_db
         from morv.ui.session import Session
@@ -32,21 +29,17 @@ class PurchasesUiTest(unittest.TestCase):
         self.service = self.item("service", "SV-1", "خدمة وهمية")
 
     def tearDown(self):
-        """تنظيف."""
         self.con.close()
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def item(self, kind, code, name):
-        """صنف وهمي مباشرة بالجدول (بيانات اختبار فقط)."""
         return self.con.execute(
             "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
             "VALUES (?,?,?,?,100,100,100)", (kind, code, name, name)).lastrowid
 
     def destroy_on_cleanup(self, widget):
-        """تدمير النافذة صراحةً قبل خروج العملية (بقاء النوافذ حيّة كان ينهار عند الإغلاق)."""
         def _destroy():
-            """حذف النافذة وتفريغ الأحداث المؤجلة."""
             from PySide6.QtCore import QEvent
             widget.deleteLater()
             self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
@@ -55,17 +48,14 @@ class PurchasesUiTest(unittest.TestCase):
         return widget
 
     def dialog(self, session=None):
-        """نافذة فاتورة جديدة."""
         from morv.ui.purchases_page import PurchaseDialog
         return self.destroy_on_cleanup(PurchaseDialog(session or self.session))
 
     def page(self, session=None):
-        """صفحة المشتريات."""
         from morv.ui.purchases_page import PurchasesPage
         return self.destroy_on_cleanup(PurchasesPage(session or self.session))
 
     def pick(self, dlg, item_id):
-        """اختيار صنف في قائمة النافذة بمعرّفه."""
         for i in range(dlg.item_combo.count()):
             if dlg.item_combo.itemData(i)[0] == item_id:
                 dlg.item_combo.setCurrentIndex(i)
@@ -73,7 +63,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.fail(f"الصنف {item_id} غير ظاهر في قائمة الاختيار")
 
     def fill_line(self, dlg, item_id, qty, cost, dot=""):
-        """إدخال سطر وإضافته؛ يعيد نتيجة add_line."""
         self.pick(dlg, item_id)
         dlg.qty.setValue(qty)
         dlg.cost.setText(cost)
@@ -81,12 +70,10 @@ class PurchasesUiTest(unittest.TestCase):
         return dlg.add_line()
 
     def invoices(self):
-        """عدد الفواتير المرحّلة."""
         return self.con.execute("SELECT count(*) FROM purchase_invoices").fetchone()[0]
 
-    # ---------- النافذة ----------
+    # ---------- Dialog ----------
     def test_post_invoice_end_to_end(self):
-        """سطران (إطار بـ DOT وبطارية بلا DOT): الإجمالي يظهر، والترحيل ينشئ الفاتورة والدفعات والطبقات والقيد بمطابقة كاملة."""
         from morv.infra import inventory
         dlg = self.dialog()
         self.assertTrue(self.fill_line(dlg, self.tire, 4, "1,000.50", "2324"))
@@ -106,7 +93,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(inventory.reconcile(self.con), [])
 
     def test_services_not_offered(self):
-        """الخدمات لا تظهر في قائمة اختيار الصنف، والبحث يضيّق القائمة."""
         dlg = self.dialog()
         ids = {dlg.item_combo.itemData(i)[0] for i in range(dlg.item_combo.count())}
         self.assertEqual(ids, {self.tire, self.battery})
@@ -115,7 +101,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(dlg.item_combo.currentData()[0], self.battery)
 
     def test_line_validation_messages(self):
-        """إطار بلا DOT، DOT غير صالح، تكلفة بفاصلة خاطئة أو صفر أو فارغة: كلها ترفض السطر برسالة ولا تضيفه."""
         dlg = self.dialog()
         cases = [(self.tire, "100", "", "DOT"), (self.tire, "100", "9999", "DOT"), (self.tire, "1,50", "2324", "الفاصلة"),
                  (self.tire, "0", "2324", "أكبر من صفر"), (self.tire, "", "2324", "المبلغ"), (self.battery, "abc", "", "مبلغ")]
@@ -129,7 +114,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertIn("اختر صنفًا", dlg.notice.text())
 
     def test_header_validation_before_posting(self):
-        """رقم فاتورة المورد وسطر واحد على الأقل مطلوبان، وبلا مورد لا ترحيل؛ ولا يُكتب شيء."""
         dlg = self.dialog()
         dlg.inv_no.setText("S-1")
         dlg.post()
@@ -146,7 +130,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(self.invoices(), 0)
 
     def test_engine_rejection_is_shown_and_keeps_input(self):
-        """رقم فاتورة مورد مكرر: رسالة المحرك تظهر، لا فاتورة ثانية، وتبقى الأسطر لتصحيحها ثم النجاح."""
         first = self.dialog()
         self.fill_line(first, self.battery, 1, "10")
         first.inv_no.setText("S-1")
@@ -167,7 +150,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(self.invoices(), 2)
 
     def test_double_post_does_not_duplicate(self):
-        """ترحيل النموذج نفسه مرتين (ضغطتان) لا ينشئ إلا فاتورة واحدة."""
         dlg = self.dialog()
         self.fill_line(dlg, self.battery, 2, "10")
         dlg.inv_no.setText("S-1")
@@ -179,7 +161,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(self.con.execute("SELECT count(*) FROM stock_lots").fetchone()[0], 1)
 
     def test_remove_line_updates_total(self):
-        """حذف سطر من المسودة يحدّث الجدول والإجمالي، ولا يحذف دون اختيار."""
         dlg = self.dialog()
         self.fill_line(dlg, self.battery, 1, "10")
         self.fill_line(dlg, self.battery, 2, "20")
@@ -192,7 +173,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(dlg.total_minor(), 2 * 2000)
 
     def test_no_active_suppliers_warns_and_blocks(self):
-        """بلا مورد نشط: تنبيه واضح، والترحيل مرفوض."""
         self.con.execute("UPDATE suppliers SET active = 0")
         dlg = self.dialog()
         self.assertIn("لا يوجد موردون", dlg.notice.text())
@@ -203,7 +183,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(self.invoices(), 0)
 
     def test_engine_permission_enforced_even_if_ui_bypassed(self):
-        """كاشير بلا صلاحية: المحرك يرفض الترحيل حتى لو فُتحت النافذة، وتظهر الرسالة."""
         dlg = self.dialog(self.cashier_session)
         self.fill_line(dlg, self.battery, 1, "10")
         dlg.inv_no.setText("S-1")
@@ -211,9 +190,8 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertIn("صلاحية", dlg.notice.text())
         self.assertEqual(self.invoices(), 0)
 
-    # ---------- الصفحة ----------
+    # ---------- Page ----------
     def test_page_lists_and_previews_invoice(self):
-        """بعد الترحيل تظهر الفاتورة في القائمة، وتفتح معاينتها بالضغط، وزر الجديد مفعّل للمدير."""
         dlg = self.dialog()
         self.fill_line(dlg, self.tire, 4, "1000", "2324")
         dlg.inv_no.setText("S-77")
@@ -225,7 +203,7 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertFalse(page.preview.isVisibleTo(page))
         page.show_preview(page.model.rows[0])
         self.assertTrue(page.preview.isVisibleTo(page))
-        page.open_dialog(page.model.rows[0][0])      # فتح صف موجود يعاينه ولا يفتح نموذج تعديل
+        page.open_dialog(page.model.rows[0][0])      # opening an existing row previews it and opens no edit form
         self.assertTrue(page.preview.isVisibleTo(page))
         page.search.setText("S-77")
         page.reload()
@@ -235,7 +213,6 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(page.model.rowCount(), 0)
 
     def test_cashier_cannot_post_or_view(self):
-        """الكاشير بلا صلاحيات المشتريات: زر الفاتورة معطّل، والقائمة فارغة ولو وُجدت فواتير، وفتح النافذة يُتجاهل."""
         dlg = self.dialog()
         self.fill_line(dlg, self.battery, 1, "10")
         dlg.inv_no.setText("S-1")
@@ -244,10 +221,9 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertFalse(page.add_btn.isEnabled())
         self.assertEqual(page.model.rowCount(), 0)
         self.assertIn("لا تملك صلاحية", page.count_label.text())
-        page.open_dialog(None)       # لا يفتح نافذة (لو فتحها لتعلّق الاختبار بـ exec)
+        page.open_dialog(None)       # opens no dialog; one would hang the test on exec
 
     def test_shell_uses_real_purchases_page(self):
-        """الشريط الجانبي يعرض صفحة المشتريات الحقيقية بدل اللافتة المؤقتة."""
         from morv.ui.purchases_page import PurchasesPage
         from morv.ui.shell import MainWindow
         w = self.destroy_on_cleanup(MainWindow(self.session, self.app))

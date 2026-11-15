@@ -1,11 +1,4 @@
-"""هيكل «قائمة + معاينة» المشترك لشاشات العملاء والموردين والأصناف.
-
-- شريط أدوات: بحث، فلاتر مقطعية، زر إضافة (Ctrl+N).
-- جدول Model/View بلا عناصر داخل الصفوف؛ النتائج صفحة صفحة (300) وزر «تحميل المزيد».
-- لوحة المعاينة لا تظهر افتراضيًا؛ تفتح عند الضغط على صف وتُغلق بزر أو Esc (قرار المالك).
-
-كل شاشة ترث ListPage وتحدد: الأعمدة، ودالة البحث، وبناء المعاينة، ونافذة الإضافة/التعديل.
-"""
+"""Shared list-and-preview skeleton for the master-data screens."""
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
@@ -20,13 +13,7 @@ PAGE = 300
 
 
 class TupleModel(QAbstractTableModel):
-    """نموذج جدول فوق قائمة صفوف (tuples) مع دوال عرض لكل عمود.
-
-    columns: قائمة (العنوان، دالة تأخذ الصف وتعيد النص). الصفوف تُضاف بالدفعات دون إعادة البناء.
-    """
-
     def __init__(self, columns: list, icon_for=None):
-        """تجهيز الأعمدة. icon_for: دالة تأخذ الصف وتعيد اسم أيقونة للعمود الأول (اختياري)."""
         super().__init__()
         self.columns = columns
         self.icon_for = icon_for
@@ -35,13 +22,11 @@ class TupleModel(QAbstractTableModel):
         self.rows: list = []
 
     def reset_rows(self, rows: list) -> None:
-        """استبدال كل الصفوف (بحث جديد)."""
         self.beginResetModel()
         self.rows = list(rows)
         self.endResetModel()
 
     def append_rows(self, rows: list) -> None:
-        """إلحاق صفحة جديدة."""
         if not rows:
             return
         self.beginInsertRows(QModelIndex(), len(self.rows), len(self.rows) + len(rows) - 1)
@@ -49,15 +34,12 @@ class TupleModel(QAbstractTableModel):
         self.endInsertRows()
 
     def rowCount(self, parent=None) -> int:
-        """عدد الصفوف."""
         return 0 if parent is not None and parent.isValid() else len(self.rows)
 
     def columnCount(self, parent=None) -> int:
-        """عدد الأعمدة."""
         return len(self.columns)
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
-        """نص الخلية."""
         if role == Qt.ItemDataRole.DisplayRole:
             return self.columns[index.column()][1](self.rows[index.row()])
         if role == Qt.ItemDataRole.DecorationRole and index.column() == 0 and self.icon_for:
@@ -69,25 +51,21 @@ class TupleModel(QAbstractTableModel):
         return None
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
-        """عناوين الأعمدة."""
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             return self.columns[section][0]
         return None
 
 
 class ListPage(QWidget):
-    """صفحة قائمة ومعاينة. الوارثون يعرّفون: columns, title, add_label, fetch(), build_preview(), open_dialog()."""
-
     columns: list = []
     title = ""
     add_label = "جديد"
     add_icon = "plus"
-    row_icon = None            # دالة (صف → اسم أيقونة) لعمود الاسم
-    filters: list = []          # [(المفتاح، العنوان)]؛ فارغة = بلا فلاتر
+    row_icon = None            # row -> icon name, for the name column
+    filters: list = []          # [(key, title)]; empty means no filters
     search_placeholder = "بحث"
 
     def __init__(self, session):
-        """بناء الصفحة."""
         super().__init__()
         self.session = session
         self.filter_key = self.filters[0][0] if self.filters else None
@@ -139,7 +117,7 @@ class ListPage(QWidget):
         self.view.setAlternatingRowColors(True)
         self.view.verticalHeader().setVisible(False)
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)   # عمود الاسم يتمدد
+        self.view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)   # the name column stretches
         self.view.horizontalHeader().setMinimumSectionSize(90)
         self.view.setIconSize(QSize(18, 18))
         self.view.clicked.connect(lambda idx: self.show_preview(self.model.rows[idx.row()]))
@@ -155,10 +133,10 @@ class ListPage(QWidget):
         left.addWidget(self.more_btn, 0, Qt.AlignmentFlag.AlignCenter)
         body.addLayout(left, 3)
 
-        # لوحة المعاينة (مخفية حتى يُضغط صف)
+        # Preview pane, hidden until a row is clicked
         self.preview = QFrame()
         self.preview.setObjectName("card")
-        # عرض المعاينة نسبي للشاشة: 360 على الشاشات الواسعة، وأقل على الضيقة
+        # Preview width follows the screen: 360 when wide, less when narrow
         screen = QGuiApplication.primaryScreen()
         avail_w = screen.availableGeometry().width() if screen else 1366
         self.preview.setFixedWidth(max(280, min(360, avail_w // 4)))
@@ -188,37 +166,30 @@ class ListPage(QWidget):
         self.current_id = None
         self.reload()
 
-    # ---------- ما يعرّفه الوارث ----------
+    # ---------- What a subclass defines ----------
     def can_edit(self) -> bool:
-        """هل يملك المستخدم صلاحية الإضافة والتعديل؟"""
         return True
 
     def fetch(self, query: str, filter_key, offset: int) -> list:
-        """جلب صفحة من الصفوف؛ العمود الأول دائمًا هو المعرّف."""
         raise NotImplementedError
 
     def total(self) -> str:
-        """نص العدّاد أعلى الصفحة."""
         return ""
 
     def build_preview(self, row_id: int) -> None:
-        """ملء preview_layout بتفاصيل السجل."""
         raise NotImplementedError
 
     def open_dialog(self, row_id: int | None) -> None:
-        """فتح نافذة إضافة (None) أو تعديل."""
         raise NotImplementedError
 
-    # ---------- السلوك ----------
+    # ---------- Behaviour ----------
     def set_filter(self, key) -> None:
-        """تبديل الفلتر."""
         self.filter_key = key
         for k, b in self.filter_buttons.items():
             b.setChecked(k == key)
         self.reload()
 
     def reload(self, keep_id: int | None = None) -> None:
-        """إعادة البحث من البداية، مع إبقاء المعاينة على نفس السجل إن طُلب."""
         self.offset = 0
         rows = self.fetch(self.search.text(), self.filter_key, 0)
         self.model.reset_rows(rows)
@@ -232,25 +203,21 @@ class ListPage(QWidget):
             self.hide_preview()
 
     def _debounced_reload(self) -> None:
-        """إعادة البحث بعد توقف الكتابة. إن أُغلقت القاعدة في الأثناء (تسجيل خروج) يُتجاهل."""
         try:
             self.reload()
         except ClosedDatabase:
             pass
 
     def load_more(self) -> None:
-        """الصفحة التالية."""
         self.offset += PAGE
         rows = self.fetch(self.search.text(), self.filter_key, self.offset)
         self.model.append_rows(rows)
         self.more_btn.setVisible(len(rows) == PAGE)
 
     def show_preview(self, row: tuple) -> None:
-        """فتح المعاينة لصف."""
         self.show_preview_id(row[0])
 
     def show_preview_id(self, row_id: int) -> None:
-        """فتح المعاينة لسجل بمعرّفه."""
         self.current_id = row_id
         while self.preview_layout.count():
             item = self.preview_layout.takeAt(0)
@@ -261,19 +228,12 @@ class ListPage(QWidget):
         self.preview.show()
 
     def hide_preview(self) -> None:
-        """إغلاق المعاينة."""
         self.current_id = None
         self.preview.hide()
         self.view.clearSelection()
 
-    # ---------- مساعدات للمعاينة ----------
+    # ---------- Preview helpers ----------
     def kv(self, key: str, value: str) -> None:
-        """سطر «عنوان: قيمة» في المعاينة: العنوان بعرض ثابت، والقيمة تبدأ من نفس الحافة دائمًا.
-
-        QLabel يحاذي النص حسب اتجاه النص نفسه لا اتجاه الواجهة، فقيمة تبدأ بأرقام لاتينية كانت تقفز
-        إلى أقصى اليسار (ملاحظة المالك). علامة RLM في أول النص تجعل اتجاه الفقرة عربيًا دون أن تغيّر
-        عزل الأرقام بـ ltr().
-        """
         row = QHBoxLayout()
         row.setSpacing(10)
         k = muted(key)
@@ -290,7 +250,6 @@ class ListPage(QWidget):
         self.preview_layout.addWidget(w)
 
     def heading(self, text: str, sub: str = "") -> None:
-        """عنوان المعاينة."""
         h = QLabel(text)
         h.setObjectName("cardTitle")
         h.setWordWrap(True)
@@ -299,7 +258,6 @@ class ListPage(QWidget):
             self.preview_layout.addWidget(muted(sub))
 
     def actions(self, *buttons) -> None:
-        """صف أزرار في المعاينة."""
         row = QHBoxLayout()
         for b in buttons:
             row.addWidget(b)

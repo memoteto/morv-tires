@@ -1,4 +1,4 @@
-"""الموردون (طبقة قاعدة البيانات). نفس قواعد العملاء: موبايل فريد، إيقاف بدل الحذف، بحث موحّد."""
+"""Suppliers (database layer): unique mobile, deactivate instead of delete."""
 import sqlite3
 from dataclasses import dataclass
 
@@ -13,12 +13,11 @@ PAY_METHODS = {"cash": "نقدي", "transfer": "تحويل بنكي", "wallet": 
 
 
 class SupplierError(ValueError):
-    """بيانات مورد مرفوضة، برسالة تصلح للعرض."""
+    """Supplier data refused, with a message fit to show."""
 
 
 @dataclass
 class Supplier:
-    """مورد."""
     id: int | None
     name: str
     mobile: str
@@ -37,7 +36,6 @@ class Supplier:
 
 
 def _clean(s: Supplier) -> Supplier:
-    """فحص وتنظيف قبل الحفظ."""
     s.name = (s.name or "").strip()
     if not s.name:
         raise SupplierError("اسم المورد مطلوب")
@@ -54,13 +52,11 @@ def _clean(s: Supplier) -> Supplier:
 
 
 def _duplicate(con, mobile: str, excluding: int | None) -> str | None:
-    """اسم المورد صاحب نفس الموبايل، أو None."""
     r = con.execute("SELECT name FROM suppliers WHERE mobile=? AND id IS NOT ?", (mobile, excluding)).fetchone()
     return r[0] if r else None
 
 
 def create(con, by, s: Supplier) -> Supplier:
-    """إنشاء مورد."""
     _clean(s)
     dup = _duplicate(con, s.mobile, None)
     if dup:
@@ -78,7 +74,6 @@ def create(con, by, s: Supplier) -> Supplier:
 
 
 def update(con, by, s: Supplier) -> Supplier:
-    """تعديل مورد."""
     _clean(s)
     dup = _duplicate(con, s.mobile, s.id)
     if dup:
@@ -96,19 +91,16 @@ def update(con, by, s: Supplier) -> Supplier:
 
 
 def set_active(con, by, supplier_id: int, active: bool) -> None:
-    """إيقاف أو تفعيل."""
     with transaction(con):
         con.execute("UPDATE suppliers SET active=? WHERE id=?", (int(active), supplier_id))
         audit(con, by, "supplier.activate" if active else "supplier.deactivate", "supplier", supplier_id)
 
 
 def has_documents(con, supplier_id: int) -> bool:
-    """هل للمورد فواتير شراء؟ يُوسَّع في المرحلة 3."""
     return False
 
 
 def delete(con, by, supplier_id: int) -> None:
-    """حذف فعلي لمورد بلا مستندات."""
     if has_documents(con, supplier_id):
         raise SupplierError("للمورد مستندات مسجّلة؛ أوقفه بدل حذفه")
     s = get(con, supplier_id)
@@ -118,7 +110,6 @@ def delete(con, by, supplier_id: int) -> None:
 
 
 def get(con, supplier_id: int) -> Supplier:
-    """مورد برقمه."""
     con.row_factory = sqlite3.Row
     r = con.execute("SELECT * FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
     con.row_factory = None
@@ -131,7 +122,6 @@ def get(con, supplier_id: int) -> Supplier:
 
 
 def search(con, query: str = "", include_inactive: bool = False, limit: int = 300, offset: int = 0) -> list[tuple]:
-    """بحث القائمة: (id, name, mobile, contact_person, active, payment_days, supplies)."""
     q = (query or "").strip()
     where, params = [], []
     if not include_inactive:
@@ -146,5 +136,4 @@ def search(con, query: str = "", include_inactive: bool = False, limit: int = 30
 
 
 def count(con) -> int:
-    """عدد الموردين النشطين."""
     return con.execute("SELECT count(*) FROM suppliers WHERE active=1").fetchone()[0]

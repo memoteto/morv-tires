@@ -1,4 +1,4 @@
-"""فاتورة البيع: ترحيل واحد ذري يكتب الفاتورة وقيد الإيراد وصرف المخزون (FIFO) وقيد التكلفة معًا."""
+"""Sale invoice: one atomic post writing the invoice, revenue entry and FIFO issue."""
 import hashlib
 import json
 import sqlite3
@@ -15,12 +15,11 @@ STOCK_KINDS = ("tire", "battery")
 
 
 class SaleError(ValueError):
-    """فاتورة بيع مرفوضة، برسالة تصلح للعرض."""
+    """Sale invoice refused, with a message fit to show."""
 
 
 @dataclass(frozen=True)
 class SaleLineIn:
-    """سطر بيع: صنف وكمية وسعر الوحدة وخصم السطر بالقرش، واختيار الدفعات اختياري مع سببه."""
     item_id: int
     qty: int
     unit_price: int
@@ -31,7 +30,6 @@ class SaleLineIn:
 
 @dataclass(frozen=True)
 class PostedSale:
-    """نتيجة الترحيل؛ replayed=True إن كان الطلب مكررًا فأُعيدت الفاتورة الأصلية دون تكرار."""
     id: int
     number: str
     total: int
@@ -39,7 +37,6 @@ class PostedSale:
 
 
 def _shape(lines) -> list:
-    """فحص شكل الأسطر بلا قاعدة بيانات: أعداد صحيحة موجبة، وخصم لا يتجاوز قيمة السطر."""
     if not lines:
         raise SaleError("الفاتورة بلا أسطر")
     for i, ln in enumerate(lines, start=1):
@@ -53,7 +50,6 @@ def _shape(lines) -> list:
 
 
 def _check_items(con, lines: list) -> dict:
-    """الأصناف موجودة ونشطة. يعيد {رقم الصنف: نوعه}."""
     kinds = {}
     for i, ln in enumerate(lines, start=1):
         row = con.execute("SELECT kind, active FROM items WHERE id=?", (ln.item_id,)).fetchone()
@@ -66,7 +62,6 @@ def _check_items(con, lines: list) -> dict:
 
 
 def _check_customer(con, customer_id, payments: list) -> None:
-    """العميل نشط إن وُجد، والآجل يحتاج عميلًا بحد ائتمان لا يُتجاوز."""
     credit = sum(p.amount for p in payments if p.method == "credit")
     if customer_id is None:
         if credit:
@@ -83,7 +78,7 @@ def _check_customer(con, customer_id, payments: list) -> None:
         sold = con.execute(
             "SELECT coalesce(sum(p.amount), 0) FROM sale_payments p JOIN sales s ON s.id = p.sale_id "
             "WHERE s.customer_id=? AND p.method='credit'", (customer_id,)).fetchone()[0]
-        # المرتجع المردود على الحساب يخفض المشغول من حد الائتمان
+        # A credit refund frees the customer's used credit limit
         refunded = con.execute(
             "SELECT coalesce(sum(r.total), 0) FROM sale_returns r JOIN sales s ON s.id = r.sale_id "
             "WHERE s.customer_id=? AND r.refund_method='credit'", (customer_id,)).fetchone()[0]
@@ -93,7 +88,6 @@ def _check_customer(con, customer_id, payments: list) -> None:
 
 
 def _payload_hash(customer_id, sale_date, lines, payments, invoice_discount, odometer, plate) -> str:
-    """بصمة محتوى الطلب لكشف إعادة استخدام المفتاح بمحتوى مختلف؛ الملاحظات خارجها عمدًا."""
     body = [customer_id, sale_date, invoice_discount, odometer, plate,
             [[x.item_id, x.qty, x.unit_price, x.line_discount, sorted((x.picks or {}).items())] for x in lines],
             [[p.method, p.amount, p.received, p.reference] for p in payments]]
@@ -104,7 +98,6 @@ def post_sale(con: sqlite3.Connection, by, *, request_key: str, customer_id: int
               payments: list, sale_date: str | None = None, invoice_discount: int = 0,
               odometer: int | None = None, vehicle_plate: str | None = None,
               notes: str | None = None) -> PostedSale:
-    """ترحيل فاتورة بيع كاملة في معاملة واحدة: الفاتورة والقيدان وصرف المخزون معًا أو لا شيء."""
     if by is None or not has_permission(con, by, "sales.post"):
         raise SaleError("لا تملك صلاحية ترحيل فواتير البيع")
     key = (request_key or "").strip()

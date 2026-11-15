@@ -1,4 +1,4 @@
-"""اختبارات قراءة فواتير الشراء للعرض (بلا واجهة): القائمة والبحث والتفاصيل."""
+"""Purchase read-model tests: list, search and details."""
 import os
 import shutil
 import tempfile
@@ -11,10 +11,7 @@ from morv.infra.purchasing import PurchaseLine
 
 
 class PurchaseViewTest(unittest.TestCase):
-    """القائمة والتفاصيل على بيانات وهمية."""
-
     def setUp(self):
-        """قاعدة مؤقتة ومورد وصنفان وفاتورتان."""
         self.dir = Path(tempfile.mkdtemp())
         os.environ["MORV_DATA_DIR"] = str(self.dir)
         self.con = open_main_db(self.dir / "m.db")
@@ -33,27 +30,23 @@ class PurchaseViewTest(unittest.TestCase):
                                 notes="ملاحظة")
 
     def tearDown(self):
-        """تنظيف."""
         self.con.close()
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def test_list_newest_first_and_count(self):
-        """الأحدث أولًا والعدّاد صحيح."""
         rows = purchase_view.list_invoices(self.con)
         self.assertEqual([r[1] for r in rows], ["PI-000002", "PI-000001"])
         self.assertEqual(purchase_view.count(self.con), 2)
         self.assertEqual(rows[1][5], 4 * 100050)
 
     def test_search_by_number_supplier_and_supplier_invoice(self):
-        """البحث برقم الفاتورة أو المورد أو رقم فاتورة المورد."""
         self.assertEqual(len(purchase_view.list_invoices(self.con, "PI-000001")), 1)
         self.assertEqual(len(purchase_view.list_invoices(self.con, "مورد")), 2)
         self.assertEqual(len(purchase_view.list_invoices(self.con, "B-2")), 1)
         self.assertEqual(purchase_view.list_invoices(self.con, "لا يوجد"), [])
 
     def test_get_invoice_with_lines(self):
-        """التفاصيل بأسطرها بالترتيب، والمبالغ بالقرش."""
         inv = purchase_view.get_invoice(self.con, 2)
         self.assertEqual((inv.number, inv.supplier_invoice_no, inv.notes), ("PI-000002", "B-2", "ملاحظة"))
         self.assertEqual([(ln.line_no, ln.item_code, ln.dot, ln.qty, ln.line_total) for ln in inv.lines],
