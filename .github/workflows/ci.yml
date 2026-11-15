@@ -63,6 +63,7 @@ jobs:
           if (-not (Test-Path "$env:MORV_DATA_DIR\morv_tires.db")) { throw "قاعدة البيانات لم تُنشأ" }
       - uses: actions/upload-artifact@v4
         with:
-          name: MorvTires-${{ github.ref_name }}-${{ github.run_number }}
+          # اسم الفرع يحمل "/" في تشغيلات الدمج (3/merge) فيرفضه الرفع؛ نستبدلها بـ "-"
+          name: MorvTires-${{ replace(github.ref_name, '/', '-') }}-${{ github.run_number }}
           path: dist/MorvTires
           retention-days: 14
