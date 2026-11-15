@@ -5,8 +5,9 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QHBoxLayout, QLine
 from morv.core.money import fmt, parse_money, MoneyError
 from morv.core.text import ltr
 from morv.core import validate
-from morv.infra import customers
+from morv.infra import customer_statement, customers
 from morv.infra.customers import Customer, Vehicle
+from morv.ui.customer_statement_dialog import CustomerStatementDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
@@ -55,18 +56,28 @@ class CustomersPage(ListPage):
             self.kv("جهة العمل", c.work_place)
         self.kv("حد الآجل", (fmt(c.credit_limit) + f" · {c.credit_days} يوم") if c.credit_limit else "لا يُسمح بالآجل")
         self.kv("تذكيرات واتساب", "موافق" if c.whatsapp_ok else "لم يوافق")
-        self.preview_layout.addWidget(muted("الرصيد وكشف الحساب وآخر زيارة تظهر هنا بعد المرحلة 4 (الفواتير)."))
+        self.preview_layout.addWidget(muted("آخر زيارة ومواعيد الصيانة تظهر هنا في إصدار لاحق."))
         self.preview_layout.addWidget(muted("المركبات"))
         if not c.vehicles:
             self.preview_layout.addWidget(muted("لا توجد مركبات مسجلة."))
         for v in c.vehicles:
             self.kv(v.title or "مركبة", " · ".join(x for x in (v.plate, ltr(v.tire_front) if v.tire_front else "", v.battery) if x))
+        statement = QPushButton("كشف الحساب")
+        statement.clicked.connect(lambda: self.open_statement(c))
         if self.can_edit():
             edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(c.id))
             toggle = danger_button("إيقاف" if c.active else "تفعيل", "pause" if c.active else "play")
             toggle.clicked.connect(lambda: self.toggle_active(c))
-            self.actions(edit, toggle)
+            self.actions(edit, toggle, statement)
+        else:
+            self.actions(statement)
+
+    def open_statement(self, c: Customer) -> None:
+        con = self.session.con
+        dlg = CustomerStatementDialog(
+            c.name, lambda date_from, date_to: customer_statement.statement(con, c.id, date_from, date_to), self)
+        dlg.exec()
 
     def toggle_active(self, c: Customer) -> None:
         verb = "إيقاف" if c.active else "تفعيل"

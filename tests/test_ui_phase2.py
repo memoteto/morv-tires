@@ -219,3 +219,62 @@ class ShellPagesTest(_Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@require_qt()
+class CustomerStatementUiTest(unittest.TestCase):
+    def setUp(self):
+        from morv.core.sales_rules import Payment
+        from morv.infra import sales, users
+        from morv.infra.db.bootstrap import open_main_db
+        from morv.infra.sales import SaleLineIn
+        from morv.ui.session import Session
+        self.tmp = Path(tempfile.mkdtemp())
+        os.environ["MORV_DATA_DIR"] = str(self.tmp)
+        self.con = open_main_db(self.tmp / "morv_tires.db")
+        self.admin = users.create_user(self.con, None, "admin", "المدير", "Admin12345", "manager")
+        self.session = Session(self.con, self.admin)
+        self.app = get_app()
+        self.service = self.con.execute(
+            "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
+            "VALUES ('service','SV-1','خدمة','خدمه',50000,50000,50000) RETURNING id").fetchone()[0]
+        self.cust = self.con.execute(
+            "INSERT INTO customers (name, name_norm, mobile, credit_limit) "
+            "VALUES ('عميل وهمي','عميل وهمي','01000000011',5000000) RETURNING id").fetchone()[0]
+        sales.post_sale(self.con, self.admin, request_key="ui-st-key-0001", customer_id=self.cust,
+                        lines=[SaleLineIn(self.service, 1, 100000)], payments=[Payment("credit", 100000)],
+                        sale_date="2026-02-01")
+
+    def tearDown(self):
+        self.con.close()
+        os.environ.pop("MORV_DATA_DIR", None)
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def dialog(self):
+        from morv.infra import customer_statement
+        from morv.ui.customer_statement_dialog import CustomerStatementDialog
+        dlg = CustomerStatementDialog(
+            "عميل وهمي",
+            lambda f, t: customer_statement.statement(self.con, self.cust, f, t))
+        self.addCleanup(dlg.deleteLater)
+        return dlg
+
+    def test_dialog_shows_the_movement_and_the_balance(self):
+        dlg = self.dialog()
+        self.assertEqual(len(dlg.model.rows), 1)
+        self.assertEqual(dlg.statement.closing, 100000)
+
+    def test_period_before_the_sale_shows_nothing(self):
+        dlg = self.dialog()
+        dlg.date_from.setText("2026-05-01")
+        dlg.date_to.setText("2026-06-01")
+        dlg.reload()
+        self.assertEqual(len(dlg.model.rows), 0)
+        self.assertEqual(dlg.statement.opening, 100000)
+        self.assertTrue(dlg.empty_label.isVisibleTo(dlg))
+
+    def test_bad_date_is_refused_without_breaking_the_view(self):
+        dlg = self.dialog()
+        dlg.date_from.setText("2026-13-99")
+        dlg.reload()
+        self.assertEqual(len(dlg.model.rows), 1)
