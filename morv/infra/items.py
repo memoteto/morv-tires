@@ -232,8 +232,11 @@ def update(con, by, it: Item) -> Item:
     """تعديل صنف. تغيير الأسعار يُسجَّل بقيمه في المراجعة."""
     _clean(con, it)
     _unique_errors(con, it)
-    old = get(con, it.id)
     with transaction(con):
+        # النوع الحالي يُقرأ هنا بعد حجز الكتابة، لا قبلها، فلا يُبنى القرار على قراءة قديمة (سباق مع تعديل أو شراء متزامن)
+        old = get(con, it.id)
+        if old.kind != it.kind and has_documents(con, it.id):
+            raise ItemError("لا يمكن تغيير نوع صنف له حركات؛ أنشئ صنفًا جديدًا")
         con.execute(
             "UPDATE items SET kind=?, code=?, barcode=?, name=?, name_norm=?, brand=?, model=?, price_retail=?, price_wholesale=?, "
             "price_super=?, min_qty=?, notes=?, updated_at=strftime('%Y-%m-%d %H:%M:%S','now','localtime') WHERE id=?",
@@ -256,8 +259,8 @@ def set_active(con, by, item_id: int, active: bool) -> None:
 
 
 def has_documents(con, item_id: int) -> bool:
-    """هل للصنف حركات؟ يُوسَّع في المرحلة 3."""
-    return False
+    """هل للصنف حركات (شراء أو دفعات)؟ يُوسَّع في المرحلة 4 بالبيع."""
+    return con.execute("SELECT 1 FROM purchase_lines WHERE item_id=? LIMIT 1", (item_id,)).fetchone() is not None
 
 
 def delete(con, by, item_id: int) -> None:

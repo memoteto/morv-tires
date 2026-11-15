@@ -32,6 +32,17 @@ class _Base(unittest.TestCase):
         os.environ.pop("MORV_DATA_DIR", None)
         shutil.rmtree(self.tmp, ignore_errors=True)
 
+    def destroy_on_cleanup(self, widget):
+        """تسجيل تدمير نافذة صراحةً قبل خروج العملية (بقاء نوافذ الصنف حيّة كان ينهار عند الإغلاق)."""
+        def _destroy():
+            """حذف النافذة وتفريغ الأحداث المؤجلة."""
+            from PySide6.QtCore import QEvent
+            widget.deleteLater()
+            self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            self.app.processEvents()
+        self.addCleanup(_destroy)
+        return widget
+
 
 class CustomersPageTest(_Base):
     """شاشة العملاء."""
@@ -123,7 +134,7 @@ class InventoryPageTest(_Base):
         cashier_page = InventoryPage(self.cashier_session)
         self.assertEqual(admin_page.tabs.count(), 3)        # حقول البطاقة انتقلت إلى الإعدادات
         self.assertEqual(cashier_page.tabs.count(), 3)
-        dlg = ItemDialog(self.session, None)
+        dlg = self.destroy_on_cleanup(ItemDialog(self.session, None))
         self.assertIn("size", dlg.widgets)          # حقل الإطار
         dlg.set_kind("battery")
         self.assertIn("ah", dlg.widgets)
@@ -150,7 +161,7 @@ class InventoryPageTest(_Base):
         self.assertEqual(dlg.saved.code, "TR-2055516-MI")
         self.assertEqual(items.count(self.con), 1)
         # بطارية بنفس النافذة
-        dlg2 = ItemDialog(self.session, None)
+        dlg2 = self.destroy_on_cleanup(ItemDialog(self.session, None))
         dlg2.set_kind("battery")
         dlg2.widgets["brand"].setText("Varta")
         dlg2.widgets["ah"].setText("70")
@@ -164,7 +175,7 @@ class InventoryPageTest(_Base):
         dlg2.save()
         self.assertEqual(dlg2.saved.name, "بطارية Varta 70 أمبير")
         # خدمة
-        dlg3 = ItemDialog(self.session, None)
+        dlg3 = self.destroy_on_cleanup(ItemDialog(self.session, None))
         dlg3.set_kind("service")
         dlg3.widgets["name"].setText("تركيب إطار")
         dlg3.widgets["price_retail"].setText("50")
