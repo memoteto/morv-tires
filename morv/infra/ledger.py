@@ -32,9 +32,10 @@ def post_entry(con: sqlite3.Connection, by, entry_date: str, source_type: str, s
             raise LedgerError("المبالغ أعداد صحيحة بالقرش فقط")
     if sum(d for _, d, _ in lines) != sum(c for _, _, c in lines):
         raise LedgerError("القيد غير متوازن")
+    total = sum(d for _, d, _ in lines)
     cur = con.execute(
-        "INSERT INTO journal_entries (entry_date, source_type, source_id, memo, user_id) VALUES (?,?,?,?,?)",
-        (entry_date, source_type, source_id, memo, by.id if by else None))
+        "INSERT INTO journal_entries (entry_date, source_type, source_id, memo, line_count, total, user_id) "
+        "VALUES (?,?,?,?,?,?,?)", (entry_date, source_type, source_id, memo, len(lines), total, by.id if by else None))
     entry_id = cur.lastrowid
     try:
         for no, (acc, d, c) in enumerate(lines, start=1):
@@ -57,4 +58,11 @@ def account_balance(con: sqlite3.Connection, code: str) -> int:
 def unbalanced_entries(con: sqlite3.Connection) -> list:
     """أرقام القيود التي لا يتساوى مدينها ودائنها (يجب أن تكون فارغة دائمًا)."""
     rows = con.execute("SELECT entry_id FROM journal_lines GROUP BY entry_id HAVING sum(debit) <> sum(credit)")
+    return [r[0] for r in rows]
+
+
+def incomplete_entries(con: sqlite3.Connection) -> list:
+    """أرقام القيود التي عدد سطورها الفعلي لا يطابق المعلن في رأسها (يجب أن تكون فارغة دائمًا)."""
+    rows = con.execute("SELECT e.id FROM journal_entries e LEFT JOIN journal_lines l ON l.entry_id = e.id "
+                       "GROUP BY e.id HAVING count(l.id) <> e.line_count")
     return [r[0] for r in rows]

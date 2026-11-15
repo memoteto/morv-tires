@@ -44,15 +44,15 @@ def suggest_lots(con, item_id: int, qty: int) -> dict:
 
 
 def issue(con: sqlite3.Connection, by, item_id: int, qty: int, *, source_type: str, source_id: int,
-          picks: dict | None = None, reason: str | None = None, issue_date: str | None = None) -> IssueResult:
+          source_line_id: int, picks: dict | None = None, reason: str | None = None, issue_date: str | None = None) -> IssueResult:
     """صرف في معاملة مستقلة (انظر issue_in_tx للاستدعاء من معاملة مستند أكبر)."""
     with transaction(con):
         return issue_in_tx(con, by, item_id, qty, source_type=source_type, source_id=source_id,
-                           picks=picks, reason=reason, issue_date=issue_date)
+                           source_line_id=source_line_id, picks=picks, reason=reason, issue_date=issue_date)
 
 
 def issue_in_tx(con: sqlite3.Connection, by, item_id: int, qty: int, *, source_type: str, source_id: int,
-                picks: dict | None = None, reason: str | None = None, issue_date: str | None = None) -> IssueResult:
+                source_line_id: int, picks: dict | None = None, reason: str | None = None, issue_date: str | None = None) -> IssueResult:
     """صرف qty من صنف داخل معاملة المتصل: حركات الدفعات + تخصيص FIFO + قيد التكلفة معًا.
 
     picks={دفعة: كمية} اختياري؛ غيابه يعني اتباع المقترح. أي اختيار يخالف المقترح يلزمه
@@ -64,6 +64,11 @@ def issue_in_tx(con: sqlite3.Connection, by, item_id: int, qty: int, *, source_t
         raise StockError("الصرف يحتاج مستخدمًا")
     if type(qty) is not int or qty <= 0:
         raise StockError("الكمية عدد صحيح موجب")
+    if type(source_id) is not int or type(source_line_id) is not int or not source_type:
+        raise StockError("مرجع المصدر (المستند والسطر) مطلوب")
+    if con.execute("SELECT 1 FROM stock_issues WHERE source_type=? AND source_id=? AND source_line_id=?",
+                   (source_type, source_id, source_line_id)).fetchone():
+        raise StockError("سطر المصدر هذا صُرف من قبل؛ لا يُصرف مرتين")
     item = con.execute("SELECT kind FROM items WHERE id=?", (item_id,)).fetchone()
     if not item or item[0] not in COGS_ACCOUNTS:
         raise StockError("صنف غير موجود أو غير مخزّن")
@@ -89,9 +94,9 @@ def issue_in_tx(con: sqlite3.Connection, by, item_id: int, qty: int, *, source_t
     issue_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM stock_issues").fetchone()[0]
     entry_id = ledger.post_entry(con, by, day, "stock_issue", issue_id, f"تكلفة صرف #{issue_id}",
                                  [(COGS_ACCOUNTS[item[0]], cost_total, 0), (INVENTORY_ACCOUNT, 0, cost_total)])
-    con.execute("INSERT INTO stock_issues (id, item_id, qty, cost_total, source_type, source_id, journal_entry_id, "
-                "user_id) VALUES (?,?,?,?,?,?,?,?)",
-                (issue_id, item_id, qty, cost_total, source_type, source_id, entry_id, by.id))
+    con.execute("INSERT INTO stock_issues (id, item_id, qty, cost_total, source_type, source_id, source_line_id, "
+                "journal_entry_id, user_id) VALUES (?,?,?,?,?,?,?,?,?)",
+                (issue_id, item_id, qty, cost_total, source_type, source_id, source_line_id, entry_id, by.id))
     for lot_id, q in chosen.items():
         con.execute("UPDATE stock_lots SET qty_on_hand = qty_on_hand - ? WHERE id=?", (q, lot_id))
         con.execute("INSERT INTO stock_movements (item_id, lot_id, kind, qty, issue_id, picked_non_oldest, "
@@ -174,4 +179,6 @@ def reconcile(con: sqlite3.Connection) -> list:
         bad.append(f"حساب المخزون {INVENTORY_ACCOUNT} = {ledger_value} ≠ قيمة الطبقات {book_value(con)}")
     for e in ledger.unbalanced_entries(con):
         bad.append(f"قيد {e} غير متوازن")
+    for e in ledger.incomplete_entries(con):
+        bad.append(f"قيد {e}: عدد السطور لا يطابق المعلن")
     return bad

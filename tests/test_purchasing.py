@@ -121,7 +121,7 @@ class MandatoryCaseTest(Base):
         self.buy(self.tire, 2, 100000, "2024")          # A
         self.buy(self.tire, 2, 120000, "2124")          # B
         a, b = self.lot_ids(self.tire)
-        r = inventory.issue(self.con, self.admin, self.tire, 1, source_type="test", source_id=1,
+        r = inventory.issue(self.con, self.admin, self.tire, 1, source_type="test", source_id=1, source_line_id=1,
                             picks={b: 1}, reason="طلب العميل دفعة أحدث")
         self.assertEqual(r.cost_total, 100000)
         self.assertEqual([(x[2], x[5], x[6]) for x in inventory.list_lots(self.con, self.tire)],
@@ -143,7 +143,7 @@ class MandatoryCaseTest(Base):
         plan = [(1, None), (2, {lots[2]: 2}), (1, {lots[1]: 1}), (3, None), (1, {lots[0]: 1}), (1, None)]
         total_cost = 0
         for i, (q, picks) in enumerate(plan, start=1):
-            r = inventory.issue(self.con, self.admin, self.tire, q, source_type="test", source_id=i,
+            r = inventory.issue(self.con, self.admin, self.tire, q, source_type="test", source_id=i, source_line_id=1,
                                 picks=picks, reason="اختيار العميل" if picks else None)
             total_cost += r.cost_total
             self.assertReconciled()
@@ -158,7 +158,7 @@ class MandatoryCaseTest(Base):
         self.buy(self.tire, 2, 130000, "5223")          # أقدم تصنيعًا، استُلم لاحقًا
         newer, older = self.lot_ids(self.tire)
         self.assertEqual(inventory.suggest_lots(self.con, self.tire, 3), {older: 2, newer: 1})
-        r = inventory.issue(self.con, self.cashier, self.tire, 2, source_type="t", source_id=1)
+        r = inventory.issue(self.con, self.cashier, self.tire, 2, source_type="t", source_id=1, source_line_id=1)
         self.assertEqual(r.lot_picks, ((older, 2),))
         self.assertEqual(r.cost_total, 220000)           # التكلفة FIFO من الاستلام الأول لا من الدفعة المصروفة
         self.assertReconciled()
@@ -178,18 +178,18 @@ class IssueRulesTest(Base):
         """دفعة غير الأقدم: الكاشير بلا صلاحية يُرفض، والمدير بلا سبب يُرفض، ولا يتغير شيء."""
         before = self.counts()
         with self.assertRaises(StockError):
-            inventory.issue(self.con, self.cashier, self.tire, 1, source_type="t", source_id=1,
+            inventory.issue(self.con, self.cashier, self.tire, 1, source_type="t", source_id=1, source_line_id=1,
                             picks={self.b: 1}, reason="سبب")
         for reason in (None, "", "  ", "ab"):
             with self.assertRaises(StockError):
-                inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=1,
+                inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=1, source_line_id=1,
                                 picks={self.b: 1}, reason=reason)
         self.assertEqual(self.counts(), before)
         self.assertReconciled()
 
     def test_override_reason_is_recorded(self):
         """السبب والعلامة يُحفظان على حركة الصرف."""
-        inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=1,
+        inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=1, source_line_id=1,
                         picks={self.b: 1}, reason="ضمان قديم")
         row = self.con.execute("SELECT picked_non_oldest, override_reason FROM stock_movements "
                                "WHERE kind='issue'").fetchone()
@@ -197,7 +197,7 @@ class IssueRulesTest(Base):
 
     def test_picking_the_suggested_lot_is_not_an_override(self):
         """اختيار الدفعة المقترحة نفسها لا يحتاج سببًا ولا صلاحية."""
-        inventory.issue(self.con, self.cashier, self.tire, 1, source_type="t", source_id=1, picks={self.a: 1})
+        inventory.issue(self.con, self.cashier, self.tire, 1, source_type="t", source_id=1, source_line_id=1, picks={self.a: 1})
         self.assertReconciled()
 
     def test_bad_picks_rejected(self):
@@ -207,14 +207,14 @@ class IssueRulesTest(Base):
         for picks in ({other: 1}, {self.a: 3}, {self.a: 1, self.b: 1}, {self.a: 0}, {self.a: True}):
             with self.assertRaises(StockError, msg=str(picks)):
                 inventory.issue(self.con, self.admin, self.tire, 1 if len(picks) == 1 else 1, source_type="t",
-                                source_id=1, picks=picks, reason="سبب")
+                                source_id=1, source_line_id=1, picks=picks, reason="سبب")
         self.assertReconciled()
 
     def test_no_negative_stock(self):
         """صرف أكثر من المتاح مرفوض، والقيد في قاعدة البيانات يمنع الرصيد السالب حتى لو تجاوزه الكود."""
         before = self.counts()
         with self.assertRaises(StockError):
-            inventory.issue(self.con, self.admin, self.tire, 5, source_type="t", source_id=1)
+            inventory.issue(self.con, self.admin, self.tire, 5, source_type="t", source_id=1, source_line_id=1)
         self.assertEqual(self.counts(), before)
         with self.assertRaises(sqlite3.IntegrityError), transaction(self.con):
             self.con.execute("UPDATE stock_lots SET qty_on_hand = -1 WHERE id=?", (self.a,))
@@ -225,26 +225,82 @@ class IssueRulesTest(Base):
         """كمية صفر أو سالبة أو عشرية، وصنف خدمة أو غير موجود."""
         for q in (0, -1, 1.5, True):
             with self.assertRaises(StockError, msg=str(q)):
-                inventory.issue(self.con, self.admin, self.tire, q, source_type="t", source_id=1)
+                inventory.issue(self.con, self.admin, self.tire, q, source_type="t", source_id=1, source_line_id=1)
         for it in (self.service, 9999):
             with self.assertRaises(StockError):
-                inventory.issue(self.con, self.admin, it, 1, source_type="t", source_id=1)
+                inventory.issue(self.con, self.admin, it, 1, source_type="t", source_id=1, source_line_id=1)
 
     def test_issue_requires_open_transaction_for_in_tx(self):
         """issue_in_tx خارج معاملة خطأ برمجي يُكشف."""
         with self.assertRaises(StockError):
-            inventory.issue_in_tx(self.con, self.admin, self.tire, 1, source_type="t", source_id=1)
+            inventory.issue_in_tx(self.con, self.admin, self.tire, 1, source_type="t", source_id=1, source_line_id=1)
 
     def test_partial_failure_rolls_back_issue(self):
         """فشل في آخر خطوة من الصرف يلغي كل شيء: دفعات وطبقات وقيود وتخصيصات."""
         before = self.counts()
         snap = self.con.execute("SELECT id, qty_on_hand FROM stock_lots").fetchall()
         with mock.patch.object(inventory, "audit", side_effect=RuntimeError("عطل")), self.assertRaises(RuntimeError):
-            inventory.issue(self.con, self.admin, self.tire, 3, source_type="t", source_id=1)
+            inventory.issue(self.con, self.admin, self.tire, 3, source_type="t", source_id=1, source_line_id=1)
         self.assertEqual(self.counts(), before)
         self.assertEqual(self.con.execute("SELECT id, qty_on_hand FROM stock_lots").fetchall(), snap)
         self.assertFalse(self.con.in_transaction)
         self.assertReconciled()
+
+
+class DuplicateIssueTest(Base):
+    """منع صرف سطر المصدر نفسه مرتين، مع جواز عدة أسطر في المستند الواحد."""
+
+    def setUp(self):
+        """صنفان بمخزون كافٍ."""
+        super().setUp()
+        self.buy(self.tire, 10, 100000, "2024")
+        self.buy(self.tire2, 10, 50000, "2024")
+
+    def state(self):
+        """لقطة: الأرصدة والقيمة وتكلفة المبيعات وعدد الصرفات."""
+        return (inventory.on_hand(self.con, self.tire), inventory.book_value(self.con),
+                ledger.account_balance(self.con, "5110"), self.counts())
+
+    def test_same_source_line_cannot_issue_twice(self):
+        """إعادة صرف نفس (المستند، السطر) تُرفض ولا تتكرر الكمية ولا تكلفة المبيعات، ولو تغيّرت الكمية أو الصنف."""
+        inventory.issue(self.con, self.admin, self.tire, 2, source_type="sale", source_id=7, source_line_id=1)
+        before = self.state()
+        for item, q in ((self.tire, 2), (self.tire, 1), (self.tire2, 2)):
+            with self.assertRaises(StockError, msg=f"{item}/{q}"):
+                inventory.issue(self.con, self.admin, item, q, source_type="sale", source_id=7, source_line_id=1)
+        self.assertEqual(self.state(), before)
+        self.assertEqual(before[0], 8)
+        self.assertEqual(before[2], 200000)
+        self.assertReconciled()
+
+    def test_several_lines_in_one_document_are_allowed(self):
+        """أسطر مختلفة في المستند نفسه تُصرف كلها، وكل سطر مرة واحدة."""
+        inventory.issue(self.con, self.admin, self.tire, 2, source_type="sale", source_id=7, source_line_id=1)
+        inventory.issue(self.con, self.admin, self.tire, 1, source_type="sale", source_id=7, source_line_id=2)
+        inventory.issue(self.con, self.admin, self.tire2, 3, source_type="sale", source_id=7, source_line_id=3)
+        inventory.issue(self.con, self.admin, self.tire, 1, source_type="sale", source_id=8, source_line_id=1)
+        self.assertEqual(inventory.on_hand(self.con, self.tire), 6)
+        self.assertEqual(inventory.on_hand(self.con, self.tire2), 7)
+        self.assertEqual(ledger.account_balance(self.con, "5110"), 550000)   # 4×1,000 + 3×500
+        with self.assertRaises(StockError):
+            inventory.issue(self.con, self.admin, self.tire, 1, source_type="sale", source_id=7, source_line_id=2)
+        self.assertReconciled()
+
+    def test_source_reference_required(self):
+        """مرجع المصدر ناقص أو غير صحيح مرفوض."""
+        for kw in (dict(source_type="", source_id=1, source_line_id=1), dict(source_type="s", source_id=None,
+                   source_line_id=1), dict(source_type="s", source_id=1, source_line_id="1")):
+            with self.assertRaises(StockError, msg=str(kw)):
+                inventory.issue(self.con, self.admin, self.tire, 1, **kw)
+        self.assertEqual(inventory.on_hand(self.con, self.tire), 10)
+
+    def test_database_enforces_uniqueness_even_if_code_is_bypassed(self):
+        """القيد الفريد في قاعدة البيانات يمنع التكرار حتى لو تخطى الكود الفحص."""
+        inventory.issue(self.con, self.admin, self.tire, 1, source_type="sale", source_id=7, source_line_id=1)
+        with self.assertRaises(sqlite3.IntegrityError), transaction(self.con):
+            self.con.execute("INSERT INTO stock_issues (item_id, qty, cost_total, source_type, source_id, "
+                             "source_line_id, journal_entry_id) SELECT item_id, qty, cost_total, source_type, "
+                             "source_id, source_line_id, 1 FROM stock_issues")
 
 
 class PurchaseTest(Base):
@@ -366,7 +422,7 @@ class PurchaseTest(Base):
         """طبقات صنفين مختلفين لا تختلط: الصرف من صنف لا يستهلك طبقة الآخر."""
         self.buy(self.tire, 1, 100000)
         self.buy(self.tire2, 1, 900000)
-        r = inventory.issue(self.con, self.admin, self.tire2, 1, source_type="t", source_id=1)
+        r = inventory.issue(self.con, self.admin, self.tire2, 1, source_type="t", source_id=1, source_line_id=1)
         self.assertEqual(r.cost_total, 900000)
         self.assertEqual(inventory.book_value(self.con, self.tire), 100000)
         self.assertReconciled()
@@ -376,7 +432,7 @@ class PurchaseTest(Base):
         self.buy(self.tire, 3, 33333, "2024")
         self.buy(self.tire, 7, 1, "2124")
         for i in range(10):
-            inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=i)
+            inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=i, source_line_id=1)
             self.assertReconciled()
         self.assertEqual(inventory.book_value(self.con), 0)
 
@@ -388,7 +444,7 @@ class ProtectionTest(Base):
         """فاتورة وصرف مرحّلان."""
         super().setUp()
         self.buy(self.tire, 3, 100000, "2024")
-        inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=1)
+        inventory.issue(self.con, self.admin, self.tire, 1, source_type="t", source_id=1, source_line_id=1)
 
     def exec_fails(self, sql):
         """أمر كتابة يجب أن يُرفض من قاعدة البيانات نفسها."""
@@ -432,6 +488,45 @@ class ProtectionTest(Base):
             ledger.post_entry(self.con, self.admin, "2026-11-01", "t", 1, "m", [("1410", 1, 0), ("2110", 0, 1)])
         self.assertEqual(ledger.unbalanced_entries(self.con), [])
         self.assertReconciled()
+
+    def test_no_extra_lines_after_entry_is_complete(self):
+        """سطر إضافي على قيد مكتمل مرفوض من قاعدة البيانات، ولا يتغير إجمالي الحساب."""
+        before = ledger.account_balance(self.con, "1410")
+        self.exec_fails("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
+                        "VALUES (1, 3, '1410', 5, 0)")
+        self.exec_fails("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
+                        "VALUES (1, 3, '2110', 0, 5)")
+        self.assertEqual(ledger.account_balance(self.con, "1410"), before)
+        self.assertReconciled()
+
+    def test_entry_must_balance_when_its_last_line_arrives(self):
+        """قيد يُبنى ذريًا: آخر سطر غير موازن للإجمالي المعلن يُلغي الإدراج، والمتوازن يُقبل."""
+        def build(second_credit):
+            """رأس بسطرين وإجمالي 100 ثم سطراه داخل معاملة واحدة."""
+            with transaction(self.con):
+                eid = self.con.execute(
+                    "INSERT INTO journal_entries (entry_date, source_type, source_id, line_count, total) "
+                    "VALUES ('2026-11-01', 't', 99, 2, 100)").lastrowid
+                self.con.execute("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
+                                 "VALUES (?,1,'1410',100,0)", (eid,))
+                self.con.execute("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
+                                 "VALUES (?,2,'2110',0,?)", (eid, second_credit))
+        before = self.counts()
+        with self.assertRaises(sqlite3.IntegrityError):
+            build(99)
+        self.assertEqual(self.counts(), before)             # المعاملة كلها تراجعت
+        build(100)
+        self.assertEqual(self.counts()["journal_entries"], before["journal_entries"] + 1)
+
+    def test_reconcile_flags_entry_missing_lines(self):
+        """رأس قيد بقي بسطر واحد من اثنين (لو عبث أحد بالقاعدة) تكشفه المطابقة."""
+        with transaction(self.con):
+            eid = self.con.execute("INSERT INTO journal_entries (entry_date, source_type, source_id, line_count, "
+                                   "total) VALUES ('2026-11-01', 't', 98, 2, 100)").lastrowid
+            self.con.execute("INSERT INTO journal_lines (entry_id, line_no, account_code, debit, credit) "
+                             "VALUES (?,1,'1410',100,0)", (eid,))
+        self.assertEqual(ledger.incomplete_entries(self.con), [eid])
+        self.assertTrue(any("عدد السطور" in x for x in inventory.reconcile(self.con)))
 
     def test_reconcile_detects_tampering(self):
         """لو عبث أحد بالرصيد (خارج الكود) تكشفه المطابقة."""
@@ -489,7 +584,7 @@ class ConcurrencyTest(Base):
 
         def sell(con, i):
             """صرف وحدة."""
-            return inventory.issue(con, self.admin, self.tire, 1, source_type="t", source_id=i)
+            return inventory.issue(con, self.admin, self.tire, 1, source_type="t", source_id=i, source_line_id=1)
         out = self.run_threads(sell, 5)
         oks = [v for k, v in out if k == "ok"]
         errs = [v for k, v in out if k == "err"]
@@ -497,6 +592,21 @@ class ConcurrencyTest(Base):
         self.assertTrue(all(isinstance(e, StockError) for e in errs), errs)
         self.assertEqual(inventory.on_hand(self.con, self.tire), 0)
         self.assertEqual(len({r.issue_id for r in oks}), 3)
+        self.assertReconciled()
+
+    def test_same_source_line_issues_once_under_concurrency(self):
+        """أربع عمليات صرف متزامنة لنفس (المستند، السطر): واحدة تنجح والباقي يُرفض، والكمية تُخصم مرة."""
+        self.buy(self.tire, 10, 100000, "2024")
+
+        def sell(con, i):
+            """صرف نفس سطر المصدر."""
+            return inventory.issue(con, self.admin, self.tire, 3, source_type="sale", source_id=5, source_line_id=1)
+        out = self.run_threads(sell, 4)
+        errs = [v for k, v in out if k == "err"]
+        self.assertEqual(([k for k, _ in out].count("ok"), len(errs)), (1, 3), errs)
+        self.assertTrue(all(isinstance(e, StockError) for e in errs), errs)
+        self.assertEqual(inventory.on_hand(self.con, self.tire), 7)
+        self.assertEqual(ledger.account_balance(self.con, "5110"), 300000)
         self.assertReconciled()
 
 
