@@ -22,6 +22,7 @@ PERMISSIONS = {
     "items.cost_view": "رؤية التكلفة والهامش",
     "purchases.post": "ترحيل فواتير الشراء واستلام البضاعة",
     "sales.post": "ترحيل فواتير البيع",
+    "sales.return": "ترحيل مرتجعات البيع",
     "stock.pick_lot": "اختيار دفعة DOT غير الأقدم عند الصرف",
     "users.manage": "المستخدمون والصلاحيات",
     "settings.edit": "الإعدادات العامة",
