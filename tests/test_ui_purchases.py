@@ -326,6 +326,45 @@ class PurchasesUiTest(unittest.TestCase):
         row["cost_edit"].setText("9")   # 10% lower than last cost
         self.assertIn("أقل من آخر شراء", row["cost_note"].text())
 
+    def test_discount_tax_shipping_paid_fields_are_disabled(self):
+        # These fields exist in the approved design but aren't wired to the
+        # engine yet (purchasing.post_invoice has no such parameters), so they
+        # must stay disabled rather than imply a function that doesn't work.
+        dlg = self.dialog()
+        for field in (dlg.disc, dlg.tax, dlg.ship, dlg.paid, dlg.pay_method):
+            self.assertFalse(field.isEnabled())
+
+    def test_disabled_fields_never_affect_the_shown_or_posted_total(self):
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 2, "100")
+        # Force values into the disabled fields (bypassing the UI, as a stray
+        # future edit might) to prove the summary and the posted total both
+        # ignore them completely rather than silently double-counting.
+        dlg.disc.setText("50")
+        dlg.tax.setText("20")
+        dlg.ship.setText("30")
+        dlg.paid.setText("999")
+        dlg._refresh_summary()
+        self.assertIn("200.00", dlg._total_lbl.text())
+        self.assertIn("200.00", dlg._rem_lbl.text())
+        dlg.inv_no.setText("S-1")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 20000)
+        stored_total = self.con.execute(
+            "SELECT total FROM purchase_invoices WHERE id=?", (dlg.posted.id,)).fetchone()[0]
+        self.assertEqual(stored_total, 20000)
+        inv_debit = self.con.execute(
+            "SELECT sum(debit) FROM journal_lines jl JOIN journal_entries je ON je.id = jl.entry_id "
+            "WHERE je.source_type='purchase_invoice' AND je.source_id=? AND jl.account_code='1410'",
+            (dlg.posted.id,)).fetchone()[0]
+        sup_credit = self.con.execute(
+            "SELECT sum(credit) FROM journal_lines jl JOIN journal_entries je ON je.id = jl.entry_id "
+            "WHERE je.source_type='purchase_invoice' AND je.source_id=? AND jl.account_code='2110'",
+            (dlg.posted.id,)).fetchone()[0]
+        self.assertEqual(inv_debit, 20000)
+        self.assertEqual(sup_credit, 20000)
+
     def test_shell_uses_real_purchases_page(self):
         from morv.ui.purchases_page import PurchasesPage
         from morv.ui.shell import MainWindow

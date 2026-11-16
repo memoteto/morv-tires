@@ -451,16 +451,22 @@ class PurchaseForm(QWidget):
         self._sub_lbl.setObjectName("cardTitle")
         sbody.addWidget(self._kv_row("إجمالي الأصناف", self._sub_lbl))
 
+        # Discount/tax/shipping are shown in the approved design's layout but not
+        # yet wired to the engine (purchasing.post_invoice has no such parameters),
+        # so they stay disabled rather than silently affecting the totals below.
         self.disc = ltr_edit("0.00")
         self.tax = ltr_edit("0.00")
         self.ship = ltr_edit("0.00")
-        self.disc.textChanged.connect(self._refresh_summary)
-        self.tax.textChanged.connect(self._refresh_summary)
-        self.ship.textChanged.connect(self._refresh_summary)
+        for field in (self.disc, self.tax, self.ship):
+            field.setEnabled(False)
+            field.setToolTip("غير مفعّل حاليًا — سيُضاف لاحقًا")
 
         sbody.addWidget(self._field("خصم المورد", self.disc))
         sbody.addWidget(self._field("ضريبة على فاتورة المورد", self.tax))
         sbody.addWidget(self._field("نقل وتحميل", self.ship))
+        hint = muted("هذه الحقول غير مفعّلة بعد؛ إجمالي الفاتورة يُضاف بالكامل لرصيد المورد.")
+        hint.setWordWrap(True)
+        sbody.addWidget(hint)
 
         self._total_lbl = QLabel()
         self._total_lbl.setObjectName("pageTitle")
@@ -470,10 +476,14 @@ class PurchaseForm(QWidget):
         pay_grid = QGridLayout()
         pay_grid.setHorizontalSpacing(10)
         self.paid = ltr_edit("0.00")
-        self.paid.textChanged.connect(self._refresh_summary)
         self.pay_method = QComboBox()
         for label in ("الخزينة (نقدي)", "تحويل بنكي", "InstaPay / محفظة"):
             self.pay_method.addItem(label)
+        # Same as discount/tax/shipping above: no partial-payment/cash-ledger
+        # handling exists in the engine yet, so this stays disabled, not wired.
+        for field in (self.paid, self.pay_method):
+            field.setEnabled(False)
+            field.setToolTip("غير مفعّل حاليًا — سيُضاف لاحقًا")
         pay_grid.addWidget(self._field("مدفوع الآن", self.paid), 0, 0)
         pay_grid.addWidget(self._field("من", self.pay_method), 0, 1)
         sbody.addLayout(pay_grid)
@@ -850,33 +860,13 @@ class PurchaseForm(QWidget):
         return lines, None
 
     def _refresh_summary(self) -> None:
+        # Discount/tax/shipping/paid are disabled (see _card above) and the engine
+        # (purchasing.post_invoice) never receives them, so the total shown here
+        # must equal exactly what gets posted: the raw line subtotal, in full.
         sub = self._sub_total()
         self._sub_lbl.setText(ltr(fmt(sub)))
-        try:
-            disc = parse_money(self.disc.text()) if self.disc.text().strip() else 0
-        except MoneyError:
-            disc = 0
-        try:
-            tax = parse_money(self.tax.text()) if self.tax.text().strip() else 0
-        except MoneyError:
-            tax = 0
-        try:
-            ship = parse_money(self.ship.text()) if self.ship.text().strip() else 0
-        except MoneyError:
-            ship = 0
-        total = sub - disc + tax + ship
-        self._total_lbl.setText(f"إجمالي الفاتورة: {ltr(fmt(total))} ج.م")
-        try:
-            paid = parse_money(self.paid.text()) if self.paid.text().strip() else 0
-        except MoneyError:
-            paid = 0
-        rem = total - paid
-        if rem > 0:
-            self._rem_lbl.setText(f"يُضاف لرصيد المورد: {ltr(fmt(rem))} ج.م")
-        elif rem < 0:
-            self._rem_lbl.setText(f"المدفوع أكبر من الفاتورة بـ {ltr(fmt(-rem))} ج.م")
-        else:
-            self._rem_lbl.setText("مدفوعة بالكامل")
+        self._total_lbl.setText(f"إجمالي الفاتورة: {ltr(fmt(sub))} ج.م")
+        self._rem_lbl.setText(f"يُضاف بالكامل لرصيد المورد: {ltr(fmt(sub))} ج.م")
 
     def _fail(self, text: str) -> bool:
         self.notice.show_message(text)
