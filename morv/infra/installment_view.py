@@ -62,7 +62,7 @@ def get_contract(con: sqlite3.Connection, contract_id: int) -> ContractView:
 def invoices_without_contract(con: sqlite3.Connection) -> list[tuple]:
     """Invoices sold on instalments whose contract was never approved: they sit on 1320 with no schedule."""
     return con.execute(
-        "SELECT s.id, s.number, cu.name, s.sale_date, s.total FROM sales s "
+        "SELECT s.id, s.number, cu.name, s.sale_date, s.total, cu.mobile FROM sales s "
         "JOIN customers cu ON cu.id = s.customer_id "
         "WHERE EXISTS (SELECT 1 FROM sale_payments p WHERE p.sale_id = s.id AND p.method = 'installment') "
         "AND NOT EXISTS (SELECT 1 FROM installment_contracts c WHERE c.sale_id = s.id) "
