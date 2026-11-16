@@ -123,7 +123,8 @@ class PurchasesUiTest(unittest.TestCase):
                 self.assertFalse(self.fill_line(dlg, item_id, 1, cost, dot))
                 self.assertIn(expect, dlg.notice.text())
                 self.assertEqual(dlg.lines_model.rowCount(), 0)
-        # No item selected -> should fail
+        # No item selected -> should fail (clear any leftover selection first)
+        dlg._selected_item_id = None
         self.assertFalse(dlg.add_line())
         self.assertIn("اختر صنفًا", dlg.notice.text())
 
@@ -188,7 +189,10 @@ class PurchasesUiTest(unittest.TestCase):
 
     def test_no_active_suppliers_warns_and_blocks(self):
         self.con.execute("UPDATE suppliers SET active = 0")
-        dlg = self.dialog()
+        stack = self.page()
+        stack.open_form()
+        dlg = stack.form_page
+        # No supplier selected (all disabled), verify warning
         self.assertIn("لا يوجد موردون", dlg.notice.text())
         self.fill_line(dlg, self.battery, 1, "10")
         dlg.inv_no.setText("S-1")
@@ -210,9 +214,11 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertIs(stack.currentWidget(), stack.list_page)
         stack.list_page.open_dialog(None)
         self.assertIs(stack.currentWidget(), stack.form_page)
-        self.fill_line(stack.form_page, self.battery, 1, "10")
-        stack.form_page.inv_no.setText("S-1")
-        stack.form_page.post()
+        f = stack.form_page
+        f._pick_supplier(self.sup, "مورد وهمي", "01000000001")
+        self.fill_line(f, self.battery, 1, "10")
+        f.inv_no.setText("S-1")
+        f.post()
         self.assertIsNotNone(stack.form_page.posted)
         self.assertIs(stack.currentWidget(), stack.list_page)
         self.assertEqual(stack.list_page.model.rowCount(), 1)
