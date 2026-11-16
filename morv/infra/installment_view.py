@@ -1,6 +1,7 @@
 """Read-only views of instalment contracts, their schedules and invoices still waiting for one."""
 import sqlite3
 from dataclasses import dataclass
+from datetime import date
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,72 @@ def list_contracts(con: sqlite3.Connection, query: str = "", limit: int = 300, o
 
 def count(con: sqlite3.Connection) -> int:
     return con.execute("SELECT count(*) FROM installment_contracts").fetchone()[0]
+
+
+@dataclass(frozen=True)
+class CollectRow:
+    no: int
+    due_date: str
+    amount: int
+    paid: int
+    remaining: int
+    status: str
+    tone: str
+
+
+@dataclass(frozen=True)
+class CollectionView:
+    contract_id: int
+    number: str
+    sale_number: str
+    customer_name: str
+    customer_mobile: str
+    national_id: str
+    monthly: int
+    paid_total: int
+    remaining_total: int
+    overdue_count: int
+    overdue_amount: int
+    next_due: tuple | None       # (due_date, remaining) of the first open row, or None if settled
+    rows: tuple
+
+
+def collection_view(con: sqlite3.Connection, contract_id: int, today: str | None = None) -> CollectionView:
+    """Schedule rows with paid/remaining/status, and the summary the Collect screen shows."""
+    today = today or date.today().isoformat()
+    head = con.execute(
+        "SELECT c.number, s.number, cu.name, coalesce(cu.mobile, ''), c.national_id, c.months, c.instalments_total "
+        "FROM installment_contracts c JOIN sales s ON s.id = c.sale_id JOIN customers cu ON cu.id = c.customer_id "
+        "WHERE c.id=?", (contract_id,)).fetchone()
+    if not head:
+        raise LookupError("العقد غير موجود")
+    number, sale_number, cust_name, cust_mobile, nid, months, instalments_total = head
+    raw = con.execute(
+        "SELECT r.id, r.no, r.due_date, r.amount, coalesce((SELECT sum(l.amount) FROM installment_payment_lines l "
+        "WHERE l.row_id = r.id), 0) FROM installment_rows r WHERE r.contract_id=? ORDER BY r.no", (contract_id,)
+    ).fetchall()
+    rows, paid_total, overdue_count, overdue_amount, next_due = [], 0, 0, 0, None
+    for _, no, due_date, amount, paid in raw:
+        paid_total += paid
+        remaining = amount - paid
+        if remaining <= 0:
+            status, tone = "مدفوع", "ok"
+        elif due_date < today:
+            days = (date.fromisoformat(today) - date.fromisoformat(due_date)).days
+            status = (("جزئي · " if paid else "") + f"متأخر {days} يومًا")
+            tone = "danger"
+            overdue_count += 1
+            overdue_amount += remaining
+        elif due_date == today:
+            status, tone = "مستحق اليوم", "warn"
+        else:
+            status, tone = ("مدفوع جزئيًا" if paid else "لم يحن"), ""
+        if remaining > 0 and next_due is None:
+            next_due = (due_date, remaining)
+        rows.append(CollectRow(no, due_date, amount, paid, remaining, status, tone))
+    return CollectionView(contract_id, number, sale_number, cust_name, cust_mobile, nid,
+                          instalments_total // months, paid_total, instalments_total - paid_total,
+                          overdue_count, overdue_amount, next_due, tuple(rows))
 
 
 def get_contract(con: sqlite3.Connection, contract_id: int) -> ContractView:

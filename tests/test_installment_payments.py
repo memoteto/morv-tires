@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from morv.core.sales_rules import Payment
-from morv.infra import installments, ledger, sales, users
+from morv.infra import installment_view, installments, ledger, sales, users
 from morv.infra.db.bootstrap import open_main_db
 from morv.infra.installments import ContractError
 from morv.infra.sales import SaleLineIn
@@ -123,6 +123,34 @@ class PaymentTest(unittest.TestCase):
                     "UPDATE installment_payment_lines SET amount = 1", "DELETE FROM installment_payment_lines"):
             with self.assertRaises(sqlite3.DatabaseError, msg=sql):
                 self.con.execute(sql)
+
+
+class CollectionViewTest(PaymentTest):
+    """The Collect screen's summary and per-row status, built on top of collect_payment."""
+
+    def test_fresh_contract_has_no_overdue_and_next_due_is_first_row(self):
+        due_date = self.con.execute("SELECT due_date FROM installment_rows WHERE id=?", (self.rows[0][0],)).fetchone()[0]
+        v = installment_view.collection_view(self.con, self.contract.id, today="2026-11-14")
+        self.assertEqual((v.paid_total, v.overdue_count, v.overdue_amount), (0, 0, 0))
+        self.assertEqual(v.next_due, (due_date, self.rows[0][2]))
+        self.assertEqual(v.rows[0].status, "لم يحن")
+
+    def test_paid_row_is_removed_from_overdue_and_marked_paid(self):
+        self.pay(amount=self.rows[0][2])
+        v = installment_view.collection_view(self.con, self.contract.id, today="2027-01-01")
+        self.assertEqual(v.rows[0].status, "مدفوع")
+        self.assertEqual(v.overdue_count, 0)   # row 2 (2027-01-13) is not yet due on 2027-01-01
+
+    def test_unpaid_past_due_row_counts_as_overdue(self):
+        v = installment_view.collection_view(self.con, self.contract.id, today="2026-12-20")
+        self.assertEqual(v.overdue_count, 1)
+        self.assertEqual(v.overdue_amount, self.rows[0][2])
+        self.assertIn("متأخر", v.rows[0].status)
+
+    def test_partial_payment_marks_row_partial_overdue(self):
+        self.pay(amount=self.rows[0][2] // 2)
+        v = installment_view.collection_view(self.con, self.contract.id, today="2027-02-01")
+        self.assertTrue(v.rows[0].status.startswith("جزئي ·"))
 
 
 if __name__ == "__main__":
