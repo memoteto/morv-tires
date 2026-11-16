@@ -4,8 +4,8 @@ from datetime import date
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout, QHeaderView,
-                               QLabel, QLineEdit, QPushButton, QSpinBox, QStackedWidget, QTableView, QVBoxLayout,
-                               QWidget)
+                               QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QTableView,
+                               QVBoxLayout, QWidget)
 
 from morv.core import installments as calc
 from morv.core.money import MoneyError, fmt, parse_money
@@ -138,7 +138,17 @@ class ContractForm(QWidget):
         self._request_key = uuid.uuid4().hex
         self._terms = None
 
-        root = QVBoxLayout(self)
+        # The form + schedule table are taller than the default window; scroll rather than overlap.
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        inner = QWidget()
+        scroll.setWidget(inner)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scroll)
+
+        root = QVBoxLayout(inner)
         root.setContentsMargins(16, 12, 16, 12)
         root.setSpacing(12)
         self.notice = Notice()
@@ -381,7 +391,17 @@ class CollectPage(QWidget):
         self._request_key = uuid.uuid4().hex
         self.view_data: installment_view.CollectionView | None = None
 
-        root = QVBoxLayout(self)
+        # The stats row + schedule table are taller than the default window; scroll rather than overlap.
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        inner = QWidget()
+        scroll.setWidget(inner)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scroll)
+
+        root = QVBoxLayout(inner)
         root.setContentsMargins(16, 12, 16, 12)
         root.setSpacing(12)
         root.addWidget(self._header())
