@@ -274,6 +274,47 @@ class PurchasesUiTest(unittest.TestCase):
         dlg._pick_supplier(new_dlg.created.id, new_dlg.created.name, new_dlg.created.mobile)
         self.assertEqual(dlg._supplier_id, new_dlg.created.id)
 
+    def test_new_item_dialog_saves_and_is_added_as_a_row(self):
+        from morv.ui.inventory_page import ItemDialog
+        dlg = self.dialog()
+        new_dlg = self.destroy_on_cleanup(ItemDialog(self.session, None, parent=dlg))
+        new_dlg.set_kind("service")
+        new_dlg.widgets["brand"].setText("ماركة وهمية")
+        new_dlg.widgets["name"].setText("خدمة سريعة وهمية")
+        new_dlg.widgets["code"].setText("SVC-TEST-1")
+        new_dlg.widgets["price_retail"].setText("100")
+        new_dlg.save()
+        self.assertIsNotNone(new_dlg.saved)
+        self.assertEqual(new_dlg.saved.name, "خدمة سريعة وهمية")
+        dlg._add_row(new_dlg.saved.id, new_dlg.saved.kind, new_dlg.saved.name)
+        self.assertEqual(dlg._rows[-1]["item_id"], new_dlg.saved.id)
+        self.assertEqual(dlg._rows[-1]["name"], "خدمة سريعة وهمية")
+
+    def test_stepper_buttons_have_their_own_compact_style(self):
+        # Regression: a plain QPushButton inherits 14px of horizontal padding
+        # from the base QSS rule, which left no room for the glyph inside a
+        # narrow fixed-width button and made it look blank.
+        from PySide6.QtWidgets import QPushButton
+        dlg = self.dialog()
+        row = self.add_row(dlg, self.battery, 1, "10")
+        row_w = row["widget"]
+        steppers = [b for b in row_w.findChildren(QPushButton) if b.objectName() == "stepperBtn"]
+        self.assertEqual(len(steppers), 2)
+        for b in steppers:
+            self.assertIn(b.text(), ("−", "+"))
+
+    def test_cost_note_hidden_until_there_is_something_to_say(self):
+        dlg = self.dialog()
+        row = self.add_row(dlg, self.battery, 1, "10")
+        dlg.inv_no.setText("S-1")
+        dlg.post()
+        second = self.dialog()
+        row2 = self.add_row(second, self.battery, 1, "")
+        self.assertFalse(row2["cost_note"].isVisibleTo(second))
+        row2["cost_edit"].setText("11")
+        self.assertTrue(row2["cost_note"].isVisibleTo(second))
+        self.assertTrue(row2["cost_note"].text())
+
     def test_cost_note_compares_against_last_purchase(self):
         dlg = self.dialog()
         self.add_row(dlg, self.battery, 1, "10")

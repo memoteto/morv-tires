@@ -16,6 +16,7 @@ from morv.infra import items, purchase_view, purchasing, suppliers
 from morv.infra.purchasing import PurchaseError, PurchaseLine
 from morv.infra import suppliers as sup_infra
 from morv.ui import icons
+from morv.ui.inventory_page import ItemDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.widgets import Notice, ltr_edit, muted, primary_button
@@ -666,7 +667,10 @@ class PurchaseForm(QWidget):
 
     def _open_new_item_dialog(self) -> None:
         self._item_popup.hide()
-        self.notice.show_message("إضافة صنف جديد — قريبًا", "warn")
+        dlg = ItemDialog(self.session, None, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.saved:
+            self.item_search.clear()
+            self._add_row(dlg.saved.id, dlg.saved.kind, dlg.saved.name)
 
     # ---------- Lines: one self-contained row per item, added on pick ----------
     def _add_row(self, item_id: int, kind: str, name: str) -> None:
@@ -677,7 +681,7 @@ class PurchaseForm(QWidget):
 
         num_lbl = muted("")
         num_lbl.setWordWrap(False)
-        h.addWidget(num_lbl, 0)
+        h.addWidget(num_lbl, 0, Qt.AlignmentFlag.AlignTop)
 
         item_w = QWidget()
         iw = QHBoxLayout(item_w)
@@ -688,7 +692,7 @@ class PurchaseForm(QWidget):
         name_lbl = QLabel(name)
         iw.addWidget(ic)
         iw.addWidget(name_lbl, 1)
-        h.addWidget(item_w, 3)
+        h.addWidget(item_w, 3, Qt.AlignmentFlag.AlignTop)
 
         # Quantity stepper: explicit −/+ buttons instead of the spin box's
         # own tiny native arrows.
@@ -697,14 +701,15 @@ class PurchaseForm(QWidget):
         qty_spin.setValue(1)
         qty_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         qty_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Width only: the base QSS forces a 38px min-height on every
-        # QPushButton, and pairing that with setFixedSize's shorter height
-        # clipped the glyph out of view, leaving the button looking blank.
+        # The base QPushButton rule pads every button 14px each side; a
+        # fixed-width button narrower than that padding has no room left
+        # to draw its own glyph, which is why it looked blank. #stepperBtn
+        # overrides the padding instead of fighting it with widget sizing.
         minus_btn = QPushButton("−")
-        minus_btn.setFixedWidth(30)
+        minus_btn.setObjectName("stepperBtn")
         minus_btn.clicked.connect(qty_spin.stepDown)
         plus_btn = QPushButton("+")
-        plus_btn.setFixedWidth(30)
+        plus_btn.setObjectName("stepperBtn")
         plus_btn.clicked.connect(qty_spin.stepUp)
         qty_w = QWidget()
         qh = QHBoxLayout(qty_w)
@@ -713,7 +718,7 @@ class PurchaseForm(QWidget):
         qh.addWidget(minus_btn)
         qh.addWidget(qty_spin, 1)
         qh.addWidget(plus_btn)
-        h.addWidget(qty_w, 1)
+        h.addWidget(qty_w, 1, Qt.AlignmentFlag.AlignTop)
 
         # Cost + an inline note comparing it against the item's last purchase cost
         cost_w = QWidget()
@@ -723,24 +728,29 @@ class PurchaseForm(QWidget):
         cost_edit = ltr_edit("0.00")
         cost_note = QLabel("")
         cost_note.setWordWrap(False)
+        # Hidden (not just empty) so the cell is single-line height like its
+        # row-mates; it only grows the row when there is a note to show,
+        # instead of always reserving a second line that pushed cost_edit
+        # up and out of vertical alignment with the rest of the row.
+        cost_note.hide()
         cw.addWidget(cost_edit)
         cw.addWidget(cost_note)
-        h.addWidget(cost_w, 1)
+        h.addWidget(cost_w, 1, Qt.AlignmentFlag.AlignTop)
 
         dot_edit = ltr_edit("WWYYYY")
-        h.addWidget(dot_edit, 1)
+        h.addWidget(dot_edit, 1, Qt.AlignmentFlag.AlignTop)
 
         total_lbl = QLabel(ltr(fmt(0)))
         total_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute
                                | Qt.AlignmentFlag.AlignVCenter)
-        h.addWidget(total_lbl, 1)
+        h.addWidget(total_lbl, 1, Qt.AlignmentFlag.AlignTop)
 
         del_btn = QPushButton()
         del_btn.setFlat(True)
         del_btn.setIcon(icons.icon("trash", ICON_MUTED, 16))
         del_btn.setFixedSize(30, 30)
         del_btn.setToolTip("حذف السطر")
-        h.addWidget(del_btn, 0)
+        h.addWidget(del_btn, 0, Qt.AlignmentFlag.AlignTop)
 
         row = {"widget": row_w, "item_id": item_id, "kind": kind, "name": name,
               "last_cost": purchasing.last_cost(self.session.con, item_id),
@@ -788,16 +798,20 @@ class PurchaseForm(QWidget):
         note = row["cost_note"]
         if not last or cost <= 0:
             note.setText("")
+            note.hide()
             return
         pct = (cost - last) / last * 100
         if cost > last:
             note.setText(f"أعلى من آخر شراء +{pct:.1f}%")
             note.setObjectName("costUp")
+            note.show()
         elif cost < last:
             note.setText(f"أقل من آخر شراء {abs(pct):.1f}%")
             note.setObjectName("costDown")
+            note.show()
         else:
             note.setText("")
+            note.hide()
         note.style().unpolish(note)
         note.style().polish(note)
 
