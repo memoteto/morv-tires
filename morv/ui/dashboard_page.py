@@ -8,17 +8,20 @@ from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QPushBu
 from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import dashboard_view
+from morv.ui import icons
 from morv.ui.pos_page import PAYMENT_LABELS
 from morv.ui.widgets import Notice, card, muted
 
 PERIODS = dashboard_view.PERIODS
 ALERT_LEVEL = {"bad": "error", "warn": "warn", "ok": "success"}
+ICON_PRIMARY = "#1F5FD6"
 # Collect.dc.html/Purchase.dc.html/Statement.dc.html have no standalone search-first entry point yet,
 # so these route to the nearest existing screen instead of a deep link; see design_decisions.md #15.
-QUICK_ACTIONS = (("pos", "فاتورة بيع جديدة", "نقطة البيع", True),
-                 ("installments", "تحصيل قسط", "بالاسم أو الموبايل", False),
-                 ("purchases", "استلام بضاعة", "فاتورة شراء", False),
-                 ("customers", "كشف حساب عميل", "الحركات والرصيد", False))
+# The icon name is one of morv.ui.icons.PATHS, matching the sidebar icon for that same screen.
+QUICK_ACTIONS = (("pos", "pos", "فاتورة بيع جديدة", "نقطة البيع", True),
+                 ("installments", "installments", "تحصيل قسط", "بالاسم أو الموبايل", False),
+                 ("purchases", "purchases", "استلام بضاعة", "فاتورة شراء", False),
+                 ("customers", "customers", "كشف حساب عميل", "الحركات والرصيد", False))
 
 
 class DashboardPage(QWidget):
@@ -89,18 +92,27 @@ class DashboardPage(QWidget):
     def _quick_actions(self) -> QGridLayout:
         grid = QGridLayout()
         grid.setSpacing(10)
-        for i, (key, title, sub, main) in enumerate(QUICK_ACTIONS):
+        for i, (key, icon_name, title, sub, main) in enumerate(QUICK_ACTIONS):
             btn = QPushButton()
             btn.setObjectName("qaMain" if main else "qaTile")
-            inner = QVBoxLayout(btn)
-            inner.setContentsMargins(14, 10, 14, 10)
-            inner.setSpacing(2)
+            outer = QHBoxLayout(btn)
+            outer.setContentsMargins(14, 10, 14, 10)
+            outer.setSpacing(12)
+            ic = QLabel()
+            ic.setObjectName("qaIcon")
+            ic.setFixedSize(38, 38)
+            ic.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            ic.setPixmap(icons.icon(icon_name, "#FFFFFF" if main else ICON_PRIMARY, 20).pixmap(20, 20))
+            outer.addWidget(ic)
+            col = QVBoxLayout()
+            col.setSpacing(2)
             title_lbl = QLabel(title)
             title_lbl.setObjectName("qaTitle")
-            inner.addWidget(title_lbl)
+            col.addWidget(title_lbl)
             sub_lbl = QLabel(sub)
             sub_lbl.setObjectName("qaSub")
-            inner.addWidget(sub_lbl)
+            col.addWidget(sub_lbl)
+            outer.addLayout(col, 1)
             if self.on_navigate:
                 btn.clicked.connect(lambda _c=False, k=key: self.on_navigate(k))
             grid.addWidget(btn, 0, i)
@@ -119,6 +131,8 @@ class DashboardPage(QWidget):
             inner.addWidget(muted(title))
             value = QLabel("—")
             value.setObjectName("cardTitleDanger" if danger else "cardTitle")
+            value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute
+                               | Qt.AlignmentFlag.AlignVCenter)
             inner.addWidget(value)
             sub = muted("")
             inner.addWidget(sub)
@@ -128,6 +142,9 @@ class DashboardPage(QWidget):
 
     def _chart_card(self) -> QFrame:
         box, lay = card("مبيعات آخر 7 أيام")
+        # Fixed cap matching the approved design's plot height, so this card never stretches
+        # to match a taller sibling (the alerts card) regardless of layout-stretch quirks.
+        box.setMaximumHeight(230)
         self.chart_row = QHBoxLayout()
         self.chart_row.setSpacing(8)
         lay.addLayout(self.chart_row, 1)

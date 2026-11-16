@@ -105,6 +105,8 @@ QPushButton#qaMain {{ text-align:right; min-height:58px; border-radius:14px; pad
 QLabel#qaTitle {{ font-weight:600; }}
 QLabel#qaSub {{ color:{t['muted']}; font-size:{t['fs']-1}px; }}
 QPushButton#qaMain QLabel#qaTitle, QPushButton#qaMain QLabel#qaSub {{ color:{t['on_primary']}; }}
+QLabel#qaIcon {{ background:{t['primary_soft']}; border-radius:10px; }}
+QPushButton#qaMain QLabel#qaIcon {{ background:rgba(255,255,255,0.18); }}
 QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2']}; border:0;
              gridline-color:{t['border']}; selection-background-color:{t['select']}; selection-color:{t['text']}; }}
 QTableView::item {{ padding:0 10px; }}
