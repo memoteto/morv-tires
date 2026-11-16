@@ -36,7 +36,7 @@ class InventoryPage(QWidget):
 
 
 class ItemsPage(ListPage):
-    title = "الأصناف"
+    title = "الأصناف والمخزون"
     add_label = "صنف جديد"
     search_placeholder = "الاسم، الكود، المقاس (205/55R16) أو الباركود (F2)"
     filters = [("all", "الكل"), ("tire", "إطارات"), ("battery", "بطاريات"), ("service", "خدمات"), ("inactive", "الموقوفة")]
