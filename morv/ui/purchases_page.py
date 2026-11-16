@@ -512,6 +512,9 @@ class PurchaseForm(QWidget):
         subtitle = QLabel("المشتريات · الاستلام في: المخزن الرئيسي")
         subtitle.setObjectName("muted")
         h.addWidget(subtitle)
+        draft_badge = QLabel("مسودة — لم تُرحَّل بعد")
+        draft_badge.setObjectName("pillWarn")
+        h.addWidget(draft_badge)
         h.addStretch(1)
         h.addWidget(self._deferred_button("إرفاق صورة فاتورة المورد"))
         back = QPushButton("رجوع للقائمة")
@@ -694,13 +697,14 @@ class PurchaseForm(QWidget):
         qty_spin.setValue(1)
         qty_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         qty_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Width only: the base QSS forces a 38px min-height on every
+        # QPushButton, and pairing that with setFixedSize's shorter height
+        # clipped the glyph out of view, leaving the button looking blank.
         minus_btn = QPushButton("−")
-        minus_btn.setFlat(True)
-        minus_btn.setFixedSize(26, 26)
+        minus_btn.setFixedWidth(30)
         minus_btn.clicked.connect(qty_spin.stepDown)
         plus_btn = QPushButton("+")
-        plus_btn.setFlat(True)
-        plus_btn.setFixedSize(26, 26)
+        plus_btn.setFixedWidth(30)
         plus_btn.clicked.connect(qty_spin.stepUp)
         qty_w = QWidget()
         qh = QHBoxLayout(qty_w)
