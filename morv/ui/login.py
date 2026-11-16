@@ -21,7 +21,18 @@ class LoginDialog(QDialog):
         outer.setContentsMargins(30, 30, 30, 22)
         outer.setSpacing(14)
 
-        name = QLabel(shop.load(con).name or APP_NAME)
+        shop_name = shop.load(con).name or APP_NAME
+        logo = QLabel((shop_name.strip()[:1] or "M").upper())
+        logo.setObjectName("loginLogo")
+        logo.setFixedSize(56, 56)
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_row = QHBoxLayout()
+        logo_row.addStretch(1)
+        logo_row.addWidget(logo)
+        logo_row.addStretch(1)
+        outer.addLayout(logo_row)
+
+        name = QLabel(shop_name)
         name.setObjectName("pageTitle")
         name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(name)
