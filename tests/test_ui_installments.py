@@ -144,14 +144,15 @@ class PosToContractTest(unittest.TestCase):
         self.assertFalse(p.split_btn.isVisibleTo(p))
         self.assertTrue(p.instalment_hint.isVisibleTo(p))
 
+    def _service_item_id(self):
+        return self.con.execute("SELECT id FROM items WHERE code='SV-1'").fetchone()[0]
+
     def test_posting_on_instalments_asks_for_a_contract(self):
         p = self.pos()
         seen = []
         p.contract_needed.connect(seen.append)
         p.customer.setCurrentIndex(1)
-        p.item_search.setText("خدمة")
-        p.qty.setValue(1)
-        p.add_line()
+        p._add_row(self._service_item_id(), "service", "خدمة")
         p.pay1_method.setCurrentIndex(p.pay1_method.findData("installment"))
         p.post()
         self.assertIsNotNone(p.posted)
@@ -161,8 +162,7 @@ class PosToContractTest(unittest.TestCase):
 
     def test_instalment_sale_without_a_customer_is_refused(self):
         p = self.pos()
-        p.item_search.setText("خدمة")
-        p.add_line()
+        p._add_row(self._service_item_id(), "service", "خدمة")
         p.pay1_method.setCurrentIndex(p.pay1_method.findData("installment"))
         p.post()
         self.assertIsNone(p.posted)
