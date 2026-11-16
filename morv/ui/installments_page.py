@@ -146,9 +146,12 @@ class ContractForm(QWidget):
         title.setObjectName("cardTitle")
         back = QPushButton("رجوع للقائمة")
         back.clicked.connect(lambda: self.stack.back_to_list())
+        preview = QPushButton("معاينة العقد — قريبًا")
+        preview.setEnabled(False)
         h.addWidget(title)
         h.addWidget(muted(f"من فاتورة البيع {ltr(self.sale[1])}"))
         h.addStretch(1)
+        h.addWidget(preview)
         h.addWidget(back)
         return w
 
@@ -269,7 +272,7 @@ class ContractForm(QWidget):
         self.post_btn = primary_button("اعتماد العقد وتحصيل المقدم")
         self.post_btn.clicked.connect(self.post)
         col.addWidget(self.post_btn)
-        for label in ("حفظ كمسودة", "طباعة العقد والجدول", "معاينة العقد"):
+        for label in ("حفظ كمسودة", "طباعة العقد والجدول"):
             b = QPushButton(f"{label} — قريبًا")
             b.setEnabled(False)
             col.addWidget(b)

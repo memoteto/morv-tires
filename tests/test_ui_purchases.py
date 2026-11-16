@@ -48,8 +48,9 @@ class PurchasesUiTest(unittest.TestCase):
         return widget
 
     def dialog(self, session=None):
-        from morv.ui.purchases_page import PurchaseDialog
-        return self.destroy_on_cleanup(PurchaseDialog(session or self.session))
+        stack = self.page(session)
+        stack.open_form()
+        return stack.form_page
 
     def page(self, session=None):
         from morv.ui.purchases_page import PurchasesPage
@@ -190,13 +191,27 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertIn("صلاحية", dlg.notice.text())
         self.assertEqual(self.invoices(), 0)
 
+    # ---------- Full-page navigation (no modal) ----------
+    def test_add_opens_full_page_and_post_returns_to_list(self):
+        stack = self.page()
+        self.assertIs(stack.currentWidget(), stack.list_page)
+        stack.list_page.open_dialog(None)
+        self.assertIs(stack.currentWidget(), stack.form_page)
+        self.fill_line(stack.form_page, self.battery, 1, "10")
+        stack.form_page.inv_no.setText("S-1")
+        stack.form_page.post()
+        self.assertIsNotNone(stack.form_page.posted)
+        self.assertIs(stack.currentWidget(), stack.list_page)
+        self.assertEqual(stack.list_page.model.rowCount(), 1)
+
     # ---------- Page ----------
     def test_page_lists_and_previews_invoice(self):
         dlg = self.dialog()
         self.fill_line(dlg, self.tire, 4, "1000", "2324")
         dlg.inv_no.setText("S-77")
         dlg.post()
-        page = self.page()
+        stack = self.page()
+        page = stack.list_page
         self.assertEqual(page.model.rowCount(), 1)
         self.assertTrue(page.add_btn.isEnabled())
         self.assertIn("1 فاتورة", page.count_label.text())
@@ -205,6 +220,7 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertTrue(page.preview.isVisibleTo(page))
         page.open_dialog(page.model.rows[0][0])      # opening an existing row previews it and opens no edit form
         self.assertTrue(page.preview.isVisibleTo(page))
+        self.assertIs(stack.currentWidget(), page)   # previewing an existing invoice never leaves the list
         page.search.setText("S-77")
         page.reload()
         self.assertEqual(page.model.rowCount(), 1)
@@ -217,11 +233,12 @@ class PurchasesUiTest(unittest.TestCase):
         self.fill_line(dlg, self.battery, 1, "10")
         dlg.inv_no.setText("S-1")
         dlg.post()
-        page = self.page(self.cashier_session)
+        stack = self.page(self.cashier_session)
+        page = stack.list_page
         self.assertFalse(page.add_btn.isEnabled())
         self.assertEqual(page.model.rowCount(), 0)
         self.assertIn("لا تملك صلاحية", page.count_label.text())
-        page.open_dialog(None)       # opens no dialog; one would hang the test on exec
+        page.open_dialog(None)       # opens no form; one would hang the test if it tried exec
 
     def test_shell_uses_real_purchases_page(self):
         from morv.ui.purchases_page import PurchasesPage

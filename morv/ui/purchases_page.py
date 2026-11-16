@@ -1,10 +1,11 @@
-"""Purchases screen: posted invoice list with preview, and a new-invoice dialog."""
+"""Purchases screen: posted invoice list with preview, and a full-page new-invoice form."""
 import uuid
 from datetime import date
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QPlainTextEdit, QPushButton, QSpinBox, QTableView, QVBoxLayout)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
+                               QLineEdit, QPlainTextEdit, QPushButton, QSpinBox, QStackedWidget, QTableView,
+                               QVBoxLayout, QWidget)
 
 from morv.core import dot as dotmod
 from morv.core.money import MoneyError, fmt, parse_money
@@ -12,13 +13,33 @@ from morv.core.text import ltr
 from morv.infra import items, purchase_view, purchasing, suppliers
 from morv.infra.purchasing import PurchaseError, PurchaseLine
 from morv.ui.listpage import TupleModel, ListPage
-from morv.ui.modal import Modal
-from morv.ui.widgets import form, ltr_edit, muted
+from morv.ui.widgets import Notice, form, ltr_edit, muted, primary_button
 
 ITEM_CHOICES = 50          # most items in the picker; search narrows it
 
 
-class PurchasesPage(ListPage):
+class PurchasesPage(QStackedWidget):
+    def __init__(self, session, parent=None):
+        super().__init__(parent)
+        self.session = session
+        self.list_page = PurchasesListPage(session, self)
+        self.form_page = None
+        self.addWidget(self.list_page)
+
+    def open_form(self) -> None:
+        if self.form_page is not None:
+            self.removeWidget(self.form_page)
+            self.form_page.deleteLater()
+        self.form_page = PurchaseForm(self.session, self)
+        self.addWidget(self.form_page)
+        self.setCurrentWidget(self.form_page)
+
+    def back_to_list(self, keep_id: int | None = None) -> None:
+        self.setCurrentWidget(self.list_page)
+        self.list_page.reload(keep_id=keep_id)
+
+
+class PurchasesListPage(ListPage):
     title = "المشتريات"
     add_label = "فاتورة شراء جديدة"
     search_placeholder = "رقم الفاتورة، المورد، أو رقم فاتورة المورد (F2)"
@@ -29,6 +50,10 @@ class PurchasesPage(ListPage):
         ("التاريخ", lambda r: ltr(r[4])),
         ("الإجمالي", lambda r: ltr(fmt(r[5]))),
     ]
+
+    def __init__(self, session, stack=None):
+        super().__init__(session)       # Qt refuses attributes set before its own init
+        self.stack = stack
 
     def can_edit(self) -> bool:
         return self.session.can("purchases.post")
@@ -64,22 +89,28 @@ class PurchasesPage(ListPage):
         if row_id is not None:
             self.show_preview_id(row_id)
             return
-        if not self.can_edit():
+        if not self.can_edit() or self.stack is None:
             return
-        dlg = PurchaseDialog(self.session, self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            self.reload(keep_id=dlg.posted.id)
+        self.stack.open_form()
 
 
-class PurchaseDialog(Modal):
-    def __init__(self, session, parent=None):
-        super().__init__("فاتورة شراء جديدة", parent, width=960)
+class PurchaseForm(QWidget):
+    def __init__(self, session, stack, parent=None):
+        super().__init__(parent)
         self.session = session
+        self.stack = stack
         self.posted = None
         self.lines: list[PurchaseLine] = []
         self._names: list[str] = []
         self._busy = False
         self._request_key = uuid.uuid4().hex     # One key per form: pressing again cannot duplicate the invoice
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 12, 16, 12)
+        root.setSpacing(12)
+        self.notice = Notice()
+        root.addWidget(self._header())
+        root.addWidget(self.notice)
 
         # ---- Invoice header ----
         f = form()
@@ -92,11 +123,14 @@ class PurchaseDialog(Modal):
         self.notes = QPlainTextEdit()
         self.notes.setPlaceholderText("ملاحظات (اختيارية)")
         self.notes.setFixedHeight(48)
+        attach = QPushButton("إرفاق صورة فاتورة المورد — قريبًا")
+        attach.setEnabled(False)
         f.addRow("المورد *", self.supplier)
         f.addRow("رقم فاتورة المورد *", self.inv_no)
         f.addRow("تاريخ الفاتورة *", self.inv_date)
         f.addRow("ملاحظات", self.notes)
-        self.body.addLayout(f)
+        f.addRow("", attach)
+        root.addLayout(f)
 
         # ---- Line entry ----
         entry = QFrame()
@@ -130,7 +164,7 @@ class PurchaseDialog(Modal):
         col.addLayout(row)
         self.dot_hint = muted("")
         col.addWidget(self.dot_hint)
-        self.body.addWidget(entry)
+        root.addWidget(entry)
 
         # ---- Line table ----
         self.lines_model = TupleModel([
@@ -151,7 +185,7 @@ class PurchaseDialog(Modal):
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.view.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.view.setMinimumHeight(170)
-        self.body.addWidget(self.view)
+        root.addWidget(self.view, 1)
         bar = QHBoxLayout()
         self.remove_btn = QPushButton("حذف السطر المختار")
         self.remove_btn.clicked.connect(self.remove_selected)
@@ -160,13 +194,35 @@ class PurchaseDialog(Modal):
         bar.addWidget(self.remove_btn)
         bar.addStretch(1)
         bar.addWidget(self.total_label)
-        self.body.addLayout(bar)
+        root.addLayout(bar)
 
-        self.post_btn = self.add_footer("ترحيل الفاتورة", self.post)
+        footer = QHBoxLayout()
+        self.post_btn = primary_button("ترحيل الفاتورة")
+        self.post_btn.clicked.connect(self.post)
+        cancel = QPushButton("إلغاء")
+        cancel.clicked.connect(lambda: self.stack.back_to_list())
+        footer.addWidget(self.post_btn)
+        footer.addWidget(cancel)
+        footer.addStretch(1)
+        root.addLayout(footer)
+
         self.refresh_items()
         self._refresh_total()
         if not self.supplier.count():
             self.notice.show_message("لا يوجد موردون نشطون؛ أضف مورّدًا من شاشة الموردين أولًا.", "warn")
+
+    def _header(self) -> QFrame:
+        w = QFrame()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 0, 0, 0)
+        title = QLabel("فاتورة شراء جديدة")
+        title.setObjectName("cardTitle")
+        back = QPushButton("رجوع للقائمة")
+        back.clicked.connect(lambda: self.stack.back_to_list())
+        h.addWidget(title)
+        h.addStretch(1)
+        h.addWidget(back)
+        return w
 
     # ---------- Items ----------
     def refresh_items(self, *_args) -> None:
@@ -268,8 +324,7 @@ class PurchaseDialog(Modal):
         except Exception as e:      # Any unexpected failure: the engine is atomic, so nothing half-written remains
             self._fail(f"تعذّر الترحيل ولم يُحفظ شيء ({type(e).__name__}). أعد المحاولة أو راجع السجل.")
         else:
-            self.accept()
+            self.stack.back_to_list(keep_id=self.posted.id)
         finally:
             self._busy = False
             self.post_btn.setEnabled(True)
-
