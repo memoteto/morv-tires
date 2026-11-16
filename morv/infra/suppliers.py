@@ -130,7 +130,7 @@ def search(con, query: str = "", include_inactive: bool = False, limit: int = 30
         digits = "".join(ch for ch in validate.to_latin(q) if ch.isdigit())
         where.append("(name_norm LIKE ? OR (? <> '' AND mobile LIKE ?))")
         params += [f"%{norm_ar(q)}%", digits, f"%{digits}%"]
-    sql = ("SELECT id, name, mobile, contact_person, active, payment_days, supplies FROM suppliers" +
+    sql = ("SELECT id, name, mobile, contact_person, active, payment_days, supplies, address FROM suppliers" +
            (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY name_norm LIMIT ? OFFSET ?")
     return con.execute(sql, (*params, limit, offset)).fetchall()
 

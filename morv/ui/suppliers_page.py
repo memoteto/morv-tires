@@ -13,13 +13,13 @@ from morv.ui.widgets import ask, danger_button, form, ltr_edit, muted, primary_b
 class SuppliersPage(ListPage):
     title = "الموردون"
     add_label = "مورد جديد"
-    search_placeholder = "الاسم أو الموبايل (F2)"
+    search_placeholder = "اسم المورد أو الموبايل (F2)"
     filters = [("all", "الكل"), ("inactive", "الموقوفون")]
     row_icon = staticmethod(lambda r: "truck")
     columns = [
         ("المورد", lambda r: r[1]),
         ("الموبايل", lambda r: ltr(r[2])),
-        ("جهة الاتصال", lambda r: r[3] or "—"),
+        ("العنوان", lambda r: r[7] or "—"),
         ("السداد", lambda r: f"آجل {r[5]} يومًا" if r[5] else "نقدي"),
         ("يورّد", lambda r: suppliers.SUPPLIES.get(r[6], "")),
         ("الحالة", lambda r: "نشط" if r[4] else "موقوف"),
