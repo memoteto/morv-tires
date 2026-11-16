@@ -1,4 +1,4 @@
-"""Instalments screen: the contract list, and the new-contract form of the approved design in place."""
+"""Instalments screen: the contract list, the new-contract form, and installment collection."""
 import uuid
 from datetime import date
 
@@ -13,9 +13,11 @@ from morv.core.text import ltr
 from morv.infra import installment_view, installments
 from morv.infra.installments import ContractError, Guarantor
 from morv.ui.listpage import ListPage, TupleModel
-from morv.ui.widgets import Notice, form, ltr_edit, muted, primary_button
+from morv.ui.widgets import Notice, card, form, ltr_edit, muted, primary_button
 
 DOWN_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"))
+COLLECT_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"),
+                   ("wallet", "محفظة"))
 RELATIONS = ("قريب", "زميل عمل", "صديق", "أخرى")
 
 
@@ -25,6 +27,7 @@ class InstallmentsPage(QStackedWidget):
         self.session = session
         self.list_page = ContractsPage(session, self)
         self.form_page = None
+        self.collect_page = None
         self.addWidget(self.list_page)
 
     def open_form(self, sale: tuple) -> None:
@@ -43,6 +46,14 @@ class InstallmentsPage(QStackedWidget):
             self.list_page.notice.show_message(str(e), "warn")
             return
         self.open_form(sale)
+
+    def open_collect(self, contract_id: int) -> None:
+        if self.collect_page is not None:
+            self.removeWidget(self.collect_page)
+            self.collect_page.deleteLater()
+        self.collect_page = CollectPage(self.session, self, contract_id)
+        self.addWidget(self.collect_page)
+        self.setCurrentWidget(self.collect_page)
 
     def back_to_list(self, keep_id: int | None = None) -> None:
         self.setCurrentWidget(self.list_page)
@@ -97,6 +108,10 @@ class ContractsPage(ListPage):
         for r in c.rows:
             self.kv(f"{ltr(str(r[0]))}. {ltr(r[1])}",
                     f"{ltr(fmt(r[2]))} · أصل {ltr(fmt(r[3]))} · فائدة {ltr(fmt(r[4]))}")
+        if self.can_edit() and self.stack is not None:
+            btn = primary_button("تحصيل قسط")
+            btn.clicked.connect(lambda: self.stack.open_collect(row_id))
+            self.actions(btn)
 
     def open_dialog(self, row_id):
         if row_id is not None:
@@ -354,3 +369,223 @@ class ContractForm(QWidget):
         finally:
             self._busy = False
             self.post_btn.setEnabled(True)
+
+
+class CollectPage(QWidget):
+    def __init__(self, session, stack, contract_id, parent=None):
+        super().__init__(parent)
+        self.session = session
+        self.stack = stack
+        self.contract_id = contract_id
+        self._busy = False
+        self._request_key = uuid.uuid4().hex
+        self.view_data: installment_view.CollectionView | None = None
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 12, 16, 12)
+        root.setSpacing(12)
+        root.addWidget(self._header())
+        self.notice = Notice()
+        root.addWidget(self.notice)
+        body = QHBoxLayout()
+        body.setSpacing(14)
+        body.addLayout(self._left(), 3)
+        body.addLayout(self._right(), 2)
+        content = QWidget()
+        content.setLayout(body)
+        root.addWidget(content, 1)
+        self.reload()
+
+    def _header(self) -> QFrame:
+        w = QFrame()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 0, 0, 0)
+        title = QLabel("تحصيل قسط")
+        title.setObjectName("cardTitle")
+        back = QPushButton("رجوع للقائمة")
+        back.clicked.connect(lambda: self.stack.back_to_list(keep_id=self.contract_id))
+        for label in ("كشف حساب العميل", "تسوية مبكرة للعقد"):
+            b = QPushButton(f"{label} — قريبًا")
+            b.setEnabled(False)
+            h.addWidget(b)
+        h.addWidget(title)
+        h.addStretch(1)
+        h.addWidget(back)
+        return w
+
+    def _left(self) -> QVBoxLayout:
+        col = QVBoxLayout()
+        col.setSpacing(12)
+        self.contract_title = muted("")
+        col.addWidget(self.contract_title)
+
+        stats = QGridLayout()
+        self.stat_labels = {}
+        for i, key in enumerate(("القسط الشهري", "المسدد", "المتبقي على العقد", "متأخر")):
+            box = QFrame()
+            box.setObjectName("card")
+            inner = QVBoxLayout(box)
+            inner.setContentsMargins(12, 10, 12, 10)
+            inner.addWidget(muted(key))
+            value = QLabel()
+            value.setObjectName("cardTitle")
+            inner.addWidget(value)
+            self.stat_labels[key] = value
+            stats.addWidget(box, 0, i)
+        col.addLayout(stats)
+
+        col.addWidget(muted("أقساط العقد"))
+        self.model = TupleModel([
+            ("م", lambda r: ltr(str(r[0]))),
+            ("الاستحقاق", lambda r: ltr(r[1])),
+            ("قيمة القسط", lambda r: ltr(fmt(r[2]))),
+            ("المسدد", lambda r: ltr(fmt(r[3])) if r[3] else "—"),
+            ("المتبقي منه", lambda r: ltr(fmt(r[4])) if r[4] else "—"),
+            ("الحالة", lambda r: r[5]),
+        ])
+        self.table = QTableView()
+        self.table.setModel(self.model)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table.setMinimumHeight(260)
+        col.addWidget(self.table, 1)
+        col.addWidget(muted("المبلغ المحصَّل يُوزَّع تلقائيًا على الأقساط من الأقدم للأحدث."))
+        return col
+
+    def _right(self) -> QVBoxLayout:
+        col = QVBoxLayout()
+        col.setSpacing(12)
+        box, inner = card("التحصيل")
+
+        presets = QHBoxLayout()
+        for label, pick in (("قسط واحد", self._preset_one), ("كل المتأخر", self._preset_overdue),
+                            ("كل المتبقي", self._preset_full)):
+            b = QPushButton(label)
+            b.clicked.connect(pick)
+            presets.addWidget(b)
+        inner.addLayout(presets)
+
+        f = form()
+        self.amount = ltr_edit("0.00")
+        self.amount.textChanged.connect(self._recompute)
+        f.addRow("المبلغ المستلم *", self.amount)
+        self.method = QComboBox()
+        for key, label in COLLECT_METHODS:
+            self.method.addItem(label, key)
+        f.addRow("طريقة الدفع", self.method)
+        inner.addLayout(f)
+
+        inner.addWidget(muted("التوزيع على الأقساط"))
+        self.alloc_box = QVBoxLayout()
+        inner.addLayout(self.alloc_box)
+
+        self.after_label = QLabel()
+        self.after_label.setObjectName("cardTitle")
+        inner.addWidget(self.after_label)
+        self.next_due_label = muted("")
+        inner.addWidget(self.next_due_label)
+
+        self.collect_btn = primary_button("تحصيل")
+        self.collect_btn.clicked.connect(self.collect)
+        inner.addWidget(self.collect_btn)
+        print_btn = QPushButton("تحصيل وطباعة الإيصال — قريبًا")
+        print_btn.setEnabled(False)
+        inner.addWidget(print_btn)
+        col.addWidget(box)
+        col.addStretch(1)
+        return col
+
+    # ---------- Data ----------
+
+    def reload(self) -> None:
+        self.view_data = installment_view.collection_view(self.session.con, self.contract_id)
+        v = self.view_data
+        self.contract_title.setText(f"عقد {ltr(v.number)} · {v.customer_name} · فاتورة {ltr(v.sale_number)}")
+        self.stat_labels["القسط الشهري"].setText(ltr(fmt(v.monthly)))
+        self.stat_labels["المسدد"].setText(ltr(fmt(v.paid_total)))
+        self.stat_labels["المتبقي على العقد"].setText(ltr(fmt(v.remaining_total)))
+        self.stat_labels["متأخر"].setText(
+            f"{ltr(fmt(v.overdue_amount))} ({v.overdue_count})" if v.overdue_count else "—")
+        self.model.reset_rows([(r.no, r.due_date, r.amount, r.paid, r.remaining, r.status) for r in v.rows])
+        default = v.overdue_amount if v.overdue_count else (v.next_due[1] if v.next_due else 0)
+        self.amount.setText(fmt(default) if default else "")
+        self._recompute()
+
+    def _preset_one(self) -> None:
+        if self.view_data and self.view_data.next_due:
+            self.amount.setText(fmt(self.view_data.next_due[1]))
+
+    def _preset_overdue(self) -> None:
+        if self.view_data and self.view_data.overdue_count:
+            self.amount.setText(fmt(self.view_data.overdue_amount))
+
+    def _preset_full(self) -> None:
+        if self.view_data:
+            self.amount.setText(fmt(self.view_data.remaining_total))
+
+    def _recompute(self, *_args) -> None:
+        while self.alloc_box.count():
+            item = self.alloc_box.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        if self.view_data is None:
+            return
+        try:
+            amount = parse_money(self.amount.text() or "0")
+        except MoneyError:
+            amount = -1
+        over = amount > self.view_data.remaining_total
+        valid = amount > 0 and not over
+        self.collect_btn.setEnabled(valid and not self._busy)
+        if over:
+            self.notice.show_message(
+                f"المبلغ أكبر من المتبقي على العقد ({ltr(fmt(self.view_data.remaining_total))})", "warn")
+        else:
+            self.notice.show_message("")
+        left = amount if valid else 0
+        for r in self.view_data.rows:
+            if left <= 0 or r.remaining <= 0:
+                continue
+            take = min(left, r.remaining)
+            left -= take
+            tail = " — كامل" if take == r.remaining else f" — جزئي، يتبقى {ltr(fmt(r.remaining - take))}"
+            row = QHBoxLayout()
+            row.addWidget(muted(f"القسط {r.no} ({ltr(r.due_date)}){tail}"))
+            row.addStretch(1)
+            row.addWidget(QLabel(ltr(fmt(take))))
+            self.alloc_box.addLayout(row)
+        after = self.view_data.remaining_total - (amount if valid else 0)
+        self.after_label.setText(f"بعد التحصيل يتبقى: {ltr(fmt(after))}")
+        self.next_due_label.setText(
+            f"القسط القادم: {ltr(self.view_data.next_due[0])} · {ltr(fmt(self.view_data.next_due[1]))}"
+            if self.view_data.next_due else "القسط القادم: لا يوجد — العقد مسدَّد بالكامل")
+
+    def collect(self) -> None:
+        if self._busy or self.view_data is None:
+            return
+        try:
+            amount = parse_money(self.amount.text() or "0")
+        except MoneyError as e:
+            self.notice.show_message(str(e))
+            return
+        self._busy = True
+        self.collect_btn.setEnabled(False)
+        try:
+            installments.collect_payment(
+                self.session.con, self.session.user, request_key=self._request_key, contract_id=self.contract_id,
+                amount=amount, method=self.method.currentData())
+        except ContractError as e:
+            self.notice.show_message(f"لم يُحصَّل القسط: {e}")
+        except Exception as e:      # the engine is atomic, so nothing half-written remains
+            self.notice.show_message(f"تعذّر التحصيل ولم يُحفظ شيء ({type(e).__name__}).")
+        else:
+            self._request_key = uuid.uuid4().hex   # a fresh key for the next collection on this screen
+            self.notice.show_message("تم التحصيل", "success")
+            self.reload()
+        finally:
+            self._busy = False
+            self._recompute()
