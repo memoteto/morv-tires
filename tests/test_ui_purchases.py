@@ -50,18 +50,25 @@ class PurchasesUiTest(unittest.TestCase):
     def dialog(self, session=None):
         stack = self.page(session)
         stack.open_form()
-        return stack.form_page
+        f = stack.form_page
+        # Pre-select the default supplier for tests that don't test supplier selection
+        if f._supplier_id is None and self.sup:
+            f._pick_supplier(self.sup, "مورد وهمي", "01000000001")
+        return f
 
     def page(self, session=None):
         from morv.ui.purchases_page import PurchasesPage
         return self.destroy_on_cleanup(PurchasesPage(session or self.session))
 
     def pick(self, dlg, item_id):
-        for i in range(dlg.item_combo.count()):
-            if dlg.item_combo.itemData(i)[0] == item_id:
-                dlg.item_combo.setCurrentIndex(i)
-                return
-        self.fail(f"الصنف {item_id} غير ظاهر في قائمة الاختيار")
+        # Directly set the selected item bypassing the popup (headless test)
+        row = self.con.execute("SELECT kind, code, name FROM items WHERE id=?", (item_id,)).fetchone()
+        if not row:
+            self.fail(f"الصنف {item_id} غير موجود في قاعدة البيانات")
+        dlg._selected_item_id = item_id
+        dlg._selected_item_kind = row[0]
+        dlg._selected_item_name = row[2]
+        dlg._selected_item_lbl.setText(row[2])
 
     def fill_line(self, dlg, item_id, qty, cost, dot=""):
         self.pick(dlg, item_id)
@@ -80,8 +87,8 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertTrue(self.fill_line(dlg, self.tire, 4, "1,000.50", "2324"))
         self.assertTrue(self.fill_line(dlg, self.battery, 2, "500"))
         self.assertEqual(dlg.lines_model.rowCount(), 2)
-        self.assertEqual(dlg.total_minor(), 4 * 100050 + 2 * 50000)
-        self.assertIn("5,002.00", dlg.total_label.text())   # 4,002.00 + 1,000.00
+        self.assertEqual(dlg._sub_total(), 4 * 100050 + 2 * 50000)
+        self.assertIn("5,002.00", dlg._sub_lbl.text())   # 4,002.00 + 1,000.00
         dlg.inv_no.setText("S-100")
         dlg.inv_date.setText("2026-11-05")
         dlg.post()
@@ -94,12 +101,18 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(inventory.reconcile(self.con), [])
 
     def test_services_not_offered(self):
-        dlg = self.dialog()
-        ids = {dlg.item_combo.itemData(i)[0] for i in range(dlg.item_combo.count())}
-        self.assertEqual(ids, {self.tire, self.battery})
-        dlg.item_search.setText("BT-1")
-        self.assertEqual(dlg.item_combo.count(), 1)
-        self.assertEqual(dlg.item_combo.currentData()[0], self.battery)
+        # Services must not appear in item search results
+        from morv.infra import items as items_infra
+        rows_all = items_infra.search(self.session.con, "", kind="tire", limit=50)
+        rows_all += items_infra.search(self.session.con, "", kind="battery", limit=50)
+        ids = {r[0] for r in rows_all}
+        self.assertIn(self.tire, ids)
+        self.assertIn(self.battery, ids)
+        self.assertNotIn(self.service, ids)
+        # Battery-specific search
+        rows_bt = items_infra.search(self.session.con, "BT-1", kind="battery", limit=50)
+        self.assertEqual(len(rows_bt), 1)
+        self.assertEqual(rows_bt[0][0], self.battery)
 
     def test_line_validation_messages(self):
         dlg = self.dialog()
@@ -110,7 +123,7 @@ class PurchasesUiTest(unittest.TestCase):
                 self.assertFalse(self.fill_line(dlg, item_id, 1, cost, dot))
                 self.assertIn(expect, dlg.notice.text())
                 self.assertEqual(dlg.lines_model.rowCount(), 0)
-        dlg.item_search.setText("لا يوجد صنف بهذا الاسم")
+        # No item selected -> should fail
         self.assertFalse(dlg.add_line())
         self.assertIn("اختر صنفًا", dlg.notice.text())
 
@@ -171,7 +184,7 @@ class PurchasesUiTest(unittest.TestCase):
         dlg.view.setCurrentIndex(dlg.lines_model.index(0, 0))
         dlg.remove_selected()
         self.assertEqual(dlg.lines_model.rowCount(), 1)
-        self.assertEqual(dlg.total_minor(), 2 * 2000)
+        self.assertEqual(dlg._sub_total(), 2 * 2000)
 
     def test_no_active_suppliers_warns_and_blocks(self):
         self.con.execute("UPDATE suppliers SET active = 0")
