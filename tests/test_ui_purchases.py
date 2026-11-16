@@ -278,8 +278,7 @@ class PurchasesUiTest(unittest.TestCase):
         from morv.ui.inventory_page import ItemDialog
         dlg = self.dialog()
         new_dlg = self.destroy_on_cleanup(ItemDialog(self.session, None, parent=dlg))
-        new_dlg.set_kind("service")
-        new_dlg.widgets["brand"].setText("ماركة وهمية")
+        new_dlg.set_kind("service")        # service hides brand/model, so only name/code/price are needed
         new_dlg.widgets["name"].setText("خدمة سريعة وهمية")
         new_dlg.widgets["code"].setText("SVC-TEST-1")
         new_dlg.widgets["price_retail"].setText("100")
@@ -305,7 +304,7 @@ class PurchasesUiTest(unittest.TestCase):
 
     def test_cost_note_hidden_until_there_is_something_to_say(self):
         dlg = self.dialog()
-        row = self.add_row(dlg, self.battery, 1, "10")
+        self.add_row(dlg, self.battery, 1, "10")
         dlg.inv_no.setText("S-1")
         dlg.post()
         second = self.dialog()
