@@ -35,6 +35,19 @@ def form() -> QFormLayout:
     return f
 
 
+def field(title: str, widget: QWidget) -> QWidget:
+    """A label above its input, matching the approved design's field layout (not label-beside-input)."""
+    w = QWidget()
+    v = QVBoxLayout(w)
+    v.setContentsMargins(0, 0, 0, 0)
+    v.setSpacing(6)
+    lbl = QLabel(title)
+    lbl.setObjectName("fieldLabel")
+    v.addWidget(lbl)
+    v.addWidget(widget)
+    return w
+
+
 def ltr_edit(placeholder: str = "") -> QLineEdit:
     e = QLineEdit()
     e.setPlaceholderText(placeholder)

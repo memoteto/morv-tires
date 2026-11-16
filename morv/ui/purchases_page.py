@@ -19,7 +19,7 @@ from morv.ui import icons
 from morv.ui.inventory_page import ItemDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
-from morv.ui.widgets import Notice, ltr_edit, muted, primary_button
+from morv.ui.widgets import Notice, field, ltr_edit, muted, primary_button
 
 ITEM_CHOICES = 50
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
@@ -229,10 +229,10 @@ class _NewSupplierDialog(Modal):
         self.addr_edit.setPlaceholderText("العنوان")
         self.notes_edit = QLineEdit()
         self.notes_edit.setPlaceholderText("ملاحظات")
-        grid.addWidget(self._field("اسم المورد *", self.name_edit), 0, 0, 1, 2)
-        grid.addWidget(self._field("رقم الموبايل *", self.mobile_edit), 1, 0)
-        grid.addWidget(self._field("العنوان", self.addr_edit), 1, 1)
-        grid.addWidget(self._field("ملاحظات", self.notes_edit), 2, 0, 1, 2)
+        grid.addWidget(field("اسم المورد *", self.name_edit), 0, 0, 1, 2)
+        grid.addWidget(field("رقم الموبايل *", self.mobile_edit), 1, 0)
+        grid.addWidget(field("العنوان", self.addr_edit), 1, 1)
+        grid.addWidget(field("ملاحظات", self.notes_edit), 2, 0, 1, 2)
         self.body.addLayout(grid)
         self.body.addWidget(muted("باقي بيانات المورد تُكمل لاحقًا من شاشة الموردين."))
         self.add_footer("حفظ واختيار المورد", self._save)
@@ -255,18 +255,6 @@ class _NewSupplierDialog(Modal):
             self.notice.show_message(str(e))
             return
         self.accept()
-
-    @staticmethod
-    def _field(title: str, widget: QWidget) -> QWidget:
-        w = QWidget()
-        v = QVBoxLayout(w)
-        v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(6)
-        lbl = QLabel(title)
-        lbl.setObjectName("fieldLabel")
-        v.addWidget(lbl)
-        v.addWidget(widget)
-        return w
 
 
 # ---------------------------------------------------------------------------
@@ -375,12 +363,12 @@ class PurchaseForm(QWidget):
         self.notes = QLineEdit()
         self.notes.setPlaceholderText("اختياري")
 
-        hdr_grid.addWidget(self._field("رقم الإدخال", self.entry_no), 0, 0)
+        hdr_grid.addWidget(field("رقم الإدخال", self.entry_no), 0, 0)
         hdr_grid.addWidget(sup_field_w, 0, 1, 1, 2)
-        hdr_grid.addWidget(self._field("تاريخ الاستلام", self.recv_date), 0, 3)
-        hdr_grid.addWidget(self._field("رقم فاتورة المورد", self.inv_no), 1, 0)
-        hdr_grid.addWidget(self._field("تاريخ فاتورة المورد", self.inv_date), 1, 1)
-        hdr_grid.addWidget(self._field("ملاحظة", self.notes), 1, 2, 1, 2)
+        hdr_grid.addWidget(field("تاريخ الاستلام", self.recv_date), 0, 3)
+        hdr_grid.addWidget(field("رقم فاتورة المورد", self.inv_no), 1, 0)
+        hdr_grid.addWidget(field("تاريخ فاتورة المورد", self.inv_date), 1, 1)
+        hdr_grid.addWidget(field("ملاحظة", self.notes), 1, 2, 1, 2)
         body.addLayout(hdr_grid)
         main_col.addWidget(box)
 
@@ -457,13 +445,13 @@ class PurchaseForm(QWidget):
         self.disc = ltr_edit("0.00")
         self.tax = ltr_edit("0.00")
         self.ship = ltr_edit("0.00")
-        for field in (self.disc, self.tax, self.ship):
-            field.setEnabled(False)
-            field.setToolTip("غير مفعّل حاليًا — سيُضاف لاحقًا")
+        for disabled_edit in (self.disc, self.tax, self.ship):
+            disabled_edit.setEnabled(False)
+            disabled_edit.setToolTip("غير مفعّل حاليًا — سيُضاف لاحقًا")
 
-        sbody.addWidget(self._field("خصم المورد", self.disc))
-        sbody.addWidget(self._field("ضريبة على فاتورة المورد", self.tax))
-        sbody.addWidget(self._field("نقل وتحميل", self.ship))
+        sbody.addWidget(field("خصم المورد", self.disc))
+        sbody.addWidget(field("ضريبة على فاتورة المورد", self.tax))
+        sbody.addWidget(field("نقل وتحميل", self.ship))
         hint = muted("هذه الحقول غير مفعّلة بعد؛ إجمالي الفاتورة يُضاف بالكامل لرصيد المورد.")
         hint.setWordWrap(True)
         sbody.addWidget(hint)
@@ -481,11 +469,11 @@ class PurchaseForm(QWidget):
             self.pay_method.addItem(label)
         # Same as discount/tax/shipping above: no partial-payment/cash-ledger
         # handling exists in the engine yet, so this stays disabled, not wired.
-        for field in (self.paid, self.pay_method):
-            field.setEnabled(False)
-            field.setToolTip("غير مفعّل حاليًا — سيُضاف لاحقًا")
-        pay_grid.addWidget(self._field("مدفوع الآن", self.paid), 0, 0)
-        pay_grid.addWidget(self._field("من", self.pay_method), 0, 1)
+        for disabled_edit in (self.paid, self.pay_method):
+            disabled_edit.setEnabled(False)
+            disabled_edit.setToolTip("غير مفعّل حاليًا — سيُضاف لاحقًا")
+        pay_grid.addWidget(field("مدفوع الآن", self.paid), 0, 0)
+        pay_grid.addWidget(field("من", self.pay_method), 0, 1)
         sbody.addLayout(pay_grid)
 
         self._rem_lbl = QLabel()
@@ -565,15 +553,6 @@ class PurchaseForm(QWidget):
         lbl = QLabel(text)
         lbl.setObjectName("fieldLabel")
         return lbl
-
-    def _field(self, title: str, widget: QWidget) -> QWidget:
-        w = QWidget()
-        v = QVBoxLayout(w)
-        v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(6)
-        v.addWidget(self._label(title))
-        v.addWidget(widget)
-        return w
 
     @staticmethod
     def _kv_row(label: str, value_widget: QWidget) -> QWidget:
