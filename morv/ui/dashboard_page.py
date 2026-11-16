@@ -15,6 +15,8 @@ from morv.ui.widgets import Notice, card, muted
 PERIODS = dashboard_view.PERIODS
 ALERT_LEVEL = {"bad": "error", "warn": "warn", "ok": "success"}
 ICON_PRIMARY = "#1F5FD6"
+BALANCE_LABELS = (("1110", "الصندوق"), ("1210", "بنك التحويلات"),
+                  ("1220", "البطاقات"), ("1230", "المحافظ الإلكترونية"))
 # Collect.dc.html/Purchase.dc.html/Statement.dc.html have no standalone search-first entry point yet,
 # so these route to the nearest existing screen instead of a deep link; see design_decisions.md #15.
 # The icon name is one of morv.ui.icons.PATHS, matching the sidebar icon for that same screen.
@@ -48,6 +50,7 @@ class DashboardPage(QWidget):
         root.addWidget(self._header())
         root.addLayout(self._quick_actions())
         root.addLayout(self._kpis())
+        root.addWidget(self._balances_card())
 
         row1 = QHBoxLayout()
         row1.setSpacing(14)
@@ -122,7 +125,7 @@ class DashboardPage(QWidget):
         grid = QGridLayout()
         grid.setSpacing(10)
         specs = (("sales", "المبيعات", False), ("coll", "المحصَّل نقدًا وإلكترونيًا", False),
-                 ("due", "أقساط مستحقة ومتأخرة", True), ("cash", "رصيد الخزينة الآن", False))
+                 ("due", "أقساط مستحقة ومتأخرة", True), ("cash", "إجمالي الأموال الآن", False))
         for i, (key, title, danger) in enumerate(specs):
             box = QFrame()
             box.setObjectName("card")
@@ -139,6 +142,22 @@ class DashboardPage(QWidget):
             self.kpi_values[key] = (value, sub)
             grid.addWidget(box, 0, i)
         return grid
+
+    def _balances_card(self) -> QFrame:
+        box, lay = card("أرصدة الصندوق والحسابات الإلكترونية الآن")
+        row = QHBoxLayout()
+        row.setSpacing(14)
+        self.balance_values: dict[str, QLabel] = {}
+        for code, title in BALANCE_LABELS:
+            col = QVBoxLayout()
+            col.addWidget(muted(title))
+            value = QLabel("—")
+            value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute)
+            col.addWidget(value)
+            self.balance_values[code] = value
+            row.addLayout(col, 1)
+        lay.addLayout(row)
+        return box
 
     def _chart_card(self) -> QFrame:
         box, lay = card("مبيعات آخر 7 أيام")
@@ -185,7 +204,9 @@ class DashboardPage(QWidget):
         self.kpi_values["due"][0].setText(ltr(fmt(v.due_amount)))
         self.kpi_values["due"][1].setText(f"{v.due_count} عقدًا")
         self.kpi_values["cash"][0].setText(ltr(fmt(v.cash_balance)))
-        self.kpi_values["cash"][1].setText("لا يوجد إغلاق بعد")   # wired once the daily-close screen ships
+        self.kpi_values["cash"][1].setText("الصندوق والحسابات الإلكترونية")
+        for code, amount in v.account_balances:
+            self.balance_values[code].setText(ltr(fmt(amount)))
 
         self._fill_chart(v.chart_days)
         self._fill_alerts(v.alerts)

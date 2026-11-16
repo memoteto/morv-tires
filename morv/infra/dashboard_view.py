@@ -34,6 +34,7 @@ class DashboardView:
     recent: tuple                 # (number, customer_name, methods, total, sale_date)
     pay_today: tuple              # (method, amount), today only
     top_month: tuple              # (item_name, qty), this month only
+    account_balances: tuple[tuple[str, int], ...] = ()
 
 
 def _period_start(period: str, today: date) -> str:
@@ -93,7 +94,8 @@ def get(con: sqlite3.Connection, period: str = "today", today: str | None = None
     due = installment_view.list_view(con, filter_key="all", today=today_s)
     due_count = due.kpis.late_count + due.kpis.today_count
     due_amount = due.kpis.late_amount + due.kpis.today_amount
-    cash_balance = sum(ledger.account_balance(con, code) for code in CASH_ACCOUNTS)
+    account_balances = tuple((code, ledger.account_balance(con, code)) for code in CASH_ACCOUNTS)
+    cash_balance = sum(amount for _, amount in account_balances)
 
     chart_days = []
     for i in range(6, -1, -1):
@@ -124,4 +126,4 @@ def get(con: sqlite3.Connection, period: str = "today", today: str | None = None
         "GROUP BY sl.item_id ORDER BY q DESC LIMIT 5", (month_start, today_s)).fetchall()
 
     return DashboardView(period, sales_total, sales_count, collected_total, due_count, due_amount, cash_balance,
-                         tuple(chart_days), tuple(alerts), tuple(recent), tuple(pay_today), tuple(top_month))
+                         tuple(chart_days), tuple(alerts), tuple(recent), tuple(pay_today), tuple(top_month), account_balances)
