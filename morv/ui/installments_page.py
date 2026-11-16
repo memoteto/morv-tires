@@ -13,7 +13,7 @@ from morv.core.text import ltr
 from morv.infra import installment_view, installments
 from morv.infra.installments import ContractError, Guarantor
 from morv.ui.listpage import ListPage, TupleModel
-from morv.ui.widgets import Notice, card, field, ltr_edit, muted, primary_button
+from morv.ui.widgets import Notice, card, field, ltr_edit, muted, primary_button, ro_field
 
 DOWN_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"))
 COLLECT_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"),
@@ -187,7 +187,7 @@ class ContractForm(QWidget):
         col = QVBoxLayout()
         col.setSpacing(12)
 
-        col.addWidget(muted("العميل والضامن"))
+        client_box, client_lay = card("العميل والضامن")
         f = QGridLayout()
         f.setSpacing(10)
         self.national_id = ltr_edit("14 رقمًا")
@@ -195,17 +195,17 @@ class ContractForm(QWidget):
         self.work_place = QLineEdit()
         self.work_place.setPlaceholderText("مثال: مدرس — مدرسة النصر الإعدادية")
         self.whatsapp_ok = QCheckBox("يوافق العميل على تلقي تذكيرات الأقساط عبر واتساب")
-        f.addWidget(field("العميل", QLabel(self.sale[2])), 0, 0, 1, 2)
-        f.addWidget(field("الموبايل", QLabel(ltr(self.sale[5]))), 1, 0)
-        f.addWidget(field("الرقم القومي *", self.national_id), 1, 1)
-        f.addWidget(field("العنوان", self.address), 2, 0, 1, 2)
-        f.addWidget(field("جهة العمل", self.work_place), 3, 0, 1, 2)
-        col.addLayout(f)
-        col.addWidget(self.whatsapp_ok)
+        f.addWidget(field("الرقم القومي *", self.national_id), 0, 0)
+        f.addWidget(ro_field("الموبايل", ltr(self.sale[5]), is_ltr=True), 0, 1)
+        f.addWidget(ro_field("العميل", self.sale[2]), 0, 2)
+        f.addWidget(field("العنوان", self.address), 1, 0, 1, 2)
+        f.addWidget(field("جهة العمل", self.work_place), 1, 2)
+        client_lay.addLayout(f)
+        client_lay.addWidget(self.whatsapp_ok)
 
         self.has_guarantor = QCheckBox("إضافة ضامن (اختياري)")
         self.has_guarantor.toggled.connect(self._toggle_guarantor)
-        col.addWidget(self.has_guarantor)
+        client_lay.addWidget(self.has_guarantor)
         self.guarantor = QFrame()
         g = QGridLayout()
         g.setSpacing(10)
@@ -222,9 +222,10 @@ class ContractForm(QWidget):
         gl.setContentsMargins(0, 0, 0, 0)
         gl.addLayout(g)
         self.guarantor.setVisible(False)
-        col.addWidget(self.guarantor)
+        client_lay.addWidget(self.guarantor)
+        col.addWidget(client_box)
 
-        col.addWidget(muted("بنود العقد"))
+        terms_box, terms_lay = card("بنود العقد")
         t = QGridLayout()
         t.setSpacing(10)
         self.contract_date = ltr_edit("YYYY-MM-DD")
@@ -245,17 +246,18 @@ class ContractForm(QWidget):
         self.down_method = QComboBox()
         for key, label in DOWN_METHODS:
             self.down_method.addItem(label, key)
-        t.addWidget(field("رقم الفاتورة", QLabel(ltr(self.sale[1]))), 0, 0)
-        t.addWidget(field("تاريخ العقد", self.contract_date), 0, 1)
-        t.addWidget(field("سعر الكاش (قطاعي)", QLabel(f"{ltr(fmt(self.sale[4]))} جنيه")), 1, 0)
-        t.addWidget(field("الفائدة % *", self.rate), 1, 1)
-        t.addWidget(field("المقدم *", self.down), 2, 0)
-        t.addWidget(field("عدد الأشهر", self.months), 2, 1)
-        t.addWidget(field("تاريخ أول قسط", self.first_due), 3, 0)
-        t.addWidget(field("تحصيل المقدم", self.down_method), 3, 1)
-        col.addLayout(t)
+        t.addWidget(ro_field("رقم الفاتورة", ltr(self.sale[1]), is_ltr=True), 0, 0)
+        t.addWidget(ro_field("سعر الكاش (قطاعي)", f"{ltr(fmt(self.sale[4]))} جنيه", is_ltr=True), 0, 1)
+        t.addWidget(field("تاريخ العقد", self.contract_date), 0, 2)
+        t.addWidget(field("الفائدة % *", self.rate), 1, 0)
+        t.addWidget(field("المقدم *", self.down), 1, 1)
+        t.addWidget(field("عدد الأشهر", self.months), 1, 2)
+        t.addWidget(field("تاريخ أول قسط", self.first_due), 2, 0)
+        t.addWidget(field("تحصيل المقدم", self.down_method), 2, 1)
+        terms_lay.addLayout(t)
+        col.addWidget(terms_box)
 
-        col.addWidget(muted("جدول التوزيع الشهري · الفائدة موزّعة بالتساوي"))
+        sched_box, sched_lay = card("جدول التوزيع الشهري · الفائدة موزّعة بالتساوي")
         self.model = TupleModel([
             ("م", lambda r: ltr(str(r[0]))),
             ("تاريخ الاستحقاق", lambda r: ltr(r[1])),
@@ -273,9 +275,10 @@ class ContractForm(QWidget):
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.view.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.view.setMinimumHeight(220)
-        col.addWidget(self.view, 1)
+        sched_lay.addWidget(self.view, 1)
         self.diff_hint = muted("فرق القروش يُجمع في القسط الأخير.")
-        col.addWidget(self.diff_hint)
+        sched_lay.addWidget(self.diff_hint)
+        col.addWidget(sched_box, 1)
         return col
 
     def _right(self) -> QVBoxLayout:

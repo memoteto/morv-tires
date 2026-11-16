@@ -48,6 +48,14 @@ def field(title: str, widget: QWidget) -> QWidget:
     return w
 
 
+def ro_field(title: str, text: str, is_ltr: bool = False) -> QWidget:
+    """A field() for a locked display value, boxed like an input so it doesn't read as plain text."""
+    e = ltr_edit() if is_ltr else QLineEdit()
+    e.setText(text)
+    e.setReadOnly(True)
+    return field(title, e)
+
+
 def ltr_edit(placeholder: str = "") -> QLineEdit:
     e = QLineEdit()
     e.setPlaceholderText(placeholder)
