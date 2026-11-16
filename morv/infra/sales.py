@@ -97,6 +97,12 @@ def _payload_hash(customer_id, sale_date, lines, payments, invoice_discount, odo
     return hashlib.sha256(json.dumps(body, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
+def next_number_preview(con: sqlite3.Connection) -> str:
+    """Best-effort preview of the invoice number the next post will get."""
+    next_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM sales").fetchone()[0]
+    return f"SI-{next_id:06d}"
+
+
 def post_sale(con: sqlite3.Connection, by, *, request_key: str, customer_id: int | None, lines: list,
               payments: list, sale_date: str | None = None, invoice_discount: int = 0,
               odometer: int | None = None, vehicle_plate: str | None = None,

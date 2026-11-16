@@ -1,21 +1,21 @@
-"""Regression guard: the approved POS design V1.0 keeps every section and element it was signed off with."""
+"""Regression guard: the POS screen keeps the elements it was redesigned with (round 2)."""
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = (ROOT / "morv" / "ui" / "pos_page.py").read_text(encoding="utf-8")
 
-# Each entry is a label the approved design V1.0 shows on the point-of-sale screen.
+# Each entry is a label the current approved point-of-sale screen shows.
 SECTIONS = ["بيانات الفاتورة والعميل", "الأصناف والخدمات", "ملخص الفاتورة", "الدفع"]
 
 HEADER = ["فاتورة بيع جديدة", "مسودة", "نقطة البيع · المخزن الرئيسي · الكاشير:",
           "تعليق الفاتورة", "معاينة الطباعة", "إلغاء"]
 
-INVOICE = ["رقم الفاتورة", "يُحدَّد عند الاعتماد", "التاريخ والوقت", "فئة السعر",
+INVOICE = ["رقم الفاتورة", "التاريخ والوقت", "فئة السعر",
            "قطاعي", "جملة", "جملة الجملة", "عداد الكيلومترات", "المركبة / اللوحة",
            "ملاحظة على الفاتورة", "رقم الموبايل", "عميل مسجّل", "تغيير العميل"]
 
-ITEMS = ["الكل", "إطارات", "بطاريات", "خدمات", "إضافة سريعة:", "الصنف المختار",
+ITEMS = ["الكل", "إطارات", "بطاريات", "خدمات", "إضافة سريعة:",
          "الكمية", "السعر", "الخصم", "الإجمالي", "الفاتورة فارغة"]
 
 SUMMARY = ["الإجمالي قبل الخصم", "خصم على الفاتورة", "الضريبة",
@@ -29,7 +29,7 @@ PAYMENT = ["طريقة الدفع", "نقدي", "بطاقة / ماكينة POS",
 class PosDesignV1Test(unittest.TestCase):
     def assert_present(self, group: str, labels: list[str]) -> None:
         missing = [t for t in labels if t not in SOURCE]
-        self.assertEqual(missing, [], f"عناصر من التصميم المعتمد V1.0 اختفت من {group}: {missing}")
+        self.assertEqual(missing, [], f"عناصر من التصميم المعتمد اختفت من {group}: {missing}")
 
     def test_sections(self):
         self.assert_present("أقسام الشاشة", SECTIONS)
@@ -57,6 +57,27 @@ class PosDesignV1Test(unittest.TestCase):
         """The owner's decision: the invoice lives in the POS screen, never in a popup."""
         self.assertIn("class PosPage(QWidget)", SOURCE)
         self.assertNotIn("class PosPage(Modal)", SOURCE)
+
+    def test_invoice_number_is_shown_live_while_writing(self):
+        """Owner feedback: the number must be visible while writing, not only after posting."""
+        self.assertIn("sales.next_number_preview", SOURCE)
+        self.assertNotIn("يُحدَّد عند الاعتماد", SOURCE)
+
+    def test_item_add_is_inline_rows_not_a_dropdown(self):
+        """Owner feedback: add items/services like the purchase screen — live search
+        picks straight into a row with inline qty/price/discount, no combo-box step."""
+        self.assertNotIn("self.item_combo", SOURCE)
+        self.assertNotIn("الصنف المختار", SOURCE)
+        self.assertIn("_ItemPopup", SOURCE)
+        self.assertIn("_add_row", SOURCE)
+
+    def test_delete_line_is_an_icon_not_a_text_button(self):
+        self.assertNotIn("حذف السطر المختار", SOURCE)
+        self.assertIn('icons.icon("trash"', SOURCE)
+
+    def test_no_horizontal_scrollbar(self):
+        """Owner feedback: the screen was too wide and needed scrolling sideways."""
+        self.assertIn("ScrollBarAlwaysOff", SOURCE)
 
 
 if __name__ == "__main__":

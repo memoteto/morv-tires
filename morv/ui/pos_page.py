@@ -2,11 +2,11 @@
 import uuid
 from datetime import date, datetime
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QCompleter, QFrame, QGridLayout, QHBoxLayout,
-                               QHeaderView, QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox, QTableView,
-                               QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QFrame, QGridLayout, QHBoxLayout,
+                               QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox,
+                               QVBoxLayout, QWidget)
 
 from morv.core import sales_rules
 from morv.core.money import MoneyError, fmt, parse_money
@@ -14,11 +14,12 @@ from morv.core.text import ltr
 from morv.infra import customers, items, sale_view, sales
 from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons
-from morv.ui.listpage import TupleModel
+from morv.ui.inventory_page import ItemDialog
+from morv.ui.purchases_page import _ItemPopup
 from morv.ui.widgets import Notice, ltr_edit, muted
 
 ITEM_CHOICES = 50
-PRICE_COLUMN = {"retail": 5, "wholesale": 6, "super": 7}      # where the tier price sits in an items.search row
+TIER_ATTR = {"retail": "price_retail", "wholesale": "price_wholesale", "super": "price_super"}
 TIER_LABELS = {"retail": "قطاعي (تجزئة)", "wholesale": "جملة", "super": "جملة الجملة"}
 TIER_SHORT = {"retail": "قطاعي", "wholesale": "جملة", "super": "جملة الجملة"}
 PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
@@ -38,9 +39,6 @@ class PosPage(QWidget):
         super().__init__(parent)
         self.session = session
         self.posted = None
-        self.lines: list[SaleLineIn] = []
-        self._names: list[str] = []
-        self._meta: list[tuple] = []             # (kind, code) per line, for display only
         self._busy = False
         self._request_key = uuid.uuid4().hex     # One key per invoice: pressing again cannot duplicate it
         self.tier = "retail"
@@ -61,6 +59,11 @@ class PosPage(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        # The old per-column QTableView forced its own width (ResizeToContents
+        # columns) wider than the viewport, which showed as a horizontal
+        # scrollbar under the whole screen. Rows are self-built, stretch-based
+        # widgets now, so they compress to fit; this policy is a hard backstop.
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(content)
         root.addWidget(scroll, 1)
         root.addLayout(self._build_hints())
@@ -68,8 +71,7 @@ class PosPage(QWidget):
 
         self._stamp()
         self._on_customer_changed()
-        self.refresh_items()
-        self._refresh_lines()
+        self._on_row_changed()
         if not items.search(self.session.con, "", limit=1):
             self.notice.show_message("لا توجد أصناف نشطة؛ أضف أصنافًا من شاشة المخزون أولًا.", "warn")
 
@@ -81,12 +83,16 @@ class PosPage(QWidget):
         h.setSpacing(10)
         title = QLabel("فاتورة بيع جديدة")
         title.setObjectName("pageTitle")
+        h.addWidget(title)
+        user = getattr(self.session.user, "display_name", "") or ""
+        # A plain, non-wrapping label: muted() turns word-wrap on, which broke
+        # this long line onto two lines instead of letting it truncate.
+        subtitle = QLabel(f"نقطة البيع · المخزن الرئيسي · الكاشير: {user}")
+        subtitle.setObjectName("muted")
+        h.addWidget(subtitle)
         draft = QLabel("مسودة")
         draft.setObjectName("pillWarn")
-        user = getattr(self.session.user, "display_name", "") or ""
-        h.addWidget(title)
         h.addWidget(draft)
-        h.addWidget(muted(f"نقطة البيع · المخزن الرئيسي · الكاشير: {user}"))
         h.addStretch(1)
         h.addWidget(self._deferred_button("تعليق الفاتورة", "pause"))
         h.addWidget(self._deferred_button("معاينة الطباعة", "printer"))
@@ -122,9 +128,9 @@ class PosPage(QWidget):
         for c in range(4):
             grid.setColumnStretch(c, 1)
 
-        self.number_edit = QLineEdit("يُحدَّد عند الاعتماد")
+        self.number_edit = ltr_edit("")
+        self.number_edit.setText(sales.next_number_preview(self.session.con))
         self.number_edit.setReadOnly(True)
-        self._trail_icon(self.number_edit, "lock")
         self.sale_date = ltr_edit()
         self.sale_date.setReadOnly(True)
         self._trail_icon(self.sale_date, "lock")
@@ -198,7 +204,15 @@ class PosPage(QWidget):
         self.item_search.setPlaceholderText("اسم الصنف، الكود، المقاس (205/55R16) أو امسح الباركود")
         self.item_search.addAction(icons.icon("search", ICON_MUTED, 18), QLineEdit.ActionPosition.LeadingPosition)
         self._trail_icon(self.item_search, "barcode")
-        self.item_search.textChanged.connect(self.refresh_items)
+        # Live popup search, same component as the purchase-invoice screen:
+        # picking a result adds the line straight away, no dropdown list step.
+        self.item_search.textChanged.connect(self._on_item_query)
+        self.item_search.installEventFilter(self)
+        self._item_timer = QTimer(self)
+        self._item_timer.setSingleShot(True)
+        self._item_timer.timeout.connect(self._do_item_search)
+        self._item_popup = _ItemPopup(self)
+        self._item_popup.hide()
         top.addWidget(self.item_search, 1)
         top.addWidget(self._kbd("F2"))
         seg = QFrame()
@@ -227,70 +241,28 @@ class PosPage(QWidget):
         quick.addStretch(1)
         body.addLayout(quick)
 
-        entry = QHBoxLayout()
-        entry.setSpacing(10)
-        self.item_combo = QComboBox()
-        self.item_combo.currentIndexChanged.connect(self._on_item_changed)
-        self.qty = QSpinBox()
-        self.qty.setRange(1, 100000)
-        self.qty.setValue(1)
-        self.qty.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.qty.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        stepper = QWidget()
-        st = QHBoxLayout(stepper)
-        st.setContentsMargins(0, 0, 0, 0)
-        st.setSpacing(4)
-        for name, delta in (("plus", 1), (None, 0), ("minus", -1)):
-            if name is None:
-                st.addWidget(self.qty, 1)
-                continue
-            b = QToolButton()
-            b.setObjectName("stepBtn")
-            b.setText("+" if delta > 0 else "−")
-            b.clicked.connect(lambda _c=False, d=delta: self.qty.setValue(self.qty.value() + d))
-            st.addWidget(b)
-        self.price = ltr_edit("0.00")
-        self.line_disc = ltr_edit("0.00")
-        self.add_btn = QPushButton("إضافة")
-        self.add_btn.setObjectName("primary")
-        self.add_btn.setIcon(icons.icon("plus", "#FFFFFF", 16))
-        self.add_btn.clicked.connect(self.add_line)
-        entry.addWidget(self._field("الصنف المختار", self.item_combo), 4)
-        entry.addWidget(self._field("الكمية", stepper), 2)
-        entry.addWidget(self._field("السعر", self.price), 2)
-        entry.addWidget(self._field("الخصم", self.line_disc), 2)
-        entry.addWidget(self.add_btn, 0, Qt.AlignmentFlag.AlignBottom)
-        body.addLayout(entry)
+        # Lines header row (column titles, once)
+        self._rows: list[dict] = []
+        lines_head = QHBoxLayout()
+        lines_head.setContentsMargins(4, 0, 4, 0)
+        lines_head.setSpacing(10)
+        for text, stretch in (("#", 0), ("الصنف / الخدمة", 3), ("الكمية", 1),
+                              ("السعر", 1), ("الخصم", 1), ("الإجمالي", 1), ("", 0)):
+            h_lbl = muted(text)
+            h_lbl.setWordWrap(False)
+            lines_head.addWidget(h_lbl, stretch)
+        body.addLayout(lines_head)
 
-        self.lines_model = TupleModel([
-            ("م", lambda r: ltr(str(r[0]))),
-            ("الصنف / الخدمة", lambda r: f"{r[1]}   ·   {ltr(r[6])}"),
-            ("الكمية", lambda r: ltr(str(r[2]))),
-            ("السعر", lambda r: ltr(fmt(r[3]))),
-            ("الخصم", lambda r: ltr(fmt(-r[4]) if r[4] else fmt(0))),
-            ("الإجمالي", lambda r: ltr(fmt(r[2] * r[3] - r[4]))),
-        ], icon_for=lambda r: KIND_ICON.get(r[5], "inventory"))
-        self.view = QTableView()
-        self.view.setModel(self.lines_model)
-        self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.view.setShowGrid(False)
-        self.view.verticalHeader().setVisible(False)
-        self.view.verticalHeader().setDefaultSectionSize(52)
-        self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.view.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.view.setMinimumHeight(220)
-        body.addWidget(self.view, 1)
-        bar = QHBoxLayout()
+        # Line rows: each row is self-contained (inline qty/price/discount + delete icon)
+        self._rows_container = QVBoxLayout()
+        self._rows_container.setSpacing(4)
+        body.addLayout(self._rows_container, 1)
+
         self.empty_label = muted("الفاتورة فارغة. ابحث عن صنف أو امسح الباركود للبدء.")
-        self.remove_btn = QPushButton("حذف السطر المختار")
-        self.remove_btn.setObjectName("dangerLink")
-        self.remove_btn.clicked.connect(self.remove_selected)
-        bar.addWidget(self.empty_label, 1)
-        bar.addStretch(1)
-        bar.addWidget(self.remove_btn)
-        body.addLayout(bar)
+        self._rows_container.addWidget(self.empty_label)
+        # Trailing stretch absorbs leftover height so rows stay pinned at the
+        # top of the card instead of stretching/centering when there are few.
+        self._rows_container.addStretch(1)
         return box
 
     def _build_left_column(self) -> QVBoxLayout:
@@ -501,13 +473,13 @@ class PosPage(QWidget):
         self.tier_combo.blockSignals(False)
         for chip in (self.tier_chip, self.cust_tier_chip):
             chip.setText(f"فئة السعر: {TIER_SHORT[self.tier]}")
-        self._on_item_changed()
 
     def _set_kind(self, kind) -> None:
         self._kind = kind
         for k, b in self.kind_tabs.items():
             b.setChecked(k == kind)
-        self.refresh_items()
+        if self.item_search.text().strip():
+            self._do_item_search()
 
     @staticmethod
     def _deferred_button(label: str, icon_name: str | None = None) -> QPushButton:
@@ -600,80 +572,205 @@ class PosPage(QWidget):
         self.cust_kind.style().polish(self.cust_kind)
         self._set_tier(level or "retail")
 
-    def refresh_items(self, *_args) -> None:
-        q = self.item_search.text()
+    def _on_item_query(self, _text: str) -> None:
+        self._item_timer.start(200)
+
+    def _do_item_search(self) -> None:
+        q = self.item_search.text().strip()
+        if not q:
+            self._item_popup.hide()
+            return
         rows = []
         for kind in ((self._kind,) if self._kind else ("tire", "battery", "service")):
             rows += items.search(self.session.con, q, kind=kind, limit=ITEM_CHOICES)
-        self.item_combo.blockSignals(True)
-        self.item_combo.clear()
-        for r in rows[:ITEM_CHOICES]:
-            spec = f" · {ltr(r[4])}" if r[4] else ""
-            self.item_combo.addItem(f"{r[3]} ({ltr(r[2])}){spec}", r)
-        self.item_combo.blockSignals(False)
-        self._on_item_changed()
+        rows = rows[:8]
+        self._item_popup.show_results(rows, on_pick=self._pick_item, on_new=self._open_new_item_dialog, query=q)
+        pos = self.item_search.mapToGlobal(self.item_search.rect().bottomLeft())
+        self._item_popup.move(pos)
+        self._item_popup.resize(self.item_search.width(), self._item_popup.sizeHint().height())
+        self._item_popup.show()
 
-    def _on_item_changed(self, *_args) -> None:
-        r = self.item_combo.currentData()
-        if r is None:
-            self.price.clear()
-            return
-        cents = r[PRICE_COLUMN[self.tier]] or r[5]
-        self.price.setText(f"{cents // 100}.{cents % 100:02d}")
+    def _pick_item(self, item_id: int, kind: str, name: str) -> None:
+        self.item_search.clear()
+        self._item_popup.hide()
+        self._add_row(item_id, kind, name)
 
-    # ---------- Lines ----------
-    def add_line(self) -> bool:
-        """Checks the line, then adds it; returns False and shows why when it refuses."""
-        r = self.item_combo.currentData()
-        if r is None:
-            return self._fail("اختر صنفًا للسطر.")
+    def _open_new_item_dialog(self) -> None:
+        self._item_popup.hide()
+        dlg = ItemDialog(self.session, None, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.saved:
+            self.item_search.clear()
+            self._add_row(dlg.saved.id, dlg.saved.kind, dlg.saved.name)
+
+    def eventFilter(self, obj, event) -> bool:
+        # The popup is a non-activating tool window (see _ItemPopup) so typing
+        # keeps working; close it shortly after the field loses focus so a
+        # click on one of its buttons still registers first.
+        if event.type() == QEvent.Type.FocusOut and obj is self.item_search:
+            QTimer.singleShot(150, self._item_popup.hide)
+        return super().eventFilter(obj, event)
+
+    # ---------- Lines: one self-contained row per item, added on pick ----------
+    def _add_row(self, item_id: int, kind: str, name: str) -> None:
+        row_w = QWidget()
+        h = QHBoxLayout(row_w)
+        h.setContentsMargins(4, 2, 4, 2)
+        h.setSpacing(10)
+
+        num_lbl = muted("")
+        num_lbl.setWordWrap(False)
+        h.addWidget(num_lbl, 0, Qt.AlignmentFlag.AlignTop)
+
+        item_w = QWidget()
+        iw = QHBoxLayout(item_w)
+        iw.setContentsMargins(0, 0, 0, 0)
+        iw.setSpacing(6)
+        ic = QLabel()
+        ic.setPixmap(icons.icon(KIND_ICON.get(kind, "inventory"), ICON_MUTED, 16).pixmap(16, 16))
+        name_lbl = QLabel(name)
+        iw.addWidget(ic)
+        iw.addWidget(name_lbl, 1)
+        h.addWidget(item_w, 3, Qt.AlignmentFlag.AlignTop)
+
+        qty_spin = QSpinBox()
+        qty_spin.setRange(1, 100000)
+        qty_spin.setValue(1)
+        qty_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        qty_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        minus_btn = QPushButton("−")
+        minus_btn.setObjectName("stepperBtn")
+        minus_btn.clicked.connect(qty_spin.stepDown)
+        plus_btn = QPushButton("+")
+        plus_btn.setObjectName("stepperBtn")
+        plus_btn.clicked.connect(qty_spin.stepUp)
+        qty_w = QWidget()
+        qh = QHBoxLayout(qty_w)
+        qh.setContentsMargins(0, 0, 0, 0)
+        qh.setSpacing(2)
+        qh.addWidget(minus_btn)
+        qh.addWidget(qty_spin, 1)
+        qh.addWidget(plus_btn)
+        h.addWidget(qty_w, 1, Qt.AlignmentFlag.AlignTop)
+
+        price_edit = ltr_edit("0.00")
+        price_edit.setText(self._tier_price_text(item_id))
+        h.addWidget(price_edit, 1, Qt.AlignmentFlag.AlignTop)
+
+        disc_edit = ltr_edit("0.00")
+        h.addWidget(disc_edit, 1, Qt.AlignmentFlag.AlignTop)
+
+        total_lbl = QLabel(ltr(fmt(0)))
+        total_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute
+                               | Qt.AlignmentFlag.AlignVCenter)
+        h.addWidget(total_lbl, 1, Qt.AlignmentFlag.AlignTop)
+
+        del_btn = QPushButton()
+        del_btn.setFlat(True)
+        del_btn.setIcon(icons.icon("trash", ICON_MUTED, 16))
+        del_btn.setFixedSize(30, 30)
+        del_btn.setToolTip("حذف السطر")
+        h.addWidget(del_btn, 0, Qt.AlignmentFlag.AlignTop)
+
+        row = {"widget": row_w, "item_id": item_id, "kind": kind, "name": name,
+              "num_lbl": num_lbl, "qty_spin": qty_spin, "price_edit": price_edit,
+              "disc_edit": disc_edit, "total_lbl": total_lbl}
+        qty_spin.valueChanged.connect(self._on_row_changed)
+        price_edit.textChanged.connect(self._on_row_changed)
+        disc_edit.textChanged.connect(self._on_row_changed)
+        del_btn.clicked.connect(lambda _=False, rw=row: self._remove_row(rw))
+
+        self._rows.append(row)
+        self.empty_label.hide()
+        # Insert before the trailing stretch (always the layout's last item)
+        # so rows stay stacked at the top instead of it.
+        self._rows_container.insertWidget(self._rows_container.count() - 1, row_w)
+        self._renumber()
+        self._on_row_changed()
+
+    def _tier_price_text(self, item_id: int) -> str:
         try:
-            unit = parse_money(self.price.text())
-            disc = parse_money(self.line_disc.text() or "0")
-        except MoneyError as e:
-            return self._fail(str(e))
-        if unit <= 0:
-            return self._fail("سعر الوحدة يجب أن يكون أكبر من صفر.")
-        if disc < 0 or disc > self.qty.value() * unit:
-            return self._fail("خصم السطر أكبر من قيمة السطر.")
-        self.lines.append(SaleLineIn(item_id=r[0], qty=self.qty.value(), unit_price=unit, line_discount=disc))
-        self._names.append(r[3])
-        self._meta.append((r[1], r[2]))
-        self.notice.show_message("")
-        self.line_disc.clear()
-        self.qty.setValue(1)
-        self._refresh_lines()
-        return True
+            it = items.get(self.session.con, item_id)
+        except items.ItemError:
+            return "0.00"
+        cents = getattr(it, TIER_ATTR[self.tier], 0) or it.price_retail
+        return f"{cents // 100}.{cents % 100:02d}"
 
-    def remove_selected(self) -> None:
-        idx = self.view.currentIndex()
-        if not idx.isValid():
-            self.notice.show_message("اختر سطرًا من الجدول أولًا.", "warn")
-            return
-        del self.lines[idx.row()]
-        del self._names[idx.row()]
-        del self._meta[idx.row()]
-        self._refresh_lines()
+    def _remove_row(self, row: dict) -> None:
+        self._rows.remove(row)
+        self._rows_container.removeWidget(row["widget"])
+        row["widget"].deleteLater()
+        if not self._rows:
+            self.empty_label.show()
+        self._renumber()
+        self._on_row_changed()
 
-    def _refresh_lines(self) -> None:
-        self.lines_model.reset_rows([(i, self._names[i - 1], ln.qty, ln.unit_price, ln.line_discount,
-                                      *self._meta[i - 1]) for i, ln in enumerate(self.lines, start=1)])
-        self.empty_label.setVisible(not self.lines)
-        pieces = sum(ln.qty for ln in self.lines)
-        self.count_chip.setText(f"{ltr(str(len(self.lines)))} سطر · {ltr(str(pieces))} قطعة")
+    def _renumber(self) -> None:
+        for i, row in enumerate(self._rows, start=1):
+            row["num_lbl"].setText(str(i))
+
+    def _on_row_changed(self) -> None:
+        for row in self._rows:
+            try:
+                price = parse_money(row["price_edit"].text())
+            except MoneyError:
+                price = 0
+            try:
+                disc = parse_money(row["disc_edit"].text() or "0")
+            except MoneyError:
+                disc = 0
+            row["total_lbl"].setText(ltr(fmt(max(row["qty_spin"].value() * price - disc, 0))))
+        pieces = sum(row["qty_spin"].value() for row in self._rows)
+        self.count_chip.setText(f"{ltr(str(len(self._rows)))} سطر · {ltr(str(pieces))} قطعة")
         self._refresh_total()
 
+    def _validate_lines(self) -> tuple[list[SaleLineIn] | None, str | None]:
+        """Parse and validate every row. Returns (lines, None) or (None, error)."""
+        if not self._rows:
+            return None, "أضف سطرًا واحدًا على الأقل قبل الترحيل."
+        lines = []
+        for i, row in enumerate(self._rows, start=1):
+            try:
+                unit = parse_money(row["price_edit"].text())
+            except MoneyError as e:
+                return None, f"السطر {i} ({row['name']}): السعر: {e}"
+            if unit <= 0:
+                return None, f"السطر {i} ({row['name']}): سعر الوحدة يجب أن يكون أكبر من صفر."
+            try:
+                disc = parse_money(row["disc_edit"].text() or "0")
+            except MoneyError as e:
+                return None, f"السطر {i} ({row['name']}): الخصم: {e}"
+            qty = row["qty_spin"].value()
+            if disc < 0 or disc > qty * unit:
+                return None, f"السطر {i} ({row['name']}): خصم السطر أكبر من قيمة السطر."
+            lines.append(SaleLineIn(item_id=row["item_id"], qty=qty, unit_price=unit, line_discount=disc))
+        return lines, None
+
     def subtotal_minor(self) -> int:
-        return sum(ln.qty * ln.unit_price for ln in self.lines)
+        total = 0
+        for row in self._rows:
+            try:
+                price = parse_money(row["price_edit"].text())
+            except MoneyError:
+                price = 0
+            total += row["qty_spin"].value() * price
+        return total
+
+    def _line_discount_minor(self) -> int:
+        total = 0
+        for row in self._rows:
+            try:
+                total += parse_money(row["disc_edit"].text() or "0")
+            except MoneyError:
+                pass
+        return total
 
     def total_minor(self) -> int:
         """Total after line and invoice discounts, in piasters, as the engine computes it."""
-        line_disc = sum(ln.line_discount for ln in self.lines)
         try:
             inv_disc = parse_money(self.invoice_disc.text() or "0")
         except MoneyError:
             inv_disc = 0
-        return self.subtotal_minor() - line_disc - inv_disc
+        return self.subtotal_minor() - self._line_discount_minor() - inv_disc
 
     def _refresh_total(self, *_args) -> None:
         total = self.total_minor()
@@ -727,8 +824,9 @@ class PosPage(QWidget):
         """Posts through the engine; any refusal is shown and nothing is written."""
         if self._busy:
             return
-        if not self.lines:
-            self._fail("أضف سطرًا واحدًا على الأقل قبل الترحيل.")
+        lines, err = self._validate_lines()
+        if err:
+            self._fail(err)
             return
         try:
             total = self.total_minor()
@@ -744,7 +842,7 @@ class PosPage(QWidget):
         try:
             self.posted = sales.post_sale(
                 self.session.con, self.session.user, request_key=self._request_key,
-                customer_id=customer[0] or None, lines=list(self.lines), payments=payments,
+                customer_id=customer[0] or None, lines=lines, payments=payments,
                 sale_date=self._stamp(), invoice_discount=inv_disc,
                 odometer=odometer, vehicle_plate=self.plate.text().strip() or None,
                 notes=self.note.text().strip() or None)
@@ -765,9 +863,11 @@ class PosPage(QWidget):
 
     def _reset_after_post(self) -> None:
         self._request_key = uuid.uuid4().hex
-        self.lines.clear()
-        self._names.clear()
-        self._meta.clear()
+        for row in list(self._rows):
+            self._rows_container.removeWidget(row["widget"])
+            row["widget"].deleteLater()
+        self._rows.clear()
+        self.empty_label.show()
         self.odometer.clear()
         self.plate.clear()
         self.note.clear()
@@ -779,8 +879,9 @@ class PosPage(QWidget):
         self.pay2_amount.clear()
         self.split_btn.setChecked(False)
         self.customer.setCurrentIndex(0)
+        self.number_edit.setText(sales.next_number_preview(self.session.con))
         self._stamp()
-        self._refresh_lines()
+        self._on_row_changed()
 
     def cancel_invoice(self) -> None:
         if self._busy:
