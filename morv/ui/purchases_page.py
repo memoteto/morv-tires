@@ -3,19 +3,23 @@ import uuid
 from datetime import date
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QPlainTextEdit, QPushButton, QSpinBox, QStackedWidget, QTableView,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFrame, QGridLayout, QHBoxLayout, QHeaderView,
+                               QLabel, QLineEdit, QPlainTextEdit, QPushButton, QSpinBox, QStackedWidget,
+                               QTableView, QVBoxLayout, QWidget)
 
 from morv.core import dot as dotmod
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
 from morv.infra import items, purchase_view, purchasing, suppliers
 from morv.infra.purchasing import PurchaseError, PurchaseLine
+from morv.ui import icons
 from morv.ui.listpage import TupleModel, ListPage
-from morv.ui.widgets import Notice, form, ltr_edit, muted, primary_button
+from morv.ui.widgets import Notice, ltr_edit, muted, primary_button
 
 ITEM_CHOICES = 50          # most items in the picker; search narrows it
+KIND_ICON = {"tire": "tire", "battery": "battery"}      # the line table's row icon, by item kind
+ICON_MUTED = "#8792A3"
+ICON_PRIMARY = "#1F5FD6"
 
 
 class PurchasesPage(QStackedWidget):
@@ -102,18 +106,24 @@ class PurchaseForm(QWidget):
         self.posted = None
         self.lines: list[PurchaseLine] = []
         self._names: list[str] = []
+        self._kinds: list[str] = []
         self._busy = False
         self._request_key = uuid.uuid4().hex     # One key per form: pressing again cannot duplicate the invoice
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 12, 16, 12)
+        root.setContentsMargins(20, 14, 20, 8)
         root.setSpacing(12)
         self.notice = Notice()
         root.addWidget(self._header())
         root.addWidget(self.notice)
 
         # ---- Invoice header ----
-        f = form()
+        box, body, _head = self._card("بيانات المورد والفاتورة", "suppliers")
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(12)
+        for c in range(4):
+            grid.setColumnStretch(c, 1)
         self.supplier = QComboBox()
         for row in suppliers.search(session.con, "", limit=300):
             self.supplier.addItem(row[1], row[0])
@@ -122,29 +132,25 @@ class PurchaseForm(QWidget):
         self.inv_date.setText(date.today().isoformat())
         self.notes = QPlainTextEdit()
         self.notes.setPlaceholderText("ملاحظات (اختيارية)")
-        self.notes.setFixedHeight(48)
-        attach = QPushButton("إرفاق صورة فاتورة المورد — قريبًا")
-        attach.setEnabled(False)
-        f.addRow("المورد *", self.supplier)
-        f.addRow("رقم فاتورة المورد *", self.inv_no)
-        f.addRow("تاريخ الفاتورة *", self.inv_date)
-        f.addRow("ملاحظات", self.notes)
-        f.addRow("", attach)
-        root.addLayout(f)
+        self.notes.setFixedHeight(42)
+        grid.addWidget(self._field("المورد *", self.supplier), 0, 0, 1, 2)
+        grid.addWidget(self._field("رقم فاتورة المورد *", self.inv_no), 0, 2)
+        grid.addWidget(self._field("تاريخ الفاتورة *", self.inv_date), 0, 3)
+        grid.addWidget(self._field("ملاحظات", self.notes), 1, 0, 1, 4)
+        body.addLayout(grid)
+        root.addWidget(box)
 
         # ---- Line entry ----
-        entry = QFrame()
-        entry.setObjectName("card")
-        col = QVBoxLayout(entry)
-        col.setContentsMargins(12, 10, 12, 10)
-        col.setSpacing(8)
+        ibox, ibody, _ihead = self._card("بنود الفاتورة", "purchases")
         self.item_search = QLineEdit()
         self.item_search.setPlaceholderText("ابحث عن صنف: الاسم أو الكود أو المقاس")
+        self.item_search.addAction(icons.icon("search", ICON_MUTED, 16), QLineEdit.ActionPosition.LeadingPosition)
+        self._trail_icon(self.item_search, "barcode")
         self.item_search.textChanged.connect(self.refresh_items)
+        ibody.addWidget(self.item_search)
         self.item_combo = QComboBox()
         self.item_combo.currentIndexChanged.connect(self._on_item_changed)
-        col.addWidget(self.item_search)
-        col.addWidget(self.item_combo)
+        ibody.addWidget(self.item_combo)
         row = QHBoxLayout()
         row.setSpacing(10)
         self.qty = QSpinBox()
@@ -152,21 +158,16 @@ class PurchaseForm(QWidget):
         self.qty.setValue(1)
         self.cost = ltr_edit("0.00")
         self.dot = ltr_edit("WWYY")
-        self.add_btn = QPushButton("إضافة السطر")
+        self.add_btn = primary_button("إضافة السطر", "plus")
         self.add_btn.clicked.connect(self.add_line)
-        for title, w in (("الكمية", self.qty), ("تكلفة الوحدة (جنيه)", self.cost), ("رمز DOT (أسبوع وسنة)", self.dot)):
-            cell = QVBoxLayout()
-            cell.setSpacing(4)
-            cell.addWidget(muted(title))
-            cell.addWidget(w)
-            row.addLayout(cell, 1)
+        row.addWidget(self._field("الكمية", self.qty), 1)
+        row.addWidget(self._field("تكلفة الوحدة (جنيه)", self.cost), 1)
+        row.addWidget(self._field("رمز DOT (أسبوع وسنة)", self.dot), 1)
         row.addWidget(self.add_btn, 0, Qt.AlignmentFlag.AlignBottom)
-        col.addLayout(row)
+        ibody.addLayout(row)
         self.dot_hint = muted("")
-        col.addWidget(self.dot_hint)
-        root.addWidget(entry)
+        ibody.addWidget(self.dot_hint)
 
-        # ---- Line table ----
         self.lines_model = TupleModel([
             ("#", lambda r: ltr(str(r[0]))),
             ("الصنف", lambda r: r[1]),
@@ -174,7 +175,7 @@ class PurchaseForm(QWidget):
             ("الكمية", lambda r: ltr(str(r[3]))),
             ("تكلفة الوحدة", lambda r: ltr(fmt(r[4]))),
             ("إجمالي السطر", lambda r: ltr(fmt(r[3] * r[4]))),
-        ])
+        ], icon_for=lambda r: KIND_ICON.get(r[5]))
         self.view = QTableView()
         self.view.setModel(self.lines_model)
         self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -185,7 +186,7 @@ class PurchaseForm(QWidget):
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.view.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.view.setMinimumHeight(170)
-        root.addWidget(self.view, 1)
+        ibody.addWidget(self.view, 1)
         bar = QHBoxLayout()
         self.remove_btn = QPushButton("حذف السطر المختار")
         self.remove_btn.clicked.connect(self.remove_selected)
@@ -194,7 +195,8 @@ class PurchaseForm(QWidget):
         bar.addWidget(self.remove_btn)
         bar.addStretch(1)
         bar.addWidget(self.total_label)
-        root.addLayout(bar)
+        ibody.addLayout(bar)
+        root.addWidget(ibox, 1)
 
         footer = QHBoxLayout()
         self.post_btn = primary_button("ترحيل الفاتورة")
@@ -215,14 +217,70 @@ class PurchaseForm(QWidget):
         w = QFrame()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(10)
         title = QLabel("فاتورة شراء جديدة")
-        title.setObjectName("cardTitle")
+        title.setObjectName("pageTitle")
+        h.addWidget(title)
+        h.addWidget(muted("المشتريات · الاستلام في: المخزن الرئيسي"))
+        h.addStretch(1)
+        h.addWidget(self._deferred_button("إرفاق صورة فاتورة المورد"))
         back = QPushButton("رجوع للقائمة")
         back.clicked.connect(lambda: self.stack.back_to_list())
-        h.addWidget(title)
-        h.addStretch(1)
         h.addWidget(back)
         return w
+
+    # ---------- Builders (the approved design's card-with-icon-header, as in PosPage) ----------
+    @staticmethod
+    def _card(title: str, icon_name: str) -> tuple:
+        box = QFrame()
+        box.setObjectName("card")
+        outer = QVBoxLayout(box)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        head_w = QWidget()
+        head_w.setObjectName("cardHead")
+        head = QHBoxLayout(head_w)
+        head.setContentsMargins(18, 12, 18, 12)
+        head.setSpacing(8)
+        ic = QLabel()
+        ic.setPixmap(icons.icon(icon_name, ICON_PRIMARY, 18).pixmap(18, 18))
+        t = QLabel(title)
+        t.setObjectName("cardTitle")
+        head.addWidget(ic)
+        head.addWidget(t)
+        head.addStretch(1)
+        outer.addWidget(head_w)
+        body = QVBoxLayout()
+        body.setContentsMargins(18, 14, 18, 16)
+        body.setSpacing(12)
+        outer.addLayout(body)
+        return box, body, head
+
+    @staticmethod
+    def _label(text: str) -> QLabel:
+        lbl = QLabel(text)
+        lbl.setObjectName("fieldLabel")
+        return lbl
+
+    def _field(self, title: str, widget: QWidget) -> QWidget:
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(6)
+        v.addWidget(self._label(title))
+        v.addWidget(widget)
+        return w
+
+    @staticmethod
+    def _trail_icon(edit: QLineEdit, name: str) -> None:
+        edit.addAction(icons.icon(name, ICON_MUTED, 16), QLineEdit.ActionPosition.TrailingPosition)
+
+    @staticmethod
+    def _deferred_button(label: str) -> QPushButton:
+        b = QPushButton(label)
+        b.setEnabled(False)
+        b.setToolTip("قريبًا — غير مبني بعد")
+        return b
 
     # ---------- Items ----------
     def refresh_items(self, *_args) -> None:
@@ -267,6 +325,7 @@ class PurchaseForm(QWidget):
             return self._fail(f"رمز DOT إلزامي للإطار «{data[2]}».")
         self.lines.append(PurchaseLine(data[0], self.qty.value(), cost, dot))
         self._names.append(data[2])
+        self._kinds.append(data[1])
         self.notice.show_message("")
         self.cost.clear()
         self.dot.clear()
@@ -281,10 +340,11 @@ class PurchaseForm(QWidget):
             return
         del self.lines[idx.row()]
         del self._names[idx.row()]
+        del self._kinds[idx.row()]
         self._refresh_lines()
 
     def _refresh_lines(self) -> None:
-        self.lines_model.reset_rows([(i, self._names[i - 1], ln.dot, ln.qty, ln.unit_cost)
+        self.lines_model.reset_rows([(i, self._names[i - 1], ln.dot, ln.qty, ln.unit_cost, self._kinds[i - 1])
                                      for i, ln in enumerate(self.lines, start=1)])
         self._refresh_total()
 
