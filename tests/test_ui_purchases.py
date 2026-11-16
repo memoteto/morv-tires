@@ -133,15 +133,22 @@ class PurchasesUiTest(unittest.TestCase):
         dlg.post()
         self.assertIn("سطرًا واحدًا", dlg.notice.text())
         self.add_row(dlg, self.battery, 1, "10")
-        dlg.inv_no.setText("  ")
-        dlg.post()
-        self.assertIn("رقم فاتورة المورد", dlg.notice.text())
-        dlg.inv_no.setText("S-1")
         dlg.inv_date.setText("2026-13-45")
         dlg.post()
         self.assertIn("لم تُرحَّل", dlg.notice.text())
         self.assertIsNone(dlg.posted)
         self.assertEqual(self.invoices(), 0)
+
+    def test_supplier_invoice_no_is_optional(self):
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "10")
+        dlg.inv_no.setText("   ")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(self.invoices(), 1)
+        stored = self.con.execute("SELECT supplier_invoice_no FROM purchase_invoices WHERE id=?",
+                                  (dlg.posted.id,)).fetchone()[0]
+        self.assertTrue(stored.startswith("AUTO-"))
 
     def test_engine_rejection_is_shown_and_keeps_input(self):
         first = self.dialog()
@@ -254,6 +261,30 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(page.model.rowCount(), 0)
         self.assertIn("لا تملك صلاحية", page.count_label.text())
         page.open_dialog(None)       # opens no form; one would hang the test if it tried exec
+
+    def test_new_supplier_dialog_saves_and_is_picked(self):
+        from morv.ui.purchases_page import _NewSupplierDialog
+        dlg = self.dialog()
+        new_dlg = self.destroy_on_cleanup(
+            _NewSupplierDialog(name_hint="مورد ثاني", mobile_hint="", session=self.session, parent=dlg))
+        new_dlg.mobile_edit.setText("01099998888")
+        new_dlg._save()
+        self.assertIsNotNone(new_dlg.created)
+        self.assertEqual(new_dlg.created.name, "مورد ثاني")
+        dlg._pick_supplier(new_dlg.created.id, new_dlg.created.name, new_dlg.created.mobile)
+        self.assertEqual(dlg._supplier_id, new_dlg.created.id)
+
+    def test_cost_note_compares_against_last_purchase(self):
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "10")
+        dlg.inv_no.setText("S-1")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        second = self.dialog()
+        row = self.add_row(second, self.battery, 1, "11")   # 10% higher than last cost
+        self.assertIn("أعلى من آخر شراء", row["cost_note"].text())
+        row["cost_edit"].setText("9")   # 10% lower than last cost
+        self.assertIn("أقل من آخر شراء", row["cost_note"].text())
 
     def test_shell_uses_real_purchases_page(self):
         from morv.ui.purchases_page import PurchasesPage

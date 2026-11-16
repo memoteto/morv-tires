@@ -39,6 +39,13 @@ def next_number_preview(con: sqlite3.Connection) -> str:
     return f"PI-{next_id:06d}"
 
 
+def last_cost(con: sqlite3.Connection, item_id: int) -> int | None:
+    """The most recent purchase unit cost recorded for an item, if any."""
+    row = con.execute("SELECT purchase_unit_cost FROM stock_lots WHERE item_id=? ORDER BY id DESC LIMIT 1",
+                      (item_id,)).fetchone()
+    return row[0] if row else None
+
+
 def _shape_lines(lines) -> list:
     if not lines:
         raise PurchaseError("الفاتورة بلا أسطر")

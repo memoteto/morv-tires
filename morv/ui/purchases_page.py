@@ -4,7 +4,7 @@ from datetime import date
 
 from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtWidgets import (
-    QComboBox, QFrame, QGridLayout, QHBoxLayout,
+    QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy,
     QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )
@@ -17,6 +17,7 @@ from morv.infra.purchasing import PurchaseError, PurchaseLine
 from morv.infra import suppliers as sup_infra
 from morv.ui import icons
 from morv.ui.listpage import ListPage
+from morv.ui.modal import Modal
 from morv.ui.widgets import Notice, ltr_edit, muted, primary_button
 
 ITEM_CHOICES = 50
@@ -207,41 +208,13 @@ class _ItemPopup(QFrame):
 # "New supplier" inline dialog
 # ---------------------------------------------------------------------------
 
-class _NewSupplierDialog(QFrame):
-    """Overlay dialog for adding a new supplier inline (design: .overlay / .dlg)."""
+class _NewSupplierDialog(Modal):
+    """The shared app modal (morv/ui/modal.py), filled in for a quick supplier add."""
 
-    def __init__(self, name_hint: str, mobile_hint: str, session, on_save, on_cancel, parent=None):
-        super().__init__(parent)
-        self.setObjectName("card")
+    def __init__(self, name_hint: str, mobile_hint: str, session, parent=None):
+        super().__init__("مورد جديد", parent, width=560)
         self.session = session
-        self._on_save = on_save
-        self._on_cancel = on_cancel
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-        # Header
-        head_w = QWidget()
-        head_w.setObjectName("cardHead")
-        head_layout = QHBoxLayout(head_w)
-        head_layout.setContentsMargins(18, 12, 18, 12)
-        title = QLabel("مورد جديد")
-        title.setObjectName("cardTitle")
-        close_btn = QPushButton("✕")
-        close_btn.setObjectName("dangerLink")
-        close_btn.setFixedSize(28, 28)
-        close_btn.clicked.connect(on_cancel)
-        head_layout.addWidget(title)
-        head_layout.addStretch(1)
-        head_layout.addWidget(close_btn)
-        layout.addWidget(head_w)
-
-        # Body
-        body = QWidget()
-        body_layout = QVBoxLayout(body)
-        body_layout.setContentsMargins(18, 14, 18, 14)
-        body_layout.setSpacing(12)
+        self.created = None
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
@@ -259,26 +232,9 @@ class _NewSupplierDialog(QFrame):
         grid.addWidget(self._field("رقم الموبايل *", self.mobile_edit), 1, 0)
         grid.addWidget(self._field("العنوان", self.addr_edit), 1, 1)
         grid.addWidget(self._field("ملاحظات", self.notes_edit), 2, 0, 1, 2)
-        body_layout.addLayout(grid)
-        self.hint = muted("باقي بيانات المورد تُكمل لاحقًا من شاشة الموردين.")
-        body_layout.addWidget(self.hint)
-        self.notice = Notice()
-        body_layout.addWidget(self.notice)
-        layout.addWidget(body)
-
-        # Footer
-        foot = QWidget()
-        foot.setObjectName("cardHead")
-        foot_layout = QHBoxLayout(foot)
-        foot_layout.setContentsMargins(18, 10, 18, 10)
-        save_btn = primary_button("حفظ واختيار المورد")
-        save_btn.clicked.connect(self._save)
-        cancel_btn = QPushButton("إلغاء")
-        cancel_btn.clicked.connect(on_cancel)
-        foot_layout.addWidget(save_btn)
-        foot_layout.addWidget(cancel_btn)
-        foot_layout.addStretch(1)
-        layout.addWidget(foot)
+        self.body.addLayout(grid)
+        self.body.addWidget(muted("باقي بيانات المورد تُكمل لاحقًا من شاشة الموردين."))
+        self.add_footer("حفظ واختيار المورد", self._save)
 
     def _save(self) -> None:
         name = self.name_edit.text().strip()
@@ -293,11 +249,11 @@ class _NewSupplierDialog(QFrame):
             s = sup_infra.Supplier(id=None, name=name, mobile=mobile,
                                    address=self.addr_edit.text().strip(),
                                    notes=self.notes_edit.text().strip())
-            saved = sup_infra.create(self.session.con, self.session.user, s)
+            self.created = sup_infra.create(self.session.con, self.session.user, s)
         except sup_infra.SupplierError as e:
             self.notice.show_message(str(e))
             return
-        self._on_save(saved)
+        self.accept()
 
     @staticmethod
     def _field(title: str, widget: QWidget) -> QWidget:
@@ -327,7 +283,6 @@ class PurchaseForm(QWidget):
         self._supplier_id: int | None = None
         self._supplier_name: str = ""
         self._supplier_mobile: str = ""
-        self._new_sup_dialog: _NewSupplierDialog | None = None
 
         # Scroll area wrapping all content
         scroll = QScrollArea(self)
@@ -422,7 +377,7 @@ class PurchaseForm(QWidget):
         hdr_grid.addWidget(self._field("رقم الإدخال", self.entry_no), 0, 0)
         hdr_grid.addWidget(sup_field_w, 0, 1, 1, 2)
         hdr_grid.addWidget(self._field("تاريخ الاستلام", self.recv_date), 0, 3)
-        hdr_grid.addWidget(self._field("رقم فاتورة المورد *", self.inv_no), 1, 0)
+        hdr_grid.addWidget(self._field("رقم فاتورة المورد", self.inv_no), 1, 0)
         hdr_grid.addWidget(self._field("تاريخ فاتورة المورد", self.inv_date), 1, 1)
         hdr_grid.addWidget(self._field("ملاحظة", self.notes), 1, 2, 1, 2)
         body.addLayout(hdr_grid)
@@ -478,6 +433,9 @@ class PurchaseForm(QWidget):
 
         self._empty_lbl = muted("لا توجد أصناف بعد. ابحث عن صنف أو امسح الباركود، أو أضف صنفًا جديدًا.")
         self._rows_container.addWidget(self._empty_lbl)
+        # Trailing stretch absorbs leftover height so rows stay pinned at the
+        # top of the card instead of stretching/centering when there are few.
+        self._rows_container.addStretch(1)
 
         main_col.addWidget(ibox, 1)
         cols.addLayout(main_col, 3)
@@ -669,27 +627,10 @@ class PurchaseForm(QWidget):
         q = self.sup_search.text().strip()
         name_hint = q if not q.replace(" ", "").isdigit() else ""
         mobile_hint = q if q.replace(" ", "").isdigit() else ""
-        if self._new_sup_dialog:
-            self._new_sup_dialog.deleteLater()
-        self._new_sup_dialog = _NewSupplierDialog(
-            name_hint=name_hint, mobile_hint=mobile_hint,
-            session=self.session,
-            on_save=self._on_new_supplier_saved,
-            on_cancel=lambda: self._new_sup_dialog.hide() if self._new_sup_dialog else None,
-            parent=self,
-        )
-        self._new_sup_dialog.setMinimumWidth(500)
-        # Center over form
-        self._new_sup_dialog.move(
-            self.rect().center() - self._new_sup_dialog.rect().center()
-        )
-        self._new_sup_dialog.show()
-        self._new_sup_dialog.raise_()
-
-    def _on_new_supplier_saved(self, saved_supplier) -> None:
-        if self._new_sup_dialog:
-            self._new_sup_dialog.hide()
-        self._pick_supplier(saved_supplier.id, saved_supplier.name, saved_supplier.mobile)
+        dlg = _NewSupplierDialog(name_hint=name_hint, mobile_hint=mobile_hint,
+                                 session=self.session, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.created:
+            self._pick_supplier(dlg.created.id, dlg.created.name, dlg.created.mobile)
 
     # ---------- Item search ----------
     def _on_item_query(self, text: str) -> None:
@@ -746,13 +687,41 @@ class PurchaseForm(QWidget):
         iw.addWidget(name_lbl, 1)
         h.addWidget(item_w, 3)
 
+        # Quantity stepper: explicit −/+ buttons instead of the spin box's
+        # own tiny native arrows.
         qty_spin = QSpinBox()
         qty_spin.setRange(1, 100000)
         qty_spin.setValue(1)
-        h.addWidget(qty_spin, 1)
+        qty_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        qty_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        minus_btn = QPushButton("−")
+        minus_btn.setFlat(True)
+        minus_btn.setFixedSize(26, 26)
+        minus_btn.clicked.connect(qty_spin.stepDown)
+        plus_btn = QPushButton("+")
+        plus_btn.setFlat(True)
+        plus_btn.setFixedSize(26, 26)
+        plus_btn.clicked.connect(qty_spin.stepUp)
+        qty_w = QWidget()
+        qh = QHBoxLayout(qty_w)
+        qh.setContentsMargins(0, 0, 0, 0)
+        qh.setSpacing(2)
+        qh.addWidget(minus_btn)
+        qh.addWidget(qty_spin, 1)
+        qh.addWidget(plus_btn)
+        h.addWidget(qty_w, 1)
 
+        # Cost + an inline note comparing it against the item's last purchase cost
+        cost_w = QWidget()
+        cw = QVBoxLayout(cost_w)
+        cw.setContentsMargins(0, 0, 0, 0)
+        cw.setSpacing(2)
         cost_edit = ltr_edit("0.00")
-        h.addWidget(cost_edit, 1)
+        cost_note = QLabel("")
+        cost_note.setWordWrap(False)
+        cw.addWidget(cost_edit)
+        cw.addWidget(cost_note)
+        h.addWidget(cost_w, 1)
 
         dot_edit = ltr_edit("WWYYYY")
         h.addWidget(dot_edit, 1)
@@ -770,15 +739,18 @@ class PurchaseForm(QWidget):
         h.addWidget(del_btn, 0)
 
         row = {"widget": row_w, "item_id": item_id, "kind": kind, "name": name,
+              "last_cost": purchasing.last_cost(self.session.con, item_id),
               "num_lbl": num_lbl, "qty_spin": qty_spin, "cost_edit": cost_edit,
-              "dot_edit": dot_edit, "total_lbl": total_lbl}
+              "cost_note": cost_note, "dot_edit": dot_edit, "total_lbl": total_lbl}
         qty_spin.valueChanged.connect(self._on_row_changed)
         cost_edit.textChanged.connect(self._on_row_changed)
         del_btn.clicked.connect(lambda _=False, rw=row: self._remove_row(rw))
 
         self._rows.append(row)
         self._empty_lbl.hide()
-        self._rows_container.addWidget(row_w)
+        # Insert before the trailing stretch (always the layout's last item)
+        # so rows stay stacked at the top instead of it.
+        self._rows_container.insertWidget(self._rows_container.count() - 1, row_w)
         self._renumber()
         self._on_row_changed()
 
@@ -802,8 +774,28 @@ class PurchaseForm(QWidget):
             except MoneyError:
                 cost = 0
             row["total_lbl"].setText(ltr(fmt(row["qty_spin"].value() * cost)))
+            self._update_cost_note(row, cost)
         self._line_count_lbl.setText(f"{len(self._rows)} سطر")
         self._refresh_summary()
+
+    @staticmethod
+    def _update_cost_note(row: dict, cost: int) -> None:
+        last = row["last_cost"]
+        note = row["cost_note"]
+        if not last or cost <= 0:
+            note.setText("")
+            return
+        pct = (cost - last) / last * 100
+        if cost > last:
+            note.setText(f"أعلى من آخر شراء +{pct:.1f}%")
+            note.setObjectName("costUp")
+        elif cost < last:
+            note.setText(f"أقل من آخر شراء {abs(pct):.1f}%")
+            note.setObjectName("costDown")
+        else:
+            note.setText("")
+        note.style().unpolish(note)
+        note.style().polish(note)
 
     def _sub_total(self) -> int:
         total = 0
@@ -891,9 +883,10 @@ class PurchaseForm(QWidget):
         if self._supplier_id is None:
             self._fail("اختر المورد.")
             return
-        if not self.inv_no.text().strip():
-            self._fail("رقم فاتورة المورد مطلوب.")
-            return
+        # Supplier invoice number is optional: when left blank, this invoice's
+        # own request key stands in so the uniqueness rule on (supplier,
+        # invoice no) still holds without forcing the user to type one.
+        inv_no_text = self.inv_no.text().strip() or f"AUTO-{self._request_key[:10].upper()}"
         lines, err = self._validate_lines()
         if err:
             self._fail(err)
@@ -905,7 +898,7 @@ class PurchaseForm(QWidget):
                 self.session.con, self.session.user,
                 request_key=self._request_key,
                 supplier_id=self._supplier_id,
-                supplier_invoice_no=self.inv_no.text(),
+                supplier_invoice_no=inv_no_text,
                 invoice_date=self.inv_date.text().strip(),
                 received_date=self._received_date,
                 lines=lines,
