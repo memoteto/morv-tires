@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>فاتورة شراء — Morv Tires</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F5FD6}a:hover{color:#174FB5}
+.mv{--bg:#F3F5F9;--surface:#FFFFFF;--surface2:#F6F8FB;--border:#E1E6EE;--border-strong:#C9D2DF;--text:#0F172A;--muted:#566173;--primary:#1F5FD6;--primary-hover:#174FB5;--primary-text:#1F5FD6;--primary-soft:#E8F0FE;--on-primary:#FFFFFF;--success:#0B7A48;--success-soft:#E3F5EC;--danger:#B42323;--danger-soft:#FDECEC;--warn:#8A5300;--warn-soft:#FFF3D6;--side:#0D1A33;--side-text:#C3CEE2;--side-muted:#8593AD;--side-hover:rgba(255,255,255,.07);--shadow:0 1px 2px rgba(15,23,42,.05);--pop:0 14px 36px rgba(15,23,42,.16);
+font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;color:var(--text);background:var(--bg);font-variant-numeric:tabular-nums;min-height:1000px;font-size:14.5px;line-height:1.5}
+.mv.dark{--bg:#0A1120;--surface:#111A2C;--surface2:#16223A;--border:#24314B;--border-strong:#33425F;--text:#E7EDF6;--muted:#9AA7BC;--primary:#2F6BE0;--primary-hover:#3D78EA;--primary-text:#8DB4FF;--primary-soft:#162A50;--on-primary:#FFFFFF;--success:#4CD394;--success-soft:#0F2E22;--danger:#FF8A8A;--danger-soft:#3A1717;--warn:#F2BE5C;--warn-soft:#33270D;--side:#070C17;--side-text:#C3CEE2;--side-muted:#7F8DA8;--shadow:none;--pop:0 14px 36px rgba(0,0,0,.5)}
+.mv *{box-sizing:border-box}
+.i{width:20px;height:20px;flex:0 0 auto}
+.app{display:flex;flex-direction:column;min-height:1000px}
+.top{min-height:60px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px;min-width:200px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;font-family:system-ui,sans-serif}
+.brand b{font-size:16px;display:block;line-height:1.2}
+.brand small{color:var(--muted);font-size:12px}
+.gsearch{flex:1 1 280px;max-width:520px;position:relative;display:flex;align-items:center}
+.gsearch .i{position:absolute;inset-inline-start:12px;color:var(--muted)}
+.gsearch input{padding-inline-start:40px;width:100%}
+.gsearch kbd{position:absolute;inset-inline-end:10px}
+.top-end{display:flex;align-items:center;gap:8px;margin-inline-start:auto;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;font-size:13px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--success-soft);color:var(--success);border-color:transparent}
+.pill .i{width:16px;height:16px}
+.body{display:flex;flex-wrap:wrap;flex:1 1 auto;align-items:stretch}
+.side{width:244px;background:var(--side);color:var(--side-text);display:flex;flex-direction:column;padding:12px 10px;gap:2px;transition:width .26s cubic-bezier(.2,.8,.2,1);flex:0 0 auto;position:relative;z-index:5}
+.side.collapsed{width:72px}
+.sec{font-size:12px;color:var(--side-muted);padding:14px 14px 6px;white-space:nowrap;overflow:hidden;transition:opacity .16s ease}
+.side.collapsed .sec{font-size:0;padding:0;height:1px;margin:10px 12px;background:rgba(255,255,255,.1)}
+.nav{display:flex;align-items:center;gap:12px;height:44px;padding:0 15px;border-radius:10px;color:var(--side-text);background:transparent;border:0;font:inherit;font-size:14.5px;cursor:pointer;white-space:nowrap;text-align:start;width:100%;position:relative;transition:background .15s ease,color .15s ease}
+.nav:hover{background:var(--side-hover);color:#FFFFFF}
+.nav:focus-visible{outline:2px solid #8DB4FF;outline-offset:2px}
+.nav.active{background:#1F5FD6;color:#FFFFFF;font-weight:600}
+.nav .i{width:22px;height:22px}
+.lbl{overflow:hidden;transition:opacity .18s ease;opacity:1;flex:1 1 auto}
+.side.collapsed .lbl{opacity:0;width:0;flex:0 0 0}
+.badge{margin-inline-start:auto;min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.12);color:#FFFFFF;font-size:12px;display:inline-flex;align-items:center;justify-content:center;transition:opacity .18s ease;font-family:inherit}
+.badge.alert{background:#E5484D}
+.side.collapsed .badge{opacity:0}
+.side.collapsed .badge.alert{opacity:1;position:absolute;top:9px;inset-inline-end:14px;min-width:9px;width:9px;height:9px;padding:0;font-size:0}
+.side.collapsed .nav:hover::after{content:attr(data-tip);position:absolute;inset-inline-start:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#0F172A;color:#FFFFFF;font-size:13px;padding:6px 10px;border-radius:8px;white-space:nowrap;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25)}
+.side-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 6px 6px 4px;min-height:40px}
+.side-top .ttl-s{font-size:12px;color:var(--side-muted);white-space:nowrap;overflow:hidden;transition:opacity .16s ease;padding-inline-start:10px}
+.side.collapsed .side-top{justify-content:center;padding:2px 0 6px}
+.side.collapsed .side-top .ttl-s{opacity:0;width:0;padding:0}
+.tgl{width:36px;height:36px;flex:0 0 36px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--side-text);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s ease,color .15s ease}
+.tgl:hover{background:rgba(255,255,255,.12);color:#FFFFFF}
+.tgl:focus-visible{outline:2px solid #8DB4FF;outline-offset:2px}
+.tgl .i{width:18px;height:18px}
+.chev{transition:transform .26s cubic-bezier(.2,.8,.2,1)}
+.side.collapsed .chev{transform:rotate(180deg)}
+.dd{position:relative}
+.dd-btn{width:100%;min-height:58px;display:flex;align-items:center;gap:12px;padding:8px 12px;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;text-align:start;transition:border-color .15s ease,box-shadow .15s ease}
+.dd-btn:hover{border-color:var(--primary)}
+.dd-btn.open{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.dd-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.dd-ic{width:38px;height:38px;border-radius:10px;background:var(--primary-soft);color:var(--primary-text);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.dd-ic .i{width:20px;height:20px}
+.dd-txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.dd-txt b{font-size:15px;font-weight:600}
+.dd-txt small{font-size:12.5px;color:var(--muted)}
+.dd-btn .caret{width:18px;height:18px;color:var(--muted);transition:transform .2s ease}
+.dd-btn.open .caret{transform:rotate(180deg)}
+.dd-opt{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;color:var(--text);font:inherit;padding:8px 10px;border-radius:10px;cursor:pointer;text-align:start}
+.dd-opt:hover,.dd-opt:focus-visible{background:var(--surface2);outline:none}
+.dd-opt.sel{background:var(--primary-soft)}
+.dd-opt .dd-ic{width:34px;height:34px;background:var(--surface2);color:var(--muted)}
+.dd-opt.sel .dd-ic{background:var(--surface);color:var(--primary-text)}
+.dd-opt .tick{width:18px;height:18px;color:var(--primary-text)}
+.dd-opt kbd{margin-inline-start:auto}
+.content{flex:999 1 560px;min-width:0;padding:18px 22px 24px;display:flex;flex-direction:column;gap:14px}
+.page-h{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between}
+.ttl{display:flex;align-items:center;gap:10px}
+.ttl h1{margin:0;font-size:22px;font-weight:700}
+.crumb{color:var(--muted);font-size:13px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.grid{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+.mainCol{flex:999 1 640px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.sumCol{flex:1 1 340px;min-width:300px;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border);font-weight:600;font-size:15px}
+.card-h .i{color:var(--primary-text)}
+.card-b{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.fgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.span2{grid-column:span 2}
+.field{display:flex;flex-direction:column;gap:6px;position:relative;min-width:0}
+.lab{font-size:13px;color:var(--muted);font-weight:500;display:flex;align-items:center;gap:6px}
+.req{color:var(--danger)}
+.inp{height:42px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface);color:var(--text);padding:0 12px;font:inherit;font-size:14.5px;outline:none;width:100%;min-width:0}
+.inp::placeholder{color:var(--muted)}
+.inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.inp.sm{height:34px;font-size:13px}
+.ro{position:relative}
+.ro .inp{background:var(--surface2);color:var(--text);border-style:dashed;padding-inline-end:36px;font-weight:600}
+.ro .i{position:absolute;inset-inline-end:10px;top:11px;width:18px;height:18px;color:var(--muted)}
+.ltr{direction:ltr;text-align:right}
+.ico-inp{position:relative}
+.ico-inp > .i{position:absolute;inset-inline-start:12px;top:11px;color:var(--muted);width:18px;height:18px}
+.ico-inp .inp{padding-inline-start:38px}
+.ico-inp .inp.ltr{padding:0 38px 0 12px}
+.ro .inp.ltr{padding:0 12px 0 36px}
+.lvl{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:600}
+.lvl.retail{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.lvl.wholesale{background:var(--primary-soft);color:var(--primary-text)}
+.lvl.super{background:var(--warn-soft);color:var(--warn)}
+.pstack{display:flex;flex-direction:column;align-items:flex-start;gap:2px;direction:ltr}
+.pstack small{font-size:11.5px;color:var(--muted);direction:rtl}
+select.inp{appearance:auto}
+.btn{height:42px;padding:0 16px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font:inherit;font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .05s ease}
+.btn:hover{background:var(--surface2)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn.primary:hover{background:var(--primary-hover)}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn.danger{color:var(--danger)}
+.btn.big{height:54px;font-size:16.5px;width:100%;border-radius:12px}
+.btn.icon{width:42px;padding:0}
+.btn.sq{width:34px;height:34px;padding:0;border-radius:8px}
+.btn .i{width:18px;height:18px}
+kbd{font-family:inherit;font-size:11.5px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-bottom-width:2px;border-radius:6px;padding:0 6px;height:22px;display:inline-flex;align-items:center}
+.btn.primary kbd{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3);color:#FFFFFF}
+.chip{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:6px;font-size:12px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.chip.ok{background:var(--success-soft);color:var(--success);border-color:transparent}
+.chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.danger{background:var(--danger-soft);color:var(--danger);border-color:transparent}
+.chip.info{background:var(--primary-soft);color:var(--primary-text);border-color:transparent}
+.pop{position:absolute;top:calc(100% + 6px);inset-inline:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--pop);z-index:30;padding:6px;display:flex;flex-direction:column;gap:2px}
+.opt{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;color:var(--text);font:inherit;font-size:14px;padding:8px 10px;border-radius:8px;cursor:pointer;text-align:start}
+.opt:hover,.opt:focus-visible{background:var(--surface2);outline:none}
+.opt .meta{color:var(--muted);font-size:12.5px}
+.opt .grow{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.opt.add{color:var(--primary-text);font-weight:600}
+.cust-strip{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);font-size:13.5px}
+.cust-strip.new{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+.cust-strip .sp{margin-inline-start:auto}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.isearch{flex:1 1 320px;position:relative}
+.isearch .inp{height:46px;font-size:15px;padding-inline-start:42px;padding-inline-end:86px}
+.isearch > .i{position:absolute;inset-inline-start:13px;top:13px;color:var(--muted)}
+.isearch .bc{position:absolute;inset-inline-end:8px;top:8px;display:flex;align-items:center;gap:6px;color:var(--muted)}
+.seg{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px}
+.seg button{height:38px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.quick{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.qbtn{height:32px;padding:0 10px;border-radius:8px;border:1px dashed var(--border-strong);background:transparent;color:var(--text);font:inherit;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.qbtn:hover{border-style:solid;border-color:var(--primary);color:var(--primary-text)}
+.qbtn .i{width:16px;height:16px}
+.tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px}
+.trow{display:grid;grid-template-columns:36px minmax(300px,1fr) 124px 108px 96px 116px 46px;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);min-width:900px}
+.trow:last-child{border-bottom:0}
+.thead{background:var(--surface2);font-size:12.5px;color:var(--muted);font-weight:600;padding-top:9px;padding-bottom:9px}
+.num{direction:ltr;text-align:left;font-variant-numeric:tabular-nums}
+.strong{font-weight:700}
+.muted{color:var(--muted)}
+.item{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.thumb{width:42px;height:42px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);flex:0 0 auto}
+.thumb.battery{color:#B7791F}
+.thumb.service{color:var(--primary-text)}
+.thumb .i{width:24px;height:24px}
+.item-txt{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 auto}
+.item-name{font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.code{font-size:12px;color:var(--muted);direction:ltr}
+.bat{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bat .inp{max-width:230px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--primary)}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;height:36px;background:var(--surface)}
+.stepper button{width:34px;height:36px;border:0;background:transparent;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.stepper button:hover{background:var(--surface2)}
+.stepper .i{width:16px;height:16px}
+.stepper span{min-width:36px;text-align:center;font-weight:700}
+.del{width:36px;height:36px;border-radius:8px;border:0;background:transparent;color:var(--danger);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.del:hover{background:var(--danger-soft)}
+.del .i{width:18px;height:18px}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.kv{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.kv span{color:var(--muted)}
+.kv b{font-weight:600}
+.kv .inp{max-width:150px;height:38px;text-align:left;direction:ltr}
+.total{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:12px;background:var(--primary-soft);color:var(--primary-text)}
+.total span{font-weight:600;font-size:15px}
+.total b{font-size:26px;font-weight:700;direction:ltr}
+.total small{font-size:14px;font-weight:600;margin-inline-end:6px}
+.paygrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pay{height:58px;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);color:var(--text);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:all .15s ease}
+.pay:hover{border-color:var(--primary)}
+.pay.on{border-color:var(--primary);background:var(--primary-soft);color:var(--primary-text);box-shadow:inset 0 0 0 1px var(--primary)}
+.pay .i{width:20px;height:20px}
+.subcard{border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--surface2)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.hint{font-size:12.5px;color:var(--muted)}
+.alert{display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--danger-soft);color:var(--danger);font-size:13.5px;font-weight:500}
+.alert .i{width:18px;height:18px}
+.change{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;font-weight:700}
+.change.pos{background:var(--success-soft);color:var(--success)}
+.change.neg{background:var(--danger-soft);color:var(--danger)}
+.change b{direction:ltr;font-size:18px}
+.status{display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:8px 20px;background:var(--surface);border-top:1px solid var(--border);font-size:12.5px;color:var(--muted)}
+.status .sp{margin-inline-start:auto;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.status .i{width:15px;height:15px}
+.st{display:inline-flex;align-items:center;gap:6px}
+.dotok{width:8px;height:8px;border-radius:50%;background:var(--success)}
+@media (max-width:760px){.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.side{width:100%;flex-direction:row;flex-wrap:wrap}.side.collapsed{width:100%}.sec{display:none}.nav{width:auto}}
+</style>
+<style>
+.okbar{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--success-soft);color:var(--success);font-weight:600}
+.okbar .i{width:20px;height:20px}
+.okbar .sp{margin-inline-start:auto}
+.qin{width:40px;height:36px;border:0;background:transparent;text-align:center;font:inherit;font-weight:700;color:var(--text);direction:ltr}
+.qin:focus{outline:2px solid var(--primary);outline-offset:-2px}
+.down{color:var(--success);font-size:12px}
+.err{color:var(--danger);font-size:12.5px}
+.prow{display:grid;grid-template-columns:36px minmax(260px,1fr) 118px 120px 112px 150px 78px 120px 46px;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);min-width:1060px}
+.prow:last-child{border-bottom:0}
+.prow .inp{height:36px;font-size:13.5px;text-align:left;direction:ltr}
+.up{color:var(--danger);font-size:12px}
+.drop{border:1.5px dashed var(--border-strong);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13.5px}
+.drop .i{width:26px;height:26px;color:var(--primary-text)}
+</style>
+<style>
+.root-rel{position:relative}
+.srow{display:grid;grid-template-columns:minmax(200px,1.4fr) 130px minmax(160px,1.2fr) 120px 110px;gap:12px;align-items:center;padding:10px 14px;border:0;border-bottom:1px solid var(--border);min-width:760px;font-size:14px;background:transparent;width:100%;color:var(--text);font-family:inherit;text-align:start;cursor:pointer}
+.srow:hover{background:var(--surface2)}
+.srow.sel{background:var(--primary-soft);box-shadow:inset -3px 0 0 var(--primary)}
+.srow.thead{cursor:default}
+.who{display:flex;flex-direction:column;min-width:0}
+.who b{font-weight:600}
+.who span{font-size:12.5px;color:var(--muted)}
+.bal{direction:ltr;text-align:right;font-weight:700}
+.bal.due{color:var(--danger)}
+.bal.zero{color:var(--muted);font-weight:500}
+.listCol{flex:999 1 620px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.detail{flex:1 1 380px;min-width:340px;display:flex;flex-direction:column;gap:14px}
+.list{max-height:600px;overflow:auto;background:var(--surface)}
+.list .thead{position:sticky;top:0;z-index:2}
+.avatar{width:48px;height:48px;border-radius:12px;background:var(--primary-soft);color:var(--primary-text);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;flex:0 0 auto}
+.info{display:flex;flex-direction:column;gap:0}
+.info .kv{padding:7px 0;border-bottom:1px solid var(--border)}
+.info .kv:last-child{border-bottom:0}
+.balbox{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:12px;background:var(--danger-soft);color:var(--danger)}
+.balbox b{font-size:22px;direction:ltr}
+.balbox.ok{background:var(--success-soft);color:var(--success)}
+.pur{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:7px 0;border-bottom:1px solid var(--border)}
+.pur:last-child{border-bottom:0}
+.overlay{position:absolute;inset:0;background:rgba(10,17,32,.42);display:flex;align-items:flex-start;justify-content:center;padding:70px 20px 20px;z-index:80}
+.dlg{width:100%;max-width:680px;border-radius:16px;background:var(--surface);border:1px solid var(--border);box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden;color:var(--text)}
+.dlg-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.dlg-h b{font-size:17px}
+.dlg-b{padding:16px 18px;display:flex;flex-direction:column;gap:14px;max-height:640px;overflow:auto}
+.dlg-f{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface2)}
+.pgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.full{grid-column:1 / -1}
+textarea.inp{height:76px;padding:10px 12px;line-height:1.7;resize:vertical}
+.err{color:var(--danger);font-size:12.5px}
+.warnt{color:var(--warn);font-size:12.5px}
+.chkrow{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer}
+.chkrow input{width:18px;height:18px;accent-color:var(--primary)}
+.obox{border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px}
+.more{display:flex;align-items:center;gap:8px;border:0;background:transparent;color:var(--primary-text);font:inherit;font-weight:600;cursor:pointer;padding:2px 0;align-self:flex-start}
+.more .i{width:16px;height:16px;transition:transform .2s ease}
+.more.open .i{transform:rotate(180deg)}
+.dir{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px}
+.dir button{height:36px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.dir button.on{background:var(--primary-soft);color:var(--primary-text)}
+</style>
+</helmet>
+<div class="mv root-rel {{themeCls}}" dir="rtl" lang="ar">
+
+
+<sc-if value="{{supDlg}}" hint-placeholder-val="{{false}}">
+  <div class="overlay">
+    <div class="dlg" style="max-width: 560px" role="dialog" aria-modal="true" aria-labelledby="nsdt">
+      <div class="dlg-h"><b id="nsdt">مورد جديد</b><button class="btn sq ghost" onClick="{{closeDlgs}}" aria-label="إغلاق"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></div>
+      <div class="dlg-b">
+        <div class="pgrid">
+          <div class="field full"><label class="lab" for="nsn">اسم المورد <span class="req">*</span></label><input id="nsn" class="inp" value="{{ns.name}}" onChange="{{onNs.name}}"><sc-if value="{{nsE.name}}" hint-placeholder-val="{{false}}"><span class="err">مطلوب</span></sc-if></div>
+          <div class="field"><label class="lab" for="nsm">رقم الموبايل <span class="req">*</span></label><input id="nsm" class="inp ltr" value="{{ns.mobile}}" onChange="{{onNs.mobile}}" placeholder="01xxxxxxxxx"><sc-if value="{{nsE.mobile}}" hint-placeholder-val="{{false}}"><span class="err">11 رقمًا يبدأ بـ 01</span></sc-if></div>
+          <div class="field"><label class="lab" for="nsa">العنوان</label><input id="nsa" class="inp" value="{{ns.addr}}" onChange="{{onNs.addr}}"></div>
+          <div class="field full"><label class="lab" for="nsnote">ملاحظات</label><input id="nsnote" class="inp" value="{{ns.notes}}" onChange="{{onNs.notes}}"></div>
+        </div>
+        <span class="hint">باقي بيانات المورد (الرصيد السابق، مدة السداد...) تُكمل لاحقًا من شاشة الموردين.</span>
+      </div>
+      <div class="dlg-f"><button class="btn primary" onClick="{{saveNs}}">حفظ واختيار المورد</button><button class="btn ghost" onClick="{{closeDlgs}}">إلغاء</button></div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{itemDlg}}" hint-placeholder-val="{{false}}">
+  <div class="overlay">
+    <div class="dlg" style="max-width: 640px" role="dialog" aria-modal="true" aria-labelledby="nidt">
+      <div class="dlg-h"><b id="nidt">صنف جديد سريع</b><button class="btn sq ghost" onClick="{{closeDlgs}}" aria-label="إغلاق"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></div>
+      <div class="dlg-b">
+        <div class="seg" role="radiogroup" aria-label="نوع الصنف" style="align-self: flex-start">
+          <button class="{{niK.tire}}" role="radio" aria-checked="{{niOn.tire}}" onClick="{{niPick.tire}}">إطار</button>
+          <button class="{{niK.battery}}" role="radio" aria-checked="{{niOn.battery}}" onClick="{{niPick.battery}}">بطارية</button>
+        </div>
+        <div class="pgrid">
+          <sc-if value="{{niTire}}" hint-placeholder-val="{{true}}">
+            <div class="field"><label class="lab" for="nisz">المقاس <span class="req">*</span></label><input id="nisz" class="inp ltr" value="{{ni.size}}" onChange="{{onNi.size}}" placeholder="205/55R16"><sc-if value="{{niE.size}}" hint-placeholder-val="{{false}}"><span class="err">مثل 205/55R16</span></sc-if></div>
+          </sc-if>
+          <sc-if value="{{niTire}}" hint-placeholder-val="{{true}}">
+            <div class="field"><label class="lab" for="nili">الحمل والسرعة <span class="req">*</span></label><input id="nili" class="inp ltr" value="{{ni.li}}" onChange="{{onNi.li}}" placeholder="91V"><sc-if value="{{niE.li}}" hint-placeholder-val="{{false}}"><span class="err">مطلوب</span></sc-if></div>
+          </sc-if>
+          <sc-if value="{{niBat}}" hint-placeholder-val="{{false}}">
+            <div class="field"><label class="lab" for="niah">السعة (أمبير) <span class="req">*</span></label><input id="niah" class="inp ltr" value="{{ni.ah}}" onChange="{{onNi.ah}}" placeholder="70"><sc-if value="{{niE.ah}}" hint-placeholder-val="{{false}}"><span class="err">مطلوب</span></sc-if></div>
+          </sc-if>
+          <sc-if value="{{niBat}}" hint-placeholder-val="{{false}}">
+            <div class="field"><label class="lab" for="nipol">القطبية <span class="req">*</span></label><select id="nipol" class="inp"><option>الموجب يمين</option><option>الموجب يسار</option></select></div>
+          </sc-if>
+          <div class="field"><label class="lab" for="nibr">الماركة <span class="req">*</span></label><input id="nibr" class="inp" value="{{ni.brand}}" onChange="{{onNi.brand}}"><sc-if value="{{niE.brand}}" hint-placeholder-val="{{false}}"><span class="err">مطلوب</span></sc-if></div>
+          <div class="field"><label class="lab" for="nimd">الموديل / النقشة</label><input id="nimd" class="inp" value="{{ni.model}}" onChange="{{onNi.model}}"></div>
+          <div class="field full"><label class="lab" for="ninm">اسم الصنف</label><input id="ninm" class="inp" value="{{niNameVal}}" onChange="{{onNi.name}}"><span class="hint">يُولَّد من البيانات ويمكن تعديله</span></div>
+          <div class="field"><label class="lab" for="nip1">سعر القطاعي <span class="req">*</span></label><input id="nip1" class="inp ltr" value="{{ni.p1}}" onChange="{{onNi.p1}}" placeholder="0.00"><sc-if value="{{niE.p1}}" hint-placeholder-val="{{false}}"><span class="err">أكبر من صفر</span></sc-if></div>
+          <div class="field"><label class="lab" for="nibc">الباركود</label><input id="nibc" class="inp ltr" value="{{ni.bc}}" onChange="{{onNi.bc}}" placeholder="امسحه بالقارئ"></div>
+        </div>
+        <span class="hint">التكلفة والكمية تُكتبان في سطر الفاتورة. باقي البيانات (أسعار الجملة، المواصفات الإضافية) تُكمل من شاشة الأصناف، وتظهر على الصنف علامة «بيانات ناقصة» حتى تُستكمل.</span>
+      </div>
+      <div class="dlg-f"><button class="btn primary" onClick="{{saveNi}}">حفظ وإضافة للفاتورة</button><button class="btn ghost" onClick="{{closeDlgs}}">إلغاء</button></div>
+    </div>
+  </div>
+</sc-if>
+<div class="app">
+
+<header class="top">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">M</div>
+    <div><b>Morv Tires</b><small>محل الإطارات والبطاريات</small></div>
+  </div>
+  <div class="gsearch">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+    <input class="inp" type="search" placeholder="بحث سريع: عميل، صنف، رقم فاتورة، موبايل" aria-label="بحث سريع في البرنامج">
+    <kbd>Ctrl+K</kbd>
+  </div>
+  <div class="top-end">
+    <span class="pill ok">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+      نسخة احتياطية: اليوم 08:00
+    </span>
+    <span class="pill">الجمعة 2026-11-13 · 10:05</span>
+    <button class="btn icon ghost" onClick="{{toggleTheme}}" aria-label="{{themeLabel}}" title="{{themeLabel}}">
+      <sc-if value="{{isDark}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+      <sc-if value="{{isLight}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg></sc-if>
+    </button>
+    <button class="btn ghost" aria-label="حساب المستخدم">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>
+      مدير النظام
+    </button>
+  </div>
+</header>
+
+<div class="body">
+<nav class="side {{sideCls}}" aria-label="القائمة الرئيسية">
+  <div class="side-top">
+    <span class="ttl-s">القائمة الرئيسية</span>
+    <button class="tgl" onClick="{{toggleSide}}" aria-label="{{sideLabel}}" title="{{sideLabel}} (Ctrl+B)" aria-expanded="{{sideExpanded}}">
+      <svg class="i chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m13 6 6 6-6 6"></path><path d="m6 6 6 6-6 6"></path></svg>
+    </button>
+  </div>
+  <div class="sec">البيع</div>
+  <button class="nav" data-tip="لوحة التحكم" aria-label="لوحة التحكم"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path><path d="M10 21v-6h4v6"></path></svg><span class="lbl">لوحة التحكم</span></button>
+  <button class="nav" data-tip="نقطة البيع" aria-label="نقطة البيع"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4M7 8h4"></path></svg><span class="lbl">نقطة البيع</span><span class="badge">F1</span></button>
+  <button class="nav" data-tip="فواتير البيع والمرتجعات" aria-label="فواتير البيع والمرتجعات"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg><span class="lbl">فواتير البيع والمرتجعات</span></button>
+  <div class="sec">المخزون والعلاقات</div>
+  <button class="nav active" aria-current="page" data-tip="المشتريات" aria-label="المشتريات"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h12v10H2z"></path><path d="M14 10h4l3 3v3h-7"></path><circle cx="6.5" cy="18" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg><span class="lbl">المشتريات</span></button>
+  <button class="nav" data-tip="الأصناف والمخزون" aria-label="الأصناف والمخزون"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"></path><path d="m3 8 9 5 9-5M12 13v8"></path></svg><span class="lbl">الأصناف والمخزون</span></button>
+  <button class="nav" data-tip="العملاء والموردون" aria-label="العملاء والموردون"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.8.7 3 2.5 3.5 5.2"></path></svg><span class="lbl">العملاء والموردون</span></button>
+  <div class="sec">المال</div>
+  <button class="nav" data-tip="التقسيط والتحصيل — 3 متأخرة" aria-label="التقسيط والتحصيل، 3 أقساط متأخرة"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path><path d="m9 15 2 2 4-4"></path></svg><span class="lbl">التقسيط والتحصيل</span><span class="badge alert">3</span></button>
+  <button class="nav" data-tip="الخزينة والمصروفات" aria-label="الخزينة والمصروفات"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h13v4"></path><path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z"></path><circle cx="16" cy="14.5" r="1.2"></circle></svg><span class="lbl">الخزينة والمصروفات</span></button>
+  <button class="nav" data-tip="التقارير" aria-label="التقارير"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"></path></svg><span class="lbl">التقارير</span></button>
+  <div class="sec">النظام</div>
+  <button class="nav" data-tip="النسخ الاحتياطي" aria-label="النسخ الاحتياطي"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg><span class="lbl">النسخ الاحتياطي</span></button>
+  <button class="nav" data-tip="الإعدادات" aria-label="الإعدادات"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg><span class="lbl">الإعدادات</span></button>
+</nav>
+
+<main class="content">
+  <div class="page-h">
+    <div class="ttl">
+      <h1>فاتورة شراء / استلام بضاعة</h1>
+      <span class="{{statusCls}}">{{statusLbl}}</span>
+      <span class="crumb">المشتريات · الاستلام في: المخزن الرئيسي</span>
+    </div>
+    <div class="actions">
+      <button class="btn">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7L14 5.5a3.5 3.5 0 0 1 5 5L10.5 19a2 2 0 0 1-3-3L15 8.5"></path></svg>
+        إرفاق صورة فاتورة المورد
+      </button>
+      <button class="btn ghost danger" onClick="{{resetAll}}">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        إلغاء
+      </button>
+    </div>
+  </div>
+
+  <sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+    <div class="okbar" role="status">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>
+      <span>{{doneMsg}}</span>
+      <button class="btn sp" onClick="{{resetAll}}">فاتورة شراء جديدة</button>
+    </div>
+  </sc-if>
+
+  <div class="grid">
+  <div class="mainCol">
+    <section class="card" aria-label="المورد والفاتورة">
+      <div class="card-h">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h12v10H2z"></path><path d="M14 10h4l3 3v3h-7"></path><circle cx="6.5" cy="18" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg>
+        المورد والفاتورة
+      </div>
+      <div class="card-b">
+        <div class="fgrid">
+          <div class="field">
+            <label class="lab" for="pno">رقم الإدخال</label>
+            <div class="ro" title="رقم داخلي تسلسلي تلقائي — لا يُعدّل"><input id="pno" class="inp ltr" value="P-2026-000038" readonly=""><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+          </div>
+          <div class="field span2">
+            <label class="lab" for="sup">المورد <span class="req">*</span></label>
+            <div class="ico-inp">
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+              <input id="sup" class="inp" value="{{supVal}}" onChange="{{onSupQ}}" placeholder="اسم المورد أو رقم الموبايل" autocomplete="off">
+            </div>
+            <sc-if value="{{showSupPop}}" hint-placeholder-val="{{false}}">
+              <div class="pop" role="listbox" aria-label="نتائج الموردين">
+                <sc-for list="{{supMatches}}" as="v" hint-placeholder-count="2">
+                  <button class="opt" role="option" onClick="{{v.pick}}">
+                    <span class="grow"><span>{{v.name}}</span><span class="meta ltr">{{v.mobile}}</span></span>
+                    <span class="meta">{{v.balF}}</span>
+                  </button>
+                </sc-for>
+                <button class="opt add" onClick="{{openNewSup}}">
+                  <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+                  <span class="grow"><span>مورد جديد: {{supQ}}</span><span class="meta">يُضاف لقائمة الموردين ويُختار مباشرة</span></span>
+                </button>
+              </div>
+            </sc-if>
+            <sc-if value="{{e.sup}}" hint-placeholder-val="{{false}}"><span class="err">اختر المورد</span></sc-if>
+          </div>
+          <div class="field">
+            <label class="lab" for="pdate">تاريخ الاستلام</label>
+            <div class="ro"><input id="pdate" class="inp ltr" value="2026-11-13  10:05" readonly=""><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+          </div>
+          <div class="field">
+            <label class="lab" for="sinv">رقم فاتورة المورد <span class="req">*</span></label>
+            <input id="sinv" class="inp ltr" value="{{sinv}}" onChange="{{onSinv}}" placeholder="كما في فاتورته">
+            <sc-if value="{{e.sinv}}" hint-placeholder-val="{{false}}"><span class="err">مطلوب</span></sc-if>
+            <sc-if value="{{sinvDup}}" hint-placeholder-val="{{false}}"><span class="err">هذا الرقم مسجّل من قبل لنفس المورد</span></sc-if>
+          </div>
+          <div class="field">
+            <label class="lab" for="sdate">تاريخ فاتورة المورد</label>
+            <input id="sdate" class="inp ltr" value="{{sdate}}" onChange="{{onSdate}}">
+          </div>
+          <div class="field span2">
+            <label class="lab" for="snote">ملاحظة</label>
+            <input id="snote" class="inp" placeholder="اختياري">
+          </div>
+        </div>
+        <sc-if value="{{hasSup}}" hint-placeholder-val="{{true}}">
+          <div class="cust-strip">
+            <span class="chip ok">مورد مسجّل</span>
+            <b>{{sup.name}}</b>
+            <span class="ltr">{{sup.mobile}}</span>
+            <span>{{supInfo}}</span>
+            <button class="btn ghost sp" onClick="{{clearSup}}">تغيير</button>
+          </div>
+        </sc-if>
+      </div>
+    </section>
+
+    <section class="card" aria-label="الأصناف المستلمة">
+      <div class="card-h">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"></path><path d="m3 8 9 5 9-5M12 13v8"></path></svg>
+        الأصناف المستلمة
+        <span class="chip" style="margin-inline-start: auto">{{lineCount}} سطر · {{pieceCount}} قطعة</span>
+      </div>
+      <div class="card-b">
+        <div class="toolbar">
+          <div class="isearch">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+            <input class="inp" value="{{itemQ}}" onChange="{{onItemQ}}" onKeyDown="{{onItemKey}}" placeholder="اسم الصنف، الكود، المقاس أو امسح الباركود" aria-label="بحث عن صنف للشراء" autocomplete="off">
+            <span class="bc"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5v14M7 5v14M11 5v14M14 5v14M18 5v14M20 5v14"></path></svg><kbd>F2</kbd></span>
+            <sc-if value="{{showItems}}" hint-placeholder-val="{{false}}">
+              <div class="pop" role="listbox" aria-label="نتائج الأصناف">
+                <sc-for list="{{itemOpts}}" as="it" hint-placeholder-count="3">
+                  <button class="opt" role="option" onClick="{{it.pick}}">
+                    <span class="grow"><span>{{it.name}}</span><span class="meta"><span class="ltr">{{it.code}}</span> · {{it.spec}}</span></span>
+                    <span class="chip">رصيد {{it.stock}}</span>
+                    <span class="pstack" style="min-width: 120px"><b>{{it.lastF}}</b><small>آخر تكلفة</small></span>
+                  </button>
+                </sc-for>
+                <button class="opt add" onClick="{{openNewItem}}">
+                  <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+                  <span class="grow"><span>صنف جديد: {{itemQ}}</span><span class="meta">يُسجَّل في الأصناف ويُضاف لهذه الفاتورة</span></span>
+                </button>
+              </div>
+            </sc-if>
+          </div>
+          <button class="btn" onClick="{{openNewItem}}">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+            صنف جديد
+          </button>
+        </div>
+        <div class="tblwrap">
+          <div class="prow thead">
+            <span>م</span><span>الصنف</span><span>الكمية</span><span class="num">تكلفة الوحدة</span><span>{{lotHead}}</span><span>أسعار البيع</span><span class="num">أقل هامش</span><span class="num">الإجمالي</span><span></span>
+          </div>
+          <sc-for list="{{lines}}" as="ln" hint-placeholder-count="3">
+            <div class="prow">
+              <span class="muted">{{ln.n}}</span>
+              <div class="item">
+                <div class="thumb {{ln.kind}}">
+                  <sc-if value="{{ln.isTire}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><path d="M12 3v5M12 16v5M3 12h5M16 12h5"></path></svg></sc-if>
+                  <sc-if value="{{ln.isBattery}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M7 7V5h3v2M14 7V5h3v2M6.5 13.5h3M15.5 12v3M14 13.5h3"></path></svg></sc-if>
+                </div>
+                <div class="item-txt">
+                  <span class="item-name">{{ln.name}}</span>
+                  <div class="chips"><span class="code">{{ln.code}}</span><span class="chip info">{{ln.spec}}</span><sc-if value="{{ln.isNew}}" hint-placeholder-val="{{false}}"><span class="chip ok">صنف جديد</span></sc-if></div>
+                </div>
+              </div>
+              <div class="stepper" role="group" aria-label="الكمية">
+                <button onClick="{{ln.inc}}" aria-label="زيادة"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+                <input class="qin" value="{{ln.qty}}" onChange="{{ln.onQty}}" aria-label="الكمية" inputmode="numeric">
+                <button onClick="{{ln.dec}}" aria-label="إنقاص"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+              </div>
+              <div class="field" style="gap: 2px">
+                <input class="inp" value="{{ln.costStr}}" onChange="{{ln.onCost}}" aria-label="تكلفة الوحدة" inputmode="decimal">
+                <sc-if value="{{ln.costUp}}" hint-placeholder-val="{{false}}"><span class="up">{{ln.costNote}}</span></sc-if>
+                <sc-if value="{{ln.costDown}}" hint-placeholder-val="{{false}}"><span class="down">{{ln.costNote}}</span></sc-if>
+              </div>
+              <input class="inp" value="{{ln.dot}}" onChange="{{ln.onDot}}" aria-label="أسبوع وسنة الإنتاج" placeholder="24/2025">
+              <span class="pstack"><b>{{ln.sell}}</b><small>جملة {{ln.sellW}}</small><small>جملة الجملة {{ln.sellS}}</small></span>
+              <span class="num"><span class="chip {{ln.marginTone}}">{{ln.margin}}</span></span>
+              <span class="num strong">{{ln.total}}</span>
+              <button class="del" onClick="{{ln.remove}}" aria-label="حذف السطر"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg></button>
+            </div>
+          </sc-for>
+          <sc-if value="{{noLines}}" hint-placeholder-val="{{false}}">
+            <div class="empty">لا توجد أصناف بعد. ابحث عن صنف أو امسح الباركود، أو أضف صنفًا جديدًا.</div>
+          </sc-if>
+        </div>
+        <sc-if value="{{e.lines}}" hint-placeholder-val="{{false}}"><span class="err">أضف صنفًا واحدًا على الأقل بكمية وتكلفة أكبر من صفر</span></sc-if>
+      </div>
+    </section>
+  </div>
+
+  <aside class="sumCol" aria-label="ملخص الشراء">
+    <section class="card">
+      <div class="card-h">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h4"></path></svg>
+        ملخص فاتورة الشراء
+      </div>
+      <div class="card-b">
+        <div class="kv"><span>إجمالي الأصناف</span><b class="num">{{subF}}</b></div>
+        <div class="kv"><label for="sdisc"><span>خصم المورد</span></label><input id="sdisc" class="inp" value="{{disc}}" onChange="{{onDisc}}" inputmode="decimal"></div>
+        <div class="kv"><label for="stax"><span>ضريبة على فاتورة المورد</span></label><input id="stax" class="inp" value="{{tax}}" onChange="{{onTax}}" inputmode="decimal"></div>
+        <div class="kv"><label for="ship"><span>نقل وتحميل</span></label><input id="ship" class="inp" value="{{ship}}" onChange="{{onShip}}" inputmode="decimal"></div>
+        <div class="total"><span>إجمالي الفاتورة</span><b><small>ج.م</small>{{totalF}}</b></div>
+        <div class="two">
+          <div class="field"><label class="lab" for="ppaid">مدفوع الآن</label><input id="ppaid" class="inp ltr" value="{{paid}}" onChange="{{onPaid}}" inputmode="decimal"></div>
+          <div class="field"><label class="lab" for="pmeth">من</label><select id="pmeth" class="inp"><option>الخزينة (نقدي)</option><option>تحويل بنكي</option><option>InstaPay / محفظة</option></select></div>
+        </div>
+        <div class="{{remCls}}"><span>{{remLbl}}</span><b>{{remF}}</b></div>
+        <sc-if value="{{hasDue}}" hint-placeholder-val="{{false}}"><div class="kv"><span>تاريخ استحقاق المتبقي</span><b class="num">{{dueDate}}</b></div></sc-if>
+        <sc-if value="{{e.paid}}" hint-placeholder-val="{{false}}"><span class="err">المدفوع أكبر من إجمالي الفاتورة</span></sc-if>
+        <button class="btn primary big" onClick="{{approve}}" disabled="{{done}}">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>
+          اعتماد الاستلام وتحديث المخزون
+          <kbd>F9</kbd>
+        </button>
+        <div class="two">
+          <button class="btn">حفظ كمسودة</button>
+          <button class="btn">طباعة إذن الاستلام</button>
+        </div>
+        <span class="hint">بعد الاعتماد تُنشأ دفعة مخزون لكل سطر بتكلفتها وتاريخ إنتاجها، ويُضاف المتبقي لحساب المورد. الفاتورة المعتمدة لا تُعدَّل؛ التصحيح بمرتجع شراء.</span>
+      </div>
+    </section>
+  </aside>
+  </div>
+</main>
+</div>
+
+<footer class="status">
+  <span class="st"><span class="dotok" aria-hidden="true"></span>قاعدة البيانات متصلة</span>
+  <span class="st">آخر نسخة: 08:00 (محلي + USB)</span>
+  <span class="st">تصميم معتمد v1.0 — بيانات تجريبية</span>
+  <span class="sp"><span class="st"><kbd>F2</kbd> صنف</span><span class="st"><kbd>F9</kbd> اعتماد</span><span class="st"><kbd>Esc</kbd> إغلاق</span></span>
+</footer>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+function fmt(m){var n=m<0;var s=(Math.abs(m)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});return (n?'-':'')+s;}
+function latin(s){return String(s==null?'':s).replace(/[٠-٩]/g,function(d){return String(d.charCodeAt(0)-0x0660);}).replace(/[۰-۹]/g,function(d){return String(d.charCodeAt(0)-0x06F0);});}
+function toMinor(s){var v=parseFloat(latin(s).replace(/,/g,''));return isFinite(v)?Math.round(v*100):0;}
+function addDays(iso,n){var d=new Date(Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10)));d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+function parseSize(v){var x=String(v).toUpperCase().replace(/\s/g,'');return /^\d{3}\/\d{2}Z?R\d{2}$/.test(x)||/^\d{1,2}\.\d{2}R\d{2}(\.\d)?$/.test(x);}
+var SUPS=[
+ {id:'v1',name:'الشركة المتحدة لتجارة الإطارات',mobile:'01001112233',bal:4850000,terms:30,invs:['INV-87410','INV-86120']},
+ {id:'v2',name:'مؤسسة النور للبطاريات',mobile:'01224455667',bal:0,terms:0,invs:['NB-1102']},
+ {id:'v3',name:'كونتيننتال مصر — موزع الدلتا',mobile:'01112223344',bal:1380000,terms:15,invs:['CD-2231']}
+];
+var ITEMS=[
+ {id:'t1',kind:'tire',name:'إطار ميشلان Primacy 4',code:'TR-2055516-MI',bc:'6221234500011',spec:'205/55R16 · 91V',stock:18,last:510000,p:[645000,612000,595000]},
+ {id:'t2',kind:'tire',name:'إطار كونتيننتال PremiumContact 6',code:'TR-2254517-CO',bc:'6221234500028',spec:'225/45R17 · 94W',stock:6,last:640000,p:[790000,750000,728000]},
+ {id:'t3',kind:'tire',name:'إطار هانكوك Kinergy Eco 2',code:'TR-1856515-HK',bc:'6221234500035',spec:'185/65R15 · 88H',stock:32,last:278000,p:[385000,365000,355000]},
+ {id:'t4',kind:'tire',name:'إطار بريدجستون Turanza T005',code:'TR-1956515-BR',bc:'6221234500042',spec:'195/65R15 · 91H',stock:3,last:330000,p:[410000,390000,378000]},
+ {id:'b1',kind:'battery',name:'بطارية ACDelco 70 أمبير',code:'BT-70-ACD',bc:'6221234500103',spec:'70Ah · 12V · CCA 640',stock:10,last:330000,p:[420000,399000,388000]},
+ {id:'b2',kind:'battery',name:'بطارية فارتا Blue Dynamic 60 أمبير',code:'BT-60-VAR',bc:'6221234500110',spec:'60Ah · 12V · CCA 540',stock:4,last:285000,p:[365000,347000,337000]}
+];
+var START_LINES=[{id:'t3',qty:20,cost:'2,950.00',dot:'38/2025'},{id:'t1',qty:8,cost:'5,100.00',dot:'33/2025'},{id:'b1',qty:10,cost:'3,250.00',dot:'08/2025'}];
+var NS0={name:'',mobile:'',addr:'',notes:''};
+var NI0={kind:'tire',size:'',li:'',ah:'',brand:'',model:'',name:'',p1:'',bc:''};
+class Component extends DCLogic {
+  state = {collapsed:true,dark:true,sups:SUPS,items:ITEMS,sup:SUPS[0],supQ:'',supOpen:false,sinv:'INV-88213',sdate:'2026-11-11',
+    lines:START_LINES,itemQ:'',disc:'500.00',tax:'0.00',ship:'600.00',paid:'20,000.00',tried:false,done:false,
+    supDlg:false,ns:Object.assign({},NS0),nsTried:false,itemDlg:false,ni:Object.assign({},NI0),niTried:false};
+  renderVals() {
+    var self=this,s=this.state;
+    var set=function(o){self.setState(o);};
+    var findItem=function(id){return s.items.filter(function(x){return x.id===id;})[0];};
+    // supplier
+    var q=latin(s.supQ).trim();
+    var supMatches=(q?s.sups.filter(function(v){return v.name.indexOf(q)>=0||v.mobile.indexOf(q)>=0;}):[]).map(function(v){
+      return {name:v.name,mobile:v.mobile,balF:v.bal>0?('مستحق له '+fmt(v.bal)):'لا رصيد',pick:function(){set({sup:v,supQ:'',supOpen:false});}};});
+    // items
+    var addItem=function(it,extra){var ls=s.lines.slice();var i=-1;ls.forEach(function(l,j){if(l.id===it.id)i=j;});
+      if(i>=0){ls[i]=Object.assign({},ls[i],{qty:ls[i].qty+1});}else{ls.push({id:it.id,qty:1,cost:it.last?fmt(it.last):'',dot:''});}
+      set(Object.assign({lines:ls,itemQ:''},extra||{}));};
+    var iq=latin(s.itemQ).trim().toLowerCase();
+    var matches=iq?s.items.filter(function(it){return (it.name+' '+it.code+' '+it.bc+' '+it.spec).toLowerCase().indexOf(iq)>=0;}).slice(0,6):[];
+    var itemOpts=matches.map(function(it){return {name:it.name,code:it.code,spec:it.spec,stock:it.stock,lastF:it.last?fmt(it.last):'—',pick:function(){addItem(it);}};});
+    var onItemKey=function(ev){if(ev.key==='Enter'&&matches.length>0){addItem(matches[0]);}if(ev.key==='Escape'){set({itemQ:''});}};
+    // lines
+    var sub=0,pieces=0,okLines=0;
+    var lines=s.lines.map(function(l,idx){
+      var it=findItem(l.id); var cost=toMinor(l.cost); var q2=parseInt(l.qty,10)||0;
+      var tot=cost*q2; sub+=tot; pieces+=q2; if(q2>0&&cost>0)okLines++;
+      var upd=function(patch){set({lines:s.lines.map(function(x,j){return j===idx?Object.assign({},x,patch):x;})});};
+      var pct=it.last&&cost?((cost-it.last)/it.last*100):0;
+      var low=it.p[2]||it.p[0];
+      var margin=cost&&low?((low-cost)/low*100):null;
+      return {n:idx+1,kind:it.kind,isTire:it.kind==='tire',isBattery:it.kind==='battery',isNew:!!it.isNew,name:it.name,code:it.code,spec:it.spec,
+        qty:String(l.qty),costStr:l.cost,dot:l.dot,
+        costUp:pct>0.5,costDown:pct<-0.5,costNote:(pct>0?'أعلى':'أقل')+' من آخر شراء '+(pct>0?'+':'')+pct.toFixed(1)+'%',
+        sell:fmt(it.p[0]),sellW:fmt(it.p[1]||it.p[0]),sellS:fmt(it.p[2]||it.p[0]),
+        margin:margin==null?'—':margin.toFixed(1)+'%',marginTone:margin==null?'':(margin<0?'danger':(margin<10?'warn':'ok')),total:fmt(tot),
+        inc:function(){upd({qty:q2+1});},dec:function(){upd({qty:Math.max(1,q2-1)});},
+        onQty:function(ev){upd({qty:parseInt(latin(ev.target.value),10)||0});},
+        onCost:function(ev){upd({cost:latin(ev.target.value)});},onDot:function(ev){upd({dot:latin(ev.target.value)});},
+        remove:function(){set({lines:s.lines.filter(function(x,j){return j!==idx;})});}};
+    });
+    var total=sub-toMinor(s.disc)+toMinor(s.tax)+toMinor(s.ship);
+    var paid=toMinor(s.paid); var rem=total-paid;
+    var terms=s.sup?s.sup.terms:0;
+    var sinvDup=!!(s.sup&&s.sinv&&s.sup.invs.indexOf(s.sinv.trim())>=0);
+    var req={sup:!s.sup,sinv:!s.sinv.trim()||sinvDup,lines:okLines===0||okLines<s.lines.length,paid:paid>total};
+    var e={};Object.keys(req).forEach(function(k){e[k]=s.tried&&req[k];});e.paid=req.paid;
+    var approve=function(){
+      if(Object.keys(req).some(function(k){return req[k];})){set({tried:true});return;}
+      set({done:true,tried:false});
+    };
+    // new supplier dialog
+    var ns=s.ns, nsMob=latin(ns.mobile).replace(/[^0-9]/g,'');
+    var nsReq={name:!ns.name.trim(),mobile:!/^01[0-9]{9}$/.test(nsMob)};
+    var onNs={};['name','mobile','addr','notes'].forEach(function(k){onNs[k]=function(ev){var o=Object.assign({},s.ns);o[k]=k==='mobile'?latin(ev.target.value):ev.target.value;set({ns:o});};});
+    var saveNs=function(){if(nsReq.name||nsReq.mobile){set({nsTried:true});return;}
+      var v={id:'v'+Date.now(),name:ns.name.trim(),mobile:nsMob,bal:0,terms:0,invs:[]};
+      set({sups:[v].concat(s.sups),sup:v,supDlg:false,nsTried:false,ns:Object.assign({},NS0),supQ:'',supOpen:false});};
+    // new item dialog
+    var ni=s.ni, niTire=ni.kind==='tire';
+    var autoName=niTire?('إطار '+ni.brand+' '+ni.model+' '+ni.size.toUpperCase()+' '+ni.li.toUpperCase()).replace(/\s+/g,' ').trim():('بطارية '+ni.brand+' '+(ni.ah?ni.ah+' أمبير':'')+' '+ni.model).replace(/\s+/g,' ').trim();
+    var niReq={size:niTire&&!parseSize(ni.size),li:niTire&&!ni.li.trim(),ah:!niTire&&!ni.ah.trim(),brand:!ni.brand.trim(),p1:toMinor(ni.p1)<=0};
+    var niE={};Object.keys(niReq).forEach(function(k){niE[k]=s.niTried&&niReq[k];});
+    var onNi={};['size','li','ah','brand','model','name','p1','bc'].forEach(function(k){onNi[k]=function(ev){var o=Object.assign({},s.ni);o[k]=['size','li','ah','p1','bc'].indexOf(k)>=0?latin(ev.target.value):ev.target.value;set({ni:o});};});
+    var saveNi=function(){if(Object.keys(niReq).some(function(k){return niReq[k];})){set({niTried:true});return;}
+      var p1=toMinor(ni.p1);
+      var it={id:'n'+Date.now(),kind:ni.kind,isNew:true,name:(ni.name||autoName).trim(),code:niTire?('TR-'+ni.size.replace(/[^0-9]/g,'')+'-'+(ni.brand.slice(0,2)||'XX')):('BT-'+ni.ah+'-'+(ni.brand.slice(0,3)||'XXX')),
+        bc:ni.bc||'—',spec:niTire?(ni.size.toUpperCase()+' · '+ni.li.toUpperCase()):(ni.ah+'Ah · 12V'),stock:0,last:0,p:[p1,p1,p1]};
+      var items=[it].concat(s.items);
+      set({items:items,lines:s.lines.concat([{id:it.id,qty:1,cost:'',dot:''}]),itemDlg:false,niTried:false,ni:Object.assign({},NI0),itemQ:''});};
+    var niK={tire:ni.kind==='tire'?'on':'',battery:ni.kind==='battery'?'on':''};
+    var setNiKind=function(k){return function(){var o=Object.assign({},s.ni);o.kind=k;set({ni:o});};};
+    var resetAll=function(){set({sup:null,supQ:'',sinv:'',lines:[],disc:'0.00',tax:'0.00',ship:'0.00',paid:'0.00',tried:false,done:false});};
+    return {
+      themeCls:s.dark?'dark':'',isDark:s.dark,isLight:!s.dark,themeLabel:s.dark?'التبديل إلى الثيم الفاتح':'التبديل إلى الثيم الداكن',
+      toggleTheme:function(){set({dark:!s.dark});},
+      sideCls:s.collapsed?'collapsed':'',sideLabel:s.collapsed?'توسيع القائمة':'طيّ القائمة',sideExpanded:!s.collapsed,
+      toggleSide:function(){set({collapsed:!s.collapsed});},
+      statusCls:s.done?'chip ok':'chip warn',statusLbl:s.done?'معتمدة':'مسودة',done:s.done,
+      doneMsg:'تم اعتماد الاستلام P-2026-000038 — أُضيفت '+pieces+' قطعة للمخزون، والمتبقي للمورد '+fmt(Math.max(0,rem))+' ج.م',
+      supVal:s.sup?s.sup.name:s.supQ, supQ:q, onSupQ:function(ev){set({sup:null,supQ:ev.target.value,supOpen:true});},
+      showSupPop:s.supOpen&&!s.sup&&q.length>0, supMatches:supMatches, hasSup:!!s.sup, sup:s.sup||{name:'',mobile:''},
+      supInfo:s.sup?((s.sup.bal>0?('مستحق له '+fmt(s.sup.bal)):'لا رصيد مستحق')+(s.sup.terms?(' · آجل '+s.sup.terms+' يومًا'):' · نقدي')):'',
+      clearSup:function(){set({sup:null,supQ:''});},
+      openNewSup:function(){set({supDlg:true,ns:Object.assign({},NS0,{name:/^[0-9]+$/.test(q)?'':q,mobile:/^[0-9]+$/.test(q)?q:''}),nsTried:false});},
+      sinv:s.sinv,onSinv:function(ev){set({sinv:latin(ev.target.value)});},sinvDup:sinvDup,sdate:s.sdate,onSdate:function(ev){set({sdate:latin(ev.target.value)});},
+      itemQ:s.itemQ,onItemQ:function(ev){set({itemQ:ev.target.value});},onItemKey:onItemKey,showItems:iq.length>0,itemOpts:itemOpts,
+      openNewItem:function(){set({itemDlg:true,niTried:false,ni:Object.assign({},NI0,{size:/\d{3}\/\d{2}/.test(s.itemQ)?latin(s.itemQ).toUpperCase():''})});},
+      lines:lines,noLines:lines.length===0,lineCount:lines.length,pieceCount:pieces,lotHead:'DOT / الإنتاج',
+      subF:fmt(sub),disc:s.disc,onDisc:function(ev){set({disc:latin(ev.target.value)});},tax:s.tax,onTax:function(ev){set({tax:latin(ev.target.value)});},
+      ship:s.ship,onShip:function(ev){set({ship:latin(ev.target.value)});},totalF:fmt(total),
+      paid:s.paid,onPaid:function(ev){set({paid:latin(ev.target.value)});},
+      remCls:rem>0?'change neg':'change pos',remLbl:rem>0?'يُضاف لرصيد المورد':(rem<0?'المدفوع أكبر من الفاتورة':'مدفوعة بالكامل'),remF:fmt(Math.abs(rem)),
+      hasDue:rem>0&&terms>0,dueDate:addDays(s.sdate||'2026-11-11',terms),
+      e:e,approve:approve,resetAll:resetAll,
+      supDlg:s.supDlg,ns:ns,onNs:onNs,nsE:{name:s.nsTried&&nsReq.name,mobile:s.nsTried&&nsReq.mobile},saveNs:saveNs,
+      itemDlg:s.itemDlg,ni:ni,onNi:onNi,niE:niE,niTire:niTire,niBat:!niTire,niK:niK,niOn:{tire:niTire,battery:!niTire},
+      niPick:{tire:setNiKind('tire'),battery:setNiKind('battery')},niNameVal:ni.name||autoName,saveNi:saveNi,
+      closeDlgs:function(){set({supDlg:false,itemDlg:false,nsTried:false,niTried:false});}
+    };
+  }
+}
+</script>
+</body>
+</html>

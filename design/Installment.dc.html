@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>عقد تقسيط جديد — Morv Tires</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F5FD6}a:hover{color:#174FB5}
+.mv{--bg:#F3F5F9;--surface:#FFFFFF;--surface2:#F6F8FB;--border:#E1E6EE;--border-strong:#C9D2DF;--text:#0F172A;--muted:#566173;--primary:#1F5FD6;--primary-hover:#174FB5;--primary-text:#1F5FD6;--primary-soft:#E8F0FE;--on-primary:#FFFFFF;--success:#0B7A48;--success-soft:#E3F5EC;--danger:#B42323;--danger-soft:#FDECEC;--warn:#8A5300;--warn-soft:#FFF3D6;--side:#0D1A33;--side-text:#C3CEE2;--side-muted:#8593AD;--side-hover:rgba(255,255,255,.07);--shadow:0 1px 2px rgba(15,23,42,.05);--pop:0 14px 36px rgba(15,23,42,.16);
+font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;color:var(--text);background:var(--bg);font-variant-numeric:tabular-nums;min-height:1000px;font-size:14.5px;line-height:1.5}
+.mv.dark{--bg:#0A1120;--surface:#111A2C;--surface2:#16223A;--border:#24314B;--border-strong:#33425F;--text:#E7EDF6;--muted:#9AA7BC;--primary:#2F6BE0;--primary-hover:#3D78EA;--primary-text:#8DB4FF;--primary-soft:#162A50;--on-primary:#FFFFFF;--success:#4CD394;--success-soft:#0F2E22;--danger:#FF8A8A;--danger-soft:#3A1717;--warn:#F2BE5C;--warn-soft:#33270D;--side:#070C17;--side-text:#C3CEE2;--side-muted:#7F8DA8;--shadow:none;--pop:0 14px 36px rgba(0,0,0,.5)}
+.mv *{box-sizing:border-box}
+.i{width:20px;height:20px;flex:0 0 auto}
+.app{display:flex;flex-direction:column;min-height:1000px}
+.top{min-height:60px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px;min-width:200px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;font-family:system-ui,sans-serif}
+.brand b{font-size:16px;display:block;line-height:1.2}
+.brand small{color:var(--muted);font-size:12px}
+.gsearch{flex:1 1 280px;max-width:520px;position:relative;display:flex;align-items:center}
+.gsearch .i{position:absolute;inset-inline-start:12px;color:var(--muted)}
+.gsearch input{padding-inline-start:40px;width:100%}
+.gsearch kbd{position:absolute;inset-inline-end:10px}
+.top-end{display:flex;align-items:center;gap:8px;margin-inline-start:auto;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;font-size:13px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--success-soft);color:var(--success);border-color:transparent}
+.pill .i{width:16px;height:16px}
+.body{display:flex;flex-wrap:wrap;flex:1 1 auto;align-items:stretch}
+.side{width:244px;background:var(--side);color:var(--side-text);display:flex;flex-direction:column;padding:12px 10px;gap:2px;transition:width .26s cubic-bezier(.2,.8,.2,1);flex:0 0 auto;position:relative;z-index:5}
+.side.collapsed{width:72px}
+.sec{font-size:12px;color:var(--side-muted);padding:14px 14px 6px;white-space:nowrap;overflow:hidden;transition:opacity .16s ease}
+.side.collapsed .sec{font-size:0;padding:0;height:1px;margin:10px 12px;background:rgba(255,255,255,.1)}
+.nav{display:flex;align-items:center;gap:12px;height:44px;padding:0 15px;border-radius:10px;color:var(--side-text);background:transparent;border:0;font:inherit;font-size:14.5px;cursor:pointer;white-space:nowrap;text-align:start;width:100%;position:relative;transition:background .15s ease,color .15s ease}
+.nav:hover{background:var(--side-hover);color:#FFFFFF}
+.nav:focus-visible{outline:2px solid #8DB4FF;outline-offset:2px}
+.nav.active{background:#1F5FD6;color:#FFFFFF;font-weight:600}
+.nav .i{width:22px;height:22px}
+.lbl{overflow:hidden;transition:opacity .18s ease;opacity:1;flex:1 1 auto}
+.side.collapsed .lbl{opacity:0;width:0;flex:0 0 0}
+.badge{margin-inline-start:auto;min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.12);color:#FFFFFF;font-size:12px;display:inline-flex;align-items:center;justify-content:center;transition:opacity .18s ease;font-family:inherit}
+.badge.alert{background:#E5484D}
+.side.collapsed .badge{opacity:0}
+.side.collapsed .badge.alert{opacity:1;position:absolute;top:9px;inset-inline-end:14px;min-width:9px;width:9px;height:9px;padding:0;font-size:0}
+.side.collapsed .nav:hover::after{content:attr(data-tip);position:absolute;inset-inline-start:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#0F172A;color:#FFFFFF;font-size:13px;padding:6px 10px;border-radius:8px;white-space:nowrap;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,.25)}
+.side-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 6px 6px 4px;min-height:40px}
+.side-top .ttl-s{font-size:12px;color:var(--side-muted);white-space:nowrap;overflow:hidden;transition:opacity .16s ease;padding-inline-start:10px}
+.side.collapsed .side-top{justify-content:center;padding:2px 0 6px}
+.side.collapsed .side-top .ttl-s{opacity:0;width:0;padding:0}
+.tgl{width:36px;height:36px;flex:0 0 36px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--side-text);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s ease,color .15s ease}
+.tgl:hover{background:rgba(255,255,255,.12);color:#FFFFFF}
+.tgl:focus-visible{outline:2px solid #8DB4FF;outline-offset:2px}
+.tgl .i{width:18px;height:18px}
+.chev{transition:transform .26s cubic-bezier(.2,.8,.2,1)}
+.side.collapsed .chev{transform:rotate(180deg)}
+.dd{position:relative}
+.dd-btn{width:100%;min-height:58px;display:flex;align-items:center;gap:12px;padding:8px 12px;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;text-align:start;transition:border-color .15s ease,box-shadow .15s ease}
+.dd-btn:hover{border-color:var(--primary)}
+.dd-btn.open{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.dd-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.dd-ic{width:38px;height:38px;border-radius:10px;background:var(--primary-soft);color:var(--primary-text);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.dd-ic .i{width:20px;height:20px}
+.dd-txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.dd-txt b{font-size:15px;font-weight:600}
+.dd-txt small{font-size:12.5px;color:var(--muted)}
+.dd-btn .caret{width:18px;height:18px;color:var(--muted);transition:transform .2s ease}
+.dd-btn.open .caret{transform:rotate(180deg)}
+.dd-opt{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;color:var(--text);font:inherit;padding:8px 10px;border-radius:10px;cursor:pointer;text-align:start}
+.dd-opt:hover,.dd-opt:focus-visible{background:var(--surface2);outline:none}
+.dd-opt.sel{background:var(--primary-soft)}
+.dd-opt .dd-ic{width:34px;height:34px;background:var(--surface2);color:var(--muted)}
+.dd-opt.sel .dd-ic{background:var(--surface);color:var(--primary-text)}
+.dd-opt .tick{width:18px;height:18px;color:var(--primary-text)}
+.dd-opt kbd{margin-inline-start:auto}
+.content{flex:999 1 560px;min-width:0;padding:18px 22px 24px;display:flex;flex-direction:column;gap:14px}
+.page-h{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between}
+.ttl{display:flex;align-items:center;gap:10px}
+.ttl h1{margin:0;font-size:22px;font-weight:700}
+.crumb{color:var(--muted);font-size:13px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.grid{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+.mainCol{flex:999 1 640px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.sumCol{flex:1 1 340px;min-width:300px;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border);font-weight:600;font-size:15px}
+.card-h .i{color:var(--primary-text)}
+.card-b{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.fgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.span2{grid-column:span 2}
+.field{display:flex;flex-direction:column;gap:6px;position:relative;min-width:0}
+.lab{font-size:13px;color:var(--muted);font-weight:500;display:flex;align-items:center;gap:6px}
+.req{color:var(--danger)}
+.inp{height:42px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface);color:var(--text);padding:0 12px;font:inherit;font-size:14.5px;outline:none;width:100%;min-width:0}
+.inp::placeholder{color:var(--muted)}
+.inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.inp.sm{height:34px;font-size:13px}
+.ro{position:relative}
+.ro .inp{background:var(--surface2);color:var(--text);border-style:dashed;padding-inline-end:36px;font-weight:600}
+.ro .i{position:absolute;inset-inline-end:10px;top:11px;width:18px;height:18px;color:var(--muted)}
+.ltr{direction:ltr;text-align:right}
+.ico-inp{position:relative}
+.ico-inp > .i{position:absolute;inset-inline-start:12px;top:11px;color:var(--muted);width:18px;height:18px}
+.ico-inp .inp{padding-inline-start:38px}
+.ico-inp .inp.ltr{padding:0 38px 0 12px}
+.ro .inp.ltr{padding:0 12px 0 36px}
+.lvl{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:600}
+.lvl.retail{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.lvl.wholesale{background:var(--primary-soft);color:var(--primary-text)}
+.lvl.super{background:var(--warn-soft);color:var(--warn)}
+.pstack{display:flex;flex-direction:column;align-items:flex-start;gap:2px;direction:ltr}
+.pstack small{font-size:11.5px;color:var(--muted);direction:rtl}
+select.inp{appearance:auto}
+.btn{height:42px;padding:0 16px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font:inherit;font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .05s ease}
+.btn:hover{background:var(--surface2)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn.primary:hover{background:var(--primary-hover)}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn.danger{color:var(--danger)}
+.btn.big{height:54px;font-size:16.5px;width:100%;border-radius:12px}
+.btn.icon{width:42px;padding:0}
+.btn.sq{width:34px;height:34px;padding:0;border-radius:8px}
+.btn .i{width:18px;height:18px}
+kbd{font-family:inherit;font-size:11.5px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-bottom-width:2px;border-radius:6px;padding:0 6px;height:22px;display:inline-flex;align-items:center}
+.btn.primary kbd{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3);color:#FFFFFF}
+.chip{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:6px;font-size:12px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.chip.ok{background:var(--success-soft);color:var(--success);border-color:transparent}
+.chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.danger{background:var(--danger-soft);color:var(--danger);border-color:transparent}
+.chip.info{background:var(--primary-soft);color:var(--primary-text);border-color:transparent}
+.pop{position:absolute;top:calc(100% + 6px);inset-inline:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--pop);z-index:30;padding:6px;display:flex;flex-direction:column;gap:2px}
+.opt{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;color:var(--text);font:inherit;font-size:14px;padding:8px 10px;border-radius:8px;cursor:pointer;text-align:start}
+.opt:hover,.opt:focus-visible{background:var(--surface2);outline:none}
+.opt .meta{color:var(--muted);font-size:12.5px}
+.opt .grow{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.opt.add{color:var(--primary-text);font-weight:600}
+.cust-strip{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);font-size:13.5px}
+.cust-strip.new{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+.cust-strip .sp{margin-inline-start:auto}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.isearch{flex:1 1 320px;position:relative}
+.isearch .inp{height:46px;font-size:15px;padding-inline-start:42px;padding-inline-end:86px}
+.isearch > .i{position:absolute;inset-inline-start:13px;top:13px;color:var(--muted)}
+.isearch .bc{position:absolute;inset-inline-end:8px;top:8px;display:flex;align-items:center;gap:6px;color:var(--muted)}
+.seg{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px}
+.seg button{height:38px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.quick{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.qbtn{height:32px;padding:0 10px;border-radius:8px;border:1px dashed var(--border-strong);background:transparent;color:var(--text);font:inherit;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.qbtn:hover{border-style:solid;border-color:var(--primary);color:var(--primary-text)}
+.qbtn .i{width:16px;height:16px}
+.tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px}
+.trow{display:grid;grid-template-columns:36px minmax(300px,1fr) 124px 108px 96px 116px 46px;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);min-width:900px}
+.trow:last-child{border-bottom:0}
+.thead{background:var(--surface2);font-size:12.5px;color:var(--muted);font-weight:600;padding-top:9px;padding-bottom:9px}
+.num{direction:ltr;text-align:left;font-variant-numeric:tabular-nums}
+.strong{font-weight:700}
+.muted{color:var(--muted)}
+.item{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.thumb{width:42px;height:42px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);flex:0 0 auto}
+.thumb.battery{color:#B7791F}
+.thumb.service{color:var(--primary-text)}
+.thumb .i{width:24px;height:24px}
+.item-txt{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 auto}
+.item-name{font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.code{font-size:12px;color:var(--muted);direction:ltr}
+.bat{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bat .inp{max-width:230px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--primary)}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;height:36px;background:var(--surface)}
+.stepper button{width:34px;height:36px;border:0;background:transparent;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.stepper button:hover{background:var(--surface2)}
+.stepper .i{width:16px;height:16px}
+.stepper span{min-width:36px;text-align:center;font-weight:700}
+.del{width:36px;height:36px;border-radius:8px;border:0;background:transparent;color:var(--danger);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.del:hover{background:var(--danger-soft)}
+.del .i{width:18px;height:18px}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.kv{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.kv span{color:var(--muted)}
+.kv b{font-weight:600}
+.kv .inp{max-width:150px;height:38px;text-align:left;direction:ltr}
+.total{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:12px;background:var(--primary-soft);color:var(--primary-text)}
+.total span{font-weight:600;font-size:15px}
+.total b{font-size:26px;font-weight:700;direction:ltr}
+.total small{font-size:14px;font-weight:600;margin-inline-end:6px}
+.paygrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pay{height:58px;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);color:var(--text);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:all .15s ease}
+.pay:hover{border-color:var(--primary)}
+.pay.on{border-color:var(--primary);background:var(--primary-soft);color:var(--primary-text);box-shadow:inset 0 0 0 1px var(--primary)}
+.pay .i{width:20px;height:20px}
+.subcard{border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--surface2)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.hint{font-size:12.5px;color:var(--muted)}
+.alert{display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--danger-soft);color:var(--danger);font-size:13.5px;font-weight:500}
+.alert .i{width:18px;height:18px}
+.change{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;font-weight:700}
+.change.pos{background:var(--success-soft);color:var(--success)}
+.change.neg{background:var(--danger-soft);color:var(--danger)}
+.change b{direction:ltr;font-size:18px}
+.status{display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:8px 20px;background:var(--surface);border-top:1px solid var(--border);font-size:12.5px;color:var(--muted)}
+.status .sp{margin-inline-start:auto;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.status .i{width:15px;height:15px}
+.st{display:inline-flex;align-items:center;gap:6px}
+.dotok{width:8px;height:8px;border-radius:50%;background:var(--success)}
+@media (max-width:760px){.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.side{width:100%;flex-direction:row;flex-wrap:wrap}.side.collapsed{width:100%}.sec{display:none}.nav{width:auto}}
+</style>
+<style>
+.srow{display:grid;grid-template-columns:44px 130px minmax(110px,1fr) minmax(100px,1fr) minmax(100px,1fr) minmax(120px,1fr) 96px;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);min-width:820px;font-size:14px}
+.srow:last-child{border-bottom:0}
+.srow.foot{background:var(--surface2);font-weight:700}
+.srow.lastrow{background:var(--warn-soft)}
+.big{display:flex;flex-direction:column;align-items:center;gap:2px;padding:18px;border-radius:14px;background:var(--primary-soft);color:var(--primary-text)}
+.big b{font-size:32px;font-weight:700;direction:ltr}
+.big span{font-size:14px;font-weight:600}
+.note{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);font-size:13px;color:var(--muted);line-height:1.6}
+.note .i{width:18px;height:18px;flex:0 0 18px;margin-top:2px;color:var(--primary-text)}
+.sw{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--primary-text);background:transparent;border:0;font-family:inherit;padding:0}
+.err{color:var(--danger);font-size:12.5px}
+</style>
+</helmet>
+<div class="mv {{themeCls}}" dir="rtl" lang="ar">
+<div class="app">
+
+<header class="top">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">M</div>
+    <div><b>Morv Tires</b><small>محل الإطارات والبطاريات</small></div>
+  </div>
+  <div class="gsearch">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+    <input class="inp" type="search" placeholder="بحث سريع: عميل، صنف، رقم فاتورة، موبايل" aria-label="بحث سريع في البرنامج">
+    <kbd>Ctrl+K</kbd>
+  </div>
+  <div class="top-end">
+    <span class="pill ok">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+      نسخة احتياطية: اليوم 08:00
+    </span>
+    <span class="pill">الجمعة 2026-11-13 · 10:20</span>
+    <button class="btn icon ghost" onClick="{{toggleTheme}}" aria-label="{{themeLabel}}" title="{{themeLabel}}">
+      <sc-if value="{{isDark}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+      <sc-if value="{{isLight}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg></sc-if>
+    </button>
+    <button class="btn ghost" aria-label="حساب المستخدم">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>
+      مدير النظام
+    </button>
+  </div>
+</header>
+
+<div class="body">
+<nav class="side {{sideCls}}" aria-label="القائمة الرئيسية">
+  <div class="side-top">
+    <span class="ttl-s">القائمة الرئيسية</span>
+    <button class="tgl" onClick="{{toggleSide}}" aria-label="{{sideLabel}}" title="{{sideLabel}} (Ctrl+B)" aria-expanded="{{sideExpanded}}">
+      <svg class="i chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m13 6 6 6-6 6"></path><path d="m6 6 6 6-6 6"></path></svg>
+    </button>
+  </div>
+  <div class="sec">البيع</div>
+  <button class="nav" data-tip="لوحة التحكم" aria-label="لوحة التحكم">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path><path d="M10 21v-6h4v6"></path></svg>
+    <span class="lbl">لوحة التحكم</span>
+  </button>
+  <button class="nav" data-tip="نقطة البيع" aria-label="نقطة البيع">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4M7 8h4"></path></svg>
+    <span class="lbl">نقطة البيع</span>
+    <span class="badge">F1</span>
+  </button>
+  <button class="nav" data-tip="فواتير البيع" aria-label="فواتير البيع">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg>
+    <span class="lbl">فواتير البيع والمرتجعات</span>
+  </button>
+  <div class="sec">المخزون والعلاقات</div>
+  <button class="nav" data-tip="المشتريات" aria-label="المشتريات">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h12v10H2z"></path><path d="M14 10h4l3 3v3h-7"></path><circle cx="6.5" cy="18" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg>
+    <span class="lbl">المشتريات</span>
+  </button>
+  <button class="nav" data-tip="الأصناف والمخزون" aria-label="الأصناف والمخزون">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"></path><path d="m3 8 9 5 9-5M12 13v8"></path></svg>
+    <span class="lbl">الأصناف والمخزون</span>
+  </button>
+  <button class="nav" data-tip="العملاء والموردون" aria-label="العملاء والموردون">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.8.7 3 2.5 3.5 5.2"></path></svg>
+    <span class="lbl">العملاء والموردون</span>
+  </button>
+  <div class="sec">المال</div>
+  <button class="nav active" aria-current="page" data-tip="التقسيط والتحصيل — 3 متأخرة" aria-label="التقسيط والتحصيل، 3 أقساط متأخرة">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path><path d="m9 15 2 2 4-4"></path></svg>
+    <span class="lbl">التقسيط والتحصيل</span>
+    <span class="badge alert">3</span>
+  </button>
+  <button class="nav" data-tip="الخزينة والمصروفات" aria-label="الخزينة والمصروفات">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h13v4"></path><path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z"></path><circle cx="16" cy="14.5" r="1.2"></circle></svg>
+    <span class="lbl">الخزينة والمصروفات</span>
+  </button>
+  <button class="nav" data-tip="التقارير" aria-label="التقارير">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"></path></svg>
+    <span class="lbl">التقارير</span>
+  </button>
+  <div class="sec">النظام</div>
+  <button class="nav" data-tip="النسخ الاحتياطي" aria-label="النسخ الاحتياطي">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg>
+    <span class="lbl">النسخ الاحتياطي</span>
+  </button>
+  <button class="nav" data-tip="الإعدادات" aria-label="الإعدادات">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg>
+    <span class="lbl">الإعدادات</span>
+  </button>
+</nav>
+
+<main class="content">
+  <div class="page-h">
+    <div class="ttl">
+      <h1>عقد تقسيط جديد</h1>
+      <span class="chip warn">مسودة</span>
+      <span class="crumb">من فاتورة البيع S-2026-000155</span>
+    </div>
+    <div class="actions">
+      <a class="btn" href="Main.dc.html" style="text-decoration: none">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+        رجوع للفاتورة
+      </a>
+      <button class="btn">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V3h10v6"></path><rect x="3" y="9" width="18" height="8" rx="2"></rect><path d="M7 14h10v7H7z"></path></svg>
+        معاينة العقد
+      </button>
+    </div>
+  </div>
+
+  <div class="grid">
+  <div class="mainCol">
+
+    <section class="card" aria-label="العميل والضامن">
+      <div class="card-h">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>
+        العميل والضامن
+      </div>
+      <div class="card-b">
+        <div class="fgrid">
+          <div class="field span2">
+            <label class="lab" for="icust">العميل</label>
+            <div class="ro"><input id="icust" class="inp" value="أحمد كمال حسن" readonly=""><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+          </div>
+          <div class="field">
+            <label class="lab" for="iphone">الموبايل</label>
+            <div class="ro"><input id="iphone" class="inp ltr" value="01234567890" readonly=""><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+          </div>
+          <div class="field">
+            <label class="lab" for="inid">الرقم القومي <span class="req">*</span></label>
+            <input id="inid" class="inp ltr" value="2••••••••••017" aria-describedby="nidh">
+            <span id="nidh" class="hint">يُعرض مخفيًا بعد الحفظ</span>
+          </div>
+          <div class="field span2">
+            <label class="lab" for="iaddr">العنوان</label>
+            <input id="iaddr" class="inp" value="شارع الجمهورية، المنصورة">
+          </div>
+          <div class="field span2">
+            <label class="lab" for="iwork">جهة العمل (اختياري)</label>
+            <input id="iwork" class="inp" placeholder="مثال: مدرس — مدرسة النصر الإعدادية">
+          </div>
+        </div>
+        <label class="chk" style="padding: 10px 12px; border-radius: 10px; background: var(--surface2); border: 1px solid var(--border)">
+          <input type="checkbox" checked="{{waOk}}" onChange="{{toggleWa}}">
+          يوافق العميل على تلقي تذكيرات الأقساط عبر واتساب على رقمه المسجّل
+        </label>
+        <button class="sw" onClick="{{toggleG}}" aria-expanded="{{hasG}}">
+          <sc-if value="{{noG}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></sc-if>
+          <sc-if value="{{hasG}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></sc-if>
+          {{gLabel}}
+        </button>
+        <sc-if value="{{hasG}}" hint-placeholder-val="{{false}}">
+          <div class="fgrid">
+            <div class="field"><label class="lab" for="gname">اسم الضامن</label><input id="gname" class="inp" placeholder="الاسم رباعي"></div>
+            <div class="field"><label class="lab" for="gphone">موبايل الضامن</label><input id="gphone" class="inp ltr" placeholder="01xxxxxxxxx"></div>
+            <div class="field"><label class="lab" for="gnid">الرقم القومي للضامن</label><input id="gnid" class="inp ltr" placeholder="14 رقمًا"></div>
+            <div class="field"><label class="lab" for="grel">الصلة بالعميل</label><select id="grel" class="inp"><option>قريب</option><option>زميل عمل</option><option>صديق</option><option>أخرى</option></select></div>
+          </div>
+        </sc-if>
+      </div>
+    </section>
+
+    <section class="card" aria-label="بنود العقد">
+      <div class="card-h">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"></path><path d="M14 3v5h5M9 13h7M9 17h5"></path></svg>
+        بنود العقد
+      </div>
+      <div class="card-b">
+        <div class="fgrid">
+          <div class="field">
+            <label class="lab" for="iinv">رقم الفاتورة</label>
+            <div class="ro" title="فاتورة البيع المرتبطة بالعقد"><input id="iinv" class="inp ltr" value="S-2026-000155" readonly=""><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+          </div>
+          <div class="field">
+            <label class="lab" for="icno">رقم العقد</label>
+            <div class="ro"><input id="icno" class="inp ltr" value="IC-2026-000031" readonly=""><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+          </div>
+          <div class="field">
+            <label class="lab" for="icdate">تاريخ العقد</label>
+            <div class="ro"><input id="icdate" class="inp ltr" value="2026-11-13" readonly=""><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+          </div>
+          <div class="field">
+            <label class="lab" for="icash">سعر الكاش (قطاعي)</label>
+            <div class="ro"><input id="icash" class="inp ltr" value="{{cashF}}" readonly=""><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+          </div>
+          <div class="field">
+            <label class="lab" for="irate">الفائدة % <span class="req">*</span></label>
+            <input id="irate" class="inp ltr" value="{{rate}}" onChange="{{onRate}}" inputmode="decimal" placeholder="مثال: 15">
+            <span class="hint">{{rateHint}}</span>
+          </div>
+          <div class="field">
+            <label class="lab" for="idown">المقدم <span class="req">*</span></label>
+            <input id="idown" class="inp ltr" value="{{down}}" onChange="{{onDown}}" inputmode="decimal">
+            <sc-if value="{{downErr}}" hint-placeholder-val="{{false}}"><span class="err">المقدم أكبر من سعر الكاش</span></sc-if>
+          </div>
+          <div class="field">
+            <span class="lab">عدد الأشهر</span>
+            <div class="stepper" role="group" aria-label="عدد الأشهر" style="width: 100%; justify-content: space-between; height: 42px">
+              <button onClick="{{incM}}" aria-label="زيادة الأشهر"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+              <span>{{months}}</span>
+              <button onClick="{{decM}}" aria-label="إنقاص الأشهر"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+            </div>
+          </div>
+          <div class="field">
+            <label class="lab" for="ifirst">تاريخ أول قسط</label>
+            <select id="ifirst" class="inp ltr" value="{{firstKey}}" onChange="{{onFirst}}">
+              <option value="2026-12-01">2026-12-01</option>
+              <option value="2026-12-13">2026-12-13</option>
+              <option value="2026-12-25">2026-12-25</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="lab" for="idpay">تحصيل المقدم</label>
+            <select id="idpay" class="inp"><option>نقدي</option><option>بطاقة / ماكينة POS</option><option>تحويل / محفظة</option></select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-label="جدول التوزيع الشهري">
+      <div class="card-h">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path><path d="M7 14h2M11 14h2M15 14h2M7 17h2M11 17h2"></path></svg>
+        جدول التوزيع الشهري
+        <span class="chip info" style="margin-inline-start: auto">شهري · {{months}} قسطًا</span>
+        <span class="chip">الفائدة موزّعة بالتساوي</span>
+      </div>
+      <div class="card-b">
+        <div class="tblwrap">
+          <div class="srow thead">
+            <span>م</span><span>تاريخ الاستحقاق</span><span class="num">قيمة القسط</span><span class="num">منها أصل</span><span class="num">منها فائدة</span><span class="num">المتبقي بعد السداد</span><span>الحالة</span>
+          </div>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+            <div class="{{r.cls}}">
+              <span class="muted">{{r.n}}</span>
+              <span class="num" style="text-align: right">{{r.due}}</span>
+              <span class="num strong">{{r.inst}}</span>
+              <span class="num">{{r.p}}</span>
+              <span class="num">{{r.m}}</span>
+              <span class="num muted">{{r.bal}}</span>
+              <span><span class="chip">لم يحن</span></span>
+            </div>
+          </sc-for>
+          <div class="srow foot">
+            <span></span><span>الإجمالي</span><span class="num">{{instTotalF}}</span><span class="num">{{finF}}</span><span class="num">{{markupF}}</span><span></span><span></span>
+          </div>
+        </div>
+        <sc-if value="{{hasDiff}}" hint-placeholder-val="{{false}}">
+          <div class="hint">فرق القروش يُجمع في القسط الأخير (المظلَّل).</div>
+        </sc-if>
+      </div>
+    </section>
+  </div>
+
+  <aside class="sumCol" aria-label="ملخص العقد">
+    <section class="card">
+      <div class="card-h">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h4"></path></svg>
+        ملخص العقد
+      </div>
+      <div class="card-b">
+        <div class="big"><span>القسط الشهري</span><b>{{monthlyF}}</b><span>× {{months}} شهرًا</span></div>
+        <div class="kv"><span>سعر الكاش (قطاعي)</span><b class="num">{{cashF}}</b></div>
+        <div class="kv"><span>المقدم</span><b class="num">{{downF}}</b></div>
+        <div class="kv"><span>المبلغ المموّل</span><b class="num">{{finF}}</b></div>
+        <div class="kv"><span>الفائدة {{rateLbl}}</span><b class="num">{{markupF}}</b></div>
+        <div class="kv"><span>فائدة كل شهر</span><b class="num">{{mMonthF}}</b></div>
+        <div class="kv"><span>إجمالي الأقساط (بدون المقدم)</span><b class="num">{{instTotalF}}</b></div>
+        <div class="total"><span>إجمالي العقد</span><b><small>ج.م</small>{{contractF}}</b></div>
+        <button class="btn primary big" disabled="{{blockApprove}}">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>
+          اعتماد العقد وتحصيل المقدم
+          <kbd>F9</kbd>
+        </button>
+        <div class="two">
+          <button class="btn">حفظ كمسودة</button>
+          <button class="btn">طباعة العقد والجدول</button>
+        </div>
+      </div>
+    </section>
+  </aside>
+  </div>
+</main>
+</div>
+
+<footer class="status">
+  <span class="st"><span class="dotok" aria-hidden="true"></span>قاعدة البيانات متصلة</span>
+  <span class="st">آخر نسخة: 08:00 (محلي + USB)</span>
+  <span class="st">تصميم معتمد v1.0 — بيانات تجريبية</span>
+  <span class="sp"><span class="st"><kbd>F9</kbd> اعتماد</span><span class="st"><kbd>Esc</kbd> رجوع</span></span>
+</footer>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+var CASH = 1200000;
+function fmt(m){var n=m<0;var s=(Math.abs(m)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});return (n?'-':'')+s;}
+function latin(s){return String(s==null?'':s).replace(/[٠-٩]/g,function(d){return String(d.charCodeAt(0)-0x0660);}).replace(/[۰-۹]/g,function(d){return String(d.charCodeAt(0)-0x06F0);});}
+function toMinor(s){var v=parseFloat(latin(s).replace(/,/g,''));return isFinite(v)?Math.round(v*100):0;}
+function addMonths(iso,k){var y=parseInt(iso.slice(0,4),10),m=parseInt(iso.slice(5,7),10)-1,d=parseInt(iso.slice(8,10),10);var t=y*12+m+k;var yy=Math.floor(t/12),mm=t%12+1;return yy+'-'+(mm<10?'0':'')+mm+'-'+(d<10?'0':'')+d;}
+
+class Component extends DCLogic {
+  state = {collapsed:false,dark:false,g:false,rate:'15',down:'2,000.00',months:10,first:'2026-12-13'};
+  renderVals() {
+    var self=this,s=this.state;
+    var set=function(o){self.setState(o);};
+    var downM=toMinor(s.down);
+    var downErr = downM>CASH || downM<0;
+    var dM = downErr ? 0 : downM;
+    var n=s.months;
+    var fin=CASH-dM;
+    var rv=parseFloat(latin(s.rate)); var rateOk=isFinite(rv)&&rv>=0&&rv<=100; var RATE_BP=rateOk?Math.round(rv*100):0;
+    var mk=Math.round(fin*RATE_BP/10000);
+    var pB=Math.floor(fin/n), mB=Math.floor(mk/n);
+    var bal=fin+mk, rows=[], diff=false;
+    for(var i=0;i<n;i++){
+      var last=(i===n-1);
+      var p= last ? fin-pB*(n-1) : pB;
+      var m= last ? mk-mB*(n-1) : mB;
+      if(last && (p!==pB || m!==mB)) diff=true;
+      bal-= (p+m);
+      rows.push({n:i+1,due:addMonths(s.first,i),inst:fmt(p+m),p:fmt(p),m:fmt(m),bal:fmt(bal),cls: (last&&diff)?'srow lastrow':'srow'});
+    }
+    return {
+      themeCls:s.dark?'dark':'',isDark:s.dark,isLight:!s.dark,themeLabel:s.dark?'التبديل إلى الثيم الفاتح':'التبديل إلى الثيم الداكن',
+      toggleTheme:function(){set({dark:!s.dark});},
+      sideCls:s.collapsed?'collapsed':'',sideLabel:s.collapsed?'توسيع القائمة':'طيّ القائمة',sideExpanded:!s.collapsed,
+      toggleSide:function(){set({collapsed:!s.collapsed});},
+      hasG:s.g,noG:!s.g,gLabel:s.g?'إزالة الضامن':'إضافة ضامن (اختياري)',toggleG:function(){set({g:!s.g});},
+      cashF:fmt(CASH),down:s.down,onDown:function(e){set({down:latin(e.target.value)});},downErr:downErr,downF:fmt(dM),
+      months:n,incM:function(){set({months:Math.min(24,n+1)});},decM:function(){set({months:Math.max(2,n-1)});},
+      firstKey:s.first,onFirst:function(e){set({first:e.target.value});},
+      waOk:!!s.wa, toggleWa:function(){set({wa:!s.wa});},
+      rows:rows,hasDiff:diff,blockApprove: downErr || !rateOk,
+      rate:s.rate,onRate:function(e){set({rate:latin(e.target.value)});},rateLbl:(RATE_BP/100)+'%',
+      rateHint: !rateOk ? 'أدخل نسبة بين 0 و100' : 'تُحدَّد لكل عقد وتُحفظ معه',
+      finF:fmt(fin),markupF:fmt(mk),mMonthF:fmt(mB),monthlyF:fmt(pB+mB),instTotalF:fmt(fin+mk),contractF:fmt(dM+fin+mk)
+    };
+  }
+}
+</script>
+</body>
+</html>
