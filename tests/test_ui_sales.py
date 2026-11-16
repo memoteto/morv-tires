@@ -46,34 +46,77 @@ class SalesUiTest(_Fixture, unittest.TestCase):
         page = self.destroy_on_cleanup(SalesPage(self.session))
         self.assertTrue(page.total().startswith("0 فاتورة بيع"), page.total())
 
+    def _service_item_id(self):
+        return self.con.execute("SELECT id FROM items WHERE code='SV-1'").fetchone()[0]
+
     def test_dialog_posts_service_sale_through_engine(self):
         from morv.ui.pos_page import PosPage
         dlg = self.destroy_on_cleanup(PosPage(self.session))
-        dlg.item_search.setText("خدمة")
-        self.assertEqual(dlg.item_combo.count(), 1)
-        dlg.price.setText("1.00")
-        self.assertTrue(dlg.add_line())
+        dlg._add_row(self._service_item_id(), "service", "خدمة وهمية")
+        dlg._rows[-1]["price_edit"].setText("1.00")
         dlg.pay1_received.setText("2.00")
         dlg.post()
         self.assertIsNotNone(dlg.posted)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sales").fetchone()[0], 1)
         self.assertEqual(self.con.execute("SELECT total FROM sales").fetchone()[0], 100)
 
+    def test_item_search_popup_finds_matches(self):
+        # Regression: the old combo-box "search" never showed a result for a
+        # typed query; the live popup must actually find the matching item.
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
+        dlg.item_search.setText("خدمة")
+        dlg._do_item_search()
+        # One result button plus the "new item" button.
+        self.assertGreaterEqual(dlg._item_popup._layout.count(), 2)
+        dlg.item_search.setText("لا يوجد صنف بهذا الاسم إطلاقًا")
+        dlg._do_item_search()
+        self.assertEqual(dlg._item_popup._layout.count(), 1)   # only the "new item" button
+
     def test_pos_design_tabs_change_and_cancel(self):
         from morv.ui.pos_page import PosPage
         dlg = self.destroy_on_cleanup(PosPage(self.session))
         dlg._set_kind("tire")
-        self.assertEqual(dlg.item_combo.count(), 0)
+        self.assertEqual(dlg._kind, "tire")
         dlg._set_kind(None)
-        self.assertEqual(dlg.item_combo.count(), 1)
-        dlg.price.setText("10.00")
-        dlg.qty.setValue(2)
-        self.assertTrue(dlg.add_line())
+        self.assertIsNone(dlg._kind)
+        dlg._add_row(self._service_item_id(), "service", "خدمة وهمية")
+        dlg._rows[-1]["price_edit"].setText("10.00")
+        dlg._rows[-1]["qty_spin"].setValue(2)
         self.assertIn("20.00", dlg.total_label.text())
         dlg.pay1_received.setText("50.00")
         self.assertIn("30.00", dlg.change_label.text())
         dlg.cancel_invoice()
-        self.assertEqual(dlg.lines, [])
+        self.assertEqual(dlg._rows, [])
+        self.assertIsNone(dlg.posted)
+
+    def test_number_shown_live_before_posting(self):
+        # Owner feedback: the invoice number must be visible while writing the
+        # invoice, not only revealed after it's posted.
+        from morv.infra import sales
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
+        self.assertEqual(dlg.number_edit.text(), sales.next_number_preview(self.con))
+        self.assertNotIn("يُحدَّد", dlg.number_edit.text())
+
+    def test_remove_row_updates_total(self):
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
+        dlg._add_row(self._service_item_id(), "service", "خدمة وهمية")
+        dlg._rows[0]["price_edit"].setText("10.00")
+        self.assertIn("10.00", dlg.total_label.text())
+        dlg._remove_row(dlg._rows[0])
+        self.assertEqual(dlg._rows, [])
+        self.assertTrue(dlg.empty_label.isVisibleTo(dlg))
+        self.assertIn("0.00", dlg.total_label.text())
+
+    def test_line_discount_cannot_exceed_line_value(self):
+        from morv.ui.pos_page import PosPage
+        dlg = self.destroy_on_cleanup(PosPage(self.session))
+        dlg._add_row(self._service_item_id(), "service", "خدمة وهمية")
+        dlg._rows[0]["price_edit"].setText("10.00")
+        dlg._rows[0]["disc_edit"].setText("11.00")
+        dlg.post()
         self.assertIsNone(dlg.posted)
 
     def test_customer_found_by_typed_name_or_mobile(self):

@@ -22,7 +22,7 @@ from morv.ui.modal import Modal
 from morv.ui.widgets import Notice, ltr_edit, muted, primary_button
 
 ITEM_CHOICES = 50
-KIND_ICON = {"tire": "tire", "battery": "battery"}
+KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
 ICON_MUTED = "#8792A3"
 ICON_PRIMARY = "#1F5FD6"
 
