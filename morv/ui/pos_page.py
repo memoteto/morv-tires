@@ -53,7 +53,7 @@ class PosPage(QWidget):
         main = QHBoxLayout()
         main.setSpacing(16)
         main.addLayout(self._build_right_column(), 3)
-        main.addLayout(self._build_left_column(), 2)
+        main.addLayout(self._build_left_column(), 1)
         content = QWidget()
         content.setLayout(main)
         scroll = QScrollArea()
