@@ -275,20 +275,14 @@ class PosPage(QWidget):
 
     def _summary_card(self) -> QFrame:
         box, body, _head = self._card("ملخص الفاتورة", "sales")
-        grid = QGridLayout()
-        grid.setVerticalSpacing(12)
-        grid.setColumnStretch(0, 1)
         self.subtotal_label = QLabel()
         self.invoice_disc = ltr_edit("0.00")
         self.invoice_disc.setFixedWidth(150)
         self.invoice_disc.textChanged.connect(self._refresh_total)
-        trail = Qt.AlignmentFlag.AlignTrailing | Qt.AlignmentFlag.AlignVCenter
-        for r, (label, w) in enumerate((("الإجمالي قبل الخصم", self.subtotal_label),
-                                        ("خصم على الفاتورة", self.invoice_disc),
-                                        ("الضريبة", self._chip("المحل غير مسجّل — بدون ضريبة")))):
-            grid.addWidget(muted(label), r, 0)
-            grid.addWidget(w, r, 1, trail)
-        body.addLayout(grid)
+        for label, w in (("الإجمالي قبل الخصم", self.subtotal_label),
+                          ("خصم على الفاتورة", self.invoice_disc),
+                          ("الضريبة", self._chip("المحل غير مسجّل — بدون ضريبة"))):
+            body.addWidget(self._kv_row(label, w))
         total = QFrame()
         total.setObjectName("totalBox")
         t = QHBoxLayout(total)
@@ -448,6 +442,17 @@ class PosPage(QWidget):
         else:
             v.addWidget(self._label(title))
         v.addWidget(widget)
+        return w
+
+    @staticmethod
+    def _kv_row(label: str, value_widget: QWidget) -> QWidget:
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 4, 0, 4)
+        lbl = muted(label)
+        h.addWidget(lbl)
+        h.addStretch(1)
+        h.addWidget(value_widget)
         return w
 
     @staticmethod
