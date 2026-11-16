@@ -60,29 +60,92 @@ class InstallmentsPage(QStackedWidget):
         self.list_page.reload(keep_id=keep_id)
 
 
+KPI_TILES = (("late", "متأخر"), ("today", "مستحق اليوم"), ("week", "خلال 7 أيام"), ("active", "المتبقي على العقود النشطة"))
+
+
 class ContractsPage(ListPage):
     title = "التقسيط والتحصيل"
     add_label = "عقد تقسيط جديد"
-    search_placeholder = "رقم العقد، اسم العميل، أو الموبايل (F2)"
+    search_placeholder = "اسم العميل أو رقم الموبايل (F2)"
     columns = [
-        ("العقد", lambda r: ltr(r[1])),
         ("العميل", lambda r: r[2]),
-        ("التاريخ", lambda r: ltr(r[3])),
-        ("إجمالي العقد", lambda r: ltr(fmt(r[4]))),
-        ("الأشهر", lambda r: ltr(str(r[5]))),
+        ("العقد", lambda r: ltr(r[1])),
+        ("الاستحقاق", lambda r: ltr(r[4]) if r[4] else "—"),
+        ("المطلوب الآن", lambda r: ltr(fmt(r[5])) if r[5] else "—"),
+        ("الحالة", lambda r: r[6]),
+        ("السداد", lambda r: r[7]),
+        ("المتبقي على العقد", lambda r: ltr(fmt(r[8]))),
     ]
 
     def __init__(self, session, stack=None):
-        super().__init__(session)       # Qt refuses attributes set before its own init
         self.stack = stack
+        self.notice = Notice()
+        self._kpis = None
+        self._kpi_values: dict[str, tuple] = {}
+        self._kpi_buttons: dict[str, QPushButton] = {}
+        super().__init__(session)       # Qt refuses attributes set before its own init
 
     def can_edit(self) -> bool:
         return self.session.can("installments.manage")
 
+    def extra_header(self) -> QWidget:
+        box = QWidget()
+        col = QVBoxLayout(box)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(10)
+        col.addWidget(self.notice)
+        grid = QGridLayout()
+        grid.setSpacing(10)
+        for i, (key, title) in enumerate(KPI_TILES):
+            btn = QPushButton()
+            btn.setCheckable(True)
+            btn.setObjectName("kpiTile")
+            inner = QVBoxLayout(btn)
+            inner.setContentsMargins(14, 10, 14, 10)
+            inner.setSpacing(4)
+            inner.addWidget(muted(title))
+            value = QLabel("0")
+            value.setObjectName("cardTitle")
+            inner.addWidget(value)
+            sub = muted("")
+            inner.addWidget(sub)
+            btn.clicked.connect(lambda _c=False, k=key: self._pick_kpi(k))
+            self._kpi_values[key] = (value, sub)
+            self._kpi_buttons[key] = btn
+            grid.addWidget(btn, 0, i)
+        col.addLayout(grid)
+        return box
+
+    def _pick_kpi(self, key: str) -> None:
+        self.set_filter("all" if self.filter_key == key else key)
+
+    def set_filter(self, key) -> None:
+        self.filter_key = key
+        for k, b in self._kpi_buttons.items():
+            b.setChecked(k == key)
+        self.reload()
+
     def fetch(self, query, filter_key, offset):
         if not self.can_edit():
             return []
-        return installment_view.list_contracts(self.session.con, query, offset=offset)
+        view = installment_view.list_view(self.session.con, query=query, filter_key=filter_key or "all")
+        self._kpis = view.kpis
+        return [(r.contract_id, r.number, r.customer_name, r.customer_mobile, r.next_due, r.amount_now,
+                r.status, r.progress_text, r.remaining_total, r.can_collect) for r in view.rows]
+
+    def reload(self, keep_id: int | None = None) -> None:
+        super().reload(keep_id)
+        k = self._kpis
+        if k is None:
+            return
+        self._kpi_values["late"][0].setText(ltr(fmt(k.late_amount)))
+        self._kpi_values["late"][1].setText(f"{k.late_count} عقدًا")
+        self._kpi_values["today"][0].setText(ltr(fmt(k.today_amount)))
+        self._kpi_values["today"][1].setText(f"{k.today_count} عقدًا")
+        self._kpi_values["week"][0].setText(ltr(fmt(k.week_amount)))
+        self._kpi_values["week"][1].setText(f"{k.week_count} عقدًا")
+        self._kpi_values["active"][0].setText(ltr(fmt(k.active_amount)))
+        self._kpi_values["active"][1].setText(f"{k.active_count} عقدًا")
 
     def total(self) -> str:
         if not self.can_edit():
@@ -112,6 +175,9 @@ class ContractsPage(ListPage):
             btn = primary_button("تحصيل قسط")
             btn.clicked.connect(lambda: self.stack.open_collect(row_id))
             self.actions(btn)
+            statement_btn = QPushButton("كشف حساب العقد — قريبًا")
+            statement_btn.setEnabled(False)
+            self.actions(statement_btn)
 
     def open_dialog(self, row_id):
         if row_id is not None:

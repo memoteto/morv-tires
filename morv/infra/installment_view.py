@@ -1,7 +1,7 @@
 """Read-only views of instalment contracts, their schedules and invoices still waiting for one."""
 import sqlite3
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 
 @dataclass(frozen=True)
@@ -30,16 +30,6 @@ class ContractView:
 
 def _like(query: str) -> str:
     return f"%{(query or '').strip()}%"
-
-
-def list_contracts(con: sqlite3.Connection, query: str = "", limit: int = 300, offset: int = 0) -> list[tuple]:
-    return con.execute(
-        "SELECT c.id, c.number, cu.name, c.contract_date, c.contract_total, c.months, "
-        "(SELECT coalesce(sum(r.amount), 0) FROM installment_rows r WHERE r.contract_id = c.id) "
-        "FROM installment_contracts c JOIN customers cu ON cu.id = c.customer_id "
-        "WHERE (? = '%%' OR c.number LIKE ? OR cu.name LIKE ? OR cu.mobile LIKE ?) "
-        "ORDER BY c.id DESC LIMIT ? OFFSET ?",
-        (_like(query), _like(query), _like(query), _like(query), limit, offset)).fetchall()
 
 
 def count(con: sqlite3.Connection) -> int:
@@ -124,6 +114,106 @@ def get_contract(con: sqlite3.Connection, contract_id: int) -> ContractView:
     rows = con.execute("SELECT no, due_date, amount, principal, markup, balance_after FROM installment_rows "
                        "WHERE contract_id=? ORDER BY no", (contract_id,)).fetchall()
     return ContractView(*head, rows=tuple(rows))
+
+
+@dataclass(frozen=True)
+class ListRow:
+    contract_id: int
+    number: str
+    customer_name: str
+    customer_mobile: str
+    next_due: str
+    amount_now: int
+    status: str
+    tone: str
+    progress_text: str
+    remaining_total: int
+    can_collect: bool
+
+
+@dataclass(frozen=True)
+class ListKpis:
+    late_count: int
+    late_amount: int
+    today_count: int
+    today_amount: int
+    week_count: int
+    week_amount: int
+    active_count: int
+    active_amount: int
+
+
+@dataclass(frozen=True)
+class ListView:
+    kpis: ListKpis
+    rows: tuple
+
+
+def _category(overdue_amt: int, today_amt: int, remaining_total: int) -> tuple[str, str, str]:
+    if overdue_amt > 0:
+        return "متأخر", "danger", "late"
+    if today_amt > 0:
+        return "مستحق اليوم", "warn", "today"
+    if remaining_total <= 0:
+        return "مكتمل", "ok", "done"
+    return "نشط", "", "active"
+
+
+def list_view(con: sqlite3.Connection, query: str = "", filter_key: str = "all",
+              today: str | None = None) -> ListView:
+    """One row per contract with its urgency category; KPI totals cover the query but not filter_key."""
+    today = today or date.today().isoformat()
+    week_end = (date.fromisoformat(today) + timedelta(days=7)).isoformat()
+    contracts = con.execute(
+        "SELECT c.id, c.number, cu.name, coalesce(cu.mobile, ''), c.instalments_total "
+        "FROM installment_contracts c JOIN customers cu ON cu.id = c.customer_id "
+        "WHERE (? = '' OR cu.name LIKE ? OR cu.mobile LIKE ? OR c.number LIKE ?) ORDER BY c.id DESC",
+        (query, _like(query), _like(query), _like(query))).fetchall()
+    by_contract: dict[int, list[tuple]] = {}
+    for cid, no, due_date, amount, paid in con.execute(
+            "SELECT r.contract_id, r.no, r.due_date, r.amount, coalesce((SELECT sum(l.amount) "
+            "FROM installment_payment_lines l WHERE l.row_id = r.id), 0) FROM installment_rows r "
+            "ORDER BY r.contract_id, r.no"):
+        by_contract.setdefault(cid, []).append((no, due_date, amount, paid))
+
+    late_count = late_amount = today_count = today_amount = 0
+    week_count = week_amount = active_count = active_amount = 0
+    result = []
+    for cid, number, name, mobile, instalments_total in contracts:
+        rows = by_contract.get(cid, [])
+        paid_total = sum(p for _, _, _, p in rows)
+        remaining_total = instalments_total - paid_total
+        overdue_amt = sum(a - p for _, d, a, p in rows if a > p and d < today)
+        due_today_amt = sum(a - p for _, d, a, p in rows if a > p and d == today)
+        due_week_amt = sum(a - p for _, d, a, p in rows if a > p and today < d <= week_end)
+        next_open = next(((d, a - p) for _, d, a, p in rows if a > p), None)
+        status, tone, cat = _category(overdue_amt, due_today_amt, remaining_total)
+        paid_rows = sum(1 for _, _, a, p in rows if a > 0 and p >= a)
+
+        if overdue_amt > 0:
+            late_count += 1
+            late_amount += overdue_amt
+        if due_today_amt > 0:
+            today_count += 1
+            today_amount += due_today_amt
+        if due_week_amt > 0:
+            week_count += 1
+            week_amount += due_week_amt
+        if remaining_total > 0:
+            active_count += 1
+            active_amount += remaining_total
+
+        matches = (filter_key == "all" or filter_key == cat
+                   or (filter_key == "week" and due_week_amt > 0))
+        if matches:
+            result.append(ListRow(
+                cid, number, name, mobile, next_open[0] if next_open else "",
+                overdue_amt + due_today_amt, status, tone, f"{paid_rows} من {len(rows)} قسطًا",
+                remaining_total, remaining_total > 0))
+
+    kpis = ListKpis(late_count, late_amount, today_count, today_amount,
+                    week_count, week_amount, active_count, active_amount)
+    return ListView(kpis, tuple(result))
 
 
 def invoices_without_contract(con: sqlite3.Connection) -> list[tuple]:

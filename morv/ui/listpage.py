@@ -82,6 +82,9 @@ class ListPage(QWidget):
         self.add_btn.setEnabled(self.can_edit())
         head.addWidget(self.add_btn)
         root.addLayout(head)
+        extra = self.extra_header()
+        if extra is not None:
+            root.addWidget(extra)
 
         body = QHBoxLayout()
         body.setSpacing(12)
@@ -181,6 +184,10 @@ class ListPage(QWidget):
 
     def open_dialog(self, row_id: int | None) -> None:
         raise NotImplementedError
+
+    def extra_header(self) -> QWidget | None:
+        """A widget placed between the add-button row and the search/table (e.g. KPI cards). None by default."""
+        return None
 
     # ---------- Behaviour ----------
     def set_filter(self, key) -> None:
