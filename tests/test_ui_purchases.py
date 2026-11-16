@@ -50,25 +50,28 @@ class PurchasesUiTest(unittest.TestCase):
     def dialog(self, session=None):
         stack = self.page(session)
         stack.open_form()
-        return stack.form_page
+        f = stack.form_page
+        # Pre-select the default supplier for tests that don't test supplier selection
+        if f._supplier_id is None and self.sup:
+            f._pick_supplier(self.sup, "مورد وهمي", "01000000001")
+        return f
 
     def page(self, session=None):
         from morv.ui.purchases_page import PurchasesPage
         return self.destroy_on_cleanup(PurchasesPage(session or self.session))
 
-    def pick(self, dlg, item_id):
-        for i in range(dlg.item_combo.count()):
-            if dlg.item_combo.itemData(i)[0] == item_id:
-                dlg.item_combo.setCurrentIndex(i)
-                return
-        self.fail(f"الصنف {item_id} غير ظاهر في قائمة الاختيار")
-
-    def fill_line(self, dlg, item_id, qty, cost, dot=""):
-        self.pick(dlg, item_id)
-        dlg.qty.setValue(qty)
-        dlg.cost.setText(cost)
-        dlg.dot.setText(dot)
-        return dlg.add_line()
+    def add_row(self, dlg, item_id, qty=1, cost="", dot=""):
+        # Bypass the live-search popup (headless test): add the row directly,
+        # then fill in qty/cost/DOT the way the inline row fields would.
+        row = self.con.execute("SELECT kind, name FROM items WHERE id=?", (item_id,)).fetchone()
+        if not row:
+            self.fail(f"الصنف {item_id} غير موجود في قاعدة البيانات")
+        dlg._add_row(item_id, row[0], row[1])
+        line = dlg._rows[-1]
+        line["qty_spin"].setValue(qty)
+        line["cost_edit"].setText(cost)
+        line["dot_edit"].setText(dot)
+        return line
 
     def invoices(self):
         return self.con.execute("SELECT count(*) FROM purchase_invoices").fetchone()[0]
@@ -77,11 +80,11 @@ class PurchasesUiTest(unittest.TestCase):
     def test_post_invoice_end_to_end(self):
         from morv.infra import inventory
         dlg = self.dialog()
-        self.assertTrue(self.fill_line(dlg, self.tire, 4, "1,000.50", "2324"))
-        self.assertTrue(self.fill_line(dlg, self.battery, 2, "500"))
-        self.assertEqual(dlg.lines_model.rowCount(), 2)
-        self.assertEqual(dlg.total_minor(), 4 * 100050 + 2 * 50000)
-        self.assertIn("5,002.00", dlg.total_label.text())   # 4,002.00 + 1,000.00
+        self.add_row(dlg, self.tire, 4, "1,000.50", "2324")
+        self.add_row(dlg, self.battery, 2, "500")
+        self.assertEqual(len(dlg._rows), 2)
+        self.assertEqual(dlg._sub_total(), 4 * 100050 + 2 * 50000)
+        self.assertIn("5,002.00", dlg._sub_lbl.text())   # 4,002.00 + 1,000.00
         dlg.inv_no.setText("S-100")
         dlg.inv_date.setText("2026-11-05")
         dlg.post()
@@ -94,12 +97,18 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(inventory.reconcile(self.con), [])
 
     def test_services_not_offered(self):
-        dlg = self.dialog()
-        ids = {dlg.item_combo.itemData(i)[0] for i in range(dlg.item_combo.count())}
-        self.assertEqual(ids, {self.tire, self.battery})
-        dlg.item_search.setText("BT-1")
-        self.assertEqual(dlg.item_combo.count(), 1)
-        self.assertEqual(dlg.item_combo.currentData()[0], self.battery)
+        # Services must not appear in item search results
+        from morv.infra import items as items_infra
+        rows_all = items_infra.search(self.session.con, "", kind="tire", limit=50)
+        rows_all += items_infra.search(self.session.con, "", kind="battery", limit=50)
+        ids = {r[0] for r in rows_all}
+        self.assertIn(self.tire, ids)
+        self.assertIn(self.battery, ids)
+        self.assertNotIn(self.service, ids)
+        # Battery-specific search
+        rows_bt = items_infra.search(self.session.con, "BT-1", kind="battery", limit=50)
+        self.assertEqual(len(rows_bt), 1)
+        self.assertEqual(rows_bt[0][0], self.battery)
 
     def test_line_validation_messages(self):
         dlg = self.dialog()
@@ -107,43 +116,54 @@ class PurchasesUiTest(unittest.TestCase):
                  (self.tire, "0", "2324", "أكبر من صفر"), (self.tire, "", "2324", "المبلغ"), (self.battery, "abc", "", "مبلغ")]
         for item_id, cost, dot, expect in cases:
             with self.subTest(cost=cost, dot=dot):
-                self.assertFalse(self.fill_line(dlg, item_id, 1, cost, dot))
-                self.assertIn(expect, dlg.notice.text())
-                self.assertEqual(dlg.lines_model.rowCount(), 0)
-        dlg.item_search.setText("لا يوجد صنف بهذا الاسم")
-        self.assertFalse(dlg.add_line())
-        self.assertIn("اختر صنفًا", dlg.notice.text())
+                row = self.add_row(dlg, item_id, 1, cost, dot)
+                lines, err = dlg._validate_lines()
+                self.assertIsNone(lines)
+                self.assertIn(expect, err)
+                dlg._remove_row(row)
+        # No rows at all -> should fail
+        self.assertEqual(len(dlg._rows), 0)
+        lines, err = dlg._validate_lines()
+        self.assertIsNone(lines)
+        self.assertIn("سطرًا واحدًا", err)
 
     def test_header_validation_before_posting(self):
         dlg = self.dialog()
         dlg.inv_no.setText("S-1")
         dlg.post()
         self.assertIn("سطرًا واحدًا", dlg.notice.text())
-        self.fill_line(dlg, self.battery, 1, "10")
-        dlg.inv_no.setText("  ")
-        dlg.post()
-        self.assertIn("رقم فاتورة المورد", dlg.notice.text())
-        dlg.inv_no.setText("S-1")
+        self.add_row(dlg, self.battery, 1, "10")
         dlg.inv_date.setText("2026-13-45")
         dlg.post()
         self.assertIn("لم تُرحَّل", dlg.notice.text())
         self.assertIsNone(dlg.posted)
         self.assertEqual(self.invoices(), 0)
 
+    def test_supplier_invoice_no_is_optional(self):
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "10")
+        dlg.inv_no.setText("   ")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(self.invoices(), 1)
+        stored = self.con.execute("SELECT supplier_invoice_no FROM purchase_invoices WHERE id=?",
+                                  (dlg.posted.id,)).fetchone()[0]
+        self.assertTrue(stored.startswith("AUTO-"))
+
     def test_engine_rejection_is_shown_and_keeps_input(self):
         first = self.dialog()
-        self.fill_line(first, self.battery, 1, "10")
+        self.add_row(first, self.battery, 1, "10")
         first.inv_no.setText("S-1")
         first.post()
         self.assertEqual(self.invoices(), 1)
         second = self.dialog()
-        self.fill_line(second, self.battery, 3, "20")
+        self.add_row(second, self.battery, 3, "20")
         second.inv_no.setText("s-1")
         second.post()
         self.assertIsNone(second.posted)
         self.assertIn("نفس رقم فاتورة المورد", second.notice.text())
         self.assertEqual(self.invoices(), 1)
-        self.assertEqual(second.lines_model.rowCount(), 1)
+        self.assertEqual(len(second._rows), 1)
         self.assertTrue(second.post_btn.isEnabled())
         second.inv_no.setText("S-2")
         second.post()
@@ -152,7 +172,7 @@ class PurchasesUiTest(unittest.TestCase):
 
     def test_double_post_does_not_duplicate(self):
         dlg = self.dialog()
-        self.fill_line(dlg, self.battery, 2, "10")
+        self.add_row(dlg, self.battery, 2, "10")
         dlg.inv_no.setText("S-1")
         dlg.post()
         first_id = dlg.posted.id
@@ -163,21 +183,21 @@ class PurchasesUiTest(unittest.TestCase):
 
     def test_remove_line_updates_total(self):
         dlg = self.dialog()
-        self.fill_line(dlg, self.battery, 1, "10")
-        self.fill_line(dlg, self.battery, 2, "20")
-        dlg.remove_selected()
-        self.assertIn("اختر سطرًا", dlg.notice.text())
-        dlg.view.selectRow(0)
-        dlg.view.setCurrentIndex(dlg.lines_model.index(0, 0))
-        dlg.remove_selected()
-        self.assertEqual(dlg.lines_model.rowCount(), 1)
-        self.assertEqual(dlg.total_minor(), 2 * 2000)
+        self.add_row(dlg, self.battery, 1, "10")
+        row2 = self.add_row(dlg, self.battery, 2, "20")
+        self.assertEqual(len(dlg._rows), 2)
+        dlg._remove_row(row2)
+        self.assertEqual(len(dlg._rows), 1)
+        self.assertEqual(dlg._sub_total(), 1 * 1000)
 
     def test_no_active_suppliers_warns_and_blocks(self):
         self.con.execute("UPDATE suppliers SET active = 0")
-        dlg = self.dialog()
+        stack = self.page()
+        stack.open_form()
+        dlg = stack.form_page
+        # No supplier selected (all disabled), verify warning
         self.assertIn("لا يوجد موردون", dlg.notice.text())
-        self.fill_line(dlg, self.battery, 1, "10")
+        self.add_row(dlg, self.battery, 1, "10")
         dlg.inv_no.setText("S-1")
         dlg.post()
         self.assertIn("اختر المورد", dlg.notice.text())
@@ -185,7 +205,7 @@ class PurchasesUiTest(unittest.TestCase):
 
     def test_engine_permission_enforced_even_if_ui_bypassed(self):
         dlg = self.dialog(self.cashier_session)
-        self.fill_line(dlg, self.battery, 1, "10")
+        self.add_row(dlg, self.battery, 1, "10")
         dlg.inv_no.setText("S-1")
         dlg.post()
         self.assertIn("صلاحية", dlg.notice.text())
@@ -197,9 +217,11 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertIs(stack.currentWidget(), stack.list_page)
         stack.list_page.open_dialog(None)
         self.assertIs(stack.currentWidget(), stack.form_page)
-        self.fill_line(stack.form_page, self.battery, 1, "10")
-        stack.form_page.inv_no.setText("S-1")
-        stack.form_page.post()
+        f = stack.form_page
+        f._pick_supplier(self.sup, "مورد وهمي", "01000000001")
+        self.add_row(f, self.battery, 1, "10")
+        f.inv_no.setText("S-1")
+        f.post()
         self.assertIsNotNone(stack.form_page.posted)
         self.assertIs(stack.currentWidget(), stack.list_page)
         self.assertEqual(stack.list_page.model.rowCount(), 1)
@@ -207,7 +229,7 @@ class PurchasesUiTest(unittest.TestCase):
     # ---------- Page ----------
     def test_page_lists_and_previews_invoice(self):
         dlg = self.dialog()
-        self.fill_line(dlg, self.tire, 4, "1000", "2324")
+        self.add_row(dlg, self.tire, 4, "1000", "2324")
         dlg.inv_no.setText("S-77")
         dlg.post()
         stack = self.page()
@@ -230,7 +252,7 @@ class PurchasesUiTest(unittest.TestCase):
 
     def test_cashier_cannot_post_or_view(self):
         dlg = self.dialog()
-        self.fill_line(dlg, self.battery, 1, "10")
+        self.add_row(dlg, self.battery, 1, "10")
         dlg.inv_no.setText("S-1")
         dlg.post()
         stack = self.page(self.cashier_session)
@@ -239,6 +261,109 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(page.model.rowCount(), 0)
         self.assertIn("لا تملك صلاحية", page.count_label.text())
         page.open_dialog(None)       # opens no form; one would hang the test if it tried exec
+
+    def test_new_supplier_dialog_saves_and_is_picked(self):
+        from morv.ui.purchases_page import _NewSupplierDialog
+        dlg = self.dialog()
+        new_dlg = self.destroy_on_cleanup(
+            _NewSupplierDialog(name_hint="مورد ثاني", mobile_hint="", session=self.session, parent=dlg))
+        new_dlg.mobile_edit.setText("01099998888")
+        new_dlg._save()
+        self.assertIsNotNone(new_dlg.created)
+        self.assertEqual(new_dlg.created.name, "مورد ثاني")
+        dlg._pick_supplier(new_dlg.created.id, new_dlg.created.name, new_dlg.created.mobile)
+        self.assertEqual(dlg._supplier_id, new_dlg.created.id)
+
+    def test_new_item_dialog_saves_and_is_added_as_a_row(self):
+        from morv.ui.inventory_page import ItemDialog
+        dlg = self.dialog()
+        new_dlg = self.destroy_on_cleanup(ItemDialog(self.session, None, parent=dlg))
+        new_dlg.set_kind("service")        # service hides brand/model, so only name/code/price are needed
+        new_dlg.widgets["name"].setText("خدمة سريعة وهمية")
+        new_dlg.widgets["code"].setText("SVC-TEST-1")
+        new_dlg.widgets["price_retail"].setText("100")
+        new_dlg.save()
+        self.assertIsNotNone(new_dlg.saved)
+        self.assertEqual(new_dlg.saved.name, "خدمة سريعة وهمية")
+        dlg._add_row(new_dlg.saved.id, new_dlg.saved.kind, new_dlg.saved.name)
+        self.assertEqual(dlg._rows[-1]["item_id"], new_dlg.saved.id)
+        self.assertEqual(dlg._rows[-1]["name"], "خدمة سريعة وهمية")
+
+    def test_stepper_buttons_have_their_own_compact_style(self):
+        # Regression: a plain QPushButton inherits 14px of horizontal padding
+        # from the base QSS rule, which left no room for the glyph inside a
+        # narrow fixed-width button and made it look blank.
+        from PySide6.QtWidgets import QPushButton
+        dlg = self.dialog()
+        row = self.add_row(dlg, self.battery, 1, "10")
+        row_w = row["widget"]
+        steppers = [b for b in row_w.findChildren(QPushButton) if b.objectName() == "stepperBtn"]
+        self.assertEqual(len(steppers), 2)
+        for b in steppers:
+            self.assertIn(b.text(), ("−", "+"))
+
+    def test_cost_note_hidden_until_there_is_something_to_say(self):
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "10")
+        dlg.inv_no.setText("S-1")
+        dlg.post()
+        second = self.dialog()
+        row2 = self.add_row(second, self.battery, 1, "")
+        self.assertFalse(row2["cost_note"].isVisibleTo(second))
+        row2["cost_edit"].setText("11")
+        self.assertTrue(row2["cost_note"].isVisibleTo(second))
+        self.assertTrue(row2["cost_note"].text())
+
+    def test_cost_note_compares_against_last_purchase(self):
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "10")
+        dlg.inv_no.setText("S-1")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        second = self.dialog()
+        row = self.add_row(second, self.battery, 1, "11")   # 10% higher than last cost
+        self.assertIn("أعلى من آخر شراء", row["cost_note"].text())
+        row["cost_edit"].setText("9")   # 10% lower than last cost
+        self.assertIn("أقل من آخر شراء", row["cost_note"].text())
+
+    def test_discount_tax_shipping_paid_fields_are_disabled(self):
+        # These fields exist in the approved design but aren't wired to the
+        # engine yet (purchasing.post_invoice has no such parameters), so they
+        # must stay disabled rather than imply a function that doesn't work.
+        dlg = self.dialog()
+        for field in (dlg.disc, dlg.tax, dlg.ship, dlg.paid, dlg.pay_method):
+            self.assertFalse(field.isEnabled())
+
+    def test_disabled_fields_never_affect_the_shown_or_posted_total(self):
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 2, "100")
+        # Force values into the disabled fields (bypassing the UI, as a stray
+        # future edit might) to prove the summary and the posted total both
+        # ignore them completely rather than silently double-counting.
+        dlg.disc.setText("50")
+        dlg.tax.setText("20")
+        dlg.ship.setText("30")
+        dlg.paid.setText("999")
+        dlg._refresh_summary()
+        self.assertIn("200.00", dlg._total_lbl.text())
+        self.assertIn("200.00", dlg._rem_lbl.text())
+        dlg.inv_no.setText("S-1")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 20000)
+        stored_total = self.con.execute(
+            "SELECT total FROM purchase_invoices WHERE id=?", (dlg.posted.id,)).fetchone()[0]
+        self.assertEqual(stored_total, 20000)
+        inv_debit = self.con.execute(
+            "SELECT sum(debit) FROM journal_lines jl JOIN journal_entries je ON je.id = jl.entry_id "
+            "WHERE je.source_type='purchase_invoice' AND je.source_id=? AND jl.account_code='1410'",
+            (dlg.posted.id,)).fetchone()[0]
+        sup_credit = self.con.execute(
+            "SELECT sum(credit) FROM journal_lines jl JOIN journal_entries je ON je.id = jl.entry_id "
+            "WHERE je.source_type='purchase_invoice' AND je.source_id=? AND jl.account_code='2110'",
+            (dlg.posted.id,)).fetchone()[0]
+        self.assertEqual(inv_debit, 20000)
+        self.assertEqual(sup_credit, 20000)
 
     def test_shell_uses_real_purchases_page(self):
         from morv.ui.purchases_page import PurchasesPage

@@ -48,6 +48,7 @@ PATHS = {
     "barcode": "<path d='M4 5v14M7 5v14M10 5v14M14 5v14M16 5v14M20 5v14'/>",
     "printer": "<path d='M7 9V3h10v6'/><rect x='3' y='9' width='18' height='8' rx='2'/><path d='M7 14h10v7H7z'/>",
     "cash": "<rect x='3' y='6' width='18' height='12' rx='2'/><circle cx='12' cy='12' r='2.5'/><path d='M6 9v.01M18 15v.01'/>",
+    "trash": "<path d='M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3'/>",
 }
 
 
