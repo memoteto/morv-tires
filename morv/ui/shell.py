@@ -80,9 +80,14 @@ class MainWindow(QMainWindow):
         self.pages = {}
         builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
                     "inventory": InventoryPage, "purchases": PurchasesPage, "sales": SalesPage,
-                    "pos": PosPage, "installments": InstallmentsPage, "home": DashboardPage}
+                    "pos": PosPage, "installments": InstallmentsPage}
         for key, _title, _icon, phase in NAV:
-            page = builders[key](session) if key in builders else placeholder(phase)
+            if key == "home":
+                page = DashboardPage(session, on_navigate=self.go_key)
+            elif key in builders:
+                page = builders[key](session)
+            else:
+                page = placeholder(phase)
             self.pages[key] = page
             self.stack.addWidget(page)
         self.pages["pos"].contract_needed.connect(self.open_contract)

@@ -1,4 +1,6 @@
-"""Home dashboard: period KPIs, a 7-day sales chart, alerts, recent invoices and top sellers."""
+"""Home dashboard: quick actions, period KPIs, a sales chart, alerts, recent invoices and top sellers."""
+from typing import Callable
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
                                QWidget)
@@ -11,12 +13,19 @@ from morv.ui.widgets import Notice, card, muted
 
 PERIODS = dashboard_view.PERIODS
 ALERT_LEVEL = {"bad": "error", "warn": "warn", "ok": "success"}
+# Collect.dc.html/Purchase.dc.html/Statement.dc.html have no standalone search-first entry point yet,
+# so these route to the nearest existing screen instead of a deep link; see design_decisions.md #15.
+QUICK_ACTIONS = (("pos", "فاتورة بيع جديدة", "نقطة البيع", True),
+                 ("installments", "تحصيل قسط", "بالاسم أو الموبايل", False),
+                 ("purchases", "استلام بضاعة", "فاتورة شراء", False),
+                 ("customers", "كشف حساب عميل", "الحركات والرصيد", False))
 
 
 class DashboardPage(QWidget):
-    def __init__(self, session, parent=None):
+    def __init__(self, session, on_navigate: Callable[[str], None] | None = None, parent=None):
         super().__init__(parent)
         self.session = session
+        self.on_navigate = on_navigate
         self.period = "today"
         self.kpi_values: dict[str, tuple] = {}
         self.period_buttons: dict[str, QPushButton] = {}
@@ -34,11 +43,14 @@ class DashboardPage(QWidget):
         root.setContentsMargins(24, 16, 24, 16)
         root.setSpacing(14)
         root.addWidget(self._header())
+        root.addLayout(self._quick_actions())
         root.addLayout(self._kpis())
 
         row1 = QHBoxLayout()
         row1.setSpacing(14)
-        row1.addWidget(self._chart_card(), 2)
+        # AlignTop keeps the chart card at its own natural height instead of stretching
+        # to match the (often taller) alerts card beside it.
+        row1.addWidget(self._chart_card(), 2, Qt.AlignmentFlag.AlignTop)
         row1.addWidget(self._alerts_card(), 1)
         root.addLayout(row1)
 
@@ -73,6 +85,26 @@ class DashboardPage(QWidget):
         for k, b in self.period_buttons.items():
             b.setChecked(k == key)
         self.reload()
+
+    def _quick_actions(self) -> QGridLayout:
+        grid = QGridLayout()
+        grid.setSpacing(10)
+        for i, (key, title, sub, main) in enumerate(QUICK_ACTIONS):
+            btn = QPushButton()
+            btn.setObjectName("qaMain" if main else "qaTile")
+            inner = QVBoxLayout(btn)
+            inner.setContentsMargins(14, 10, 14, 10)
+            inner.setSpacing(2)
+            title_lbl = QLabel(title)
+            title_lbl.setObjectName("qaTitle")
+            inner.addWidget(title_lbl)
+            sub_lbl = QLabel(sub)
+            sub_lbl.setObjectName("qaSub")
+            inner.addWidget(sub_lbl)
+            if self.on_navigate:
+                btn.clicked.connect(lambda _c=False, k=key: self.on_navigate(k))
+            grid.addWidget(btn, 0, i)
+        return grid
 
     def _kpis(self) -> QGridLayout:
         grid = QGridLayout()

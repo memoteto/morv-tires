@@ -98,6 +98,13 @@ QPushButton#kpiTile:hover {{ border-color:{t['primary']}; }}
 QPushButton#kpiTile:checked {{ border:2px solid {t['primary']}; background:{t['primary_soft']}; }}
 QLabel#cardTitleDanger {{ font-size:{t['fs']+1}px; font-weight:700; color:{t['danger']}; }}
 QFrame#barFill {{ background:{t['primary']}; border-radius:4px; }}
+QPushButton#qaTile {{ text-align:right; min-height:58px; border-radius:14px; padding:10px 14px; }}
+QPushButton#qaTile:hover {{ border-color:{t['primary']}; }}
+QPushButton#qaMain {{ text-align:right; min-height:58px; border-radius:14px; padding:10px 14px;
+                     background:{t['primary']}; color:{t['on_primary']}; border:0; }}
+QLabel#qaTitle {{ font-weight:600; }}
+QLabel#qaSub {{ color:{t['muted']}; font-size:{t['fs']-1}px; }}
+QPushButton#qaMain QLabel#qaTitle, QPushButton#qaMain QLabel#qaSub {{ color:{t['on_primary']}; }}
 QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2']}; border:0;
              gridline-color:{t['border']}; selection-background-color:{t['select']}; selection-color:{t['text']}; }}
 QTableView::item {{ padding:0 10px; }}
