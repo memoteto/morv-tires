@@ -5,7 +5,7 @@ from datetime import date
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QFrame, QGridLayout, QHBoxLayout, QHeaderView,
-    QLabel, QLineEdit, QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy,
+    QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy,
     QSpinBox, QStackedWidget, QTableView, QVBoxLayout, QWidget,
 )
 
@@ -169,7 +169,7 @@ class _ItemPopup(QFrame):
             if item.widget():
                 item.widget().deleteLater()
         for row in rows[:8]:
-            item_id, kind, code, name = row[0], row[1], row[2], row[3]
+            item_id, kind, _code, name = row[0], row[1], row[2], row[3]
             spec = row[4] if len(row) > 4 else ""
             btn = QPushButton()
             btn.setFlat(True)
@@ -417,11 +417,11 @@ class PurchaseForm(QWidget):
         main_col.addWidget(box)
 
         # ---- Card 2: Invoice lines ----
-        ibox, ibody, ihead_tuple = self._card("الأصناف المستلمة", "purchases")
+        ibox, ibody, ihead_w = self._card("الأصناف المستلمة", "purchases")
 
         # Item count chip in card header (we'll update it)
         self._line_count_lbl = muted("0 سطر")
-        ihead_tuple[0].findChild(QHBoxLayout).addWidget(self._line_count_lbl)
+        ihead_w.findChild(QHBoxLayout).addWidget(self._line_count_lbl)
 
         # Item search
         item_search_row = QHBoxLayout()
