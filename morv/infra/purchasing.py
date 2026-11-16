@@ -33,6 +33,12 @@ class PostedInvoice:
     replayed: bool
 
 
+def next_number_preview(con: sqlite3.Connection) -> str:
+    """Best-effort preview of the invoice number the next post will get."""
+    next_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM purchase_invoices").fetchone()[0]
+    return f"PI-{next_id:06d}"
+
+
 def _shape_lines(lines) -> list:
     if not lines:
         raise PurchaseError("الفاتورة بلا أسطر")
