@@ -98,6 +98,13 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
             raise ReturnError("الفاتورة غير موجودة")
         if day < sale[2]:
             raise ReturnError("تاريخ المرتجع قبل تاريخ الفاتورة")
+        # Installment returns need a joint receivable/deferred-interest settlement.
+        # Refuse every installment sale, regardless of the requested refund method.
+        if con.execute(
+            "SELECT 1 FROM sale_payments WHERE sale_id=? AND method='installment' LIMIT 1",
+            (sale_id,),
+        ).fetchone():
+            raise ReturnError("مرتجع التقسيط موقوف مؤقتًا حتى اكتمال تسويته المحاسبية")
         method = _refund_method(con, sale_id, refund_method)
         h = _payload_hash(sale_id, day, lines, method, why)
         old = con.execute("SELECT id, number, total, payload_hash FROM sale_returns WHERE request_key=?",

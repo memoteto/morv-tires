@@ -7,7 +7,7 @@ from pathlib import Path
 
 from morv.core import costing
 from morv.core.sales_rules import Payment
-from morv.infra import inventory, purchasing, sale_returns, sale_view, sales, users
+from morv.infra import installments, inventory, ledger, purchasing, sale_returns, sale_view, sales, users
 from morv.infra.db.bootstrap import open_main_db
 from morv.infra.purchasing import PurchaseLine
 from morv.infra.sale_returns import ReturnError, ReturnLineIn
@@ -128,6 +128,78 @@ class SaleReturnsTest(unittest.TestCase):
         self.assertEqual(self.con.execute("SELECT count(*) FROM sale_returns").fetchone()[0], 1)
 
     # ---------- Refused ----------
+    def _installment_sale_for_guard(self):
+        sale = self.sell(
+            [SaleLineIn(self.tire, 1, 200000), SaleLineIn(self.service, 1, 200000)],
+            [Payment("installment", 400000)], customer_id=self.cust,
+        )
+        lines = self.con.execute(
+            "SELECT id FROM sale_lines WHERE sale_id=? ORDER BY line_no", (sale.id,)
+        ).fetchall()
+        return sale, [row[0] for row in lines]
+
+    def _installment_guard_snapshot(self):
+        tables = (
+            "sale_returns", "sale_return_lines", "journal_entries", "journal_lines",
+            "installment_return_adjustments", "installment_return_refunds",
+            "installment_return_allocations", "stock_movements", "cost_allocations",
+            "stock_lots", "cost_layers", "installment_payments", "installment_payment_lines",
+        )
+        counts = tuple(
+            self.con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+            for table in tables
+        )
+        lots = tuple(self.con.execute(
+            "SELECT id, qty_on_hand FROM stock_lots ORDER BY id"
+        ).fetchall())
+        layers = tuple(self.con.execute(
+            "SELECT id, qty_remaining, cost_remaining FROM cost_layers ORDER BY id"
+        ).fetchall())
+        balances = tuple(ledger.account_balance(self.con, code) for code in (
+            "1110", "1320", "1410", "1430", "2410", "4140", "4190", "5110",
+        ))
+        return counts, lots, layers, balances
+
+    def _assert_installment_return_refused(self, sale, lines, refund_method=None):
+        before = self._installment_guard_snapshot()
+        with self.assertRaisesRegex(ReturnError, "مرتجع التقسيط موقوف"):
+            sale_returns.post_return(
+                self.con, self.admin, request_key=f"guard-ret-{self.n:04d}",
+                sale_id=sale.id, lines=lines, reason="عيب في الصنف",
+                refund_method=refund_method, return_date="2026-11-15",
+            )
+        self.assertEqual(self._installment_guard_snapshot(), before)
+        self.assertEqual(inventory.reconcile(self.con), [])
+
+    def test_installment_return_before_contract_is_rejected_without_side_effects(self):
+        sale, lines = self._installment_sale_for_guard()
+        self._assert_installment_return_refused(
+            sale, [ReturnLineIn(lines[0], 1, "defective")]
+        )
+        self._assert_installment_return_refused(
+            sale, [ReturnLineIn(lines[1], 1)], refund_method="installment"
+        )
+
+    def test_installment_return_after_collection_is_rejected_without_side_effects(self):
+        sale, lines = self._installment_sale_for_guard()
+        contract = installments.post_contract(
+            self.con, self.admin, request_key="guard-contract-0001",
+            sale_id=sale.id, down=50000, rate_bp=1500, months=10,
+            first_due="2026-12-13", national_id="29001011201234",
+            down_method="cash", contract_date="2026-11-13",
+        )
+        installments.collect_payment(
+            self.con, self.admin, request_key="guard-collection-0001",
+            contract_id=contract.id, amount=10000, method="cash",
+            payment_date="2026-11-14",
+        )
+        self._assert_installment_return_refused(
+            sale, [ReturnLineIn(line, 1) for line in lines]
+        )
+        self._assert_installment_return_refused(
+            sale, [ReturnLineIn(lines[0], 1)], refund_method="installment"
+        )
+
     def test_more_than_sold_is_refused(self):
         before = self.counts()
         with self.assertRaises(ReturnError):
