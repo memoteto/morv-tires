@@ -231,6 +231,7 @@ def invoices_without_contract(con: sqlite3.Connection) -> list[tuple]:
         "JOIN customers cu ON cu.id = s.customer_id "
         "WHERE EXISTS (SELECT 1 FROM sale_payments p WHERE p.sale_id = s.id AND p.method = 'installment') "
         "AND NOT EXISTS (SELECT 1 FROM installment_contracts c WHERE c.sale_id = s.id) "
+        "AND NOT EXISTS (SELECT 1 FROM sale_returns r WHERE r.sale_id = s.id) "
         "ORDER BY s.id DESC").fetchall()
 
 
