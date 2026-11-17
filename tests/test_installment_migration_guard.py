@@ -47,8 +47,9 @@ class InstallmentMigrationGuardTest(unittest.TestCase):
 
     def test_main_uses_only_the_approved_payment_engine(self):
         migrations = load_migrations()
-        self.assertEqual(migrations[-1].version, 12)
-        self.assertEqual(migrations[-1].name, "installment_payments")
+        self.assertEqual(migrations[-1].version, 13)
+        self.assertEqual(migrations[-1].name, "installment_returns")
+        self.assertEqual(migrations[11].name, "installment_payments")
         names = {r[0] for r in self.con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertIn("installment_payments", names)
         self.assertIn("installment_payment_lines", names)
@@ -98,7 +99,7 @@ class InstallmentMigrationGuardTest(unittest.TestCase):
                 "CREATE TABLE installment_collections (id INTEGER PRIMARY KEY, amount INTEGER NOT NULL);"
                 "INSERT INTO installment_collections (amount) VALUES (4200);"
             )
-            migrate(other, main_migrations[:-1] + [
+            migrate(other, main_migrations[:11] + [
                 self._synthetic_migration(12, "installment_collections", alternate_sql),
             ])
             before = self._state(other)
@@ -111,26 +112,23 @@ class InstallmentMigrationGuardTest(unittest.TestCase):
             other.close()
 
     def test_alternative_0013_path_is_refused_without_mutation(self):
-        """Two different synthetic v13 histories cannot be identified as one."""
-        main_migrations = load_migrations()
-        old_interest = self._synthetic_migration(
-            13, "interest_recognition",
-            "CREATE TABLE interest_recognitions (id INTEGER PRIMARY KEY, amount INTEGER NOT NULL);"
-            "INSERT INTO interest_recognitions (amount) VALUES (12345);",
-        )
-        migrate(self.con, main_migrations + [old_interest])
-        before = self._state(self.con)
-        different_returns = self._synthetic_migration(
-            13, "installment_returns",
-            "CREATE TABLE installment_return_adjustments (id INTEGER PRIMARY KEY);",
-        )
-        with self.assertRaisesRegex(MigrationError, "0013"):
-            migrate(self.con, main_migrations + [different_returns])
-        self.assertEqual(self._state(self.con), before)
-        self.assertEqual(self.con.execute("SELECT amount FROM interest_recognitions").fetchall(), [(12345,)])
-        self.assertIsNone(self.con.execute(
-            "SELECT 1 FROM sqlite_master WHERE name='installment_return_adjustments'"
-        ).fetchone())
+        other = open_db(self.folder / "alternate13.db", create=True)
+        try:
+            migrations = load_migrations()
+            old_interest = self._synthetic_migration(
+                13, "interest_recognition",
+                "CREATE TABLE interest_recognitions (id INTEGER PRIMARY KEY, amount INTEGER NOT NULL);"
+                "INSERT INTO interest_recognitions (amount) VALUES (12345);",
+            )
+            migrate(other, migrations[:12] + [old_interest])
+            before = self._state(other)
+            with self.assertRaisesRegex(MigrationError, "0013"):
+                migrate(other, migrations)
+            self.assertEqual(self._state(other), before)
+            self.assertEqual(other.execute("SELECT amount FROM interest_recognitions").fetchall(), [(12345,)])
+            self.assertEqual(other.execute("PRAGMA foreign_key_check").fetchall(), [])
+        finally:
+            other.close()
 
     def test_duplicate_migration_numbers_in_bundle_are_rejected(self):
         folder = self.folder / "conflicting_package"
@@ -143,9 +141,6 @@ class InstallmentMigrationGuardTest(unittest.TestCase):
         with self.assertRaisesRegex(MigrationError, "ترقيم الترقيات"):
             load_migrations(folder)
         (folder / "0012_installment_collections.sql").unlink()
-        (folder / "0013_installment_returns.sql").write_text(
-            "CREATE TABLE returns_stub (id INTEGER PRIMARY KEY);", encoding="utf-8"
-        )
         (folder / "0013_interest_recognition.sql").write_text(
             "CREATE TABLE interest_stub (id INTEGER PRIMARY KEY);", encoding="utf-8"
         )

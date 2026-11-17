@@ -79,6 +79,14 @@ def migrate(con: sqlite3.Connection, migrations=None, before_apply=None) -> list
         before_apply()
     done = []
     for mig in todo:
+        # SQLite cannot rebuild a parent table with live child FKs while FK enforcement is on.
+        # Only migration 0013 needs this atomic, pre-backup rebuild. Foreign-key integrity is
+        # checked before commit and normal enforcement is restored even if migration fails.
+        rebuild_returns = mig.version == 13 and mig.name == "installment_returns"
+        if rebuild_returns:
+            if con.in_transaction or con.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+                raise MigrationError("إعادة بناء المرتجعات تتطلب اتصالًا بلا معاملة مع تفعيل العلاقات")
+            con.execute("PRAGMA foreign_keys=OFF")
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # A migration is atomic: the whole script in one transaction, then the check, then COMMIT.
         # The inlined values are safe: a number, a lower-case name, a hex checksum.
@@ -102,5 +110,10 @@ def migrate(con: sqlite3.Connection, migrations=None, before_apply=None) -> list
             if isinstance(e, MigrationError):
                 raise
             raise MigrationError(f"فشلت الترقية {mig.version:04d}_{mig.name}: {e}") from e
+        finally:
+            if rebuild_returns:
+                con.execute("PRAGMA foreign_keys=ON")
+                if con.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+                    raise MigrationError("تعذرت إعادة تفعيل فحص العلاقات بعد ترقية المرتجعات")
         done.append(mig.version)
     return done
