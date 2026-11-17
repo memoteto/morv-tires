@@ -1,5 +1,6 @@
 """EIR journal posting, idempotence and fail-closed contract-timing tests."""
 import shutil
+import sqlite3
 import tempfile
 import unittest
 from datetime import date
@@ -201,7 +202,7 @@ class EirPostingTest(unittest.TestCase):
             "UPDATE interest_recognitions SET amount=1 WHERE id=?",
             "DELETE FROM interest_recognitions WHERE id=?",
         ):
-            with self.assertRaises(Exception):
+            with self.assertRaises(sqlite3.DatabaseError):
                 self.con.execute(sql, (posted.id,))
 
     def test_financial_totals_equal_contract_when_fully_paid_on_schedule(self):
