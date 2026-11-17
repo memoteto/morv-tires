@@ -99,7 +99,9 @@ def returnable_lines(con: sqlite3.Connection, sale_id: int) -> list[ReturnableLi
 
 
 def refund_methods(con: sqlite3.Connection, sale_id: int) -> list[str]:
-    return [r[0] for r in con.execute(
+    methods = [r[0] for r in con.execute(
         "SELECT DISTINCT method FROM sale_payments WHERE sale_id=? ORDER BY method", (sale_id,))]
+    # Instalment returns reverse receipts and receivables together, not by a user-picked single method.
+    return ["installment"] if "installment" in methods else methods
 
 
