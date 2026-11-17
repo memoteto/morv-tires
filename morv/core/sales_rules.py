@@ -41,6 +41,8 @@ def check_payments(total: int, payments: list) -> None:
     methods = [p.method for p in payments]
     if len(set(methods)) != len(methods):
         raise SaleRuleError("لا تتكرر الوسيلة في الفاتورة الواحدة")
+    if "installment" in methods and len(methods) != 1:
+        raise SaleRuleError("التقسيط يجب أن يغطي كامل الفاتورة دون تقسيمه مع وسيلة أخرى")
     for p in payments:
         if p.method not in PAYMENT_ACCOUNT:
             raise SaleRuleError(f"وسيلة دفع غير معروفة: {p.method}")
