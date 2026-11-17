@@ -303,6 +303,8 @@ class InstallmentReturnUiTest(_Synthetic):
             dialog.lines = [ReturnLineIn(line_id, 1)]
             dialog._refresh_lines()
             self.assertIn("سيُرد للعميل", dialog.refund_breakdown.text())
+            self.assertIn("وسائل الرد", dialog.refund_breakdown.text())
+            self.assertIn("نقدي", dialog.refund_breakdown.text())
             self.assertIn("تُلغى مديونية", dialog.refund_breakdown.text())
         finally:
             dialog.deleteLater()
