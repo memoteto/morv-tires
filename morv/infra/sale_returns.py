@@ -7,7 +7,6 @@ from datetime import date
 
 from morv.core import costing
 from morv.core import return_rules as rules
-from morv.core import sales_rules as sale_rules
 from morv.core.sales_rules import PAYMENT_ACCOUNT
 from morv.infra import installments, ledger
 from morv.infra.db.connection import transaction
