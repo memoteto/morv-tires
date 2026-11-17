@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from datetime import date
 
 from morv.core.sales_rules import Payment
 from morv.infra import dashboard_view, installments, purchasing, sales, users
@@ -111,7 +112,7 @@ class DashboardViewTest(unittest.TestCase):
         view = dashboard_view.get(self.con, today="2026-11-16")
         old_dot = [a for a in view.alerts if a.kind == "old_dot"]
         self.assertEqual(len(old_dot), 1)
-        self.assertEqual((old_dot[0].count, old_dot[0].detail), (1, "إطار"))
+        self.assertEqual((old_dot[0].count, old_dot[0].detail), (4, "إطار"))
 
     def test_backup_never_run_always_raises_a_backup_alert(self):
         view = dashboard_view.get(self.con, today="2026-11-16")
@@ -140,3 +141,76 @@ class DashboardViewTest(unittest.TestCase):
                         payments=[Payment("cash", 1900000, 1900000)], sale_date="2026-11-16")
         view = dashboard_view.get(self.con, today="2026-11-16")
         self.assertEqual(view.top_month[0], ("خدمة", 3))
+
+    def _contract(self):
+        sale = self._sale("2026-09-01", [Payment("installment", 500000)])
+        return installments.post_contract(
+            self.con, self.admin, request_key="contract-replay-key", sale_id=sale.id,
+            down=100000, rate_bp=0, months=4, first_due="2026-10-16", national_id=NID,
+            down_method="cash", contract_date="2026-09-02")
+
+    def test_receipts_use_payment_dates_and_exclude_financed_sales(self):
+        contract = self._contract()
+        self.assertEqual(dashboard_view.get(self.con, today="2026-09-01").collected_total, 0)
+        self.assertEqual(dashboard_view.get(self.con, today="2026-09-02").collected_total, 100000)
+        for _ in range(2):
+            installments.collect_payment(self.con, self.admin, request_key="payment-replay-key",
+                                         contract_id=contract.id, amount=25000, method="transfer",
+                                         payment_date="2026-11-16")
+        view = dashboard_view.get(self.con, today="2026-11-16")
+        self.assertEqual(view.collected_total, 25000)
+        self.assertEqual(dict(view.pay_today), {"transfer": 25000})
+        self.assertEqual(dashboard_view.get(self.con, today="2026-11-15").collected_total, 0)
+
+    def test_overdue_and_due_today_contract_is_counted_once_and_named(self):
+        self._contract()
+        view = dashboard_view.get(self.con, today="2026-11-16")
+        self.assertEqual((view.due_count, view.due_amount), (1, 200000))
+        today_alert = next(a for a in view.alerts if a.kind == "due_today")
+        self.assertEqual((today_alert.count, today_alert.amount, today_alert.detail),
+                         (1, 100000, "عميل وهمي"))
+
+    def test_recent_dot_is_not_old_and_boundary_waits_for_full_week(self):
+        for n, dot in enumerate(("4626", "4623", "4523")):
+            purchasing.post_invoice(self.con, self.admin, request_key=f"dot-purchase-{n}",
+                                    supplier_id=self.supplier, supplier_invoice_no=f"DOT-{n}",
+                                    invoice_date="2026-11-10", lines=[PurchaseLine(self.tire, 4, 300000, dot=dot)])
+        view = dashboard_view.get(self.con, today="2026-11-16")
+        alert = next(a for a in view.alerts if a.kind == "old_dot")
+        self.assertEqual(alert.count, 4)
+        view = dashboard_view.get(self.con, today="2026-11-19")
+        self.assertEqual(next(a for a in view.alerts if a.kind == "old_dot").count, 8)
+
+    def test_dot_cutoff_handles_leap_day(self):
+        self.assertIsNone(dashboard_view._old_dot_alert(self.con, date(2024, 2, 29)))
+
+    def test_collections_combine_sales_down_payments_and_receipts_without_transfers(self):
+        from morv.infra import ledger
+        from morv.infra.db.connection import transaction
+        contract = self._contract()
+        self._sale("2026-09-02", [Payment("card", 500000)])
+        installments.collect_payment(self.con, self.admin, request_key="same-day-payment",
+                                     contract_id=contract.id, amount=25000, method="wallet",
+                                     payment_date="2026-09-02")
+        with transaction(self.con):
+            ledger.post_entry(self.con, self.admin, "2026-09-02", "test_transfer", 1, "Transfer",
+                              [("1110", 0, 10000), ("1210", 10000, 0)])
+        view = dashboard_view.get(self.con, today="2026-09-02")
+        self.assertEqual(view.collected_total, 625000)
+        self.assertEqual(dict(view.pay_today), {"cash": 100000, "card": 500000, "wallet": 25000})
+        self.assertEqual(sum(amount for _, amount in view.pay_today), view.collected_total)
+
+    def test_failed_collection_does_not_change_dashboard(self):
+        import sqlite3
+        contract = self._contract()
+        before = dashboard_view.get(self.con, today="2026-11-16")
+        self.con.execute("CREATE TRIGGER reject_payment BEFORE INSERT ON installment_payment_lines "
+                         "BEGIN SELECT RAISE(ABORT, 'injected failure'); END")
+        with self.assertRaises(sqlite3.IntegrityError):
+            installments.collect_payment(self.con, self.admin, request_key="failed-payment-key",
+                                         contract_id=contract.id, amount=25000, method="cash",
+                                         payment_date="2026-11-16")
+        after = dashboard_view.get(self.con, today="2026-11-16")
+        self.assertEqual(after.collected_total, before.collected_total)
+        self.assertEqual(after.account_balances, before.account_balances)
+        self.assertEqual(after.due_amount, before.due_amount)
