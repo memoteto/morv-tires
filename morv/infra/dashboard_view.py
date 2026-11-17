@@ -78,7 +78,8 @@ def _due_alerts(con: sqlite3.Connection, today_s: str) -> list[Alert]:
             "JOIN installment_contracts c ON c.id = r.contract_id "
             "JOIN customers cu ON cu.id = c.customer_id WHERE r.due_date = ? "
             "AND r.amount > coalesce((SELECT sum(p.amount) FROM installment_payment_lines p "
-            "WHERE p.row_id = r.id), 0)", (today_s,)).fetchall()
+            "WHERE p.row_id = r.id), 0) + coalesce((SELECT sum(a.amount) "
+            "FROM installment_return_allocations a WHERE a.row_id=r.id), 0)", (today_s,)).fetchall()
         detail = customers[0][1] if len(customers) == 1 else ""
         alerts.append(Alert("warn", "due_today", due_today.kpis.today_count, due_today.kpis.today_amount,
                             detail, "installments"))
