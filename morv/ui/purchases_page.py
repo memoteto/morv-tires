@@ -726,7 +726,7 @@ class PurchaseForm(QWidget):
         cw.addWidget(cost_note)
         h.addWidget(cost_w, 1, Qt.AlignmentFlag.AlignTop)
 
-        dot_edit = ltr_edit("WWYYYY")
+        dot_edit = ltr_edit("WWYY")
         h.addWidget(dot_edit, 1, Qt.AlignmentFlag.AlignTop)
 
         total_lbl = QLabel(ltr(fmt(0)))
