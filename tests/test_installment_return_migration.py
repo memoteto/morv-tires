@@ -19,7 +19,7 @@ class MigrationOfExistingData(unittest.TestCase):
         con = None
         try:
             con = open_db(folder / "old_synthetic.db", create=True)
-            migrate(con, load_migrations()[:-1])
+            migrate(con, load_migrations()[:12])
             self.assertEqual(current_version(con), 12)
             manager = users.create_user(con, None, "oldadmin", "مدير وهمي", "Admin12345", "manager")
             sid = con.execute(
@@ -47,7 +47,7 @@ class MigrationOfExistingData(unittest.TestCase):
                               for code in ("1110", "1410", "4190")}
             before = con.execute("SELECT id,total,refund_method FROM sale_returns").fetchall()
             self.assertEqual(len(before), 1)
-            self.assertEqual(migrate(con), [13])
+            self.assertEqual(migrate(con, load_migrations()[:13]), [13])
             self.assertEqual(con.execute("PRAGMA foreign_keys").fetchone()[0], 1)
             self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
             self.assertEqual(con.execute("SELECT id,total,refund_method FROM sale_returns").fetchall(), before)
