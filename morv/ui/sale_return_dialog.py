@@ -205,8 +205,11 @@ class SaleReturnDialog(Modal):
         except ReturnError as e:
             self.refund_breakdown.setText(f"لا يمكن تسوية التقسيط: {e}")
             return
+        methods = "، ".join(
+            f"{REFUND_LABELS[method]}: {ltr(fmt(amount))}" for method, amount in preview.refunds)
         self.refund_breakdown.setText(
-            f"سيُرد للعميل: {ltr(fmt(preview.refunded))} جنيه حسب وسائل التحصيل الأصلية. "
+            f"سيُرد للعميل: {ltr(fmt(preview.refunded))} جنيه. "
+            f"وسائل الرد: {methods or 'لا توجد مدفوعات سابقة'}. "
             f"تُلغى مديونية: {ltr(fmt(preview.receivable_reduced))} جنيه "
             f"وفوائد مؤجلة: {ltr(fmt(preview.markup))} جنيه.")
 
