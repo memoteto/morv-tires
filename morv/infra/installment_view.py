@@ -185,9 +185,8 @@ def list_view(con: sqlite3.Connection, query: str = "", filter_key: str = "all",
     late_count = late_amount = today_count = today_amount = 0
     week_count = week_amount = active_count = active_amount = 0
     result = []
-    for cid, number, name, mobile, instalments_total in contracts:
+    for cid, number, name, mobile, _instalments_total in contracts:
         rows = by_contract.get(cid, [])
-        paid_total = sum(p for _, _, _, p in rows)
         remaining_total = sum(a - p for _, _, a, p in rows)
         overdue_amt = sum(a - p for _, d, a, p in rows if a > p and d < today)
         due_today_amt = sum(a - p for _, d, a, p in rows if a > p and d == today)
