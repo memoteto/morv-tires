@@ -7,8 +7,9 @@ from datetime import date
 
 from morv.core import costing
 from morv.core import return_rules as rules
+from morv.core import sales_rules as sale_rules
 from morv.core.sales_rules import PAYMENT_ACCOUNT
-from morv.infra import ledger
+from morv.infra import installments, ledger
 from morv.infra.db.connection import transaction
 from morv.infra.inventory import COGS_ACCOUNTS
 from morv.infra.users import audit, has_permission
@@ -49,6 +50,107 @@ def _refund_method(con, sale_id: int, asked) -> str:
     if len(set(methods)) != 1:
         raise ReturnError("الفاتورة دُفعت بوسيلتين؛ حدّد طريقة الرد")
     return methods[0]
+
+
+
+@dataclass(frozen=True)
+class InstallmentSettlement:
+    contract_id: int
+    principal: int
+    markup: int
+    refunded: int
+    receivable_reduced: int
+    refunds: tuple
+    allocations: tuple
+
+
+def _installment_settlement(con, sale_id: int, amount: int, day: str) -> InstallmentSettlement:
+    """A pro-rata cancellation of the *remaining* contract, never a second refund of paid money."""
+    contract = con.execute(
+        "SELECT c.id, c.cash_price, c.down, c.down_method, c.markup, c.contract_date "
+        "FROM installment_contracts c WHERE c.sale_id=?", (sale_id,)).fetchone()
+    if contract is None:
+        raise ReturnError("لا يمكن إرجاع فاتورة تقسيط قبل اعتماد عقدها وتسوية التزاماتها")
+    cid, cash_price, down, down_method, markup, contract_date = contract
+    last_payment = con.execute(
+        "SELECT max(payment_date) FROM installment_payments WHERE contract_id=?", (cid,)).fetchone()[0]
+    last_return = con.execute(
+        "SELECT max(r.return_date) FROM installment_return_adjustments a "
+        "JOIN sale_returns r ON r.id=a.return_id WHERE a.contract_id=?", (cid,)).fetchone()[0]
+    if day < max(d for d in (contract_date, last_payment, last_return) if d):
+        raise ReturnError("تاريخ مرتجع التقسيط يجب ألا يسبق العقد أو آخر تحصيل أو مرتجع")
+
+    previously = con.execute(
+        "SELECT coalesce(sum(principal),0), coalesce(sum(markup),0) "
+        "FROM installment_return_adjustments WHERE contract_id=?", (cid,)).fetchone()
+    returned, reversed_markup = previously
+    if not 0 <= amount <= cash_price - returned:
+        raise ReturnError("قيمة المرتجع تتجاوز المتبقي من أصل عقد التقسيط")
+    interest = rules.portion(markup, returned, amount, cash_price)
+    remaining_face = cash_price + markup - returned - reversed_markup
+    canceled_face = amount + interest
+    if canceled_face > remaining_face or remaining_face <= 0:
+        raise ReturnError("العقد مغلق أو قيمة المرتجع تتجاوز مستحقاته")
+
+    received = {"cash": 0, "card": 0, "transfer": 0, "wallet": 0}
+    if down:
+        received[down_method] += down
+    for method, paid in con.execute(
+            "SELECT method, sum(amount) FROM installment_payments WHERE contract_id=? GROUP BY method", (cid,)):
+        received[method] += paid
+    for method, refunded in con.execute(
+            "SELECT r.method, sum(r.amount) FROM installment_return_refunds r "
+            "JOIN installment_return_adjustments a ON a.return_id=r.return_id "
+            "WHERE a.contract_id=? GROUP BY r.method", (cid,)):
+        received[method] -= refunded
+    if any(v < 0 for v in received.values()):
+        raise ReturnError("المدفوعات المستردة تتجاوز التحصيلات المسجلة للعقد")
+
+    due = installments.remaining_rows(con, cid)
+    received_total = sum(received.values())
+    due_total = sum(row[4] for row in due)
+    if remaining_face != received_total + due_total:
+        raise ReturnError("تسوية التقسيط موقوفة: أرصدة التحصيل والأقساط غير متطابقة")
+    # All prices are piasters. The last return receives all remaining paid money, with no rounding drift.
+    money_back = received_total * canceled_face // remaining_face
+    due_reduction = canceled_face - money_back
+    split = sale_rules.allocate(list(received.values()), money_back)
+    refunds = tuple((method, value) for method, value in zip(received, split, strict=True) if value)
+
+    to_cancel, allocations = due_reduction, []
+    for row_id, _no, _date, _face, remaining in reversed(due):
+        if to_cancel <= 0:
+            break
+        take = min(to_cancel, remaining)
+        if take:
+            allocations.append((row_id, take))
+            to_cancel -= take
+    if to_cancel:
+        raise ReturnError("تسوية التقسيط موقوفة: الأقساط المتاحة أقل من المطلوب إلغاؤه")
+    return InstallmentSettlement(cid, amount, interest, money_back, due_reduction,
+                                 refunds, tuple(allocations))
+
+
+def preview_installment_refund(con, sale_id: int, lines: list, return_date: str) -> InstallmentSettlement | None:
+    """Read-only preview of actual paid refunds and debt cancellation before posting."""
+    if not con.execute(
+            "SELECT 1 FROM sale_payments WHERE sale_id=? AND method='installment'", (sale_id,)).fetchone():
+        return None
+    if not lines or len({x.sale_line_id for x in lines}) != len(lines):
+        raise ReturnError("حدّد أسطر المرتجع دون تكرار")
+    try:
+        day = ledger.valid_date(return_date, "تاريخ المرتجع")
+    except ledger.LedgerError as e:
+        raise ReturnError(str(e)) from e
+    amount = 0
+    for ln in lines:
+        _, _, _item, sold, net, _kind, already = _sale_line(con, sale_id, ln.sale_line_id)
+        try:
+            qty = rules.returnable(sold, already, ln.qty)
+        except rules.ReturnRuleError as e:
+            raise ReturnError(str(e)) from e
+        amount += rules.portion(net, already, qty, sold)
+    return _installment_settlement(con, sale_id, amount, day)
 
 
 def _sale_line(con, sale_id: int, line_id: int) -> tuple:
@@ -99,6 +201,9 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         if day < sale[2]:
             raise ReturnError("تاريخ المرتجع قبل تاريخ الفاتورة")
         method = _refund_method(con, sale_id, refund_method)
+        if con.execute("SELECT 1 FROM sale_payments WHERE sale_id=? AND method='installment'",
+                       (sale_id,)).fetchone() and method != "installment":
+            raise ReturnError("مرتجع فاتورة التقسيط يجب أن يُسوّى عبر عقد التقسيط وليس برد نقدي منفرد")
         h = _payload_hash(sale_id, day, lines, method, why)
         old = con.execute("SELECT id, number, total, payload_hash FROM sale_returns WHERE request_key=?",
                           (key,)).fetchone()
@@ -135,9 +240,18 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         return_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM sale_returns").fetchone()[0]
         number = f"SR-{return_id:06d}"
 
+        settlement = _installment_settlement(con, sale_id, total, day) if method == "installment" else None
         entry = []
         if total:
-            entry += [(rules.RETURNS_ACCOUNT, total, 0), (PAYMENT_ACCOUNT[method], 0, total)]
+            entry.append((rules.RETURNS_ACCOUNT, total, 0))
+        if settlement:
+            if settlement.markup:
+                entry.append((installments.DEFERRED_INTEREST_ACCOUNT, settlement.markup, 0))
+            if settlement.receivable_reduced:
+                entry.append((installments.RECEIVABLE_ACCOUNT, 0, settlement.receivable_reduced))
+            entry.extend((PAYMENT_ACCOUNT[m], 0, amount) for m, amount in settlement.refunds)
+        elif total:
+            entry.append((PAYMENT_ACCOUNT[method], 0, total))
         stock_side: dict[str, int] = {}
         cogs_side: dict[str, int] = {}
         for ln, _item, kind, _qty, _value, cost, _layers, _lots in shaped:
@@ -159,6 +273,21 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
             "cost_total, reason, refund_method, notes, journal_entry_id, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (return_id, number, key, h, sale_id, day, total, cost_total, why, method,
              (notes or "").strip() or None, entry_id, by.id))
+        if settlement:
+            con.execute(
+                "INSERT INTO installment_return_adjustments "
+                "(return_id,contract_id,principal,markup,refunded,receivable_reduced) "
+                "VALUES (?,?,?,?,?,?)",
+                (return_id, settlement.contract_id, total, settlement.markup, settlement.refunded,
+                 settlement.receivable_reduced))
+            for method_name, amount in settlement.refunds:
+                con.execute(
+                    "INSERT INTO installment_return_refunds (return_id,method,amount) VALUES (?,?,?)",
+                    (return_id, method_name, amount))
+            for row_id, amount in settlement.allocations:
+                con.execute(
+                    "INSERT INTO installment_return_allocations (return_id,row_id,amount) VALUES (?,?,?)",
+                    (return_id, row_id, amount))
         for no, (ln, item_id, _kind, qty, value, cost, layer_take, lot_take) in enumerate(shaped, start=1):
             cur = con.execute(
                 "INSERT INTO sale_return_lines (return_id, line_no, sale_line_id, qty, condition, value, cost) "
