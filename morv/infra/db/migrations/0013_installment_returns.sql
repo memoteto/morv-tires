@@ -9,7 +9,7 @@ CREATE TABLE sale_returns_rebuilt (
   request_key      TEXT NOT NULL UNIQUE CHECK (length(request_key) >= 8),
   payload_hash     TEXT NOT NULL,
   sale_id          INTEGER NOT NULL REFERENCES sales(id),
-  return_date      TEXT NOT NULL CHECK (return_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]'),
+  return_date      TEXT NOT NULL CHECK (return_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   total            INTEGER NOT NULL CHECK (total >= 0),
   cost_total       INTEGER NOT NULL CHECK (cost_total >= 0),
   reason           TEXT NOT NULL CHECK (length(trim(reason)) >= 3),
