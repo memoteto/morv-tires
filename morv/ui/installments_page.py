@@ -172,9 +172,12 @@ class ContractsPage(ListPage):
             self.kv(f"{ltr(str(r[0]))}. {ltr(r[1])}",
                     f"{ltr(fmt(r[2]))} · أصل {ltr(fmt(r[3]))} · فائدة {ltr(fmt(r[4]))}")
         if self.can_edit() and self.stack is not None:
-            btn = primary_button("تحصيل قسط")
-            btn.clicked.connect(lambda: self.stack.open_collect(row_id))
-            self.actions(btn)
+            if installments.remaining_rows(self.session.con, row_id):
+                btn = primary_button("تحصيل قسط")
+                btn.clicked.connect(lambda: self.stack.open_collect(row_id))
+                self.actions(btn)
+            else:
+                self.actions(muted("لا توجد أقساط قابلة للتحصيل"))
             statement_btn = QPushButton("كشف حساب العقد — قريبًا")
             statement_btn.setEnabled(False)
             self.actions(statement_btn)
