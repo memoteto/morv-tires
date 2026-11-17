@@ -154,8 +154,10 @@ def _payment_hash(contract_id, day, amount, method) -> str:
 def remaining_rows(con: sqlite3.Connection, contract_id: int) -> list[tuple]:
     """Unpaid/partly-paid rows, oldest due first: (row_id, no, due_date, amount, remaining)."""
     rows = con.execute(
-        "SELECT r.id, r.no, r.due_date, r.amount, r.amount - coalesce(("
-        "  SELECT sum(l.amount) FROM installment_payment_lines l WHERE l.row_id = r.id), 0) AS remaining "
+        "SELECT r.id, r.no, r.due_date, r.amount, "
+        "r.amount - coalesce((SELECT sum(l.amount) FROM installment_payment_lines l "
+        "WHERE l.row_id=r.id),0) - coalesce((SELECT sum(a.amount) "
+        "FROM installment_return_allocations a WHERE a.row_id=r.id),0) AS remaining "
         "FROM installment_rows r WHERE r.contract_id=? ORDER BY r.no", (contract_id,)).fetchall()
     return [r for r in rows if r[4] > 0]
 

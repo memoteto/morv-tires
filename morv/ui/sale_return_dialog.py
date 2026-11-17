@@ -9,14 +9,14 @@ from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFrame, QHBoxLayout
 from morv.core import return_rules
 from morv.core.money import fmt
 from morv.core.text import ltr
-from morv.infra.sale_returns import ReturnError, ReturnLineIn, post_return
+from morv.infra.sale_returns import ReturnError, ReturnLineIn, post_return, preview_installment_refund
 from morv.ui.listpage import TupleModel
 from morv.ui.modal import Modal
 from morv.ui.widgets import form, ltr_edit, muted
 
 CONDITIONS = (("sound", "سليم — يعود للمخزون"), ("defective", "معيب — مخزن التالف"))
 REFUND_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
-                 "credit": "على حساب العميل"}
+                 "credit": "على حساب العميل", "installment": "تقسيط — رد المدفوع وإلغاء المتبقي"}
 REASONS = ("عيب في الصنف", "مقاس خاطئ", "لم يُركَّب", "طلب العميل")
 
 
@@ -108,6 +108,9 @@ class SaleReturnDialog(Modal):
         bar.addWidget(muted("قيمة الأصناف المرتجعة"))
         bar.addWidget(self.total_label)
         self.body.addLayout(bar)
+        self.refund_breakdown = muted("")
+        self.refund_breakdown.setWordWrap(True)
+        self.body.addWidget(self.refund_breakdown)
         self.body.addWidget(muted("المحل غير مسجّل — بدون ضريبة"))
         override = QPushButton("موافقة المدير على تجاوز مدة الإرجاع — قريبًا")
         override.setEnabled(False)
@@ -117,6 +120,7 @@ class SaleReturnDialog(Modal):
         print_btn = QPushButton("طباعة الإيصال — قريبًا")
         print_btn.setEnabled(False)
         self.add_footer_widget(print_btn)
+        self.return_date.textChanged.connect(lambda _text: self._refresh_total())
         self._refresh_choices()
         self._refresh_total()
 
@@ -186,7 +190,33 @@ class SaleReturnDialog(Modal):
         self._refresh_total()
 
     def _refresh_total(self) -> None:
-        self.total_label.setText(f"{ltr(fmt(getattr(self, '_total', 0)))} جنيه")
+        total = getattr(self, "_total", 0)
+        self.total_label.setText(f"{ltr(fmt(total))} جنيه")
+        if self.refund.currentData() != "installment":
+            self.refund_breakdown.setText("")
+            self.post_btn.setEnabled(True)
+            return
+        if not self.lines:
+            self.refund_breakdown.setText(
+                "يلزم إرجاع كل أصناف الفاتورة لإلغاء عقد التقسيط؛ المرتجع الجزئي غير متاح.")
+            self.post_btn.setEnabled(False)
+            return
+        try:
+            preview = preview_installment_refund(
+                self.session.con, self.sale.id, self.lines, self.return_date.text().strip())
+        except ReturnError as exc:
+            self.refund_breakdown.setText(f"لا يمكن تسوية التقسيط: {exc}")
+            self.post_btn.setEnabled(False)
+            return
+        methods = "، ".join(
+            f"{REFUND_LABELS[method]}: {ltr(fmt(amount))}" for method, amount in preview.refunds)
+        self.refund_breakdown.setText(
+            f"إلغاء عقد التقسيط بالكامل — سيُرد للعميل: {ltr(fmt(preview.refunded))} جنيه. "
+            f"وسائل الرد: {methods or 'لا توجد مبالغ محصّلة'}. "
+            f"تُلغى المديونية: {ltr(fmt(preview.receivable_reduced))} جنيه. "
+            f"تُعكس الفوائد المؤجلة: {ltr(fmt(preview.deferred_reversal))} جنيه "
+            f"والفوائد المعترف بها سابقًا: {ltr(fmt(preview.recognized_reversal))} جنيه.")
+        self.post_btn.setEnabled(True)
 
     def post(self) -> None:
         if self._busy:
@@ -216,4 +246,4 @@ class SaleReturnDialog(Modal):
             self.accept()
         finally:
             self._busy = False
-            self.post_btn.setEnabled(True)
+            self._refresh_total()

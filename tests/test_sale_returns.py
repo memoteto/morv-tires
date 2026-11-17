@@ -162,7 +162,7 @@ class SaleReturnsTest(unittest.TestCase):
 
     def _assert_installment_return_refused(self, sale, lines, refund_method=None):
         before = self._installment_guard_snapshot()
-        with self.assertRaisesRegex(ReturnError, "مرتجع التقسيط موقوف"):
+        with self.assertRaisesRegex(ReturnError, "جزئي"):
             sale_returns.post_return(
                 self.con, self.admin, request_key=f"guard-ret-{self.n:04d}",
                 sale_id=sale.id, lines=lines, reason="عيب في الصنف",
@@ -194,7 +194,7 @@ class SaleReturnsTest(unittest.TestCase):
             payment_date="2026-11-14",
         )
         self._assert_installment_return_refused(
-            sale, [ReturnLineIn(line, 1) for line in lines]
+            sale, [ReturnLineIn(lines[1], 1)]
         )
         self._assert_installment_return_refused(
             sale, [ReturnLineIn(lines[0], 1)], refund_method="installment"

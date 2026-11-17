@@ -7,8 +7,9 @@ from datetime import date
 
 from morv.core import costing
 from morv.core import return_rules as rules
+from morv.core import sales_rules as sale_rules
 from morv.core.sales_rules import PAYMENT_ACCOUNT
-from morv.infra import ledger
+from morv.infra import installments, ledger
 from morv.infra.db.connection import transaction
 from morv.infra.inventory import COGS_ACCOUNTS
 from morv.infra.users import audit, has_permission
@@ -49,6 +50,116 @@ def _refund_method(con, sale_id: int, asked) -> str:
     if len(set(methods)) != 1:
         raise ReturnError("الفاتورة دُفعت بوسيلتين؛ حدّد طريقة الرد")
     return methods[0]
+
+
+
+def _require_complete_sale(con, sale_id: int, lines: list[ReturnLineIn]) -> None:
+    """Only every original invoice line and quantity may cancel the installment contract."""
+    expected = dict(con.execute(
+        "SELECT id, qty FROM sale_lines WHERE sale_id=?", (sale_id,),
+    ).fetchall())
+    submitted = {line.sale_line_id: line.qty for line in lines}
+    if len(submitted) != len(lines) or submitted != expected:
+        raise ReturnError("مرتجع التقسيط الجزئي موقوف حتى اعتماد سياسة إعادة قياس EIR")
+    if con.execute(
+        "SELECT 1 FROM sale_returns WHERE sale_id=? LIMIT 1", (sale_id,),
+    ).fetchone():
+        raise ReturnError("لا يمكن إلغاء عقد سبق تسجيل مرتجع منه")
+
+
+@dataclass(frozen=True)
+class InstallmentSettlement:
+    contract_id: int
+    principal: int
+    markup: int
+    refunded: int
+    receivable_reduced: int
+    refunds: tuple
+    allocations: tuple
+    recognized_reversal: int
+
+    @property
+    def deferred_reversal(self) -> int:
+        return self.markup - self.recognized_reversal
+
+
+def _installment_settlement(con, sale_id: int, amount: int, day: str) -> InstallmentSettlement:
+    """Full rescission: cancel the entire contract and refund only actual receipts."""
+    contract = con.execute(
+        "SELECT id, cash_price, down, down_method, markup, contract_date "
+        "FROM installment_contracts WHERE sale_id=?", (sale_id,),
+    ).fetchone()
+    if contract is None:
+        raise ReturnError("لا يمكن إلغاء فاتورة التقسيط قبل اعتماد عقدها")
+    cid, cash_price, down, down_method, markup, contract_date = contract
+    if amount != cash_price:
+        raise ReturnError("مرتجع التقسيط الجزئي موقوف حتى اعتماد سياسة إعادة قياس EIR")
+    if con.execute(
+        "SELECT 1 FROM installment_return_adjustments WHERE contract_id=? LIMIT 1", (cid,),
+    ).fetchone():
+        raise ReturnError("سُجلت تسوية أخرى لهذا العقد؛ لا يجوز تكرار الإلغاء")
+    last_payment = con.execute(
+        "SELECT max(payment_date) FROM installment_payments WHERE contract_id=?", (cid,),
+    ).fetchone()[0]
+    last_interest = con.execute(
+        "SELECT max(entry_date) FROM interest_recognitions WHERE contract_id=?", (cid,),
+    ).fetchone()[0]
+    if day < max(d for d in (contract_date, last_payment, last_interest) if d):
+        raise ReturnError("تاريخ إلغاء التقسيط يسبق عقدًا أو تحصيلًا أو قيد فائدة مرحّلًا")
+
+    recognized = con.execute(
+        "SELECT coalesce(sum(amount),0) FROM interest_recognitions WHERE contract_id=?",
+        (cid,),
+    ).fetchone()[0]
+    if not 0 <= recognized <= markup:
+        raise ReturnError("إيراد فوائد EIR المعترف به لا يطابق إجمالي فوائد العقد")
+
+    receipts = {"cash": 0, "card": 0, "transfer": 0, "wallet": 0}
+    if down:
+        receipts[down_method] += down
+    for method, paid in con.execute(
+        "SELECT method, sum(amount) FROM installment_payments "
+        "WHERE contract_id=? GROUP BY method", (cid,),
+    ):
+        receipts[method] += paid
+    received = sum(receipts.values())
+    due = installments.remaining_rows(con, cid)
+    receivable = sum(row[4] for row in due)
+    if cash_price + markup != received + receivable:
+        raise ReturnError("تسوية التقسيط موقوفة: التحصيل والمديونية لا يساويان قيمة العقد")
+    return InstallmentSettlement(
+        cid, cash_price, markup, received, receivable,
+        tuple((method, value) for method, value in receipts.items() if value),
+        tuple((row_id, outstanding) for row_id, _no, _due, _amount, outstanding in due),
+        recognized,
+    )
+
+
+def preview_installment_refund(con, sale_id: int, lines: list,
+                               return_date: str) -> InstallmentSettlement | None:
+    """Read-only full-return preview; partial installment returns fail closed."""
+    if not con.execute(
+        "SELECT 1 FROM sale_payments WHERE sale_id=? AND method='installment'",
+        (sale_id,),
+    ).fetchone():
+        return None
+    try:
+        day = ledger.valid_date(return_date, "تاريخ المرتجع")
+    except ledger.LedgerError as exc:
+        raise ReturnError(str(exc)) from exc
+    if not lines:
+        raise ReturnError("حدّد كل أصناف الفاتورة لإلغاء عقد التقسيط بالكامل")
+    _require_complete_sale(con, sale_id, lines)
+    total = 0
+    for line in lines:
+        _, _, _item, sold, net, _kind, already = _sale_line(con, sale_id, line.sale_line_id)
+        try:
+            rules.check_condition(line.condition)
+            qty = rules.returnable(sold, already, line.qty)
+        except rules.ReturnRuleError as exc:
+            raise ReturnError(str(exc)) from exc
+        total += rules.portion(net, already, qty, sold)
+    return _installment_settlement(con, sale_id, total, day)
 
 
 def _sale_line(con, sale_id: int, line_id: int) -> tuple:
@@ -98,14 +209,12 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
             raise ReturnError("الفاتورة غير موجودة")
         if day < sale[2]:
             raise ReturnError("تاريخ المرتجع قبل تاريخ الفاتورة")
-        # Installment returns need a joint receivable/deferred-interest settlement.
-        # Refuse every installment sale, regardless of the requested refund method.
-        if con.execute(
-            "SELECT 1 FROM sale_payments WHERE sale_id=? AND method='installment' LIMIT 1",
-            (sale_id,),
-        ).fetchone():
-            raise ReturnError("مرتجع التقسيط موقوف مؤقتًا حتى اكتمال تسويته المحاسبية")
         method = _refund_method(con, sale_id, refund_method)
+        if con.execute(
+            "SELECT 1 FROM sale_payments WHERE sale_id=? AND method='installment'",
+            (sale_id,),
+        ).fetchone() and method != "installment":
+            raise ReturnError("مرتجع التقسيط يجب تسويته على عقده لا برد نقدي منفرد")
         h = _payload_hash(sale_id, day, lines, method, why)
         old = con.execute("SELECT id, number, total, payload_hash FROM sale_returns WHERE request_key=?",
                           (key,)).fetchone()
@@ -135,6 +244,8 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
             cost = sum(c for _, _, c in layer_take)
             shaped.append((ln, item_id, kind, qty, value, cost, layer_take, lot_take))
 
+        if method == "installment":
+            _require_complete_sale(con, sale_id, lines)
         total = sum(x[4] for x in shaped)
         cost_total = sum(x[5] for x in shaped)
         if total <= 0 and cost_total <= 0:
@@ -142,9 +253,20 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         return_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM sale_returns").fetchone()[0]
         number = f"SR-{return_id:06d}"
 
+        settlement = _installment_settlement(con, sale_id, total, day) if method == "installment" else None
         entry = []
         if total:
-            entry += [(rules.RETURNS_ACCOUNT, total, 0), (PAYMENT_ACCOUNT[method], 0, total)]
+            entry.append((rules.RETURNS_ACCOUNT, total, 0))
+        if settlement:
+            if settlement.deferred_reversal:
+                entry.append((installments.DEFERRED_INTEREST_ACCOUNT, settlement.deferred_reversal, 0))
+            if settlement.recognized_reversal:
+                entry.append(("4140", settlement.recognized_reversal, 0))
+            if settlement.receivable_reduced:
+                entry.append((installments.RECEIVABLE_ACCOUNT, 0, settlement.receivable_reduced))
+            entry.extend((PAYMENT_ACCOUNT[m], 0, amount) for m, amount in settlement.refunds)
+        elif total:
+            entry.append((PAYMENT_ACCOUNT[method], 0, total))
         stock_side: dict[str, int] = {}
         cogs_side: dict[str, int] = {}
         for ln, _item, kind, _qty, _value, cost, _layers, _lots in shaped:
@@ -166,6 +288,21 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
             "cost_total, reason, refund_method, notes, journal_entry_id, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (return_id, number, key, h, sale_id, day, total, cost_total, why, method,
              (notes or "").strip() or None, entry_id, by.id))
+        if settlement:
+            con.execute(
+                "INSERT INTO installment_return_adjustments "
+                "(return_id,contract_id,principal,markup,refunded,receivable_reduced) "
+                "VALUES (?,?,?,?,?,?)",
+                (return_id, settlement.contract_id, total, settlement.markup, settlement.refunded,
+                 settlement.receivable_reduced))
+            for method_name, amount in settlement.refunds:
+                con.execute(
+                    "INSERT INTO installment_return_refunds (return_id,method,amount) VALUES (?,?,?)",
+                    (return_id, method_name, amount))
+            for row_id, amount in settlement.allocations:
+                con.execute(
+                    "INSERT INTO installment_return_allocations (return_id,row_id,amount) VALUES (?,?,?)",
+                    (return_id, row_id, amount))
         for no, (ln, item_id, _kind, qty, value, cost, layer_take, lot_take) in enumerate(shaped, start=1):
             cur = con.execute(
                 "INSERT INTO sale_return_lines (return_id, line_no, sale_line_id, qty, condition, value, cost) "
