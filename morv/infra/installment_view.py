@@ -76,14 +76,16 @@ def collection_view(con: sqlite3.Connection, contract_id: int, today: str | None
     number, sale_number, cust_name, cust_mobile, nid, months, instalments_total = head
     raw = con.execute(
         "SELECT r.id, r.no, r.due_date, r.amount, coalesce((SELECT sum(l.amount) FROM installment_payment_lines l "
-        "WHERE l.row_id = r.id), 0) FROM installment_rows r WHERE r.contract_id=? ORDER BY r.no", (contract_id,)
+        "WHERE l.row_id = r.id), 0), coalesce((SELECT sum(a.amount) FROM installment_return_allocations a "
+        "WHERE a.row_id=r.id),0) FROM installment_rows r WHERE r.contract_id=? ORDER BY r.no", (contract_id,)
     ).fetchall()
     rows, paid_total, overdue_count, overdue_amount, next_due = [], 0, 0, 0, None
-    for _, no, due_date, amount, paid in raw:
+    for _, no, due_date, original, paid, canceled in raw:
+        amount = original - canceled
         paid_total += paid
         remaining = amount - paid
         if remaining <= 0:
-            status, tone = "مدفوع", "ok"
+            status, tone = ("مُسوّى بالمرتجع" if canceled else "مدفوع"), "ok"
         elif due_date < today:
             days = (date.fromisoformat(today) - date.fromisoformat(due_date)).days
             status = (("جزئي · " if paid else "") + f"متأخر {days} يومًا")
@@ -98,7 +100,7 @@ def collection_view(con: sqlite3.Connection, contract_id: int, today: str | None
             next_due = (due_date, remaining)
         rows.append(CollectRow(no, due_date, amount, paid, remaining, status, tone))
     return CollectionView(contract_id, number, sale_number, cust_name, cust_mobile, nid,
-                          instalments_total // months, paid_total, instalments_total - paid_total,
+                          instalments_total // months, paid_total, sum(r.remaining for r in rows),
                           overdue_count, overdue_amount, next_due, tuple(rows))
 
 
@@ -170,11 +172,15 @@ def list_view(con: sqlite3.Connection, query: str = "", filter_key: str = "all",
         "WHERE (? = '' OR cu.name LIKE ? OR cu.mobile LIKE ? OR c.number LIKE ?) ORDER BY c.id DESC",
         (query, _like(query), _like(query), _like(query))).fetchall()
     by_contract: dict[int, list[tuple]] = {}
-    for cid, no, due_date, amount, paid in con.execute(
+    for cid, no, due_date, original, paid, canceled in con.execute(
             "SELECT r.contract_id, r.no, r.due_date, r.amount, coalesce((SELECT sum(l.amount) "
-            "FROM installment_payment_lines l WHERE l.row_id = r.id), 0) FROM installment_rows r "
-            "ORDER BY r.contract_id, r.no"):
-        by_contract.setdefault(cid, []).append((no, due_date, amount, paid))
+            "FROM installment_payment_lines l WHERE l.row_id = r.id), 0), "
+            "coalesce((SELECT sum(a.amount) FROM installment_return_allocations a WHERE a.row_id=r.id),0) "
+            "FROM installment_rows r ORDER BY r.contract_id, r.no"):
+        by_contract.setdefault(cid, []).append((no, due_date, original - canceled, paid))
+    returned = dict(con.execute(
+        "SELECT contract_id, sum(principal) FROM installment_return_adjustments GROUP BY contract_id"))
+    sale_prices = dict(con.execute("SELECT id, cash_price FROM installment_contracts"))
 
     late_count = late_amount = today_count = today_amount = 0
     week_count = week_amount = active_count = active_amount = 0
@@ -182,12 +188,14 @@ def list_view(con: sqlite3.Connection, query: str = "", filter_key: str = "all",
     for cid, number, name, mobile, instalments_total in contracts:
         rows = by_contract.get(cid, [])
         paid_total = sum(p for _, _, _, p in rows)
-        remaining_total = instalments_total - paid_total
+        remaining_total = sum(a - p for _, _, a, p in rows)
         overdue_amt = sum(a - p for _, d, a, p in rows if a > p and d < today)
         due_today_amt = sum(a - p for _, d, a, p in rows if a > p and d == today)
         due_week_amt = sum(a - p for _, d, a, p in rows if a > p and today < d <= week_end)
         next_open = next(((d, a - p) for _, d, a, p in rows if a > p), None)
         status, tone, cat = _category(overdue_amt, due_today_amt, remaining_total)
+        if returned.get(cid, 0) >= sale_prices[cid]:
+            status, tone, cat = "مرتجع بالكامل", "ok", "done"
         paid_rows = sum(1 for _, _, a, p in rows if a > 0 and p >= a)
 
         if overdue_amt > 0:
