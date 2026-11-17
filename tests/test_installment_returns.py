@@ -171,6 +171,23 @@ class InstallmentReturnTest(_Synthetic):
         self.assertEqual(installments.remaining_rows(self.con, contract.id), [])
         self.assertEqual(installment_view.list_view(self.con).rows[0].status, "مرتجع بالكامل")
 
+    def test_due_today_alert_ignores_returned_contract_when_naming_customer(self):
+        from morv.infra.dashboard_view import _due_alerts
+
+        returned_sale = self.sale()
+        self.contract(returned_sale)
+        self.ret(returned_sale)
+        self.customer = self.con.execute(
+            "INSERT INTO customers (name,name_norm,mobile,credit_limit) "
+            "VALUES ('عميل نشط','عميل نشط','01000000022',0)").lastrowid
+        active_sale = self.sale()
+        self.contract(active_sale)
+        alerts = _due_alerts(self.con, "2026-12-13")
+        today = [a for a in alerts if a.kind == "due_today"]
+        self.assertEqual(len(today), 1)
+        self.assertEqual(today[0].count, 1)
+        self.assertEqual(today[0].detail, "عميل نشط")
+
     def test_replay_is_idempotent_including_settlement_and_refund(self):
         sale = self.sale()
         contract = self.contract(sale)
