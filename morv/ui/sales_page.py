@@ -6,8 +6,10 @@ from morv.core.text import ltr
 from morv.infra import sale_view
 from morv.ui.listpage import ListPage
 from morv.ui.sale_return_dialog import SaleReturnDialog
+from morv.ui.widgets import muted
 
-PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة", "transfer": "تحويل / محفظة", "wallet": "محفظة"}
+PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة", "transfer": "تحويل / محفظة", "wallet": "محفظة",
+                  "installment": "تقسيط"}
 
 
 class SalesPage(ListPage):
@@ -61,9 +63,12 @@ class SalesPage(ListPage):
             for r in inv.returns:
                 self.kv(ltr(r[0]), f"{ltr(r[1])} · {ltr(fmt(r[2]))} · {r[3]}")
         if self.can_return():
-            btn = QPushButton("مرتجع من الفاتورة")
-            btn.clicked.connect(lambda: self.open_return(row_id))
-            self.actions(btn)
+            if any(line.available > 0 for line in sale_view.returnable_lines(self.session.con, row_id)):
+                btn = QPushButton("مرتجع من الفاتورة")
+                btn.clicked.connect(lambda: self.open_return(row_id))
+                self.actions(btn)
+            else:
+                self.actions(muted("الفاتورة مرتجعة بالكامل"))
 
     def can_return(self) -> bool:
         return self.session.can("sales.return")
