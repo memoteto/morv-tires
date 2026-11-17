@@ -285,6 +285,83 @@ class MigrationOfExistingData(unittest.TestCase):
 
 @require_qt()
 class InstallmentReturnUiTest(_Synthetic):
+    def test_sales_preview_hides_return_action_after_full_return_and_translates_payment(self):
+        from PySide6.QtWidgets import QLabel, QPushButton
+        from morv.ui.sales_page import SalesPage
+        from morv.ui.session import Session
+
+        app = get_app()
+        sale = self.sale()
+        self.contract(sale)
+        page = SalesPage(Session(self.con, self.admin))
+        try:
+            page.show_preview_id(sale.id)
+            self.assertTrue(any(b.text() == "مرتجع من الفاتورة"
+                                for b in page.preview.findChildren(QPushButton)))
+            texts = [w.text() for w in page.preview.findChildren(QLabel)]
+            self.assertIn("تقسيط", texts)
+            self.assertNotIn("installment", texts)
+        finally:
+            page.deleteLater()
+            app.processEvents()
+
+        self.ret(sale)
+        page = SalesPage(Session(self.con, self.admin))
+        try:
+            page.show_preview_id(sale.id)
+            self.assertFalse(any(b.text() == "مرتجع من الفاتورة"
+                                 for b in page.preview.findChildren(QPushButton)))
+            self.assertIn("الفاتورة مرتجعة بالكامل",
+                          [w.text() for w in page.preview.findChildren(QLabel)])
+        finally:
+            page.deleteLater()
+            app.processEvents()
+
+    def test_contract_preview_collection_button_obeys_remaining_balance(self):
+        from PySide6.QtWidgets import QLabel, QPushButton
+        from morv.ui.installments_page import InstallmentsPage
+        from morv.ui.session import Session
+
+        app = get_app()
+        sale = self.sale()
+        contract = self.contract(sale)
+        def inspect():
+            page = InstallmentsPage(Session(self.con, self.admin))
+            try:
+                page.list_page.show_preview_id(contract.id)
+                buttons = [b.text() for b in page.list_page.preview.findChildren(QPushButton)]
+                labels = [l.text() for l in page.list_page.preview.findChildren(QLabel)]
+                return buttons, labels
+            finally:
+                page.deleteLater()
+                app.processEvents()
+
+        active_buttons, _ = inspect()
+        self.assertIn("تحصيل قسط", active_buttons)
+        self.ret(sale)
+        settled_buttons, settled_labels = inspect()
+        self.assertNotIn("تحصيل قسط", settled_buttons)
+        self.assertIn("لا توجد أقساط قابلة للتحصيل", settled_labels)
+
+    def test_partial_return_keeps_collection_action_when_balance_remains(self):
+        from PySide6.QtWidgets import QPushButton
+        from morv.ui.installments_page import InstallmentsPage
+        from morv.ui.session import Session
+
+        app = get_app()
+        sale = self.sale(qty=2)
+        contract = self.contract(sale)
+        self.ret(sale, qty=1)
+        self.assertTrue(installments.remaining_rows(self.con, contract.id))
+        page = InstallmentsPage(Session(self.con, self.admin))
+        try:
+            page.list_page.show_preview_id(contract.id)
+            self.assertIn("تحصيل قسط",
+                          [b.text() for b in page.list_page.preview.findChildren(QPushButton)])
+        finally:
+            page.deleteLater()
+            app.processEvents()
+
     def test_return_dialog_shows_preview_of_actual_refund_and_debt(self):
         from PySide6.QtCore import QEvent
         from morv.ui.sale_return_dialog import SaleReturnDialog
