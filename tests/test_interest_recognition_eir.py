@@ -240,12 +240,13 @@ class HistoricMigrationTest(unittest.TestCase):
             migrate(con, migrations[:13])
             self.assertEqual(current_version(con), 13)
             before = tuple(con.execute("SELECT version, checksum FROM schema_migrations ORDER BY version"))
-            self.assertEqual(migrate(con), [14])
+            self.assertEqual(migrate(con, migrations[:14]), [14])
             self.assertEqual(current_version(con), 14)
             self.assertEqual(tuple(con.execute(
                 "SELECT version, checksum FROM schema_migrations WHERE version<=13 ORDER BY version")), before)
             self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
             self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(migrate(con), [15])
             self.assertEqual(migrate(con), [])
         finally:
             if con is not None:
