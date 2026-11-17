@@ -49,7 +49,7 @@ class InstallmentMigrationGuardTest(unittest.TestCase):
         migrations = load_migrations()
         self.assertEqual(migrations[-1].version, 15)
         self.assertEqual(migrations[-1].name, "installment_modifications")
-        self.assertEqual(migrations[13].name, "interest_eir"
+        self.assertEqual(migrations[13].name, "interest_eir")
         self.assertEqual(migrations[12].name, "installment_returns")
         self.assertEqual(migrations[11].name, "installment_payments")
         names = {r[0] for r in self.con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
