@@ -12,6 +12,7 @@ from morv.core import security
 from morv.infra import backup, settings
 from morv.ui import icons, theme
 from morv.ui.customers_page import CustomersPage
+from morv.ui.dashboard_page import DashboardPage
 from morv.ui.installments_page import InstallmentsPage
 from morv.ui.inventory_page import InventoryPage
 from morv.ui.purchases_page import PurchasesPage
@@ -33,7 +34,7 @@ SIDE_NARROW = 72    # sidebar width when collapsed to icons
 # - Settings holds backup.
 # Phase numbers as in the plan document; 0 means built.
 NAV = [
-    ("home", "الرئيسية", "home", 6),
+    ("home", "الرئيسية", "home", 0),
     ("pos", "نقطة البيع", "pos", 4),
     ("sales", "المبيعات", "sales", 4),
     ("purchases", "المشتريات", "purchases", 3),
@@ -81,7 +82,12 @@ class MainWindow(QMainWindow):
                     "inventory": InventoryPage, "purchases": PurchasesPage, "sales": SalesPage,
                     "pos": PosPage, "installments": InstallmentsPage}
         for key, _title, _icon, phase in NAV:
-            page = builders[key](session) if key in builders else placeholder(phase)
+            if key == "home":
+                page = DashboardPage(session, on_navigate=self.go_key)
+            elif key in builders:
+                page = builders[key](session)
+            else:
+                page = placeholder(phase)
             self.pages[key] = page
             self.stack.addWidget(page)
         self.pages["pos"].contract_needed.connect(self.open_contract)
