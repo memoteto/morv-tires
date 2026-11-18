@@ -313,6 +313,42 @@ class CustomerStatementUiTest(unittest.TestCase):
         self.assertEqual(dlg.statement.closing, 100000)
         dlg.close()
 
+    def test_compact_calendars_and_single_row_filters(self):
+        from PySide6.QtCore import QPoint
+        from PySide6.QtWidgets import QCalendarWidget
+
+        dlg = self.dialog()
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("custom"))
+        dlg.show()
+        self.app.processEvents()
+        self.assertTrue(dlg.date_controls.isVisibleTo(dlg))
+        self.assertEqual(dlg.period_filter.mapTo(dlg, QPoint()).y(),
+                         dlg.date_from.mapTo(dlg, QPoint()).y())
+        self.assertEqual(dlg.movement_filter.mapTo(dlg, QPoint()).y(),
+                         dlg.date_to.mapTo(dlg, QPoint()).y())
+        for edit in (dlg.date_from, dlg.date_to):
+            calendar = edit.calendarWidget()
+            self.assertIsNotNone(calendar)
+            self.assertEqual(calendar.minimumSize().width(), 316)
+            self.assertEqual(calendar.maximumSize().width(), 316)
+            self.assertEqual(calendar.minimumSize().height(), 272)
+            self.assertEqual(calendar.maximumSize().height(), 272)
+            self.assertEqual(calendar.verticalHeaderFormat(),
+                             QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+            self.assertTrue(edit.calendarPopup())
+        dlg.close()
+
+    def test_customer_phone_stays_below_name_at_the_right(self):
+        dlg = self.dialog()
+        dlg.show()
+        self.app.processEvents()
+        name_right = dlg.customer_name_label.mapTo(
+            dlg, dlg.customer_name_label.rect().topRight()).x()
+        phone_right = dlg.strip.mapTo(dlg, dlg.strip.rect().topRight()).x()
+        self.assertLessEqual(abs(name_right - phone_right), 2)
+        self.assertLess(dlg.customer_name_label.y(), dlg.strip.y())
+        dlg.close()
+
     def test_statement_table_scrolls_without_moving_controls(self):
         from PySide6.QtCore import QPoint
         dlg = self.dialog()

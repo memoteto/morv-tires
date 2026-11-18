@@ -1,7 +1,7 @@
 """Customer statement dialog: period, totals and the ledger movements of one customer."""
 from PySide6.QtCore import QDate, Qt
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDateEdit, QFrame, QHBoxLayout, QHeaderView, QLabel,
-                               QSizePolicy, QStackedWidget, QTableView, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QCalendarWidget, QComboBox, QDateEdit, QFrame, QHBoxLayout,
+                               QHeaderView, QLabel, QSizePolicy, QStackedWidget, QTableView, QVBoxLayout, QWidget)
 
 from morv.core.money import MoneyError, fmt
 from morv.core.text import ltr
@@ -23,8 +23,8 @@ class CustomerStatementDialog(Modal):
         self.customer_name_label = QLabel(customer_name)
         self.customer_name_label.setObjectName("statementCustomerName")
         self.strip = muted("")
-        identity.addWidget(self.customer_name_label)
-        identity.addWidget(self.strip)
+        identity.addWidget(self.customer_name_label, 0, Qt.AlignmentFlag.AlignLeading)
+        identity.addWidget(self.strip, 0, Qt.AlignmentFlag.AlignLeading)
         self.body.addLayout(identity)
 
         filters = QHBoxLayout()
@@ -34,16 +34,16 @@ class CustomerStatementDialog(Modal):
                            ("previous", "الشهر السابق"), ("custom", "فترة مخصصة")):
             self.period_filter.addItem(title, key)
         self.period_filter.setMinimumWidth(185)
+        self.period_filter.setObjectName("statementFilter")
         self.movement_filter = QComboBox()
         for key, title in (("all", "جميع الحركات"), ("sale", "فواتير البيع الآجل"),
                            ("return", "مرتجعات البيع"), ("debit", "الحركات المدينة"),
                            ("credit", "الحركات الدائنة")):
             self.movement_filter.addItem(title, key)
         self.movement_filter.setMinimumWidth(200)
+        self.movement_filter.setObjectName("statementFilter")
         filters.addWidget(field("الفترة الزمنية", self.period_filter))
         filters.addWidget(field("نوع الحركة", self.movement_filter))
-        filters.addStretch(1)
-        self.body.addLayout(filters)
 
         self.date_controls = QWidget()
         dates = QHBoxLayout(self.date_controls)
@@ -60,12 +60,19 @@ class CustomerStatementDialog(Modal):
             edit.setMinimumWidth(155)
             edit.setMaximumWidth(185)
             edit.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
+            calendar = edit.calendarWidget()
+            calendar.setObjectName("statementCalendar")
+            calendar.setFixedSize(316, 272)
+            calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+            calendar.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
+            calendar.setGridVisible(False)
         self.date_from.setDate(QDate(today.year(), today.month(), 1))
         self.date_to.setDate(today)
         dates.addWidget(field("من تاريخ", self.date_from))
         dates.addWidget(field("إلى تاريخ", self.date_to))
-        dates.addStretch(1)
-        self.body.addWidget(self.date_controls)
+        filters.addWidget(self.date_controls)
+        filters.addStretch(1)
+        self.body.addLayout(filters)
         self.date_controls.hide()
 
         kpis = QHBoxLayout()
