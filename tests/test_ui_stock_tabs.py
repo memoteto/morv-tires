@@ -96,7 +96,7 @@ class StockTabsTest(unittest.TestCase):
         self.assertEqual(kinds, ["استلام", "صرف"])
         qty = [table.model().data(table.model().index(i, 1))
                for i in range(table.model().rowCount())]
-        self.assertEqual(qty, [ltr("2"), ltr("1")])
+        self.assertEqual(qty, [ltr("2"), ltr("-1")])
 
     def test_cashier_sees_quantities_but_not_costs(self):
         lots = self.lots_page(self.cashier_session)
