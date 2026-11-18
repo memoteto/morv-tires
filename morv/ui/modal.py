@@ -9,8 +9,10 @@ from morv.ui.widgets import Notice, primary_button
 
 
 class Modal(QDialog):
-    def __init__(self, title: str, parent=None, width: int = 560):
+    def __init__(self, title: str, parent=None, width: int = 560, *,
+                 table_mode: bool = False, height: int = 680):
         super().__init__(parent)
+        self.table_mode = table_mode
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setModal(True)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)   # so the rounded corners show
@@ -47,19 +49,25 @@ class Modal(QDialog):
         h.addWidget(self.close_btn)
         col.addWidget(self.header)
 
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Prefers the content size; the maximum height then brings the scrollbar
-        self.scroll.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
+        self.scroll = None
+        if not table_mode:
+            self.scroll = QScrollArea()
+            self.scroll.setWidgetResizable(True)
+            self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+            self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            # Prefers the content size; the maximum height then brings the scrollbar
+            self.scroll.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
         body_widget = QWidget()
         body_widget.setObjectName("modalBody")
         self.body = QVBoxLayout(body_widget)
         self.body.setContentsMargins(22, 16, 22, 16)
         self.body.setSpacing(12)
-        self.scroll.setWidget(body_widget)
-        col.addWidget(self.scroll, 1)
+        if table_mode:
+            # The table scrolls itself; the other body controls must remain stationary.
+            col.addWidget(body_widget, 1)
+        else:
+            self.scroll.setWidget(body_widget)
+            col.addWidget(self.scroll, 1)
 
         self.notice = Notice()
         notice_wrap = QWidget()
@@ -80,6 +88,8 @@ class Modal(QDialog):
         screen = QGuiApplication.primaryScreen()
         if screen:
             self.setMaximumHeight(screen.availableGeometry().height() - 60)
+        if table_mode:
+            self.setFixedHeight(min(height, self.maximumHeight()))
         QShortcut(QKeySequence("Esc"), self, activated=self.reject)
 
     def add_footer(self, primary_text: str, on_primary, secondary_text: str = "إلغاء") -> QPushButton:
@@ -114,7 +124,8 @@ class Modal(QDialog):
 
     def showEvent(self, e) -> None:
         super().showEvent(e)
-        self.adjustSize()
+        if not self.table_mode:
+            self.adjustSize()
         anchor = self.parentWidget().window() if self.parentWidget() else None
         geo = anchor.frameGeometry() if anchor else QGuiApplication.primaryScreen().availableGeometry()
         self.move(geo.center() - self.rect().center())
