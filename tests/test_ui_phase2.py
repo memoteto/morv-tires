@@ -267,27 +267,34 @@ class CustomerStatementUiTest(unittest.TestCase):
         self.assertEqual(dlg.statement.closing, 100000)
 
     def test_period_before_the_sale_shows_nothing(self):
+        from PySide6.QtCore import QDate
         dlg = self.dialog()
-        dlg.date_from.setText("2026-05-01")
-        dlg.date_to.setText("2026-06-01")
-        dlg.reload()
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("custom"))
+        dlg.date_from.setDate(QDate(2026, 5, 1))
+        dlg.date_to.setDate(QDate(2026, 6, 1))
         self.assertEqual(len(dlg.model.rows), 0)
         self.assertEqual(dlg.statement.opening, 100000)
-        self.assertTrue(dlg.empty_label.isVisibleTo(dlg))
+        self.assertIs(dlg.results.currentWidget(), dlg.empty_panel)
 
     def test_bad_date_is_refused_without_breaking_the_view(self):
+        from PySide6.QtCore import QDate
         dlg = self.dialog()
-        dlg.date_from.setText("2026-13-99")
-        dlg.reload()
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("custom"))
+        dlg.date_from.setDate(QDate(2026, 8, 1))
+        dlg.date_to.setDate(QDate(2026, 1, 1))
         self.assertEqual(len(dlg.model.rows), 1)
+        self.assertIn("تاريخ البداية بعد تاريخ النهاية", dlg.notice.text())
 
     def test_statement_layout_keeps_dates_and_opening_before_table(self):
         from PySide6.QtCore import QPoint
         from PySide6.QtWidgets import QScrollArea
         dlg = self.dialog()
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("custom"))
         dlg.show()
         self.app.processEvents()
         self.assertTrue(dlg.table_mode)
+        self.assertTrue(dlg.date_from.calendarPopup())
+        self.assertTrue(dlg.date_controls.isVisibleTo(dlg))
         self.assertIsNone(dlg.scroll)
         self.assertEqual(dlg.findChildren(QScrollArea), [])
         self.assertEqual(dlg.date_from.mapTo(dlg, QPoint()).y(),
@@ -323,3 +330,58 @@ class CustomerStatementUiTest(unittest.TestCase):
         self.assertTrue(dlg.footer.isVisibleTo(dlg))
         self.assertTrue(dlg.opening_label.isVisibleTo(dlg))
         dlg.close()
+
+    def test_presets_query_the_expected_dates(self):
+        from PySide6.QtCore import QDate
+        dlg = self.dialog()
+        today = QDate.currentDate()
+        start = QDate(today.year(), today.month(), 1)
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("today"))
+        self.assertEqual(dlg.statement.date_from, today.toString("yyyy-MM-dd"))
+        self.assertEqual(dlg.statement.date_to, today.toString("yyyy-MM-dd"))
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("month"))
+        self.assertEqual(dlg.statement.date_from, start.toString("yyyy-MM-dd"))
+        self.assertEqual(dlg.statement.date_to, today.toString("yyyy-MM-dd"))
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("previous"))
+        self.assertEqual(dlg.statement.date_from, start.addMonths(-1).toString("yyyy-MM-dd"))
+        self.assertEqual(dlg.statement.date_to, start.addDays(-1).toString("yyyy-MM-dd"))
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("all"))
+        self.assertEqual((dlg.statement.date_from, dlg.statement.date_to), ("", ""))
+
+    def test_type_filter_does_not_change_financial_totals(self):
+        dlg = self.dialog()
+        original = (dlg.kpi_debit.text(), dlg.kpi_credit.text(), dlg.kpi_balance.text())
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("sale"))
+        self.assertEqual(len(dlg.model.rows), 1)
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("return"))
+        self.assertEqual(len(dlg.model.rows), 0)
+        self.assertIs(dlg.results.currentWidget(), dlg.empty_panel)
+        self.assertEqual((dlg.kpi_debit.text(), dlg.kpi_credit.text(), dlg.kpi_balance.text()), original)
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("debit"))
+        self.assertEqual(len(dlg.model.rows), 1)
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("credit"))
+        self.assertEqual(len(dlg.model.rows), 0)
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("all"))
+        self.assertEqual(len(dlg.model.rows), 1)
+        self.assertIs(dlg.results.currentWidget(), dlg.view)
+
+    def test_type_filter_works_with_real_credit_return(self):
+        from morv.infra import sale_returns
+        from morv.infra.sale_returns import ReturnLineIn
+        sale_id = self.con.execute("SELECT id FROM sales WHERE customer_id=?", (self.cust,)).fetchone()[0]
+        line_id = self.con.execute("SELECT id FROM sale_lines WHERE sale_id=?", (sale_id,)).fetchone()[0]
+        sale_returns.post_return(
+            self.con, self.admin, request_key="ui-st-return-01", sale_id=sale_id,
+            lines=[ReturnLineIn(line_id, 1)], reason="إلغاء الخدمة", return_date="2026-02-05")
+        dlg = self.dialog()
+        self.assertEqual(len(dlg.model.rows), 2)
+        self.assertEqual(dlg.statement.closing, 0)
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("return"))
+        self.assertEqual(len(dlg.model.rows), 1)
+        self.assertEqual(dlg.model.rows[0][2], "مرتجع بيع")
+        self.assertEqual(dlg.model.rows[0][5], 0)
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("credit"))
+        self.assertEqual(len(dlg.model.rows), 1)
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("all"))
+        self.assertEqual(len(dlg.model.rows), 2)
+        self.assertEqual(dlg.statement.closing, 0)

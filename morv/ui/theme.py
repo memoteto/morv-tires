@@ -142,6 +142,20 @@ QCheckBox::indicator {{ width:18px; height:18px; }}
 QListWidget#userList {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:10px; }}
 QListWidget#userList::item {{ padding:10px; border-radius:8px; }}
 QListWidget#userList::item:selected {{ background:{t['primary_soft']}; color:{t['text']}; }}
+QDateEdit#statementDate {{ background:{t['surface']}; color:{t['text']};
+                              border:1px solid {t['border_strong']}; border-radius:8px;
+                              min-height:38px; padding:0 8px; }}
+QDateEdit#statementDate:focus {{ border:2px solid {t['primary']}; }}
+QCalendarWidget QWidget#qt_calendar_navigationbar {{ background:{t['surface2']}; }}
+QCalendarWidget QToolButton {{ color:{t['text']}; background:{t['surface2']}; border:0; }}
+QCalendarWidget QAbstractItemView {{ background:{t['surface']}; color:{t['text']};
+                                     selection-background-color:{t['primary']};
+                                     selection-color:{t['on_primary']}; }}
+QLabel#statementCustomerName {{ font-size:{t['fs']+2}px; font-weight:700; }}
+QFrame#statementKpiCard {{ background:{t['surface2']}; border:1px solid {t['border']};
+                           border-radius:10px; }}
+QLabel#statementKpiValue {{ font-size:{t['fs']+3}px; font-weight:700; }}
+QLabel#statementSectionTitle, QLabel#statementEmptyTitle {{ font-weight:700; }}
 QFrame#modalFrame {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:14px; }}
 QWidget#modalHeader {{ background:{t['surface2']}; border-top-left-radius:14px; border-top-right-radius:14px; border-bottom:1px solid {t['border']}; }}
 QLabel#modalTitle {{ font-size:{t['fs']+2}px; font-weight:700; }}
