@@ -82,13 +82,20 @@ class StockTabsTest(unittest.TestCase):
         self.assertEqual([r[4] for r in page.model.rows], ["2124"])
 
     def test_lot_preview_shows_movements(self):
-        from PySide6.QtWidgets import QLabel
+        from PySide6.QtWidgets import QTableView
         page = self.lots_page()
         row = next(r for r in page.model.rows if r[4] == "2024")
         page.show_preview(row)
-        texts = [lb.text() for lb in page.preview_body.findChildren(QLabel)]
-        self.assertTrue(any("استلام" in t for t in texts))
-        self.assertTrue(any("صرف" in t for t in texts))
+        table = page.preview_body.findChild(QTableView, "summaryTable")
+        self.assertIsNotNone(table)
+        self.assertEqual(table.model().columnCount(), 3)
+        self.assertEqual(table.model().rowCount(), 2)
+        kinds = [table.model().data(table.model().index(i, 0))
+                 for i in range(table.model().rowCount())]
+        self.assertEqual(kinds, ["استلام", "صرف"])
+        qty = [table.model().data(table.model().index(i, 1))
+               for i in range(table.model().rowCount())]
+        self.assertEqual(qty, ["2", "1"])
 
     def test_cashier_sees_quantities_but_not_costs(self):
         lots = self.lots_page(self.cashier_session)
