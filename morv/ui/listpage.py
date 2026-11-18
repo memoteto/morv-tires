@@ -145,11 +145,21 @@ class ListPage(QWidget):
         self.preview.setFixedWidth(max(280, min(360, avail_w // 4)))
         pv = QVBoxLayout(self.preview)
         pv.setContentsMargins(16, 12, 16, 16)
+        # Fixed header: identity stays visible while only the details scroll.
         top = QHBoxLayout()
-        top.addWidget(muted("المعاينة"), 1)
-        close = QPushButton("إغلاق")
-        close.clicked.connect(self.hide_preview)
-        top.addWidget(close)
+        header_text = QVBoxLayout()
+        header_text.setSpacing(4)
+        self.preview_title = QLabel("المعاينة")
+        self.preview_title.setObjectName("cardTitle")
+        self.preview_title.setWordWrap(True)
+        self.preview_subtitle = muted("")
+        self.preview_subtitle.hide()
+        header_text.addWidget(self.preview_title)
+        header_text.addWidget(self.preview_subtitle)
+        top.addLayout(header_text, 1)
+        self.preview_close = QPushButton("إغلاق")
+        self.preview_close.clicked.connect(self.hide_preview)
+        top.addWidget(self.preview_close, 0, Qt.AlignmentFlag.AlignTop)
         pv.addLayout(top)
         self.preview_scroll = QScrollArea()
         self.preview_scroll.setWidgetResizable(True)
@@ -159,6 +169,14 @@ class ListPage(QWidget):
         self.preview_layout.setContentsMargins(0, 0, 0, 0)
         self.preview_scroll.setWidget(self.preview_body)
         pv.addWidget(self.preview_scroll, 1)
+
+        # Fixed footer: actions are separate from the scrollable details.
+        self.preview_footer = QWidget()
+        self.preview_footer_layout = QVBoxLayout(self.preview_footer)
+        self.preview_footer_layout.setContentsMargins(0, 8, 0, 0)
+        self.preview_footer_layout.setSpacing(8)
+        self.preview_footer.hide()
+        pv.addWidget(self.preview_footer)
         self.preview.hide()
         body.addWidget(self.preview)
         root.addLayout(body, 1)
@@ -230,9 +248,19 @@ class ListPage(QWidget):
             item = self.preview_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+        self.preview_footer.hide()
+        while self.preview_footer_layout.count():
+            item = self.preview_footer_layout.takeAt(0)
+            if item.widget():
+                item.widget().hide()
+                item.widget().deleteLater()
+        self.preview_title.setText("المعاينة")
+        self.preview_subtitle.clear()
+        self.preview_subtitle.hide()
         self.build_preview(row_id)
         self.preview_layout.addStretch(1)
         self.preview.show()
+        self.preview_scroll.verticalScrollBar().setValue(0)
 
     def hide_preview(self) -> None:
         self.current_id = None
@@ -257,18 +285,19 @@ class ListPage(QWidget):
         self.preview_layout.addWidget(w)
 
     def heading(self, text: str, sub: str = "") -> None:
-        h = QLabel(text)
-        h.setObjectName("cardTitle")
-        h.setWordWrap(True)
-        self.preview_layout.addWidget(h)
-        if sub:
-            self.preview_layout.addWidget(muted(sub))
+        self.preview_title.setText(text)
+        self.preview_subtitle.setText(sub)
+        self.preview_subtitle.setVisible(bool(sub))
 
     def actions(self, *buttons) -> None:
+        if not buttons:
+            return
         row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
         for b in buttons:
             row.addWidget(b)
         row.addStretch(1)
         w = QWidget()
         w.setLayout(row)
-        self.preview_layout.addWidget(w)
+        self.preview_footer_layout.addWidget(w)
+        self.preview_footer.show()
