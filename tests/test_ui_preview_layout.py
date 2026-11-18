@@ -20,6 +20,8 @@ class PreviewLayoutTest(unittest.TestCase):
                 self.heading(f"عنوان {row_id}", f"وصف {row_id}")
                 for i in range(50 if row_id == 1 else 2):
                     self.kv(f"بيان {i}", f"قيمة {i}")
+                self.kv("التكلفة", "1,500.00")
+                self.kv("الملاحظات", "هذا شرح عربي طويل يمكن تقسيمه بين الأسطر عند ضيق المكان")
                 if row_id == 3:
                     return
                 main = QPushButton(f"أساسي {row_id}")
@@ -91,6 +93,52 @@ class PreviewLayoutTest(unittest.TestCase):
         self.page.preview_close.click()
         self.assertIsNone(self.page.current_id)
         self.assertFalse(self.page.preview.isVisibleTo(self.page))
+
+
+    def test_preview_uses_split_and_compact_modes(self):
+        from morv.ui.tokens import LAYOUT
+        self.page.resize(1280, 520)
+        self.page.show_preview_id(1)
+        self.app.processEvents()
+        self.assertTrue(self.page.list_panel.isVisibleTo(self.page))
+        self.assertGreaterEqual(self.page.list_panel.width(), LAYOUT["list_min"])
+        self.assertGreaterEqual(self.page.preview.width(), LAYOUT["preview_min"])
+        self.page.resize(880, 520)
+        self.app.processEvents()
+        self.assertFalse(self.page.list_panel.isVisibleTo(self.page))
+        self.assertGreater(self.page.preview.width(), 700)
+        self.page.hide_preview()
+        self.app.processEvents()
+        self.assertTrue(self.page.list_panel.isVisibleTo(self.page))
+        self.assertFalse(self.page.preview.isVisibleTo(self.page))
+        self.page.resize(1280, 520)
+        self.page.show_preview_id(2)
+        self.app.processEvents()
+        self.assertTrue(self.page.list_panel.isVisibleTo(self.page))
+
+    def test_values_wrap_only_when_they_are_text(self):
+        from PySide6.QtWidgets import QLabel
+        from morv.ui.tokens import LAYOUT
+        self.page.show_preview_id(1)
+        self.app.processEvents()
+        labels = self.page.preview_body.findChildren(QLabel)
+        numeric = next(w for w in labels if w.text().endswith("1,500.00"))
+        prose = next(w for w in labels if w.text().endswith("عند ضيق المكان"))
+        key = next(w for w in labels if w.text() == "التكلفة")
+        self.assertFalse(numeric.wordWrap())
+        self.assertTrue(prose.wordWrap())
+        self.assertEqual(key.maximumWidth(), LAYOUT["field_label_max"])
+
+    def test_filters_reflow_without_losing_buttons(self):
+        from PySide6.QtWidgets import QPushButton
+        for i in range(5):
+            self.page.filter_buttons[f"extra-{i}"] = QPushButton(f"اختيار طويل {i}")
+        self.page.resize(700, 520)
+        self.page._update_responsive_layout()
+        self.app.processEvents()
+        self.assertTrue(self.page._filter_layout_state[0])
+        self.assertTrue(all(self.page.tools_layout.indexOf(b) >= 0
+                            for b in self.page.filter_buttons.values()))
 
 
 if __name__ == "__main__":

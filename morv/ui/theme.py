@@ -149,6 +149,10 @@ QWidget#modalBody {{ background:{t['surface']}; }}
 QWidget#modalFooter {{ background:{t['surface2']}; border-top:1px solid {t['border']}; border-bottom-left-radius:14px; border-bottom-right-radius:14px; }}
 QScrollArea {{ background:transparent; border:0; }}
 QScrollArea > QWidget > QWidget {{ background:transparent; }}
+QScrollArea#previewScroll QScrollBar:vertical {{ background:{t['surface2']}; width:8px; margin:0; border:0; border-radius:4px; }}
+QScrollArea#previewScroll QScrollBar::handle:vertical {{ background:{t['border_strong']}; min-height:28px; border-radius:4px; }}
+QScrollArea#previewScroll QScrollBar::add-line:vertical, QScrollArea#previewScroll QScrollBar::sub-line:vertical {{ height:0; border:0; }}
+QScrollArea#previewScroll QScrollBar::add-page:vertical, QScrollArea#previewScroll QScrollBar::sub-page:vertical {{ background:transparent; }}
 QSpinBox {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px; padding:0 10px; }}
 QPlainTextEdit {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; padding:6px 10px; }}
 QToolTip {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']};

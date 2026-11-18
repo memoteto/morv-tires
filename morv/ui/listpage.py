@@ -1,12 +1,15 @@
 """Shared list-and-preview skeleton for the master-data screens."""
+import re
+
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QTimer
-from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
-                               QPushButton, QScrollArea, QTableView, QVBoxLayout, QWidget)
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
+                               QLineEdit, QPushButton, QScrollArea, QSizePolicy, QTableView, QVBoxLayout, QWidget)
 
 from morv.core.text import RLM
 from morv.infra.db.connection import ClosedDatabase
 from morv.ui import icons
+from morv.ui.tokens import LAYOUT
 from morv.ui.widgets import muted, primary_button
 
 PAGE = 300
@@ -71,8 +74,8 @@ class ListPage(QWidget):
         self.filter_key = self.filters[0][0] if self.filters else None
         self.offset = 0
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 16, 24, 16)
-        root.setSpacing(12)
+        root.setContentsMargins(LAYOUT["page_margin"], 16, LAYOUT["page_margin"], 16)
+        root.setSpacing(LAYOUT["pane_gap"])
 
         head = QHBoxLayout()
         self.count_label = muted("")
@@ -87,9 +90,16 @@ class ListPage(QWidget):
             root.addWidget(extra)
 
         body = QHBoxLayout()
-        body.setSpacing(12)
-        left = QVBoxLayout()
-        tools = QHBoxLayout()
+        body.setSpacing(LAYOUT["pane_gap"])
+        self.list_panel = QWidget()
+        self.list_panel.setMinimumWidth(0)
+        left = QVBoxLayout(self.list_panel)
+        left.setContentsMargins(0, 0, 0, 0)
+        self.tools_layout = QGridLayout()
+        self.tools_layout.setHorizontalSpacing(8)
+        self.tools_layout.setVerticalSpacing(8)
+        self._filter_layout_state = None
+        tools = self.tools_layout
         self.search = QLineEdit()
         self.search.setPlaceholderText(self.search_placeholder)
         self.search.setClearButtonEnabled(True)
@@ -99,7 +109,7 @@ class ListPage(QWidget):
         self._debounce.setInterval(200)
         self._debounce.timeout.connect(self._debounced_reload)
         self.search.textChanged.connect(lambda _t: self._debounce.start())
-        tools.addWidget(self.search, 1)
+        tools.addWidget(self.search, 0, 0)
         self.filter_buttons = {}
         for key, label in self.filters:
             b = QPushButton(label)
@@ -108,7 +118,8 @@ class ListPage(QWidget):
             b.setChecked(key == self.filter_key)
             b.clicked.connect(lambda _c=False, k=key: self.set_filter(k))
             self.filter_buttons[key] = b
-            tools.addWidget(b)
+            tools.addWidget(b, 0, len(self.filter_buttons))
+        tools.setColumnStretch(0, 1)
         left.addLayout(tools)
 
         self.model = TupleModel(self.columns, self.row_icon)
@@ -134,17 +145,14 @@ class ListPage(QWidget):
         self.empty_label.hide()
         left.addWidget(self.empty_label)
         left.addWidget(self.more_btn, 0, Qt.AlignmentFlag.AlignCenter)
-        body.addLayout(left, 3)
+        body.addWidget(self.list_panel, 3)
 
         # Preview pane, hidden until a row is clicked
         self.preview = QFrame()
         self.preview.setObjectName("card")
-        # Preview width follows the screen: 360 when wide, less when narrow
-        screen = QGuiApplication.primaryScreen()
-        avail_w = screen.availableGeometry().width() if screen else 1366
-        self.preview.setFixedWidth(max(280, min(360, avail_w // 4)))
+        self.preview.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         pv = QVBoxLayout(self.preview)
-        pv.setContentsMargins(16, 12, 16, 16)
+        pv.setContentsMargins(LAYOUT["preview_padding"], 12, LAYOUT["preview_padding"], 16)
         # Fixed header: identity stays visible while only the details scroll.
         top = QHBoxLayout()
         header_text = QVBoxLayout()
@@ -162,11 +170,13 @@ class ListPage(QWidget):
         top.addWidget(self.preview_close, 0, Qt.AlignmentFlag.AlignTop)
         pv.addLayout(top)
         self.preview_scroll = QScrollArea()
+        self.preview_scroll.setObjectName("previewScroll")
         self.preview_scroll.setWidgetResizable(True)
         self.preview_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.preview_body = QWidget()
         self.preview_layout = QVBoxLayout(self.preview_body)
         self.preview_layout.setContentsMargins(0, 0, 0, 0)
+        self.preview_layout.setSpacing(LAYOUT["field_spacing"])
         self.preview_scroll.setWidget(self.preview_body)
         pv.addWidget(self.preview_scroll, 1)
 
@@ -178,14 +188,16 @@ class ListPage(QWidget):
         self.preview_footer.hide()
         pv.addWidget(self.preview_footer)
         self.preview.hide()
-        body.addWidget(self.preview)
+        body.addWidget(self.preview, 1)
         root.addLayout(body, 1)
 
         QShortcut(QKeySequence("Ctrl+N"), self, activated=lambda: self.open_dialog(None) if self.can_edit() else None)
         QShortcut(QKeySequence("Esc"), self, activated=self.hide_preview)
         QShortcut(QKeySequence("F2"), self, activated=self.search.setFocus)
         self.current_id = None
+        self._action_groups = []
         self.reload()
+        self._update_responsive_layout()
 
     # ---------- What a subclass defines ----------
     def can_edit(self) -> bool:
@@ -206,6 +218,66 @@ class ListPage(QWidget):
     def extra_header(self) -> QWidget | None:
         """A widget placed between the add-button row and the search/table (e.g. KPI cards). None by default."""
         return None
+
+    # ---------- Responsive layout ----------
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "current_id"):
+            self._update_responsive_layout()
+
+    def _update_responsive_layout(self) -> None:
+        available = max(0, self.width() - 2 * LAYOUT["page_margin"])
+        compact = available < LAYOUT["list_min"] + LAYOUT["preview_min"] + LAYOUT["pane_gap"]
+        preview_open = self.current_id is not None and not self.preview.isHidden()
+        self.list_panel.setVisible(not (compact and preview_open))
+        if compact and preview_open:
+            self.preview.setMinimumWidth(0)
+            self.preview.setMaximumWidth(16777215)
+            preview_width = available
+        else:
+            preview_width = min(
+                LAYOUT["preview_max"],
+                max(LAYOUT["preview_min"], available * 30 // 100),
+                max(LAYOUT["preview_min"], available - LAYOUT["list_min"] - LAYOUT["pane_gap"]),
+            )
+            self.preview.setFixedWidth(preview_width)
+        list_width = (available if not preview_open or compact else
+                      max(0, available - preview_width - LAYOUT["pane_gap"]))
+        self._arrange_filters(list_width)
+        self._arrange_actions(max(0, preview_width - 2 * LAYOUT["preview_padding"]))
+
+    def _arrange_filters(self, available: int) -> None:
+        buttons = list(self.filter_buttons.values())
+        needed = LAYOUT["search_min"] + sum(b.sizeHint().width() for b in buttons) + 8 * len(buttons)
+        wrapped = bool(buttons) and available < needed
+        cols = (max(1, min(len(buttons), (available + 8) // (LAYOUT["filter_min"] + 8)))
+                if wrapped else len(buttons))
+        state = (wrapped, cols)
+        if state == self._filter_layout_state:
+            return
+        self._filter_layout_state = state
+        for w in (self.search, *buttons):
+            self.tools_layout.removeWidget(w)
+        if wrapped:
+            self.tools_layout.addWidget(self.search, 0, 0, 1, cols)
+            for i, b in enumerate(buttons):
+                self.tools_layout.addWidget(b, 1 + i // cols, i % cols)
+        else:
+            self.tools_layout.addWidget(self.search, 0, 0)
+            for i, b in enumerate(buttons):
+                self.tools_layout.addWidget(b, 0, i + 1)
+
+    def _arrange_actions(self, available: int) -> None:
+        for grid, buttons in self._action_groups:
+            needed = sum(b.sizeHint().width() for b in buttons) + 8 * (len(buttons) - 1)
+            if needed <= available:
+                slots = [(0, i, 1, 1) for i in range(len(buttons))]
+            elif len(buttons) == 3:
+                slots = [(0, 0, 1, 2), (1, 0, 1, 1), (1, 1, 1, 1)]
+            else:
+                slots = [(i, 0, 1, 1) for i in range(len(buttons))]
+            for b, (row, col, height, width) in zip(buttons, slots):
+                grid.addWidget(b, row, col, height, width)
 
     # ---------- Behaviour ----------
     def set_filter(self, key) -> None:
@@ -249,6 +321,7 @@ class ListPage(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         self.preview_footer.hide()
+        self._action_groups.clear()
         while self.preview_footer_layout.count():
             item = self.preview_footer_layout.takeAt(0)
             if item.widget():
@@ -260,22 +333,33 @@ class ListPage(QWidget):
         self.build_preview(row_id)
         self.preview_layout.addStretch(1)
         self.preview.show()
+        self._update_responsive_layout()
         self.preview_scroll.verticalScrollBar().setValue(0)
 
     def hide_preview(self) -> None:
         self.current_id = None
         self.preview.hide()
+        self.list_panel.show()
+        self._update_responsive_layout()
         self.view.clearSelection()
 
     # ---------- Preview helpers ----------
     def kv(self, key: str, value: str) -> None:
         row = QHBoxLayout()
-        row.setSpacing(10)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(12)
         k = muted(key)
-        k.setFixedWidth(118)
+        k.setMaximumWidth(LAYOUT["field_label_max"])
         k.setAlignment(Qt.AlignmentFlag.AlignLeading | Qt.AlignmentFlag.AlignTop)
-        v = QLabel(RLM + (value or "—"))
-        v.setWordWrap(True)
+        raw = value or "—"
+        v = QLabel(RLM + raw)
+        clean = raw.strip("\u2066\u2069\u200f")
+        atomic = bool(re.fullmatch(r"[A-Za-z0-9٠-٩][A-Za-z0-9٠-٩ .,:/+%()_×=\-]*", clean))
+        v.setWordWrap(not atomic)
+        if atomic:
+            v.setToolTip(clean)
+        v.setMinimumWidth(0)
+        v.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         v.setAlignment(Qt.AlignmentFlag.AlignLeading | Qt.AlignmentFlag.AlignTop)
         v.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         row.addWidget(k)
@@ -292,12 +376,12 @@ class ListPage(QWidget):
     def actions(self, *buttons) -> None:
         if not buttons:
             return
-        row = QHBoxLayout()
+        row = QGridLayout()
         row.setContentsMargins(0, 0, 0, 0)
-        for b in buttons:
-            row.addWidget(b)
-        row.addStretch(1)
+        row.setSpacing(8)
         w = QWidget()
         w.setLayout(row)
+        self._action_groups.append((row, buttons))
         self.preview_footer_layout.addWidget(w)
         self.preview_footer.show()
+        self._arrange_actions(max(0, self.preview.width() - 2 * LAYOUT["preview_padding"]))

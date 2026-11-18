@@ -15,3 +15,10 @@ DARK = dict(
     warn="#F0B94A", warn_soft="#33270D",
     side="#070C17", side_text="#C3CEE2", side_hover="#111C33", select="#21407A",
 )
+
+# Logical Qt pixels shared by all list-preview screens.
+LAYOUT = dict(
+    page_margin=24, pane_gap=12, preview_padding=16,
+    preview_min=360, preview_max=420, list_min=640,
+    search_min=190, filter_min=95, field_label_max=128, field_spacing=10,
+)
