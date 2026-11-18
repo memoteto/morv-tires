@@ -280,3 +280,46 @@ class CustomerStatementUiTest(unittest.TestCase):
         dlg.date_from.setText("2026-13-99")
         dlg.reload()
         self.assertEqual(len(dlg.model.rows), 1)
+
+    def test_statement_layout_keeps_dates_and_opening_before_table(self):
+        from PySide6.QtCore import QPoint
+        from PySide6.QtWidgets import QScrollArea
+        dlg = self.dialog()
+        dlg.show()
+        self.app.processEvents()
+        self.assertTrue(dlg.table_mode)
+        self.assertIsNone(dlg.scroll)
+        self.assertEqual(dlg.findChildren(QScrollArea), [])
+        self.assertEqual(dlg.date_from.mapTo(dlg, QPoint()).y(),
+                         dlg.date_to.mapTo(dlg, QPoint()).y())
+        self.assertLess(dlg.opening_label.mapTo(dlg, QPoint()).y(),
+                        dlg.view.mapTo(dlg, QPoint()).y())
+        self.assertTrue(dlg.opening_label.isVisibleTo(dlg))
+        self.assertTrue(dlg.footer.isVisibleTo(dlg))
+        self.assertEqual(dlg.statement.closing, 100000)
+        dlg.close()
+
+    def test_statement_table_scrolls_without_moving_controls(self):
+        from PySide6.QtCore import QPoint
+        dlg = self.dialog()
+        dlg.show()
+        self.app.processEvents()
+        dlg.model.reset_rows([
+            ("2026-02-01", f"SI-{i:06d}", "فاتورة بيع آجلة", 100000, 0, 100000)
+            for i in range(120)
+        ])
+        self.app.processEvents()
+        bar = dlg.view.verticalScrollBar()
+        self.assertGreater(bar.maximum(), 0)
+        self.assertGreater(dlg.view.height(), 120)
+        fixed = (dlg.date_from.mapTo(dlg, QPoint()),
+                 dlg.opening_label.mapTo(dlg, QPoint()),
+                 dlg.footer.mapTo(dlg, QPoint()))
+        bar.setValue(bar.maximum())
+        self.app.processEvents()
+        self.assertEqual(fixed, (dlg.date_from.mapTo(dlg, QPoint()),
+                                 dlg.opening_label.mapTo(dlg, QPoint()),
+                                 dlg.footer.mapTo(dlg, QPoint())))
+        self.assertTrue(dlg.footer.isVisibleTo(dlg))
+        self.assertTrue(dlg.opening_label.isVisibleTo(dlg))
+        dlg.close()

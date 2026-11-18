@@ -1,36 +1,48 @@
 """Customer statement dialog: period, totals and the ledger movements of one customer."""
-from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QPushButton, QTableView,
-                               QVBoxLayout)
+from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QPushButton,
+                               QSizePolicy, QTableView, QVBoxLayout)
 
 from morv.core.money import MoneyError, fmt
 from morv.core.text import ltr
 from morv.ui.listpage import TupleModel
 from morv.ui.modal import Modal
-from morv.ui.widgets import form, ltr_edit, muted, primary_button
+from morv.ui.widgets import ltr_edit, muted, primary_button
 
 
 class CustomerStatementDialog(Modal):
     def __init__(self, customer_name, load, parent=None):
-        super().__init__(f"كشف حساب — {customer_name}", parent, width=940)
+        super().__init__(f"كشف حساب — {customer_name}", parent, width=1080,
+                         table_mode=True, height=680)
         self._load = load
         self.statement = None
+        self.body.setSpacing(10)
 
-        head = form()
+        dates = QHBoxLayout()
+        dates.setSpacing(10)
         self.date_from = ltr_edit("YYYY-MM-DD")
         self.date_to = ltr_edit("YYYY-MM-DD")
+        self.date_from.setMinimumWidth(140)
+        self.date_to.setMinimumWidth(140)
+        self.date_from.setMaximumWidth(180)
+        self.date_to.setMaximumWidth(180)
         self.date_from.editingFinished.connect(self.reload)
         self.date_to.editingFinished.connect(self.reload)
-        head.addRow("من", self.date_from)
-        head.addRow("إلى", self.date_to)
-        self.body.addLayout(head)
+        dates.addWidget(QLabel("من"))
+        dates.addWidget(self.date_from)
+        dates.addSpacing(12)
+        dates.addWidget(QLabel("إلى"))
+        dates.addWidget(self.date_to)
+        dates.addStretch(1)
+        self.body.addLayout(dates)
         self.strip = muted("")
         self.body.addWidget(self.strip)
 
         kpis = QFrame()
         kpis.setObjectName("card")
         grid = QHBoxLayout(kpis)
-        grid.setContentsMargins(12, 10, 12, 10)
-        grid.setSpacing(16)
+        grid.setContentsMargins(12, 8, 12, 8)
+        grid.setSpacing(12)
+        kpis.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.kpi_debit, self.kpi_credit, self.kpi_balance = QLabel(), QLabel(), QLabel()
         self.kpi_balance.setObjectName("cardTitle")
         for title, w in (("إجمالي المستحق عليه", self.kpi_debit), ("إجمالي المسدد", self.kpi_credit),
@@ -41,7 +53,11 @@ class CustomerStatementDialog(Modal):
             cell.addWidget(w)
             grid.addLayout(cell, 1)
         self.body.addWidget(kpis)
+        self.opening_label = muted("")
+        self.body.addWidget(self.opening_label)
         self.body.addWidget(muted("المتأخر من الأقساط يظهر هنا بعد بناء التقسيط (المرحلة 5)."))
+        self.empty_label = muted("لا توجد حركات على حساب هذا العميل في هذه الفترة.")
+        self.body.addWidget(self.empty_label)
 
         self.model = TupleModel([
             ("التاريخ", lambda r: ltr(r[0])),
@@ -59,12 +75,8 @@ class CustomerStatementDialog(Modal):
         self.view.verticalHeader().setVisible(False)
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        self.view.setMinimumHeight(260)
-        self.body.addWidget(self.view)
-        self.opening_label = muted("")
-        self.body.addWidget(self.opening_label)
-        self.empty_label = muted("لا توجد حركات على حساب هذا العميل في هذه الفترة.")
-        self.body.addWidget(self.empty_label)
+        self.view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.body.addWidget(self.view, 1)
 
         close = primary_button("إغلاق")
         close.clicked.connect(self.accept)
