@@ -280,10 +280,17 @@ class CustomerStatementUiTest(unittest.TestCase):
         from PySide6.QtCore import QDate
         dlg = self.dialog()
         dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("custom"))
+        dlg.date_to.setDate(QDate(2026, 12, 1))
         dlg.date_from.setDate(QDate(2026, 8, 1))
+        previous_rows = list(dlg.model.rows)
+        previous_statement = dlg.statement
         dlg.date_to.setDate(QDate(2026, 1, 1))
-        self.assertEqual(len(dlg.model.rows), 1)
+        self.assertEqual(dlg.model.rows, previous_rows)
+        self.assertIs(dlg.statement, previous_statement)
         self.assertIn("تاريخ البداية بعد تاريخ النهاية", dlg.notice.text())
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("all"))
+        self.assertEqual(len(dlg.model.rows), 1)
+        self.assertFalse(dlg.notice.text())
 
     def test_statement_layout_keeps_dates_and_opening_before_table(self):
         from PySide6.QtCore import QPoint
