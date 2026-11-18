@@ -349,7 +349,7 @@ class ListPage(QWidget):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(12)
         k = muted(key)
-        k.setMaximumWidth(LAYOUT["field_label_max"])
+        k.setFixedWidth(LAYOUT["field_label_max"])
         k.setAlignment(Qt.AlignmentFlag.AlignLeading | Qt.AlignmentFlag.AlignTop)
         raw = value or "—"
         v = QLabel(RLM + raw)

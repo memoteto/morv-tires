@@ -22,6 +22,9 @@ class PreviewLayoutTest(unittest.TestCase):
                     self.kv(f"بيان {i}", f"قيمة {i}")
                 self.kv("التكلفة", "1,500.00")
                 self.kv("الملاحظات", "هذا شرح عربي طويل يمكن تقسيمه بين الأسطر عند ضيق المكان")
+                self.kv("حد الآجل", "لا يسمح بالآجل")
+                self.kv("تذكيرات واتساب", "لم يوافق")
+                self.kv("فواتير الشراء", "1 فاتورة · 100,000.00 جنيه")
                 if row_id == 3:
                     return
                 main = QPushButton(f"أساسي {row_id}")
@@ -128,6 +131,21 @@ class PreviewLayoutTest(unittest.TestCase):
         self.assertFalse(numeric.wordWrap())
         self.assertTrue(prose.wordWrap())
         self.assertEqual(key.maximumWidth(), LAYOUT["field_label_max"])
+
+    def test_field_labels_keep_their_column_under_value_pressure(self):
+        from PySide6.QtWidgets import QLabel
+        from morv.ui.tokens import LAYOUT
+        self.page.resize(1120, 520)
+        self.page.show_preview_id(2)
+        self.app.processEvents()
+        self.assertGreaterEqual(self.page.preview.width(), LAYOUT["preview_min"])
+        labels = self.page.preview_body.findChildren(QLabel)
+        for title in ("حد الآجل", "تذكيرات واتساب", "فواتير الشراء"):
+            key = next(w for w in labels if w.text() == title)
+            self.assertEqual(key.width(), LAYOUT["field_label_max"])
+            self.assertEqual(key.minimumWidth(), LAYOUT["field_label_max"])
+            self.assertEqual(key.maximumWidth(), LAYOUT["field_label_max"])
+            self.assertLessEqual(key.fontMetrics().horizontalAdvance(title), key.width())
 
     def test_filters_reflow_without_losing_buttons(self):
         from PySide6.QtWidgets import QPushButton
