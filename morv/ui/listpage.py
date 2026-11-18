@@ -3,7 +3,7 @@ import re
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QAbstractItemView, QBoxLayout, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
+from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QPushButton, QScrollArea, QSizePolicy, QTableView, QVBoxLayout, QWidget)
 
 from morv.core.text import RLM
@@ -69,11 +69,13 @@ class SummaryDetailRow(QWidget):
         self.value_label.setMinimumWidth(0)
         self.value_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.value_label.setToolTip(value or "—")
-        self.row = QBoxLayout(QBoxLayout.Direction.LeftToRight, self)
+        self.row = QGridLayout(self)
         self.row.setContentsMargins(0, 0, 0, 0)
         self.row.setSpacing(8)
-        self.row.addWidget(self.key_label)
-        self.row.addWidget(self.value_label, 1)
+        self.row.setColumnStretch(1, 1)
+        self.row.addWidget(self.key_label, 0, 0)
+        self.row.addWidget(self.value_label, 0, 1)
+        self._stacked = False
         self._adapt()
 
     def resizeEvent(self, event) -> None:
@@ -86,9 +88,13 @@ class SummaryDetailRow(QWidget):
         value_width = max(0, width - key_width - 8)
         text_width = self.value_label.fontMetrics().horizontalAdvance(self.value_label.text())
         stacked = width < LAYOUT["summary_field_stack_below"] or text_width > value_width * 2
-        direction = QBoxLayout.Direction.TopToBottom if stacked else QBoxLayout.Direction.LeftToRight
-        if self.row.direction() != direction:
-            self.row.setDirection(direction)
+        if stacked != self._stacked:
+            self.row.removeWidget(self.value_label)
+            if stacked:
+                self.row.addWidget(self.value_label, 1, 0, 1, 2)
+            else:
+                self.row.addWidget(self.value_label, 0, 1)
+            self._stacked = stacked
         self.row.setSpacing(5 if stacked else 8)
         self.key_label.setMaximumWidth(16777215 if stacked else key_width)
 

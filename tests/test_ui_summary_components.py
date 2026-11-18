@@ -77,13 +77,12 @@ class SharedSummaryComponentsTest(unittest.TestCase):
                          {"2", "2,500.00", "5,000.00"})
 
     def test_responsive_details_stack_long_values_without_data_loss(self):
-        from PySide6.QtWidgets import QBoxLayout
         from morv.ui.listpage import SummaryDetailRow
         detail = SummaryDetailRow("رقم فاتورة المورد", "AUTO-VERY-LONG-INVOICE-REFERENCE-1234567890")
         detail.resize(250, 90)
         detail.show()
         self.app.processEvents()
-        self.assertEqual(detail.row.direction(), QBoxLayout.Direction.TopToBottom)
+        self.assertTrue(detail._stacked)
         self.assertIn("1234567890", detail.value_label.text())
         detail.resize(470, 90)
         self.app.processEvents()

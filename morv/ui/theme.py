@@ -121,8 +121,10 @@ QLabel#summaryMetricValue {{ font-size:{t['fs']+3}px; font-weight:700; }}
 QFrame#summaryNote {{ background:{t['surface2']}; border:1px solid {t['border']};
                       border-radius:10px; }}
 QTableView#summaryTable {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:8px; }}
+QWidget#summaryDetailRow {{ background:transparent; }}
 QFrame#summaryRecord {{ background:{t['surface2']}; border:1px solid {t['border']};
                         border-radius:10px; }}
+QLabel#summaryRecordLabel {{ color:{t['muted']}; }}
 QLabel#summaryRecordTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
 QLabel#summaryRecordValue {{ font-size:{t['fs']+1}px; font-weight:600; }}
 QPushButton#danger {{ color:{t['danger']}; border-color:{t['danger']}; }}
