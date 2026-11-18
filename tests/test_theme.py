@@ -32,6 +32,25 @@ class TooltipTest(unittest.TestCase):
             self.assertGreaterEqual(contrast(bg, fg), 4.5, f"تلميح غير مقروء في الوضع {name}")
 
 
+class SummaryTableScrollbarTest(unittest.TestCase):
+    def test_vertical_scrollbar_uses_central_theme_in_both_modes(self):
+        from morv.ui.tokens import DARK, LIGHT
+
+        for name, palette in (("light", LIGHT), ("dark", DARK)):
+            css = qss_text({**palette, "fs": 14})
+            track = re.search(
+                r"QTableView#summaryTable QScrollBar:vertical\s*\{([^}]*)\}", css)
+            self.assertIsNotNone(track, name)
+            self.assertIn(f"background:{palette['surface2']}", track.group(1), name)
+            self.assertIn("width:10px", track.group(1), name)
+            handle = re.search(
+                r"QTableView#summaryTable QScrollBar::handle:vertical\s*\{([^}]*)\}", css)
+            self.assertIsNotNone(handle, name)
+            self.assertIn(f"background:{palette['border_strong']}", handle.group(1), name)
+            self.assertIn("QTableView#summaryTable QScrollBar::add-line:vertical", css)
+            self.assertIn("QTableView#summaryTable QScrollBar::add-page:vertical", css)
+
+
 class ObjectNamesTest(unittest.TestCase):
     # names used to find a widget, not to style it
     LOOKUP_ONLY = {"modal"}

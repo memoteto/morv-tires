@@ -81,6 +81,26 @@ class SharedSummaryComponentsTest(unittest.TestCase):
             self.assertEqual(amount.alignment(), right)
             self.assertFalse(amount.wordWrap())
 
+    def test_record_headers_and_values_share_center_alignment(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QFrame, QLabel
+        from morv.ui.tokens import LAYOUT
+
+        record = next(frame for frame in self.page.preview_body.findChildren(QFrame)
+                      if frame.objectName() == "summaryRecord")
+        grid = record.layout().itemAt(1).layout()
+        self.assertIsNotNone(grid)
+        for col in range(LAYOUT["summary_record_columns"]):
+            self.assertEqual(grid.columnStretch(col), 1)
+        captions = record.findChildren(QLabel, "summaryRecordLabel")
+        self.assertEqual(len(captions), 3)
+        for caption in captions:
+            value = caption.parentWidget().findChild(QLabel, "summaryRecordValue")
+            self.assertIsNotNone(value)
+            self.assertIs(value.parentWidget(), caption.parentWidget())
+            self.assertEqual(caption.alignment(), Qt.AlignmentFlag.AlignCenter)
+            self.assertEqual(value.alignment(), Qt.AlignmentFlag.AlignCenter)
+
     def test_record_cards_preserve_long_names_and_values(self):
         from PySide6.QtWidgets import QFrame, QLabel
         records = [f for f in self.page.preview_body.findChildren(QFrame)

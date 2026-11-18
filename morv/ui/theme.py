@@ -135,6 +135,18 @@ QTableView#summaryTable QScrollBar::sub-line:horizontal {{
 }}
 QTableView#summaryTable QScrollBar::add-page:horizontal,
 QTableView#summaryTable QScrollBar::sub-page:horizontal {{ background:transparent; }}
+QTableView#summaryTable QScrollBar:vertical {{
+    width:10px; background:{t['surface2']}; border:0; margin:0;
+}}
+QTableView#summaryTable QScrollBar::handle:vertical {{
+    background:{t['border_strong']}; min-height:28px; border-radius:4px;
+}}
+QTableView#summaryTable QScrollBar::add-line:vertical,
+QTableView#summaryTable QScrollBar::sub-line:vertical {{
+    height:0; border:0;
+}}
+QTableView#summaryTable QScrollBar::add-page:vertical,
+QTableView#summaryTable QScrollBar::sub-page:vertical {{ background:transparent; }}
 QScrollArea#summaryCardsScroll QScrollBar:vertical {{
     width:8px; background:{t['surface2']}; border:0; margin:0;
 }}

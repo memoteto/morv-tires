@@ -552,18 +552,24 @@ class ListPage(QWidget):
             grid = QGridLayout()
             grid.setContentsMargins(0, 0, 0, 0)
             grid.setSpacing(8)
+            for col in range(LAYOUT["summary_record_columns"]):
+                grid.setColumnStretch(col, 1)
             index = 0
             for header, value in zip(headers[1:], row[1:], strict=True):
                 if value is None or value == "":
                     continue
                 cell = QWidget()
+                cell.setMinimumWidth(0)
+                cell.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
                 column = QVBoxLayout(cell)
                 column.setContentsMargins(0, 0, 0, 0)
                 column.setSpacing(3)
                 caption = muted(header)
                 caption.setObjectName("summaryRecordLabel")
+                caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 data = QLabel(str(value))
                 data.setObjectName("summaryRecordValue")
+                data.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 data.setWordWrap(True)
                 data.setToolTip(str(value))
                 data.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
