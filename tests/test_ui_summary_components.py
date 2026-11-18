@@ -63,8 +63,10 @@ class SharedSummaryComponentsTest(unittest.TestCase):
         self.assertTrue(any(x.text().endswith("2,500.00") for x in labels))
 
     def test_summary_widgets_refresh_as_one_group(self):
+        from PySide6.QtCore import QEvent
         from PySide6.QtWidgets import QFrame
         self.page.show_preview_id(1)
+        self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         self.app.processEvents()
         self.assertEqual(len([f for f in self.page.preview_body.findChildren(QFrame)
                               if f.objectName() == "summaryMetric"]), 2)

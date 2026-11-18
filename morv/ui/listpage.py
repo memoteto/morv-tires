@@ -319,6 +319,7 @@ class ListPage(QWidget):
         while self.preview_layout.count():
             item = self.preview_layout.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
         self.preview_footer.hide()
         self._action_groups.clear()
