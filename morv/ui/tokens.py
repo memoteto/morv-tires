@@ -21,7 +21,10 @@ LAYOUT = dict(
     page_margin=24, pane_gap=12, preview_padding=16,
     preview_min=380, preview_max=480, list_min=640,
     search_min=190, filter_min=95, field_label_max=160, field_spacing=10,
-    summary_field_stack_below=300, summary_record_columns=3,
+    summary_field_stack_below=300, summary_field_label_min=80,
+    summary_field_value_min=100, summary_record_columns=3,
     summary_table_min_column=72, summary_table_max_column=250,
-    summary_table_row_height=36, summary_table_visible_rows=6,
+    summary_table_row_height=36, summary_table_datetime_row_height=52, summary_table_visible_rows=6,
+    summary_table_cards_below=580, summary_cards_min_height=144,
+    summary_cards_max_height=340, summary_cards_row_height=148,
 )

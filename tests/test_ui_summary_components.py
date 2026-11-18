@@ -90,6 +90,60 @@ class SharedSummaryComponentsTest(unittest.TestCase):
         detail.close()
         detail.deleteLater()
 
+    def test_short_arabic_detail_labels_do_not_wrap(self):
+        from morv.ui.listpage import SummaryDetailRow
+        for title, value in (("حد الآجل", "لا يُسمح بالآجل"),
+                             ("مدة الائتمان", "0 يوم"),
+                             ("تذكيرات واتساب", "لم يوافق")):
+            row = SummaryDetailRow(title, value)
+            row.resize(356, 52)
+            row.show()
+            self.app.processEvents()
+            self.assertFalse(row._stacked, title)
+            self.assertFalse(row.key_label.wordWrap(), title)
+            self.assertGreaterEqual(
+                row.key_label.width(), row.key_label.fontMetrics().horizontalAdvance(title),
+                title)
+            row.close()
+            row.deleteLater()
+
+    def test_schedule_uses_cards_in_narrow_previews(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QLabel
+        from morv.ui.listpage import SummaryAdaptiveTable
+        table = self.page.summary_table(
+            ["القسط", "الاستحقاق", "المبلغ", "الأصل", "الفائدة"],
+            [("1", "2026-12-17", "1,731.35", "1,549.00", "232.35") for _ in range(10)])
+        self.app.processEvents()
+        wrapper = table.parentWidget()
+        self.assertIsInstance(wrapper, SummaryAdaptiveTable)
+        self.assertIs(wrapper.stack.currentWidget(), wrapper.cards_scroll)
+        values = [label.text() for label in wrapper.cards_scroll.findChildren(QLabel)]
+        self.assertIn("2026-12-17", values)
+        self.assertIn("1,731.35", values)
+        self.assertEqual(table.model().rowCount(), 10)
+        self.assertEqual(wrapper.cards_scroll.horizontalScrollBarPolicy(),
+                         Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def test_adaptive_summary_table_restores_table_when_wide(self):
+        from PySide6.QtWidgets import QLabel, QTableView, QVBoxLayout, QWidget
+        from morv.ui.listpage import SummaryAdaptiveTable
+        table = QTableView()
+        table.setFixedHeight(270)
+        cards = QWidget()
+        layout = QVBoxLayout(cards)
+        layout.addWidget(QLabel("اختبار البطاقات"))
+        wrapper = SummaryAdaptiveTable(table, cards, 2)
+        wrapper.resize(430, 240)
+        wrapper.show()
+        self.app.processEvents()
+        self.assertIs(wrapper.stack.currentWidget(), wrapper.cards_scroll)
+        wrapper.resize(660, wrapper.height())
+        self.app.processEvents()
+        self.assertIs(wrapper.stack.currentWidget(), table)
+        wrapper.close()
+        wrapper.deleteLater()
+
     def test_wide_schedule_table_uses_horizontal_scrolling(self):
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QHeaderView

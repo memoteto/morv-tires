@@ -4,7 +4,8 @@ import re
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QPushButton, QScrollArea, QSizePolicy, QTableView, QVBoxLayout, QWidget)
+                               QLineEdit, QPushButton, QScrollArea, QSizePolicy, QStackedLayout, QTableView,
+                               QVBoxLayout, QWidget)
 
 from morv.core.text import RLM
 from morv.infra.db.connection import ClosedDatabase
@@ -59,11 +60,53 @@ class TupleModel(QAbstractTableModel):
         return None
 
 
+def _summary_cell_text(value: object, header: str) -> str:
+    text = str(value)
+    if header == "التاريخ" and re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", text):
+        return text.replace(" ", "\n", 1)
+    return text
+
+
+class SummaryAdaptiveTable(QWidget):
+    def __init__(self, table: QTableView, cards: QWidget, row_count: int):
+        super().__init__()
+        self.setObjectName("summaryAdaptiveTable")
+        self.table = table
+        self.cards_scroll = QScrollArea()
+        self.cards_scroll.setObjectName("summaryCardsScroll")
+        self.cards_scroll.setWidgetResizable(True)
+        self.cards_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.cards_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.cards_scroll.setWidget(cards)
+        self.cards_scroll.setFixedHeight(min(
+            LAYOUT["summary_cards_max_height"],
+            max(LAYOUT["summary_cards_min_height"], row_count * LAYOUT["summary_cards_row_height"])))
+        self.stack = QStackedLayout(self)
+        self.stack.setContentsMargins(0, 0, 0, 0)
+        self.stack.addWidget(table)
+        self.stack.addWidget(self.cards_scroll)
+        self._adapt()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._adapt()
+
+    def _adapt(self) -> None:
+        use_cards = self.width() < LAYOUT["summary_table_cards_below"]
+        target = self.cards_scroll if use_cards else self.table
+        if self.stack.currentWidget() is not target:
+            self.stack.setCurrentWidget(target)
+        height = target.height()
+        if self.minimumHeight() != height or self.maximumHeight() != height:
+            self.setFixedHeight(height)
+
+
 class SummaryDetailRow(QWidget):
     def __init__(self, key: str, value: str):
         super().__init__()
         self.setObjectName("summaryDetailRow")
         self.key_label = muted(key)
+        self.key_label.setWordWrap(False)
         self.value_label = QLabel(RLM + (value or "—"))
         self.value_label.setWordWrap(True)
         self.value_label.setMinimumWidth(0)
@@ -84,10 +127,15 @@ class SummaryDetailRow(QWidget):
 
     def _adapt(self) -> None:
         width = self.width()
-        key_width = min(LAYOUT["field_label_max"], max(90, width * 35 // 100))
+        required = self.key_label.fontMetrics().horizontalAdvance(self.key_label.text()) + 8
+        key_width = min(LAYOUT["field_label_max"],
+                        max(LAYOUT["summary_field_label_min"], required))
         value_width = max(0, width - key_width - 8)
         text_width = self.value_label.fontMetrics().horizontalAdvance(self.value_label.text())
-        stacked = width < LAYOUT["summary_field_stack_below"] or text_width > value_width * 2
+        stacked = (width < LAYOUT["summary_field_stack_below"]
+                   or required > LAYOUT["field_label_max"]
+                   or value_width < LAYOUT["summary_field_value_min"]
+                   or text_width > value_width * 2)
         if stacked != self._stacked:
             self.row.removeWidget(self.value_label)
             if stacked:
@@ -96,6 +144,8 @@ class SummaryDetailRow(QWidget):
                 self.row.addWidget(self.value_label, 0, 1)
             self._stacked = stacked
         self.row.setSpacing(5 if stacked else 8)
+        self.row.setColumnMinimumWidth(0, 0 if stacked else key_width)
+        self.key_label.setMinimumWidth(0 if stacked else key_width)
         self.key_label.setMaximumWidth(16777215 if stacked else key_width)
 
 
@@ -465,7 +515,7 @@ class ListPage(QWidget):
             layout.addWidget(SummaryDetailRow(key, str(value)))
         self.preview_layout.addWidget(card)
 
-    def summary_records(self, headers: list[str], rows: list[tuple]) -> QWidget:
+    def _summary_records_widget(self, headers: list[str], rows: list[tuple]) -> QWidget:
         wrapper = QWidget()
         layout = QVBoxLayout(wrapper)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -509,13 +559,17 @@ class ListPage(QWidget):
                 index += 1
             body.addLayout(grid)
             layout.addWidget(card)
+        return wrapper
+
+    def summary_records(self, headers: list[str], rows: list[tuple]) -> QWidget:
+        wrapper = self._summary_records_widget(headers, rows)
         self.preview_layout.addWidget(wrapper)
         return wrapper
 
     def summary_table(self, headers: list[str], rows: list[tuple]) -> QTableView:
         table = QTableView()
         table.setObjectName("summaryTable")
-        model = TupleModel([(header, lambda row, pos=index: str(row[pos]))
+        model = TupleModel([(header, lambda row, pos=index, name=header: _summary_cell_text(row[pos], name))
                             for index, header in enumerate(headers)])
         model.reset_rows(rows)
         table._summary_model = model
@@ -523,11 +577,20 @@ class ListPage(QWidget):
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.verticalHeader().hide()
-        table.verticalHeader().setDefaultSectionSize(36)
+        timestamp_columns = [i for i, name in enumerate(headers)
+                             if name == "التاريخ" and any(
+                                 re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", str(row[i]))
+                                 for row in rows)]
+        row_height = (LAYOUT["summary_table_datetime_row_height"] if timestamp_columns
+                      else LAYOUT["summary_table_row_height"])
+        table.verticalHeader().setDefaultSectionSize(row_height)
+        table.setWordWrap(True)
         header = table.horizontalHeader()
         header.setMinimumSectionSize(LAYOUT["summary_table_min_column"])
         if len(headers) <= 3:
             header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            for index in timestamp_columns:
+                header.setSectionResizeMode(index, QHeaderView.ResizeMode.ResizeToContents)
         else:
             header.setMaximumSectionSize(LAYOUT["summary_table_max_column"])
             header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
@@ -535,10 +598,15 @@ class ListPage(QWidget):
         table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         table.setTextElideMode(Qt.TextElideMode.ElideNone)
-        table.setFixedHeight(40 + LAYOUT["summary_table_row_height"] *
+        table.setFixedHeight(40 + row_height *
                              min(len(rows), LAYOUT["summary_table_visible_rows"]) +
                              (18 if len(headers) > 3 else 0))
-        self.preview_layout.addWidget(table)
+        if len(headers) > 3:
+            cards = self._summary_records_widget(headers, rows)
+            adaptive = SummaryAdaptiveTable(table, cards, len(rows))
+            self.preview_layout.addWidget(adaptive)
+        else:
+            self.preview_layout.addWidget(table)
         return table
 
     def summary_note(self, message: str, icon_name: str = "alert") -> None:

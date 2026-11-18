@@ -5,7 +5,7 @@ from morv.infra import inventory, stock_view
 from morv.ui.listpage import ListPage
 from morv.ui.widgets import info
 
-MOVE_LABELS = {"receipt": "استلام", "issue": "صرف"}
+MOVE_LABELS = {"receipt": "استلام", "issue": "صرف", "return": "مرتجع"}
 
 
 def _cost_ok(session) -> bool:

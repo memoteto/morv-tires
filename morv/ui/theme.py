@@ -121,6 +121,32 @@ QLabel#summaryMetricValue {{ font-size:{t['fs']+3}px; font-weight:700; }}
 QFrame#summaryNote {{ background:{t['surface2']}; border:1px solid {t['border']};
                       border-radius:10px; }}
 QTableView#summaryTable {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:8px; }}
+QWidget#summaryAdaptiveTable {{ background:transparent; }}
+QScrollArea#summaryCardsScroll {{ background:transparent; border:0; }}
+QTableView#summaryTable QScrollBar:horizontal {{
+    height:10px; background:{t['surface2']}; border:0; margin:0;
+}}
+QTableView#summaryTable QScrollBar::handle:horizontal {{
+    background:{t['border_strong']}; min-width:28px; border-radius:4px;
+}}
+QTableView#summaryTable QScrollBar::add-line:horizontal,
+QTableView#summaryTable QScrollBar::sub-line:horizontal {{
+    width:0; border:0;
+}}
+QTableView#summaryTable QScrollBar::add-page:horizontal,
+QTableView#summaryTable QScrollBar::sub-page:horizontal {{ background:transparent; }}
+QScrollArea#summaryCardsScroll QScrollBar:vertical {{
+    width:8px; background:{t['surface2']}; border:0; margin:0;
+}}
+QScrollArea#summaryCardsScroll QScrollBar::handle:vertical {{
+    background:{t['border_strong']}; min-height:28px; border-radius:4px;
+}}
+QScrollArea#summaryCardsScroll QScrollBar::add-line:vertical,
+QScrollArea#summaryCardsScroll QScrollBar::sub-line:vertical {{
+    height:0; border:0;
+}}
+QScrollArea#summaryCardsScroll QScrollBar::add-page:vertical,
+QScrollArea#summaryCardsScroll QScrollBar::sub-page:vertical {{ background:transparent; }}
 QWidget#summaryDetailRow {{ background:transparent; }}
 QFrame#summaryRecord {{ background:{t['surface2']}; border:1px solid {t['border']};
                         border-radius:10px; }}

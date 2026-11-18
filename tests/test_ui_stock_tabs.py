@@ -84,6 +84,8 @@ class StockTabsTest(unittest.TestCase):
     def test_lot_preview_shows_movements(self):
         from PySide6.QtWidgets import QTableView
         from morv.core.text import ltr
+        from morv.ui.tokens import LAYOUT
+        from PySide6.QtWidgets import QHeaderView
         page = self.lots_page()
         row = next(r for r in page.model.rows if r[4] == "2024")
         page.show_preview(row)
@@ -97,6 +99,16 @@ class StockTabsTest(unittest.TestCase):
         qty = [table.model().data(table.model().index(i, 1))
                for i in range(table.model().rowCount())]
         self.assertEqual(qty, [ltr("2"), ltr("-1")])
+        date = table.model().data(table.model().index(0, 2))
+        self.assertIn("\n", date)
+        self.assertEqual(table.verticalHeader().defaultSectionSize(),
+                         LAYOUT["summary_table_datetime_row_height"])
+        self.assertEqual(table.horizontalHeader().sectionResizeMode(2),
+                         QHeaderView.ResizeMode.ResizeToContents)
+
+    def test_lot_return_uses_arabic_label(self):
+        from morv.ui.stock_pages import MOVE_LABELS
+        self.assertEqual(MOVE_LABELS["return"], "مرتجع")
 
     def test_cashier_sees_quantities_but_not_costs(self):
         lots = self.lots_page(self.cashier_session)
