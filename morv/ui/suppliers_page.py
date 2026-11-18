@@ -37,26 +37,35 @@ class SuppliersPage(ListPage):
     def build_preview(self, row_id: int) -> None:
         s = suppliers.get(self.session.con, row_id)
         self.heading(s.name, suppliers.SUPPLIES[s.supplies] + ("" if s.active else " · موقوف"))
-        self.kv("الموبايل", ltr(s.mobile))
+        contact = [("الموبايل", ltr(s.mobile)), ("جهة الاتصال", s.contact_person),
+                   ("العنوان", s.address)]
         if s.phone2:
-            self.kv("هاتف إضافي", ltr(s.phone2))
-        self.kv("جهة الاتصال", s.contact_person)
-        self.kv("العنوان", s.address)
-        self.kv("السداد", (f"آجل {s.payment_days} يومًا" if s.payment_days else "نقدي") + f" · {suppliers.PAY_METHODS[s.pay_method]}")
+            contact.insert(1, ("هاتف إضافي", ltr(s.phone2)))
+        self.summary_section("بيانات التواصل", "phone")
+        self.summary_details(contact)
+        self.summary_section("بيانات السداد", "cash")
+        payment = [("السداد", (f"آجل {s.payment_days} يومًا" if s.payment_days else "نقدي") +
+                    f" · {suppliers.PAY_METHODS[s.pay_method]}")]
         if s.credit_limit:
-            self.kv("حد الائتمان لنا", ltr(fmt(s.credit_limit)))
+            payment.append(("حد الائتمان لنا", ltr(fmt(s.credit_limit))))
+        self.summary_details(payment)
+        extra = []
         if s.commercial_reg:
-            self.kv("السجل التجاري", ltr(s.commercial_reg))
+            extra.append(("السجل التجاري", ltr(s.commercial_reg)))
         if s.tax_id:
-            self.kv("الرقم الضريبي", ltr(s.tax_id))
+            extra.append(("الرقم الضريبي", ltr(s.tax_id)))
         if s.bank_info:
-            self.kv("بيانات التحويل", ltr(s.bank_info))
+            extra.append(("بيانات التحويل", ltr(s.bank_info)))
         if s.notes:
-            self.kv("ملاحظات", s.notes)
+            extra.append(("ملاحظات", s.notes))
+        if extra:
+            self.summary_section("بيانات إضافية", "truck")
+            self.summary_details(extra)
         if self.session.can("purchases.post") or self.session.can("items.cost_view"):
-            n, total = purchase_view.supplier_totals(self.session.con, s.id)
-            self.kv("فواتير الشراء", f"{ltr(str(n))} فاتورة · {ltr(fmt(total))} جنيه")
-        self.preview_layout.addWidget(muted("رصيد المورد وسداده يأتيان مع مرحلة الخزينة."))
+            count, total = purchase_view.supplier_totals(self.session.con, s.id)
+            self.summary_metrics([("فواتير الشراء", ltr(str(count))),
+                                  ("إجمالي الفواتير", f"{ltr(fmt(total))} جنيه")])
+        self.summary_note("رصيد المورد وسداده يأتيان مع مرحلة الخزينة.")
         if self.can_edit():
             edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(s.id))

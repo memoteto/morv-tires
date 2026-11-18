@@ -3,7 +3,7 @@ from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import inventory, stock_view
 from morv.ui.listpage import ListPage
-from morv.ui.widgets import info, muted
+from morv.ui.widgets import info
 
 MOVE_LABELS = {"receipt": "استلام", "issue": "صرف"}
 
@@ -46,15 +46,28 @@ class LotsPage(ListPage):
     def build_preview(self, row_id: int) -> None:
         row = next(r for r in self.model.rows if r[0] == row_id)
         self.heading(row[2], f"الدفعة {ltr(row[1])}")
-        self.kv("رمز DOT", ltr(row[4]) if row[4] else "—")
-        self.kv("تاريخ الاستلام", ltr(row[5]))
-        self.kv("الكمية المستلمة", ltr(str(row[6])))
-        self.kv("المتبقي", ltr(str(row[7])))
+        self.summary_metrics([
+            ("DOT", ltr(row[4]) if row[4] else "—"),
+            ("المستلم", ltr(str(row[6]))),
+            ("المتبقي", ltr(str(row[7]))),
+        ])
+        self.summary_section("بيانات الدفعة", "tire")
+        details = [("الدفعة", ltr(row[1])), ("تاريخ الاستلام", ltr(row[5]))]
         if row[8] is not None:
-            self.kv("تكلفة الوحدة", ltr(fmt(row[8])))
-        for kind, qty, at, non_oldest, reason in stock_view.lot_movements(self.session.con, row_id):
-            note = f" · صرف من غير الأقدم: {reason}" if non_oldest else ""
-            self.kv(MOVE_LABELS.get(kind, kind), f"{ltr(str(qty))} · {ltr(at)}{note}")
+            details.append(("تكلفة الوحدة", ltr(fmt(row[8]))))
+        self.summary_details(details)
+        self.summary_section("حركة الدفعة", "truck")
+        moves = stock_view.lot_movements(self.session.con, row_id)
+        if moves:
+            self.summary_table(["الحركة", "الكمية", "التاريخ"],
+                               [(MOVE_LABELS.get(kind, kind), ltr(str(qty)), ltr(at))
+                                for kind, qty, at, _non_oldest, _reason in moves])
+        else:
+            self.summary_note("لا توجد حركات مسجلة لهذه الدفعة.")
+        for kind, _qty, _at, non_oldest, reason in moves:
+            if kind == "issue" and non_oldest:
+                self.summary_note(f"صرف من غير الأقدم: {reason}")
+
 
 
 class StockPage(ListPage):
@@ -89,13 +102,29 @@ class StockPage(ListPage):
     def build_preview(self, row_id: int) -> None:
         row = next(r for r in self.model.rows if r[0] == row_id)
         self.heading(row[1], f"{ltr(row[2])} · الرصيد {ltr(str(row[4]))}")
+        metrics = [("الرصيد", ltr(str(row[4]))), ("الدفعات", ltr(str(row[5])))]
+        if row[6] is not None:
+            metrics.append(("القيمة الدفترية", ltr(fmt(row[6]))))
+        self.summary_metrics(metrics)
+        self.summary_section("تفاصيل الدفعات (LOT)", "tire")
         lots = [lot for lot in inventory.list_lots(self.session.con, row_id) if lot[5] > 0]
-        if not lots:
-            self.preview_layout.addWidget(muted("لا رصيد لهذا الصنف."))
-        for _id, ref, dot, _received, _qty_in, on_hand, unit_cost in lots:
-            cost = f" × {ltr(fmt(unit_cost))}" if _cost_ok(self.session) else ""
-            self.kv(f"DOT {ltr(dot)}" if dot else "بلا DOT", f"{ltr(str(on_hand))}{cost} · {ltr(ref)}")
-        self.preview_layout.addWidget(muted("تسويات الجرد (زيادة أو نقص أو تلف) غير مفعّلة بعد؛ تُضاف مع دفتر التسويات."))
+        if lots:
+            if _cost_ok(self.session):
+                self.summary_table(
+                    ["DOT", "المتبقي", "تكلفة الشراء"],
+                    [(ltr(dot) if dot else "—", ltr(str(on_hand)), ltr(fmt(unit_cost)))
+                     for _id, _ref, dot, _received, _qty_in, on_hand, unit_cost in lots])
+                self.summary_note("تكلفة الشراء التاريخية للدفعات مستقلة عن تقييم FIFO والقيمة الدفترية.")
+            else:
+                self.summary_table(
+                    ["DOT", "المتبقي"],
+                    [(ltr(dot) if dot else "—", ltr(str(on_hand)))
+                     for _id, _ref, dot, _received, _qty_in, on_hand, _unit_cost in lots])
+            self.summary_details([("مرجع الدفعة", ltr(ref))
+                                  for _id, ref, _dot, _received, _qty_in, _on_hand, _unit_cost in lots])
+        else:
+            self.summary_note("لا رصيد لهذا الصنف.")
+        self.summary_note("تسويات الجرد (زيادة أو نقص أو تلف) غير مفعّلة بعد؛ تُضاف مع دفتر التسويات.")
 
     def open_dialog(self, row_id):
         if row_id is not None or not self.can_edit():
