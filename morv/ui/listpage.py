@@ -276,7 +276,7 @@ class ListPage(QWidget):
                 slots = [(0, 0, 1, 2), (1, 0, 1, 1), (1, 1, 1, 1)]
             else:
                 slots = [(i, 0, 1, 1) for i in range(len(buttons))]
-            for b, (row, col, height, width) in zip(buttons, slots):
+            for b, (row, col, height, width) in zip(buttons, slots, strict=True):
                 grid.addWidget(b, row, col, height, width)
 
     # ---------- Behaviour ----------
