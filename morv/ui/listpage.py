@@ -265,7 +265,8 @@ class ListPage(QWidget):
         self.preview_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.preview_body = QWidget()
         self.preview_layout = QVBoxLayout(self.preview_body)
-        self.preview_layout.setContentsMargins(0, 0, 0, 0)
+        self.preview_layout.setContentsMargins(
+            LAYOUT["preview_scroll_gutter"], 0, LAYOUT["preview_scroll_end_gap"], 0)
         self.preview_layout.setSpacing(LAYOUT["field_spacing"])
         self.preview_scroll.setWidget(self.preview_body)
         pv.addWidget(self.preview_scroll, 1)
@@ -327,7 +328,7 @@ class ListPage(QWidget):
         else:
             preview_width = min(
                 LAYOUT["preview_max"],
-                max(LAYOUT["preview_min"], available * 34 // 100),
+                max(LAYOUT["preview_min"], available * LAYOUT["preview_share_pct"] // 100),
                 max(LAYOUT["preview_min"], available - LAYOUT["list_min"] - LAYOUT["pane_gap"]),
             )
             self.preview.setFixedWidth(preview_width)

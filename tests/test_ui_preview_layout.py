@@ -119,6 +119,20 @@ class PreviewLayoutTest(unittest.TestCase):
         self.app.processEvents()
         self.assertTrue(self.page.list_panel.isVisibleTo(self.page))
 
+    def test_wider_preview_keeps_list_usable_and_scroll_gutter(self):
+        from morv.ui.tokens import LAYOUT
+        self.page.resize(1280, 600)
+        self.page.show_preview_id(1)
+        self.app.processEvents()
+        self.assertGreaterEqual(self.page.preview.width(), 500)
+        self.assertLessEqual(self.page.preview.width(), LAYOUT["preview_max"])
+        self.assertGreaterEqual(self.page.list_panel.width(), LAYOUT["list_min"])
+        margins = self.page.preview_layout.contentsMargins()
+        self.assertEqual(margins.left(), LAYOUT["preview_scroll_gutter"])
+        self.assertEqual(margins.right(), LAYOUT["preview_scroll_end_gap"])
+        self.assertGreater(margins.left(), margins.right())
+        self.assertGreater(self.page.preview_scroll.verticalScrollBar().maximum(), 0)
+
     def test_values_wrap_only_when_they_are_text(self):
         from PySide6.QtWidgets import QLabel
         from morv.ui.tokens import LAYOUT
