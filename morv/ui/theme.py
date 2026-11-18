@@ -150,6 +150,9 @@ QDateEdit#statementDate {{ background:{t['surface']}; color:{t['text']};
                               border:1px solid {t['border_strong']}; border-radius:8px;
                               min-height:38px; padding:0 8px 0 28px; }}
 QDateEdit#statementDate:focus {{ border:2px solid {t['primary']}; }}
+QDateEdit#statementDate::drop-down {{ subcontrol-origin:border; subcontrol-position:top left;
+                                     width:26px; border:0; background:transparent; }}
+QDateEdit#statementDate::down-arrow {{ width:10px; height:10px; }}
 QCalendarWidget#statementCalendar {{ background:{t['surface']}; }}
 QCalendarWidget#statementCalendar QWidget#qt_calendar_navigationbar {{ background:{t['surface2']}; }}
 QCalendarWidget#statementCalendar QToolButton {{ color:{t['text']}; background:{t['surface2']};
