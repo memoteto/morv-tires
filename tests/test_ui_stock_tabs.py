@@ -83,6 +83,7 @@ class StockTabsTest(unittest.TestCase):
 
     def test_lot_preview_shows_movements(self):
         from PySide6.QtWidgets import QTableView
+        from morv.core.text import ltr
         page = self.lots_page()
         row = next(r for r in page.model.rows if r[4] == "2024")
         page.show_preview(row)
@@ -95,7 +96,7 @@ class StockTabsTest(unittest.TestCase):
         self.assertEqual(kinds, ["استلام", "صرف"])
         qty = [table.model().data(table.model().index(i, 1))
                for i in range(table.model().rowCount())]
-        self.assertEqual(qty, ["2", "1"])
+        self.assertEqual(qty, [ltr("2"), ltr("1")])
 
     def test_cashier_sees_quantities_but_not_costs(self):
         lots = self.lots_page(self.cashier_session)
