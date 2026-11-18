@@ -99,12 +99,32 @@ class StockTabsTest(unittest.TestCase):
         qty = [table.model().data(table.model().index(i, 1))
                for i in range(table.model().rowCount())]
         self.assertEqual(qty, [ltr("2"), ltr("-1")])
+        from PySide6.QtCore import Qt
         date = table.model().data(table.model().index(0, 2))
-        self.assertIn("\n", date)
+        self.assertNotIn("\n", date)
+        self.assertIn(" ", date)
+        self.assertFalse(table.wordWrap())
         self.assertEqual(table.verticalHeader().defaultSectionSize(),
-                         LAYOUT["summary_table_datetime_row_height"])
+                         LAYOUT["summary_table_row_height"])
         self.assertEqual(table.horizontalHeader().sectionResizeMode(2),
                          QHeaderView.ResizeMode.ResizeToContents)
+        centered = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
+        self.assertEqual(table.model().data(table.model().index(0, 1),
+                                            Qt.ItemDataRole.TextAlignmentRole), centered)
+        self.assertEqual(table.model().headerData(1, Qt.Orientation.Horizontal,
+                                                  Qt.ItemDataRole.TextAlignmentRole), centered)
+
+    def test_item_prices_use_central_metric_cards(self):
+        from PySide6.QtWidgets import QFrame, QLabel
+        from morv.ui.inventory_page import ItemsPage
+        page = self.destroy_on_cleanup(ItemsPage(self.session))
+        page.show_preview_id(self.tire)
+        metrics = [frame for frame in page.preview_body.findChildren(QFrame)
+                   if frame.objectName() == "summaryMetric"]
+        captions = [lbl.text() for frame in metrics for lbl in frame.findChildren(QLabel)
+                    if lbl.objectName() == "muted"]
+        for price_name in ("قطاعي", "جملة", "جملة الجملة"):
+            self.assertIn(price_name, captions)
 
     def test_lot_return_uses_arabic_label(self):
         from morv.ui.stock_pages import MOVE_LABELS

@@ -65,6 +65,22 @@ class SharedSummaryComponentsTest(unittest.TestCase):
         self.assertTrue(any(x.text() == "القيمة الدفترية" for x in labels))
         self.assertTrue(any(x.text().endswith("2,500.00") for x in labels))
 
+    def test_central_metric_captions_and_values_align_right(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QFrame, QLabel
+        metrics = [frame for frame in self.page.preview_body.findChildren(QFrame)
+                   if frame.objectName() == "summaryMetric"]
+        self.assertEqual(len(metrics), 2)
+        right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        for frame in metrics:
+            caption = next(label for label in frame.findChildren(QLabel)
+                           if label.objectName() == "muted")
+            amount = next(label for label in frame.findChildren(QLabel)
+                          if label.objectName() == "summaryMetricValue")
+            self.assertEqual(caption.alignment(), right)
+            self.assertEqual(amount.alignment(), right)
+            self.assertFalse(amount.wordWrap())
+
     def test_record_cards_preserve_long_names_and_values(self):
         from PySide6.QtWidgets import QFrame, QLabel
         records = [f for f in self.page.preview_body.findChildren(QFrame)
@@ -124,6 +140,29 @@ class SharedSummaryComponentsTest(unittest.TestCase):
         self.assertEqual(table.model().rowCount(), 10)
         self.assertEqual(wrapper.cards_scroll.horizontalScrollBarPolicy(),
                          Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def test_table_only_keeps_fixed_header_and_alignments_in_narrow_preview(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QTableView
+        table = self.page.summary_table(
+            ["القسط", "الاستحقاق", "المبلغ", "الأصل", "الفائدة"],
+            [("1", "2026-12-17", "1,731.35", "1,549.00", "232.35")],
+            column_alignments=(Qt.AlignmentFlag.AlignCenter,) * 5,
+            keep_table=True)
+        self.app.processEvents()
+        self.assertIs(table.parentWidget(), self.page.preview_body)
+        self.assertIsInstance(table, QTableView)
+        self.assertEqual(table.model().columnCount(), 5)
+        self.assertTrue(table.horizontalHeader().isVisibleTo(self.page))
+        self.assertEqual(table.horizontalScrollBarPolicy(),
+                         Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        for column in range(5):
+            self.assertEqual(table.model().data(table.model().index(0, column),
+                                                Qt.ItemDataRole.TextAlignmentRole),
+                             Qt.AlignmentFlag.AlignCenter)
+            self.assertEqual(table.model().headerData(column, Qt.Orientation.Horizontal,
+                                                       Qt.ItemDataRole.TextAlignmentRole),
+                             Qt.AlignmentFlag.AlignCenter)
 
     def test_adaptive_summary_table_restores_table_when_wide(self):
         from PySide6.QtWidgets import QLabel, QTableView, QVBoxLayout, QWidget

@@ -81,7 +81,7 @@ class ItemsPage(ListPage):
                 metrics.append(("القيمة الدفترية", ltr(fmt(inventory.book_value(self.session.con, it.id)))))
             self.summary_metrics(metrics)
         self.summary_section("الأسعار", "cash")
-        self.summary_details([
+        self.summary_metrics([
             ("قطاعي", ltr(fmt(it.price_retail))),
             ("جملة", ltr(fmt(it.price_wholesale))),
             ("جملة الجملة", ltr(fmt(it.price_super))),

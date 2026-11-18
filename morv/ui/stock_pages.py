@@ -1,4 +1,6 @@
 """Stock tabs: lots with their movements, and stocktake. Read-only."""
+from PySide6.QtCore import Qt
+
 from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import inventory, stock_view
@@ -59,9 +61,16 @@ class LotsPage(ListPage):
         self.summary_section("حركة الدفعة", "truck")
         moves = stock_view.lot_movements(self.session.con, row_id)
         if moves:
-            self.summary_table(["الحركة", "الكمية", "التاريخ"],
-                               [(MOVE_LABELS.get(kind, kind), ltr(str(qty)), ltr(at))
-                                for kind, qty, at, _non_oldest, _reason in moves])
+            self.summary_table(
+                ["الحركة", "الكمية", "التاريخ"],
+                [(MOVE_LABELS.get(kind, kind), ltr(str(qty)), ltr(at))
+                 for kind, qty, at, _non_oldest, _reason in moves],
+                column_alignments=(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                    Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+                    Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+                ),
+                one_line_dates=True)
         else:
             self.summary_note("لا توجد حركات مسجلة لهذه الدفعة.")
         for kind, _qty, _at, non_oldest, reason in moves:

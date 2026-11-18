@@ -17,9 +17,12 @@ PAGE = 300
 
 
 class TupleModel(QAbstractTableModel):
-    def __init__(self, columns: list, icon_for=None):
+    def __init__(self, columns: list, icon_for=None, *, column_alignments=None):
         super().__init__()
         self.columns = columns
+        if column_alignments is not None and len(column_alignments) != len(columns):
+            raise ValueError("Column alignments do not match table columns")
+        self.column_alignments = tuple(column_alignments) if column_alignments is not None else None
         self.icon_for = icon_for
         self.icon_color = "#8792A3"
         self._icon_cache: dict = {}
@@ -46,6 +49,8 @@ class TupleModel(QAbstractTableModel):
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if role == Qt.ItemDataRole.DisplayRole:
             return self.columns[index.column()][1](self.rows[index.row()])
+        if role == Qt.ItemDataRole.TextAlignmentRole and self.column_alignments is not None:
+            return self.column_alignments[index.column()]
         if role == Qt.ItemDataRole.DecorationRole and index.column() == 0 and self.icon_for:
             name = self.icon_for(self.rows[index.row()])
             if name not in self._icon_cache:
@@ -55,14 +60,17 @@ class TupleModel(QAbstractTableModel):
         return None
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
-        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
-            return self.columns[section][0]
+        if orientation == Qt.Orientation.Horizontal:
+            if role == Qt.ItemDataRole.DisplayRole:
+                return self.columns[section][0]
+            if role == Qt.ItemDataRole.TextAlignmentRole and self.column_alignments is not None:
+                return self.column_alignments[section]
         return None
 
 
-def _summary_cell_text(value: object, header: str) -> str:
+def _summary_cell_text(value: object, header: str, *, one_line_dates: bool = False) -> str:
     text = str(value)
-    if header == "التاريخ" and re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", text):
+    if not one_line_dates and header == "التاريخ" and re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", text):
         return text.replace(" ", "\n", 1)
     return text
 
@@ -495,9 +503,15 @@ class ListPage(QWidget):
             caption = QLabel(label)
             caption.setObjectName("muted")
             caption.setWordWrap(True)
+            caption.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             amount = QLabel(str(value))
             amount.setObjectName("summaryMetricValue")
-            amount.setWordWrap(True)
+            amount.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            clean_value = str(value).strip("\u2066\u2069\u200f")
+            atomic = bool(re.fullmatch(r"[-+]?[A-Za-z0-9٠-٩][A-Za-z0-9٠-٩ .,:/+%()_×=\-]*", clean_value))
+            amount.setWordWrap(not atomic)
+            if atomic:
+                amount.setToolTip(clean_value)
             amount.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             layout.addWidget(caption)
             layout.addWidget(amount)
@@ -567,11 +581,16 @@ class ListPage(QWidget):
         self.preview_layout.addWidget(wrapper)
         return wrapper
 
-    def summary_table(self, headers: list[str], rows: list[tuple]) -> QTableView:
+    def summary_table(self, headers: list[str], rows: list[tuple], *,
+                      column_alignments=None, one_line_dates: bool = False,
+                      keep_table: bool = False) -> QTableView:
         table = QTableView()
         table.setObjectName("summaryTable")
-        model = TupleModel([(header, lambda row, pos=index, name=header: _summary_cell_text(row[pos], name))
-                            for index, header in enumerate(headers)])
+        model = TupleModel(
+            [(header, lambda row, pos=index, name=header:
+              _summary_cell_text(row[pos], name, one_line_dates=one_line_dates))
+             for index, header in enumerate(headers)],
+            column_alignments=column_alignments)
         model.reset_rows(rows)
         table._summary_model = model
         table.setModel(model)
@@ -582,10 +601,10 @@ class ListPage(QWidget):
                              if name == "التاريخ" and any(
                                  re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", str(row[i]))
                                  for row in rows)]
-        row_height = (LAYOUT["summary_table_datetime_row_height"] if timestamp_columns
-                      else LAYOUT["summary_table_row_height"])
+        row_height = (LAYOUT["summary_table_datetime_row_height"]
+                      if timestamp_columns and not one_line_dates else LAYOUT["summary_table_row_height"])
         table.verticalHeader().setDefaultSectionSize(row_height)
-        table.setWordWrap(True)
+        table.setWordWrap(not one_line_dates)
         header = table.horizontalHeader()
         header.setMinimumSectionSize(LAYOUT["summary_table_min_column"])
         if len(headers) <= 3:
@@ -602,7 +621,7 @@ class ListPage(QWidget):
         table.setFixedHeight(40 + row_height *
                              min(len(rows), LAYOUT["summary_table_visible_rows"]) +
                              (18 if len(headers) > 3 else 0))
-        if len(headers) > 3:
+        if len(headers) > 3 and not keep_table:
             cards = self._summary_records_widget(headers, rows)
             adaptive = SummaryAdaptiveTable(table, cards, len(rows))
             self.preview_layout.addWidget(adaptive)

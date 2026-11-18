@@ -178,7 +178,9 @@ class ContractsPage(ListPage):
         self.summary_table(
             ["القسط", "الاستحقاق", "المبلغ", "الأصل", "الفائدة"],
             [(ltr(str(r[0])), ltr(r[1]), ltr(fmt(r[2])), ltr(fmt(r[3])), ltr(fmt(r[4])))
-             for r in c.rows])
+             for r in c.rows],
+            column_alignments=(Qt.AlignmentFlag.AlignCenter,) * 5,
+            keep_table=True)
         if self.can_edit() and self.stack is not None:
             btn = primary_button("تحصيل قسط")
             btn.clicked.connect(lambda: self.stack.open_collect(row_id))

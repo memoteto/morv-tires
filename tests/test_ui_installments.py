@@ -99,6 +99,7 @@ class InstallmentsUiTest(unittest.TestCase):
         p.list_page.show_preview_id(row_id)
         table = p.list_page.preview_body.findChild(QTableView, "summaryTable")
         self.assertIsNotNone(table)
+        self.assertIs(table.parentWidget(), p.list_page.preview_body)
         self.assertEqual(table.model().columnCount(), 5)
         self.assertEqual(table.model().rowCount(), 10)
         self.assertEqual(table.model().headerData(
