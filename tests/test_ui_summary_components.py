@@ -71,7 +71,7 @@ class SharedSummaryComponentsTest(unittest.TestCase):
         metrics = [frame for frame in self.page.preview_body.findChildren(QFrame)
                    if frame.objectName() == "summaryMetric"]
         self.assertEqual(len(metrics), 2)
-        right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute | Qt.AlignmentFlag.AlignVCenter
         for frame in metrics:
             caption = next(label for label in frame.findChildren(QLabel)
                            if label.objectName() == "muted")

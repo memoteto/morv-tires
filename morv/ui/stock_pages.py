@@ -66,7 +66,7 @@ class LotsPage(ListPage):
                 [(MOVE_LABELS.get(kind, kind), ltr(str(qty)), ltr(at))
                  for kind, qty, at, _non_oldest, _reason in moves],
                 column_alignments=(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute | Qt.AlignmentFlag.AlignVCenter,
                     Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
                     Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
                 ),
