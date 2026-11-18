@@ -113,6 +113,14 @@ QTableView::item {{ padding:0 10px; }}
 QHeaderView::section {{ background:{t['surface2']}; color:{t['muted']}; border:0;
                        border-bottom:1px solid {t['border']}; padding:0 8px; height:36px; font-weight:600; }}
 QLabel#cardTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
+QFrame#summarySection {{ border:0; border-bottom:1px solid {t['border']}; }}
+QLabel#summarySectionTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
+QFrame#summaryMetric, QFrame#summaryDetails {{ background:{t['surface2']};
+                                                  border:1px solid {t['border']}; border-radius:10px; }}
+QLabel#summaryMetricValue {{ font-size:{t['fs']+3}px; font-weight:700; }}
+QFrame#summaryNote {{ background:{t['surface2']}; border:1px solid {t['border']};
+                      border-radius:10px; }}
+QTableView#summaryTable {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:8px; }}
 QPushButton#danger {{ color:{t['danger']}; border-color:{t['danger']}; }}
 QPushButton:disabled {{ color:{t['muted']}; border-color:{t['border']}; }}
 QLabel#noticeError {{ background:{t['danger_soft']}; color:{t['danger']}; border-radius:8px; padding:8px 12px; }}

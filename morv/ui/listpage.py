@@ -237,7 +237,7 @@ class ListPage(QWidget):
         else:
             preview_width = min(
                 LAYOUT["preview_max"],
-                max(LAYOUT["preview_min"], available * 30 // 100),
+                max(LAYOUT["preview_min"], available * 34 // 100),
                 max(LAYOUT["preview_min"], available - LAYOUT["list_min"] - LAYOUT["pane_gap"]),
             )
             self.preview.setFixedWidth(preview_width)
@@ -344,7 +344,7 @@ class ListPage(QWidget):
         self.view.clearSelection()
 
     # ---------- Preview helpers ----------
-    def kv(self, key: str, value: str) -> None:
+    def _detail_row(self, key: str, value: str) -> QWidget:
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(12)
@@ -366,7 +366,95 @@ class ListPage(QWidget):
         row.addWidget(v, 1)
         w = QWidget()
         w.setLayout(row)
-        self.preview_layout.addWidget(w)
+        return w
+
+    def kv(self, key: str, value: str) -> None:
+        self.preview_layout.addWidget(self._detail_row(key, value))
+
+    def summary_section(self, title: str, icon_name: str | None = None) -> None:
+        section = QFrame()
+        section.setObjectName("summarySection")
+        row = QHBoxLayout(section)
+        row.setContentsMargins(4, 10, 4, 8)
+        row.setSpacing(8)
+        if icon_name:
+            image = QLabel()
+            image.setPixmap(icons.icon(icon_name, "#8792A3", 18).pixmap(18, 18))
+            row.addWidget(image)
+        label = QLabel(title)
+        label.setObjectName("summarySectionTitle")
+        row.addWidget(label, 1)
+        self.preview_layout.addWidget(section)
+
+    def summary_metrics(self, metrics: list[tuple[str, str]]) -> None:
+        if not metrics:
+            return
+        wrapper = QWidget()
+        grid = QGridLayout(wrapper)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(8)
+        columns = len(metrics) if len(metrics) <= 3 else 2
+        for index, (label, value) in enumerate(metrics):
+            tile = QFrame()
+            tile.setObjectName("summaryMetric")
+            layout = QVBoxLayout(tile)
+            layout.setContentsMargins(10, 10, 10, 10)
+            layout.setSpacing(5)
+            caption = QLabel(label)
+            caption.setObjectName("muted")
+            caption.setWordWrap(True)
+            amount = QLabel(str(value))
+            amount.setObjectName("summaryMetricValue")
+            amount.setWordWrap(True)
+            amount.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            layout.addWidget(caption)
+            layout.addWidget(amount)
+            grid.addWidget(tile, index // columns, index % columns)
+        self.preview_layout.addWidget(wrapper)
+
+    def summary_details(self, details: list[tuple[str, str]]) -> None:
+        if not details:
+            return
+        card = QFrame()
+        card.setObjectName("summaryDetails")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+        for key, value in details:
+            layout.addWidget(self._detail_row(key, value))
+        self.preview_layout.addWidget(card)
+
+    def summary_table(self, headers: list[str], rows: list[tuple]) -> QTableView:
+        table = QTableView()
+        table.setObjectName("summaryTable")
+        model = TupleModel([(header, lambda row, pos=index: str(row[pos]))
+                            for index, header in enumerate(headers)])
+        model.reset_rows(rows)
+        table._summary_model = model
+        table.setModel(model)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.verticalHeader().hide()
+        table.verticalHeader().setDefaultSectionSize(36)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setMinimumSectionSize(60)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        table.setFixedHeight(40 + 36 * min(len(rows), 6))
+        self.preview_layout.addWidget(table)
+        return table
+
+    def summary_note(self, message: str, icon_name: str = "alert") -> None:
+        note = QFrame()
+        note.setObjectName("summaryNote")
+        row = QHBoxLayout(note)
+        row.setContentsMargins(10, 10, 10, 10)
+        row.setSpacing(8)
+        image = QLabel()
+        image.setPixmap(icons.icon(icon_name, "#8792A3", 18).pixmap(18, 18))
+        text = muted(message)
+        row.addWidget(image, 0, Qt.AlignmentFlag.AlignTop)
+        row.addWidget(text, 1)
+        self.preview_layout.addWidget(note)
 
     def heading(self, text: str, sub: str = "") -> None:
         self.preview_title.setText(text)
