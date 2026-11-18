@@ -60,7 +60,7 @@ class SalesPage(ListPage):
         self.summary_section("وسائل الدفع", "cash")
         self.summary_details([(PAYMENT_LABELS.get(p[0], p[0]), ltr(fmt(p[1]))) for p in inv.payments])
         self.summary_section("تفاصيل الأصناف", "tire")
-        self.summary_table(
+        self.summary_records(
             ["الصنف", "الكمية", "سعر الوحدة", "الإجمالي"],
             [(f"{ln.line_no}. {ln.item_name}", ltr(str(ln.qty)),
               ltr(fmt(ln.unit_price)), ltr(fmt(ln.net_total))) for ln in inv.lines])

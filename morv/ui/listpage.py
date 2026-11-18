@@ -3,7 +3,7 @@ import re
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
+from PySide6.QtWidgets import (QAbstractItemView, QBoxLayout, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QPushButton, QScrollArea, QSizePolicy, QTableView, QVBoxLayout, QWidget)
 
 from morv.core.text import RLM
@@ -57,6 +57,40 @@ class TupleModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             return self.columns[section][0]
         return None
+
+
+class SummaryDetailRow(QWidget):
+    def __init__(self, key: str, value: str):
+        super().__init__()
+        self.setObjectName("summaryDetailRow")
+        self.key_label = muted(key)
+        self.value_label = QLabel(RLM + (value or "—"))
+        self.value_label.setWordWrap(True)
+        self.value_label.setMinimumWidth(0)
+        self.value_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.value_label.setToolTip(value or "—")
+        self.row = QBoxLayout(QBoxLayout.Direction.LeftToRight, self)
+        self.row.setContentsMargins(0, 0, 0, 0)
+        self.row.setSpacing(8)
+        self.row.addWidget(self.key_label)
+        self.row.addWidget(self.value_label, 1)
+        self._adapt()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._adapt()
+
+    def _adapt(self) -> None:
+        width = self.width()
+        key_width = min(LAYOUT["field_label_max"], max(90, width * 35 // 100))
+        value_width = max(0, width - key_width - 8)
+        text_width = self.value_label.fontMetrics().horizontalAdvance(self.value_label.text())
+        stacked = width < LAYOUT["summary_field_stack_below"] or text_width > value_width * 2
+        direction = QBoxLayout.Direction.TopToBottom if stacked else QBoxLayout.Direction.LeftToRight
+        if self.row.direction() != direction:
+            self.row.setDirection(direction)
+        self.row.setSpacing(5 if stacked else 8)
+        self.key_label.setMaximumWidth(16777215 if stacked else key_width)
 
 
 class ListPage(QWidget):
@@ -422,8 +456,55 @@ class ListPage(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
         for key, value in details:
-            layout.addWidget(self._detail_row(key, value))
+            layout.addWidget(SummaryDetailRow(key, str(value)))
         self.preview_layout.addWidget(card)
+
+    def summary_records(self, headers: list[str], rows: list[tuple]) -> QWidget:
+        wrapper = QWidget()
+        layout = QVBoxLayout(wrapper)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        for row in rows:
+            if len(row) != len(headers):
+                raise ValueError("Summary record fields do not match column headers")
+            card = QFrame()
+            card.setObjectName("summaryRecord")
+            body = QVBoxLayout(card)
+            body.setContentsMargins(10, 10, 10, 10)
+            body.setSpacing(8)
+            title = QLabel(str(row[0]))
+            title.setObjectName("summaryRecordTitle")
+            title.setWordWrap(True)
+            title.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            title.setToolTip(str(row[0]))
+            body.addWidget(title)
+            grid = QGridLayout()
+            grid.setContentsMargins(0, 0, 0, 0)
+            grid.setSpacing(8)
+            index = 0
+            for header, value in zip(headers[1:], row[1:], strict=True):
+                if value is None or value == "":
+                    continue
+                cell = QWidget()
+                column = QVBoxLayout(cell)
+                column.setContentsMargins(0, 0, 0, 0)
+                column.setSpacing(3)
+                caption = muted(header)
+                caption.setObjectName("summaryRecordLabel")
+                data = QLabel(str(value))
+                data.setObjectName("summaryRecordValue")
+                data.setWordWrap(True)
+                data.setToolTip(str(value))
+                data.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                column.addWidget(caption)
+                column.addWidget(data)
+                grid.addWidget(cell, index // LAYOUT["summary_record_columns"],
+                               index % LAYOUT["summary_record_columns"])
+                index += 1
+            body.addLayout(grid)
+            layout.addWidget(card)
+        self.preview_layout.addWidget(wrapper)
+        return wrapper
 
     def summary_table(self, headers: list[str], rows: list[tuple]) -> QTableView:
         table = QTableView()
@@ -437,10 +518,20 @@ class ListPage(QWidget):
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.verticalHeader().hide()
         table.verticalHeader().setDefaultSectionSize(36)
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setMinimumSectionSize(60)
+        header = table.horizontalHeader()
+        header.setMinimumSectionSize(LAYOUT["summary_table_min_column"])
+        if len(headers) <= 3:
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        else:
+            header.setMaximumSectionSize(LAYOUT["summary_table_max_column"])
+            header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        table.setFixedHeight(40 + 36 * min(len(rows), 6))
+        table.setTextElideMode(Qt.TextElideMode.ElideNone)
+        table.setFixedHeight(40 + LAYOUT["summary_table_row_height"] *
+                             min(len(rows), LAYOUT["summary_table_visible_rows"]) +
+                             (18 if len(headers) > 3 else 0))
         self.preview_layout.addWidget(table)
         return table
 

@@ -24,6 +24,9 @@ class SharedSummaryComponentsTest(unittest.TestCase):
                 self.summary_table(["DOT", "المتبقي", "التكلفة"],
                                    [("2324", "3", "1,500.00"), ("2024", "1", "1,800.00")])
                 self.summary_note("الأسعار التاريخية منفصلة عن تقييم FIFO.")
+                self.summary_records(
+                    ["الصنف", "الكمية", "سعر الوحدة", "الإجمالي"],
+                    [("1. إطار 205/55R16 طويل الاسم لقياس توزيع البنود", "2", "2,500.00", "5,000.00")])
 
             def open_dialog(self, row_id):
                 pass
@@ -61,6 +64,45 @@ class SharedSummaryComponentsTest(unittest.TestCase):
         labels = p.preview_body.findChildren(QLabel)
         self.assertTrue(any(x.text() == "القيمة الدفترية" for x in labels))
         self.assertTrue(any(x.text().endswith("2,500.00") for x in labels))
+
+    def test_record_cards_preserve_long_names_and_values(self):
+        from PySide6.QtWidgets import QFrame, QLabel
+        records = [f for f in self.page.preview_body.findChildren(QFrame)
+                   if f.objectName() == "summaryRecord"]
+        self.assertEqual(len(records), 1)
+        labels = records[0].findChildren(QLabel)
+        self.assertTrue(any("إطار 205/55R16" in label.text() and label.wordWrap()
+                            for label in labels))
+        self.assertEqual({label.text() for label in labels if label.objectName() == "summaryRecordValue"},
+                         {"2", "2,500.00", "5,000.00"})
+
+    def test_responsive_details_stack_long_values_without_data_loss(self):
+        from PySide6.QtWidgets import QBoxLayout
+        from morv.ui.listpage import SummaryDetailRow
+        detail = SummaryDetailRow("رقم فاتورة المورد", "AUTO-VERY-LONG-INVOICE-REFERENCE-1234567890")
+        detail.resize(250, 90)
+        detail.show()
+        self.app.processEvents()
+        self.assertEqual(detail.row.direction(), QBoxLayout.Direction.TopToBottom)
+        self.assertIn("1234567890", detail.value_label.text())
+        detail.resize(470, 90)
+        self.app.processEvents()
+        self.assertLessEqual(detail.key_label.maximumWidth(), 160)
+        detail.close()
+        detail.deleteLater()
+
+    def test_wide_schedule_table_uses_horizontal_scrolling(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QHeaderView
+        table = self.page.summary_table(
+            ["القسط", "الاستحقاق", "المبلغ", "الأصل", "الفائدة"],
+            [("1", "2026-12-17", "1,731.35", "1,549.00", "232.35") for _ in range(10)])
+        self.app.processEvents()
+        self.assertEqual(table.model().columnCount(), 5)
+        self.assertEqual(table.model().rowCount(), 10)
+        self.assertEqual(table.horizontalHeader().sectionResizeMode(0),
+                         QHeaderView.ResizeMode.ResizeToContents)
+        self.assertEqual(table.horizontalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
     def test_summary_widgets_refresh_as_one_group(self):
         from PySide6.QtCore import QEvent

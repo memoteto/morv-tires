@@ -94,12 +94,11 @@ class PurchasesListPage(ListPage):
         self.summary_details(details)
         self.summary_metrics([("إجمالي الفاتورة", ltr(fmt(inv.total)))])
         self.summary_section("تفاصيل الأصناف", "tire")
-        for ln in inv.lines:
-            dot = f" · DOT {ltr(ln.dot)}" if ln.dot else ""
-            self.summary_details([
-                (f"{ln.line_no}. {ln.item_name}", f"{ltr(str(ln.qty))} × {ltr(fmt(ln.unit_cost))} = "
-                 f"{ltr(fmt(ln.line_total))}{dot}"),
-            ])
+        self.summary_records(
+            ["الصنف", "الكمية", "تكلفة الوحدة", "الإجمالي", "DOT"],
+            [(f"{ln.line_no}. {ln.item_name}", ltr(str(ln.qty)), ltr(fmt(ln.unit_cost)),
+              ltr(fmt(ln.line_total)), ltr(ln.dot) if ln.dot else "")
+             for ln in inv.lines])
 
     def open_dialog(self, row_id):
         if row_id is not None:
