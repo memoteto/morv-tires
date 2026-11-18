@@ -34,6 +34,8 @@ PATHS = {
     "play": "<circle cx='12' cy='12' r='9'/><path d='M10 8l6 4-6 4z'/>",
     "save": "<path d='M5 3h11l3 3v15H5z'/><path d='M8 3v5h7V3M8 21v-7h8v7'/>",
     "search": "<circle cx='11' cy='11' r='7'/><path d='m20 20-3.5-3.5'/>",
+    "chevron_down": "<path d='m6 9 6 6 6-6'/>",
+    "calendar": "<rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/>",
     "tire": "<circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='4'/><path d='M12 3v5M12 16v5M3 12h5M16 12h5'/>",
     "battery": "<rect x='3' y='7' width='18' height='13' rx='2'/><path d='M7 7V5h3v2M14 7V5h3v2M6.5 13.5h3M15.5 12v3M14 13.5h3'/>",
     "service": "<circle cx='12' cy='13' r='8'/><path d='m12 13 4-4M9 3h6'/>",

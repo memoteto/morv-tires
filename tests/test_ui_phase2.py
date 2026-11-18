@@ -274,7 +274,7 @@ class CustomerStatementUiTest(unittest.TestCase):
         dlg.date_to.setDate(QDate(2026, 6, 1))
         self.assertEqual(len(dlg.model.rows), 0)
         self.assertEqual(dlg.statement.opening, 100000)
-        self.assertIs(dlg.results.currentWidget(), dlg.empty_panel)
+        self.assertFalse(dlg.empty_panel.isHidden())
 
     def test_bad_date_is_refused_without_breaking_the_view(self):
         from PySide6.QtCore import QDate
@@ -349,6 +349,51 @@ class CustomerStatementUiTest(unittest.TestCase):
         self.assertLess(dlg.customer_name_label.y(), dlg.strip.y())
         dlg.close()
 
+    def test_table_headers_stay_visible_when_results_are_empty(self):
+        from PySide6.QtCore import Qt
+
+        dlg = self.dialog()
+        dlg.show()
+        self.app.processEvents()
+        self.assertTrue(dlg.view.horizontalHeader().isVisibleTo(dlg))
+        self.assertTrue(dlg.empty_panel.isHidden())
+        self.assertEqual(dlg.model.headerData(
+            0, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole), "التاريخ")
+        self.assertEqual(dlg.model.headerData(
+            5, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole), "الرصيد")
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("return"))
+        self.app.processEvents()
+        self.assertFalse(dlg.empty_panel.isHidden())
+        self.assertTrue(dlg.view.isVisibleTo(dlg))
+        self.assertTrue(dlg.view.horizontalHeader().isVisibleTo(dlg))
+        self.assertEqual(dlg.empty_panel.geometry(), dlg.view.viewport().rect())
+        dlg.view.resize(dlg.view.width() - 15, dlg.view.height() - 10)
+        self.app.processEvents()
+        self.assertEqual(dlg.empty_panel.geometry(), dlg.view.viewport().rect())
+        dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("all"))
+        self.app.processEvents()
+        self.assertTrue(dlg.empty_panel.isHidden())
+        self.assertTrue(dlg.view.horizontalHeader().isVisibleTo(dlg))
+        dlg.close()
+
+    def test_title_and_input_indicators(self):
+        from PySide6.QtWidgets import QLabel
+
+        dlg = self.dialog()
+        dlg.period_filter.setCurrentIndex(dlg.period_filter.findData("custom"))
+        dlg.show()
+        self.app.processEvents()
+        self.assertGreaterEqual(dlg.title_label.contentsMargins().right(), 18)
+        self.assertTrue(dlg.title_label.isVisibleTo(dlg))
+        for control in (dlg.period_filter, dlg.movement_filter, dlg.date_from, dlg.date_to):
+            indicators = [label for label in control.findChildren(QLabel)
+                          if label.pixmap() is not None]
+            self.assertEqual(len(indicators), 1)
+            self.assertTrue(indicators[0].isVisibleTo(dlg))
+            self.assertGreaterEqual(indicators[0].geometry().left(), 0)
+            self.assertLess(indicators[0].geometry().right(), control.width())
+        dlg.close()
+
     def test_statement_table_scrolls_without_moving_controls(self):
         from PySide6.QtCore import QPoint
         dlg = self.dialog()
@@ -398,7 +443,7 @@ class CustomerStatementUiTest(unittest.TestCase):
         self.assertEqual(len(dlg.model.rows), 1)
         dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("return"))
         self.assertEqual(len(dlg.model.rows), 0)
-        self.assertIs(dlg.results.currentWidget(), dlg.empty_panel)
+        self.assertFalse(dlg.empty_panel.isHidden())
         self.assertEqual((dlg.kpi_debit.text(), dlg.kpi_credit.text(), dlg.kpi_balance.text()), original)
         dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("debit"))
         self.assertEqual(len(dlg.model.rows), 1)
@@ -406,7 +451,7 @@ class CustomerStatementUiTest(unittest.TestCase):
         self.assertEqual(len(dlg.model.rows), 0)
         dlg.movement_filter.setCurrentIndex(dlg.movement_filter.findData("all"))
         self.assertEqual(len(dlg.model.rows), 1)
-        self.assertIs(dlg.results.currentWidget(), dlg.view)
+        self.assertTrue(dlg.empty_panel.isHidden())
 
     def test_type_filter_works_with_real_credit_return(self):
         from morv.infra import sale_returns

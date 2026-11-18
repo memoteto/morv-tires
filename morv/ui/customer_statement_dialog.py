@@ -1,7 +1,7 @@
 """Customer statement dialog: period, totals and the ledger movements of one customer."""
-from PySide6.QtCore import QDate, Qt
+from PySide6.QtCore import QDate, QEvent, QObject, Qt
 from PySide6.QtWidgets import (QAbstractItemView, QCalendarWidget, QComboBox, QDateEdit, QFrame, QHBoxLayout,
-                               QHeaderView, QLabel, QSizePolicy, QStackedWidget, QTableView, QVBoxLayout, QWidget)
+                               QHeaderView, QLabel, QSizePolicy, QTableView, QVBoxLayout, QWidget)
 
 from morv.core.money import MoneyError, fmt
 from morv.core.text import ltr
@@ -11,9 +11,31 @@ from morv.ui.modal import Modal
 from morv.ui.widgets import field, muted, primary_button
 
 
+class _InputIndicator(QObject):
+    def __init__(self, control, icon_name):
+        super().__init__(control)
+        self.label = QLabel(control)
+        self.label.setFixedSize(16, 16)
+        self.label.setPixmap(icons.icon(icon_name, "#9AA7BC", 16).pixmap(16, 16))
+        self.label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        control.installEventFilter(self)
+        self._position(control)
+        self.label.show()
+
+    def _position(self, control):
+        self.label.move(8, (control.height() - self.label.height()) // 2)
+        self.label.raise_()
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.Resize:
+            self._position(watched)
+        return False
+
+
 class CustomerStatementDialog(Modal):
     def __init__(self, customer_name, load, parent=None):
         super().__init__("كشف حساب العميل", parent, width=1080, table_mode=True, height=680)
+        self.title_label.setContentsMargins(0, 0, 18, 0)
         self._load = load
         self.statement = None
         self.body.setSpacing(10)
@@ -42,6 +64,8 @@ class CustomerStatementDialog(Modal):
             self.movement_filter.addItem(title, key)
         self.movement_filter.setMinimumWidth(200)
         self.movement_filter.setObjectName("statementFilter")
+        self._period_indicator = _InputIndicator(self.period_filter, "chevron_down")
+        self._movement_indicator = _InputIndicator(self.movement_filter, "chevron_down")
         filters.addWidget(field("الفترة الزمنية", self.period_filter), 0, Qt.AlignmentFlag.AlignTop)
         filters.addWidget(field("نوع الحركة", self.movement_filter), 0, Qt.AlignmentFlag.AlignTop)
 
@@ -60,6 +84,7 @@ class CustomerStatementDialog(Modal):
             edit.setMinimumWidth(155)
             edit.setMaximumWidth(185)
             edit.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
+            _InputIndicator(edit, "calendar")
             calendar = edit.calendarWidget()
             calendar.setObjectName("statementCalendar")
             calendar.setFixedSize(316, 272)
@@ -118,8 +143,9 @@ class CustomerStatementDialog(Modal):
         self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        self.empty_panel = QWidget()
+        self.empty_panel = QWidget(self.view.viewport())
         self.empty_panel.setObjectName("statementEmpty")
+        self.empty_panel.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         empty_layout = QVBoxLayout(self.empty_panel)
         empty_layout.setContentsMargins(18, 18, 18, 18)
         empty_layout.setSpacing(10)
@@ -137,10 +163,9 @@ class CustomerStatementDialog(Modal):
         empty_layout.addWidget(hint)
         empty_layout.addStretch(1)
 
-        self.results = QStackedWidget()
-        self.results.addWidget(self.view)
-        self.results.addWidget(self.empty_panel)
-        self.body.addWidget(self.results, 1)
+        self.view.viewport().installEventFilter(self)
+        self.empty_panel.setGeometry(self.view.viewport().rect())
+        self.body.addWidget(self.view, 1)
 
         close = primary_button("إغلاق")
         close.clicked.connect(self.accept)
@@ -189,7 +214,12 @@ class CustomerStatementDialog(Modal):
         elif kind == "credit":
             rows = [r for r in rows if r.credit > 0]
         self.model.reset_rows([(r.date, r.doc, r.text, r.debit, r.credit, r.balance) for r in rows])
-        self.results.setCurrentWidget(self.view if rows else self.empty_panel)
+        self.empty_panel.setVisible(not rows)
+
+    def eventFilter(self, watched, event):
+        if watched is self.view.viewport() and event.type() == QEvent.Type.Resize:
+            self.empty_panel.setGeometry(watched.rect())
+        return super().eventFilter(watched, event)
 
     def reload(self) -> None:
         try:
