@@ -23,6 +23,10 @@ def _relaunch() -> None:
         subprocess.Popen([sys.executable, sys.argv[0]])
 
 
+def _mark(log, label: str) -> None:
+    log.info("startup %s %.0fms", label, (time.perf_counter() - T_START) * 1000)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
     smoke = "--smoke" in argv
@@ -32,7 +36,9 @@ def main(argv: list[str] | None = None) -> int:
 
     setup_logging()
     log.info("بدء التشغيل %s", argv[1:])
+    _mark(log, "logging_ready")
     con = open_main_db()
+    _mark(log, "db_opened")
 
     from PySide6.QtCore import QLocale, QTimer
     from PySide6.QtWidgets import QApplication, QDialog
@@ -44,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     from morv.ui.session import Session
     from morv.ui.setup_wizard import SetupWizard
     from morv.ui.shell import MainWindow
+    _mark(log, "imports_done")
 
     QLocale.setDefault(QLocale("en_US"))   # Latin digits whatever the system locale
     app = QApplication(argv)
@@ -125,14 +132,18 @@ def main(argv: list[str] | None = None) -> int:
             user = users.login(state["con"], "admin", "Smoke12345")
         else:
             dlg = LoginDialog(state["con"])
+            _mark(log, "login_shown")
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 app.quit()
                 return
             user = dlg.user
+        _mark(log, "login_accepted")
         session = Session(state["con"], user, on_logout=do_logout, on_restore=do_restore)
         window = MainWindow(session, app)
+        _mark(log, "window_built")
         state["window"] = window
         window.showMaximized()
+        _mark(log, "window_shown")
         QTimer.singleShot(1500, lambda: _scheduled(window, session))
         if smoke:
             QTimer.singleShot(300, lambda: _smoke_done(app, paths, window))
