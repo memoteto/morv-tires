@@ -7,7 +7,8 @@ from morv.infra import sale_view
 from morv.ui.listpage import ListPage
 from morv.ui.sale_return_dialog import SaleReturnDialog
 
-PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة", "transfer": "تحويل / محفظة", "wallet": "محفظة"}
+PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة", "transfer": "تحويل / محفظة", "wallet": "محفظة",
+                  "credit": "آجل", "installment": "تقسيط"}
 
 
 class SalesPage(ListPage):
@@ -41,25 +42,36 @@ class SalesPage(ListPage):
 
     def build_preview(self, row_id: int) -> None:
         inv = sale_view.get_sale(self.session.con, row_id)
-        self.heading(inv.number, f"العميل: {inv.customer_name}")
-        self.kv("تاريخ الفاتورة", ltr(inv.sale_date))
+        self.heading(f"فاتورة {inv.number}", f"العميل: {inv.customer_name}")
+        self.summary_metrics([
+            ("الإجمالي", ltr(fmt(inv.total))),
+            ("المرتجعات", ltr(fmt(inv.returned))),
+            ("الصافي", ltr(fmt(inv.total - inv.returned))),
+        ])
+        self.summary_section("بيانات الفاتورة", "calendar")
+        details = [("تاريخ الفاتورة", ltr(inv.sale_date))]
         if inv.vehicle_plate:
-            self.kv("رقم اللوحة", ltr(inv.vehicle_plate))
+            details.append(("رقم اللوحة", ltr(inv.vehicle_plate)))
         if inv.odometer is not None:
-            self.kv("قراءة العداد", ltr(str(inv.odometer)))
-        self.kv("الإجمالي", ltr(fmt(inv.total)))
+            details.append(("قراءة العداد", ltr(str(inv.odometer))))
         if inv.invoice_discount:
-            self.kv("خصم على الفاتورة", ltr(fmt(inv.invoice_discount)))
-        for p in inv.payments:
-            self.kv(PAYMENT_LABELS.get(p[0], p[0]), ltr(fmt(p[1])))
-        for ln in inv.lines:
-            self.kv(f"{ln.line_no}. {ln.item_name}",
-                    f"{ltr(str(ln.qty))} × {ltr(fmt(ln.unit_price))} = {ltr(fmt(ln.net_total))}")
+            details.append(("خصم على الفاتورة", ltr(fmt(inv.invoice_discount))))
+        self.summary_details(details)
+        self.summary_section("وسائل الدفع", "cash")
+        self.summary_details([(PAYMENT_LABELS.get(p[0], p[0]), ltr(fmt(p[1]))) for p in inv.payments])
+        self.summary_section("تفاصيل الأصناف", "tire")
+        self.summary_records(
+            ["الصنف", "الكمية", "سعر الوحدة", "الإجمالي"],
+            [(f"{ln.line_no}. {ln.item_name}", ltr(str(ln.qty)),
+              ltr(fmt(ln.unit_price)), ltr(fmt(ln.net_total))) for ln in inv.lines])
         if inv.returned:
-            self.kv("المرتجعات", ltr(fmt(inv.returned)))
-            self.kv("الصافي بعد المرتجع", ltr(fmt(inv.total - inv.returned)))
-            for r in inv.returns:
-                self.kv(ltr(r[0]), f"{ltr(r[1])} · {ltr(fmt(r[2]))} · {r[3]}")
+            self.summary_section("المرتجعات", "alert")
+            self.summary_table(
+                ["المستند", "التاريخ", "الإجمالي"],
+                [(ltr(r[0]), ltr(r[1]), ltr(fmt(r[2]))) for r in inv.returns])
+            reasons = [(ltr(r[0]), r[3]) for r in inv.returns if r[3]]
+            if reasons:
+                self.summary_details(reasons)
         if self.can_return():
             btn = QPushButton("مرتجع من الفاتورة")
             btn.clicked.connect(lambda: self.open_return(row_id))

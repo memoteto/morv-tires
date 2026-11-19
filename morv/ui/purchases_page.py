@@ -82,17 +82,23 @@ class PurchasesListPage(ListPage):
 
     def build_preview(self, row_id: int) -> None:
         inv = purchase_view.get_invoice(self.session.con, row_id)
-        self.heading(inv.number, f"المورد: {inv.supplier_name}")
-        self.kv("رقم فاتورة المورد", ltr(inv.supplier_invoice_no))
-        self.kv("تاريخ الفاتورة", ltr(inv.invoice_date))
-        self.kv("تاريخ الاستلام", ltr(inv.received_date))
-        self.kv("الإجمالي", ltr(fmt(inv.total)))
+        self.heading(f"فاتورة شراء {inv.number}", f"المورد: {inv.supplier_name}")
+        self.summary_section("بيانات الفاتورة", "truck")
+        details = [
+            ("رقم فاتورة المورد", ltr(inv.supplier_invoice_no)),
+            ("تاريخ الفاتورة", ltr(inv.invoice_date)),
+            ("تاريخ الاستلام", ltr(inv.received_date)),
+        ]
         if inv.notes:
-            self.kv("ملاحظات", inv.notes)
-        for ln in inv.lines:
-            dot = f" · DOT {ltr(ln.dot)}" if ln.dot else ""
-            self.kv(f"{ln.line_no}. {ln.item_name}",
-                    f"{ltr(str(ln.qty))} × {ltr(fmt(ln.unit_cost))} = {ltr(fmt(ln.line_total))}{dot}")
+            details.append(("ملاحظات", inv.notes))
+        self.summary_details(details)
+        self.summary_metrics([("إجمالي الفاتورة", ltr(fmt(inv.total)))])
+        self.summary_section("تفاصيل الأصناف", "tire")
+        self.summary_records(
+            ["الصنف", "الكمية", "تكلفة الوحدة", "الإجمالي", "DOT"],
+            [(f"{ln.line_no}. {ln.item_name}", ltr(str(ln.qty)), ltr(fmt(ln.unit_cost)),
+              ltr(fmt(ln.line_total)), ltr(ln.dot) if ln.dot else "")
+             for ln in inv.lines])
 
     def open_dialog(self, row_id):
         if row_id is not None:

@@ -74,29 +74,37 @@ class ItemsPage(ListPage):
     def build_preview(self, row_id: int) -> None:
         it = items.get(self.session.con, row_id)
         self.heading(it.name, f"{items.KINDS[it.kind]} · {ltr(it.code)}" + ("" if it.active else " · موقوف"))
-        if it.barcode:
-            self.kv("الباركود", ltr(it.barcode))
-        if it.brand:
-            self.kv("الماركة", it.brand + (f" · {it.model}" if it.model else ""))
-        self.kv("قطاعي", ltr(fmt(it.price_retail)))
-        self.kv("جملة", ltr(fmt(it.price_wholesale)))
-        self.kv("جملة الجملة", ltr(fmt(it.price_super)))
         if it.kind != "service":
-            self.kv("حد الطلب", ltr(str(it.min_qty)))
+            metrics = [("الرصيد", ltr(str(inventory.on_hand(self.session.con, it.id)))),
+                       ("حد الطلب", ltr(str(it.min_qty)))]
+            if self.session.can("purchases.post") or self.session.can("items.cost_view"):
+                metrics.append(("القيمة الدفترية", ltr(fmt(inventory.book_value(self.session.con, it.id)))))
+            self.summary_metrics(metrics)
+        self.summary_section("الأسعار", "cash")
+        self.summary_metrics([
+            ("قطاعي", ltr(fmt(it.price_retail))),
+            ("جملة", ltr(fmt(it.price_wholesale))),
+            ("جملة الجملة", ltr(fmt(it.price_super))),
+        ])
+        details = []
+        if it.barcode:
+            details.append(("الباركود", ltr(it.barcode)))
+        if it.brand:
+            details.append(("الماركة", it.brand + (f" · {it.model}" if it.model else "")))
         labels = {f.key: f for f in items.fields(self.session.con, it.kind)}
         for key, val in it.attrs.items():
             f = labels.get(key)
             if not f:
                 continue
             shown = "نعم" if f.ftype == "bool" else (ltr(val) if any(ch.isascii() and ch.isalnum() for ch in val) else val)
-            self.kv(f.label, shown)
+            details.append((f.label, shown))
         if it.notes:
-            self.kv("ملاحظات", it.notes)
+            details.append(("ملاحظات", it.notes))
+        if details:
+            self.summary_section("بيانات الصنف", it.kind)
+            self.summary_details(details)
         if it.kind != "service":
-            self.kv("الرصيد", ltr(str(inventory.on_hand(self.session.con, it.id))))
-            if self.session.can("purchases.post") or self.session.can("items.cost_view"):
-                self.kv("القيمة الدفترية", ltr(fmt(inventory.book_value(self.session.con, it.id))))
-            self.preview_layout.addWidget(muted("تفاصيل الدفعات وDOT في تبويب «الدفعات (DOT)»."))
+            self.summary_note("تفاصيل الدفعات وDOT في تبويب «الدفعات (DOT)».")
         if self.can_edit():
             edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(it.id))

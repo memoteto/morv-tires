@@ -46,22 +46,32 @@ class CustomersPage(ListPage):
             n = Notice()
             n.show_message(c.notes, "warn")
             self.preview_layout.addWidget(n)
-        self.kv("الموبايل", ltr(c.mobile))
+        contact = [("الموبايل", ltr(c.mobile))]
         if c.mobile2:
-            self.kv("هاتف إضافي", ltr(c.mobile2))
+            contact.append(("هاتف إضافي", ltr(c.mobile2)))
         if c.national_id:
-            self.kv("الرقم القومي", ltr(validate.mask_national_id(c.national_id)))
-        self.kv("العنوان", c.address)
+            contact.append(("الرقم القومي", ltr(validate.mask_national_id(c.national_id))))
+        contact.append(("العنوان", c.address))
         if c.work_place:
-            self.kv("جهة العمل", c.work_place)
-        self.kv("حد الآجل", (fmt(c.credit_limit) + f" · {c.credit_days} يوم") if c.credit_limit else "لا يُسمح بالآجل")
-        self.kv("تذكيرات واتساب", "موافق" if c.whatsapp_ok else "لم يوافق")
-        self.preview_layout.addWidget(muted("آخر زيارة ومواعيد الصيانة تظهر هنا في إصدار لاحق."))
-        self.preview_layout.addWidget(muted("المركبات"))
-        if not c.vehicles:
-            self.preview_layout.addWidget(muted("لا توجد مركبات مسجلة."))
-        for v in c.vehicles:
-            self.kv(v.title or "مركبة", " · ".join(x for x in (v.plate, ltr(v.tire_front) if v.tire_front else "", v.battery) if x))
+            contact.append(("جهة العمل", c.work_place))
+        self.summary_section("بيانات التواصل", "phone")
+        self.summary_details(contact)
+        self.summary_section("بيانات الائتمان", "cash")
+        self.summary_details([
+            ("حد الآجل", fmt(c.credit_limit) if c.credit_limit else "لا يُسمح بالآجل"),
+            ("مدة الائتمان", f"{c.credit_days} يوم"),
+        ])
+        self.summary_section("المركبات", "car")
+        if c.vehicles:
+            self.summary_details([
+                (v.title or "مركبة", " · ".join(x for x in
+                 (v.plate, ltr(v.tire_front) if v.tire_front else "", v.battery) if x))
+                for v in c.vehicles])
+        else:
+            self.summary_note("لا توجد مركبات مسجلة.")
+        self.summary_section("موافقة واتساب", "phone")
+        self.summary_details([("تذكيرات واتساب", "موافق" if c.whatsapp_ok else "لم يوافق")])
+        self.summary_note("آخر زيارة ومواعيد الصيانة تظهر هنا في إصدار لاحق.")
         statement = QPushButton("كشف الحساب")
         statement.clicked.connect(lambda: self.open_statement(c))
         if self.can_edit():

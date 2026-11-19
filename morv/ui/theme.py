@@ -110,9 +110,48 @@ QPushButton#qaMain QLabel#qaIcon {{ background:rgba(255,255,255,0.18); }}
 QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2']}; border:0;
              gridline-color:{t['border']}; selection-background-color:{t['select']}; selection-color:{t['text']}; }}
 QTableView::item {{ padding:0 10px; }}
+QHeaderView {{ background:{t['surface2']}; }}
 QHeaderView::section {{ background:{t['surface2']}; color:{t['muted']}; border:0;
                        border-bottom:1px solid {t['border']}; padding:0 8px; height:36px; font-weight:600; }}
+QTableCornerButton::section {{ background:{t['surface2']}; border:0;
+                              border-bottom:1px solid {t['border']}; }}
 QLabel#cardTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
+QFrame#summarySection {{ border:0; border-bottom:1px solid {t['border']}; }}
+QLabel#summarySectionTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
+QFrame#summaryMetric, QFrame#summaryDetails {{ background:{t['surface2']};
+                                                  border:1px solid {t['border']}; border-radius:10px; }}
+QLabel#summaryMetricValue {{ font-size:{t['fs']+3}px; font-weight:700; }}
+QFrame#summaryNote {{ background:{t['surface2']}; border:1px solid {t['border']};
+                      border-radius:10px; }}
+QTableView#summaryTable {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:8px; }}
+QWidget#summaryAdaptiveTable {{ background:transparent; }}
+QScrollArea#summaryCardsScroll {{ background:transparent; border:0; }}
+QScrollBar:vertical {{
+    width:8px; background:{t['surface2']}; border:0; margin:0; border-radius:4px;
+}}
+QScrollBar::handle:vertical {{
+    background:{t['border_strong']}; min-height:28px; border-radius:4px;
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height:0; border:0;
+}}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background:transparent; }}
+QScrollBar:horizontal {{
+    height:10px; background:{t['surface2']}; border:0; margin:0; border-radius:4px;
+}}
+QScrollBar::handle:horizontal {{
+    background:{t['border_strong']}; min-width:28px; border-radius:4px;
+}}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+    width:0; border:0;
+}}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background:transparent; }}
+QWidget#summaryDetailRow {{ background:transparent; }}
+QFrame#summaryRecord {{ background:{t['surface2']}; border:1px solid {t['border']};
+                        border-radius:10px; }}
+QLabel#summaryRecordLabel {{ color:{t['muted']}; }}
+QLabel#summaryRecordTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
+QLabel#summaryRecordValue {{ font-size:{t['fs']+1}px; font-weight:600; }}
 QPushButton#danger {{ color:{t['danger']}; border-color:{t['danger']}; }}
 QPushButton:disabled {{ color:{t['muted']}; border-color:{t['border']}; }}
 QLabel#noticeError {{ background:{t['danger_soft']}; color:{t['danger']}; border-radius:8px; padding:8px 12px; }}
@@ -138,16 +177,41 @@ QTabBar::tab {{ padding:8px 16px; margin:0 2px; border:1px solid transparent; bo
 QTabBar::tab:selected {{ background:{t['surface']}; border-color:{t['border']}; color:{t['text']}; font-weight:600; }}
 QComboBox {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px; padding:0 10px; }}
 QComboBox QAbstractItemView {{ background:{t['surface']}; selection-background-color:{t['select']}; border:1px solid {t['border']}; }}
+QComboBox#statementFilter {{ padding-left:30px; padding-right:10px; }}
+QComboBox#statementFilter::drop-down {{ subcontrol-origin:border; subcontrol-position:top left;
+                                       width:26px; border:0; background:transparent; }}
+QComboBox#statementFilter::down-arrow {{ width:10px; height:10px; }}
 QCheckBox::indicator {{ width:18px; height:18px; }}
 QListWidget#userList {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:10px; }}
 QListWidget#userList::item {{ padding:10px; border-radius:8px; }}
 QListWidget#userList::item:selected {{ background:{t['primary_soft']}; color:{t['text']}; }}
+QDateEdit#statementDate {{ background:{t['surface']}; color:{t['text']};
+                              border:1px solid {t['border_strong']}; border-radius:8px;
+                              min-height:38px; padding:0 8px 0 28px; }}
+QDateEdit#statementDate:focus {{ border:2px solid {t['primary']}; }}
+QDateEdit#statementDate::drop-down {{ subcontrol-origin:border; subcontrol-position:top left;
+                                     width:26px; border:0; background:transparent; }}
+QDateEdit#statementDate::down-arrow {{ width:10px; height:10px; }}
+QCalendarWidget#statementCalendar {{ background:{t['surface']}; }}
+QCalendarWidget#statementCalendar QWidget#qt_calendar_navigationbar {{ background:{t['surface2']}; }}
+QCalendarWidget#statementCalendar QToolButton {{ color:{t['text']}; background:{t['surface2']};
+                                                   border:0; min-height:0; max-height:30px;
+                                                   padding:0 4px; }}
+QCalendarWidget#statementCalendar QAbstractItemView {{ background:{t['surface']}; color:{t['text']};
+                                                        selection-background-color:{t['primary']};
+                                                        selection-color:{t['on_primary']}; }}
+QLabel#statementCustomerName {{ font-size:{t['fs']+2}px; font-weight:700; }}
+QFrame#statementKpiCard {{ background:{t['surface2']}; border:1px solid {t['border']};
+                           border-radius:10px; }}
+QLabel#statementKpiValue {{ font-size:{t['fs']+3}px; font-weight:700; }}
+QLabel#statementSectionTitle, QLabel#statementEmptyTitle {{ font-weight:700; }}
 QFrame#modalFrame {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:14px; }}
 QWidget#modalHeader {{ background:{t['surface2']}; border-top-left-radius:14px; border-top-right-radius:14px; border-bottom:1px solid {t['border']}; }}
 QLabel#modalTitle {{ font-size:{t['fs']+2}px; font-weight:700; }}
 QWidget#modalBody {{ background:{t['surface']}; }}
 QWidget#modalFooter {{ background:{t['surface2']}; border-top:1px solid {t['border']}; border-bottom-left-radius:14px; border-bottom-right-radius:14px; }}
 QScrollArea {{ background:transparent; border:0; }}
+QScrollArea#previewScroll {{ background:transparent; border:0; }}
 QScrollArea > QWidget > QWidget {{ background:transparent; }}
 QSpinBox {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px; padding:0 10px; }}
 QPlainTextEdit {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; padding:6px 10px; }}

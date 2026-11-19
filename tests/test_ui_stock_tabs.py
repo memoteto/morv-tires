@@ -82,13 +82,53 @@ class StockTabsTest(unittest.TestCase):
         self.assertEqual([r[4] for r in page.model.rows], ["2124"])
 
     def test_lot_preview_shows_movements(self):
-        from PySide6.QtWidgets import QLabel
+        from PySide6.QtWidgets import QTableView
+        from morv.core.text import ltr
+        from morv.ui.tokens import LAYOUT
+        from PySide6.QtWidgets import QHeaderView
         page = self.lots_page()
         row = next(r for r in page.model.rows if r[4] == "2024")
         page.show_preview(row)
-        texts = [lb.text() for lb in page.preview_body.findChildren(QLabel)]
-        self.assertTrue(any("استلام" in t for t in texts))
-        self.assertTrue(any("صرف" in t for t in texts))
+        table = page.preview_body.findChild(QTableView, "summaryTable")
+        self.assertIsNotNone(table)
+        self.assertEqual(table.model().columnCount(), 3)
+        self.assertEqual(table.model().rowCount(), 2)
+        kinds = [table.model().data(table.model().index(i, 0))
+                 for i in range(table.model().rowCount())]
+        self.assertEqual(kinds, ["استلام", "صرف"])
+        qty = [table.model().data(table.model().index(i, 1))
+               for i in range(table.model().rowCount())]
+        self.assertEqual(qty, [ltr("2"), ltr("-1")])
+        from PySide6.QtCore import Qt
+        date = table.model().data(table.model().index(0, 2))
+        self.assertNotIn("\n", date)
+        self.assertIn(" ", date)
+        self.assertFalse(table.wordWrap())
+        self.assertEqual(table.verticalHeader().defaultSectionSize(),
+                         LAYOUT["summary_table_row_height"])
+        self.assertEqual(table.horizontalHeader().sectionResizeMode(2),
+                         QHeaderView.ResizeMode.ResizeToContents)
+        centered = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
+        self.assertEqual(table.model().data(table.model().index(0, 1),
+                                            Qt.ItemDataRole.TextAlignmentRole), centered)
+        self.assertEqual(table.model().headerData(1, Qt.Orientation.Horizontal,
+                                                  Qt.ItemDataRole.TextAlignmentRole), centered)
+
+    def test_item_prices_use_central_metric_cards(self):
+        from PySide6.QtWidgets import QFrame, QLabel
+        from morv.ui.inventory_page import ItemsPage
+        page = self.destroy_on_cleanup(ItemsPage(self.session))
+        page.show_preview_id(self.tire)
+        metrics = [frame for frame in page.preview_body.findChildren(QFrame)
+                   if frame.objectName() == "summaryMetric"]
+        captions = [lbl.text() for frame in metrics for lbl in frame.findChildren(QLabel)
+                    if lbl.objectName() == "muted"]
+        for price_name in ("قطاعي", "جملة", "جملة الجملة"):
+            self.assertIn(price_name, captions)
+
+    def test_lot_return_uses_arabic_label(self):
+        from morv.ui.stock_pages import MOVE_LABELS
+        self.assertEqual(MOVE_LABELS["return"], "مرتجع")
 
     def test_cashier_sees_quantities_but_not_costs(self):
         lots = self.lots_page(self.cashier_session)

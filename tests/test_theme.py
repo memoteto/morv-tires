@@ -32,6 +32,45 @@ class TooltipTest(unittest.TestCase):
             self.assertGreaterEqual(contrast(bg, fg), 4.5, f"تلميح غير مقروء في الوضع {name}")
 
 
+class TableCornerThemeTest(unittest.TestCase):
+    def test_table_corner_uses_header_palette_in_both_themes(self):
+        from morv.ui.tokens import DARK, LIGHT
+
+        for name, palette in (("light", LIGHT), ("dark", DARK)):
+            css = qss_text({**palette, "fs": 14})
+            corner = re.search(r"QTableCornerButton::section\s*\{([^}]*)\}", css)
+            self.assertIsNotNone(corner, name)
+            self.assertIn(f"background:{palette['surface2']}", corner.group(1), name)
+            self.assertIn(f"border-bottom:1px solid {palette['border']}", corner.group(1), name)
+            self.assertEqual(css.count("QTableCornerButton::section"), 1, name)
+
+
+class GlobalScrollbarStyleTest(unittest.TestCase):
+    def test_scrollbars_share_one_theme_in_both_modes(self):
+        from morv.ui.tokens import DARK, LIGHT
+
+        for name, palette in (("light", LIGHT), ("dark", DARK)):
+            css = qss_text({**palette, "fs": 14})
+            for direction, size_key, size in (
+                ("vertical", "width", 8), ("horizontal", "height", 10)
+            ):
+                track = re.search(
+                    rf"(?m)^QScrollBar:{direction}\s*\{{([^}}]*)\}}", css)
+                self.assertIsNotNone(track, f"{name} {direction}")
+                self.assertIn(f"{size_key}:{size}px", track.group(1))
+                self.assertIn(f"background:{palette['surface2']}", track.group(1))
+                handle = re.search(
+                    rf"(?m)^QScrollBar::handle:{direction}\s*\{{([^}}]*)\}}", css)
+                self.assertIsNotNone(handle, f"{name} {direction}")
+                self.assertIn(f"background:{palette['border_strong']}", handle.group(1))
+                self.assertIn(f"QScrollBar::add-line:{direction}", css)
+                self.assertIn(f"QScrollBar::sub-line:{direction}", css)
+                self.assertIn(f"QScrollBar::add-page:{direction}", css)
+                self.assertIn(f"QScrollBar::sub-page:{direction}", css)
+            # POS, preview, tables, lists, and dialogs inherit the same stylesheet.
+            self.assertNotRegex(css, r"(?:QScrollArea|QTableView)#[A-Za-z]+\s+QScrollBar")
+
+
 class ObjectNamesTest(unittest.TestCase):
     # names used to find a widget, not to style it
     LOOKUP_ONLY = {"modal"}

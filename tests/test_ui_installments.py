@@ -87,6 +87,24 @@ class InstallmentsUiTest(unittest.TestCase):
         self.assertEqual(self.con.execute("SELECT count(*) FROM installment_contracts").fetchone()[0], 1)
         self.assertNotIn("فاتورة بلا عقد", p.list_page.total())
 
+    def test_posted_contract_preview_has_central_schedule(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QTableView
+        p, f = self.opened_form()
+        f.down.setText("2000.00")
+        f.national_id.setText(NID)
+        f.post()
+        self.assertIsNotNone(f.posted)
+        row_id = p.list_page.model.rows[0][0]
+        p.list_page.show_preview_id(row_id)
+        table = p.list_page.preview_body.findChild(QTableView, "summaryTable")
+        self.assertIsNotNone(table)
+        self.assertIs(table.parentWidget(), p.list_page.preview_body)
+        self.assertEqual(table.model().columnCount(), 5)
+        self.assertEqual(table.model().rowCount(), 10)
+        self.assertEqual(table.model().headerData(
+            1, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole), "الاستحقاق")
+
     def test_missing_national_id_is_refused_by_the_engine(self):
         _p, f = self.opened_form()
         f.down.setText("2000.00")

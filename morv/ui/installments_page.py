@@ -157,20 +157,30 @@ class ContractsPage(ListPage):
     def build_preview(self, row_id: int) -> None:
         c = installment_view.get_contract(self.session.con, row_id)
         self.heading(ltr(c.number), f"{c.customer_name} · {ltr(c.customer_mobile)}")
-        self.kv("فاتورة البيع", ltr(c.sale_number))
-        self.kv("تاريخ العقد", ltr(c.contract_date))
-        self.kv("سعر الكاش", ltr(fmt(c.cash_price)))
-        self.kv("المقدم", ltr(fmt(c.down)))
-        self.kv("المبلغ المموّل", ltr(fmt(c.financed)))
-        self.kv(f"الفائدة {ltr(f'{c.rate_bp / 100:g}%')}", ltr(fmt(c.markup)))
-        self.kv("إجمالي الأقساط", ltr(fmt(c.instalments_total)))
-        self.kv("إجمالي العقد", ltr(fmt(c.contract_total)))
+        self.summary_metrics([
+            ("إجمالي العقد", ltr(fmt(c.contract_total))),
+            ("إجمالي الأقساط", ltr(fmt(c.instalments_total))),
+            ("المبلغ المموّل", ltr(fmt(c.financed))),
+        ])
+        self.summary_section("بيانات العقد", "calendar")
+        details = [
+            ("فاتورة البيع", ltr(c.sale_number)),
+            ("تاريخ العقد", ltr(c.contract_date)),
+            ("سعر الكاش", ltr(fmt(c.cash_price))),
+            ("المقدم", ltr(fmt(c.down))),
+            (f"الفائدة {ltr(f'{c.rate_bp / 100:g}%')}", ltr(fmt(c.markup))),
+        ]
         if c.guarantor_name:
-            self.kv("الضامن", c.guarantor_name)
-        self.kv("تذكيرات واتساب", "موافق" if c.whatsapp_ok else "لم يوافق")
-        for r in c.rows:
-            self.kv(f"{ltr(str(r[0]))}. {ltr(r[1])}",
-                    f"{ltr(fmt(r[2]))} · أصل {ltr(fmt(r[3]))} · فائدة {ltr(fmt(r[4]))}")
+            details.append(("الضامن", c.guarantor_name))
+        details.append(("تذكيرات واتساب", "موافق" if c.whatsapp_ok else "لم يوافق"))
+        self.summary_details(details)
+        self.summary_section("جدول الأقساط", "cash")
+        self.summary_table(
+            ["القسط", "الاستحقاق", "المبلغ", "الأصل", "الفائدة"],
+            [(ltr(str(r[0])), ltr(r[1]), ltr(fmt(r[2])), ltr(fmt(r[3])), ltr(fmt(r[4])))
+             for r in c.rows],
+            column_alignments=(Qt.AlignmentFlag.AlignCenter,) * 5,
+            keep_table=True)
         if self.can_edit() and self.stack is not None:
             btn = primary_button("تحصيل قسط")
             btn.clicked.connect(lambda: self.stack.open_collect(row_id))
