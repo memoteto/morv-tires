@@ -28,7 +28,10 @@ class InventoryPage(QWidget):
         self.items_tab = ItemsPage(session)
         if profile_startup:
             log.info("PROFILE inventory_tab=items init_ms=%.1f", (perf_counter() - started) * 1000)
+        tab_started = perf_counter() if profile_startup else 0.0
         self.tabs.addTab(self.items_tab, "الأصناف")
+        if profile_startup:
+            log.info("PROFILE inventory_step=add_items_tab ms=%.1f", (perf_counter() - tab_started) * 1000)
         started = perf_counter() if profile_startup else 0.0
         self.lots_tab = LotsPage(session)
         if profile_startup:
@@ -37,10 +40,19 @@ class InventoryPage(QWidget):
         self.stock_tab = StockPage(session)
         if profile_startup:
             log.info("PROFILE inventory_tab=stock init_ms=%.1f", (perf_counter() - started) * 1000)
+        tab_started = perf_counter() if profile_startup else 0.0
         self.tabs.addTab(self.lots_tab, "الدفعات (DOT)")
+        if profile_startup:
+            log.info("PROFILE inventory_step=add_lots_tab ms=%.1f", (perf_counter() - tab_started) * 1000)
+            tab_started = perf_counter()
         self.tabs.addTab(self.stock_tab, "الجرد والتسويات")
+        if profile_startup:
+            log.info("PROFILE inventory_step=add_stock_tab ms=%.1f", (perf_counter() - tab_started) * 1000)
+            tab_started = perf_counter()
         self.tabs.currentChanged.connect(self._refresh_tab)
         lay.addWidget(self.tabs)
+        if profile_startup:
+            log.info("PROFILE inventory_step=finish_layout ms=%.1f", (perf_counter() - tab_started) * 1000)
 
     def _refresh_tab(self, _index: int) -> None:
         page = self.tabs.currentWidget()
