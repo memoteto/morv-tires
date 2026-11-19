@@ -1,11 +1,14 @@
 """Read-only aggregates for the home dashboard: period KPIs, alerts, and recent activity."""
+import os
 import sqlite3
+from time import perf_counter
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 from morv.core.sales_rules import PAYMENT_ACCOUNT
 from morv.infra import backup, installment_view, ledger
+from morv.infra.logs import log
 
 CASH_ACCOUNTS = ("1110", "1210", "1220", "1230")
 OLD_DOT_YEARS = 3
@@ -104,29 +107,47 @@ def _old_dot_alert(con: sqlite3.Connection, today: date) -> Alert | None:
 
 
 def get(con: sqlite3.Connection, period: str = "today", today: str | None = None) -> DashboardView:
+    profile_startup = os.environ.get("MORV_PROFILE_STARTUP") == "1"
+    profile_last = perf_counter() if profile_startup else 0.0
+
+    def profile_step(name: str) -> None:
+        nonlocal profile_last
+        if profile_startup:
+            now = perf_counter()
+            log.info("PROFILE dashboard_step=%s ms=%.1f", name, (now - profile_last) * 1000)
+            profile_last = now
+
     today_d = date.fromisoformat(today) if today else date.today()
     today_s = today_d.isoformat()
     start = _period_start(period, today_d)
     sales_total, sales_count = _sales_in(con, start, today_s)
+    profile_step("sales_period")
     collected_total = sum(amount for _, amount in _collections_in(con, start, today_s))
+    profile_step("collections_period")
 
     due = installment_view.list_view(con, filter_key="all", today=today_s)
+    profile_step("installments_all")
     due_count = sum(row.amount_now > 0 for row in due.rows)
     due_amount = due.kpis.late_amount + due.kpis.today_amount
     account_balances = tuple((code, ledger.account_balance(con, code)) for code in CASH_ACCOUNTS)
     cash_balance = sum(amount for _, amount in account_balances)
+    profile_step("account_balances")
 
     chart_days = []
     for i in range(6, -1, -1):
         d = (today_d - timedelta(days=i)).isoformat()
         total = con.execute("SELECT coalesce(sum(total), 0) FROM sales WHERE sale_date = ?", (d,)).fetchone()[0]
         chart_days.append((d, total))
+    profile_step("chart_7_days")
 
     alerts = _due_alerts(con, today_s)
+    profile_step("installment_alerts")
     old_dot = _old_dot_alert(con, today_d)
+    profile_step("old_dot_alert")
     if old_dot:
         alerts.append(old_dot)
     level, msg = backup.health(con)
+    profile_step("backup_health")
     alerts.append(Alert({"ok": "ok", "warn": "warn", "danger": "bad"}[level], "backup", 0, 0, msg, "settings"))
 
     recent = con.execute(
@@ -134,13 +155,16 @@ def get(con: sqlite3.Connection, period: str = "today", today: str | None = None
         "(SELECT group_concat(DISTINCT p.method) FROM sale_payments p WHERE p.sale_id = s.id), s.total, s.sale_date "
         "FROM sales s LEFT JOIN customers c ON c.id = s.customer_id ORDER BY s.id DESC LIMIT 5").fetchall()
 
+    profile_step("recent_sales")
     pay_today = _collections_in(con, today_s, today_s)
+    profile_step("collections_today")
 
     month_start = today_d.replace(day=1).isoformat()
     top_month = con.execute(
         "SELECT i.name, sum(sl.qty) q FROM sale_lines sl JOIN sales s ON s.id = sl.sale_id "
         "JOIN items i ON i.id = sl.item_id WHERE s.sale_date BETWEEN ? AND ? "
         "GROUP BY sl.item_id ORDER BY q DESC LIMIT 5", (month_start, today_s)).fetchall()
+    profile_step("top_items_month")
 
     return DashboardView(period, sales_total, sales_count, collected_total, due_count, due_amount, cash_balance,
                          tuple(chart_days), tuple(alerts), tuple(recent), tuple(pay_today), tuple(top_month), account_balances)
