@@ -200,13 +200,12 @@ class DashboardPage(QWidget):
         self._fetch_gen += 1
         gen = self._fetch_gen
         period = self.period
-        con = self.session.con
 
         def on_done(view, _err):
             if gen == self._fetch_gen:
                 self._on_data(view)
 
-        run_async(lambda: dashboard_view.get(con, period=period), on_done, self)
+        run_async(lambda con: dashboard_view.get(con, period=period), on_done, self, self.session.con)
 
     def _on_data(self, v) -> None:
         if v is None:

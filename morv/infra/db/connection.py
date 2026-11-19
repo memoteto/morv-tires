@@ -74,8 +74,22 @@ def open_db(path, create: bool = False) -> sqlite3.Connection:
     # A file with no tables is a creation that failed before; only create may finish it
     if exists and read_app_id(p) != APP_ID and not (create and _is_empty(p)):
         raise UnsafeDatabase(f"هذه ليست قاعدة Morv Tires، تم الرفض: {p}")
-    # check_same_thread=False allows read queries from worker threads (e.g. background fetch).
-    # Writes always happen on the UI thread via transaction(); workers only SELECT.
-    con = sqlite3.connect(p, isolation_level=None, check_same_thread=False)
+    con = sqlite3.connect(p, isolation_level=None)
     _apply_pragmas(con)
+    return con
+
+
+def db_path(con: sqlite3.Connection) -> str:
+    """File behind an open connection, or an empty string for an in-memory database."""
+    return con.execute("PRAGMA database_list").fetchone()[2] or ""
+
+
+def open_reader(path) -> sqlite3.Connection:
+    """Short-lived read-only connection for one background fetch; the caller closes it."""
+    p = Path(path)
+    if p.name.lower() in FORBIDDEN_NAMES:
+        raise UnsafeDatabase(f"رفض فتح قاعدة البرنامج القديم: {p}")
+    con = sqlite3.connect(f"{p.resolve().as_uri()}?mode=ro", uri=True)
+    con.execute("PRAGMA query_only=ON")
+    con.execute("PRAGMA busy_timeout=3000")
     return con

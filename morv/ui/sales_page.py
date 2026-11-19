@@ -27,13 +27,13 @@ class SalesPage(ListPage):
     def can_edit(self) -> bool:
         return False
 
-    def can_view(self) -> bool:
-        return self.session.can("sales.post")
+    def can_view(self, con=None) -> bool:
+        return self.session.can("sales.post", con)
 
-    def fetch(self, query, filter_key, offset):
-        if not self.can_view():
+    def fetch(self, con, query, filter_key, offset):
+        if not self.can_view(con):
             return []
-        return sale_view.list_sales(self.session.con, query, offset=offset)
+        return sale_view.list_sales(con, query, offset=offset)
 
     def total(self) -> str:
         if not self.can_view():

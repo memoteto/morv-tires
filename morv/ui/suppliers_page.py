@@ -28,8 +28,8 @@ class SuppliersPage(ListPage):
     def can_edit(self) -> bool:
         return self.session.can("suppliers.manage")
 
-    def fetch(self, query, filter_key, offset):
-        return suppliers.search(self.session.con, query, include_inactive=filter_key == "inactive", offset=offset)
+    def fetch(self, con, query, filter_key, offset):
+        return suppliers.search(con, query, include_inactive=filter_key == "inactive", offset=offset)
 
     def total(self) -> str:
         return f"{suppliers.count(self.session.con)} مورد نشط"

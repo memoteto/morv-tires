@@ -31,6 +31,10 @@ class InventoryPage(QWidget):
         self.tabs.currentChanged.connect(self._refresh_tab)
         lay.addWidget(self.tabs)
 
+    def refresh(self) -> None:
+        page = self.tabs.currentWidget()
+        page.refresh() if hasattr(page, "refresh") else page.reload()
+
     def _refresh_tab(self, index: int) -> None:
         # Build lazy tabs on first access; guard against re-entrant signal during insertTab.
         if index == 1 and self.lots_tab is None:
@@ -78,9 +82,9 @@ class ItemsPage(ListPage):
     def can_edit(self) -> bool:
         return self.session.can("items.manage")
 
-    def fetch(self, query, filter_key, offset):
+    def fetch(self, con, query, filter_key, offset):
         kind = filter_key if filter_key in items.KINDS else None
-        return items.search(self.session.con, query, kind=kind, include_inactive=filter_key == "inactive", offset=offset)
+        return items.search(con, query, kind=kind, include_inactive=filter_key == "inactive", offset=offset)
 
     def total(self) -> str:
         return f"{items.count(self.session.con)} صنف نشط"

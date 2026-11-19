@@ -4,6 +4,8 @@ import atexit
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from shiboken6 import isValid
 
+from morv.infra.db.connection import db_path, open_reader
+
 # Tests switch this on so reload() stays synchronous and deterministic.
 SYNC = False
 
@@ -14,16 +16,23 @@ _LIVE: set = set()
 class _Worker(QObject):
     done = Signal(object, str)
 
-    def __init__(self, fn):
+    def __init__(self, fn, path):
         super().__init__()
         self._fn = fn
+        self._path = path
 
     @Slot()
     def run(self) -> None:
+        # Opened and closed in this thread: sqlite connections must not cross threads.
+        reader = None
         try:
-            self.done.emit(self._fn(), "")
+            reader = open_reader(self._path)
+            self.done.emit(self._fn(reader), "")
         except Exception as e:
             self.done.emit(None, str(e) or type(e).__name__)
+        finally:
+            if reader is not None:
+                reader.close()
 
 
 class _Receiver(QObject):
@@ -46,16 +55,21 @@ class _Receiver(QObject):
         _LIVE.discard(self._entry)
 
 
-def run_async(fn, on_done, owner: QObject) -> None:
-    """Call fn off the UI thread, then on_done(result, error) on it unless owner was destroyed."""
-    if SYNC:
+def run_async(fn, on_done, owner: QObject, con) -> None:
+    """Call fn(reader) off the UI thread, then on_done(result, error) on it unless owner was destroyed.
+
+    fn gets a private read-only connection, so it never sees uncommitted writes of the UI thread.
+    Tests and in-memory databases run fn(con) inline on the main connection instead.
+    """
+    path = db_path(con)
+    if SYNC or not path:
         try:
-            result, err = fn(), ""
+            result, err = fn(con), ""
         except Exception as e:
             result, err = None, str(e) or type(e).__name__
         on_done(result, err)
         return
-    worker = _Worker(fn)
+    worker = _Worker(fn, path)
     thread = QThread()
     receiver = _Receiver(owner, on_done)
     entry = (thread, worker, receiver)

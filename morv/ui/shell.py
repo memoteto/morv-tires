@@ -213,8 +213,9 @@ class MainWindow(QMainWindow):
         if row < 0:
             return
         key = NAV[row][0]
+        first_visit = key in self._builders
         # Build the page on first visit if it was deferred.
-        if key in self._builders:
+        if first_visit:
             page = self._builders.pop(key)(self.session)
             self.pages[key] = page
             self.stack.insertWidget(row, page)
@@ -226,6 +227,9 @@ class MainWindow(QMainWindow):
                 page.contract_needed.connect(self.open_contract)
         self.stack.setCurrentIndex(row)
         self.title.setText(NAV[row][1])
+        # Other screens may have changed the data since this one was last shown; home refreshes itself.
+        if not first_visit and hasattr(self.pages[key], "refresh"):
+            self.pages[key].refresh()
         if key == "settings" and hasattr(self, "health_pill"):
             self.refresh_health()
 
