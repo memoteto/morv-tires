@@ -1,4 +1,6 @@
 """Stock screen tabs: items, lots and stocktake."""
+import os
+from time import perf_counter
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLineEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget,
                                QVBoxLayout, QWidget)
@@ -7,6 +9,7 @@ from morv.core import validate
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
 from morv.infra import inventory, items
+from morv.infra.logs import log
 from morv.infra.items import Item
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
@@ -20,10 +23,20 @@ class InventoryPage(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 16, 24, 16)
         self.tabs = QTabWidget()
+        profile_startup = os.environ.get("MORV_PROFILE_STARTUP") == "1"
+        started = perf_counter() if profile_startup else 0.0
         self.items_tab = ItemsPage(session)
+        if profile_startup:
+            log.info("PROFILE inventory_tab=items init_ms=%.1f", (perf_counter() - started) * 1000)
         self.tabs.addTab(self.items_tab, "الأصناف")
+        started = perf_counter() if profile_startup else 0.0
         self.lots_tab = LotsPage(session)
+        if profile_startup:
+            log.info("PROFILE inventory_tab=lots init_ms=%.1f", (perf_counter() - started) * 1000)
+        started = perf_counter() if profile_startup else 0.0
         self.stock_tab = StockPage(session)
+        if profile_startup:
+            log.info("PROFILE inventory_tab=stock init_ms=%.1f", (perf_counter() - started) * 1000)
         self.tabs.addTab(self.lots_tab, "الدفعات (DOT)")
         self.tabs.addTab(self.stock_tab, "الجرد والتسويات")
         self.tabs.currentChanged.connect(self._refresh_tab)
