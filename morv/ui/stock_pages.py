@@ -61,21 +61,22 @@ class LotsPage(ListPage):
         self.summary_section("حركة الدفعة", "truck")
         moves = stock_view.lot_movements(self.session.con, row_id)
         if moves:
+            has_override = any(kind == "issue" and non_oldest
+                               for kind, _qty, _at, non_oldest, _reason in moves)
             self.summary_table(
                 ["الحركة", "الكمية", "التاريخ"],
-                [(MOVE_LABELS.get(kind, kind), ltr(str(qty)), ltr(at))
-                 for kind, qty, at, _non_oldest, _reason in moves],
+                [(f"{MOVE_LABELS.get(kind, kind)}\n{reason}"
+                  if kind == "issue" and non_oldest else MOVE_LABELS.get(kind, kind),
+                  ltr(str(qty)), ltr(at))
+                 for kind, qty, at, non_oldest, reason in moves],
                 column_alignments=(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute | Qt.AlignmentFlag.AlignVCenter,
                     Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
                     Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
                 ),
-                one_line_dates=True)
+                one_line_dates=True, multiline_rows=has_override)
         else:
             self.summary_note("لا توجد حركات مسجلة لهذه الدفعة.")
-        for kind, _qty, _at, non_oldest, reason in moves:
-            if kind == "issue" and non_oldest:
-                self.summary_note(f"صرف من غير الأقدم: {reason}")
 
 
 
@@ -120,17 +121,18 @@ class StockPage(ListPage):
         if lots:
             if _cost_ok(self.session):
                 self.summary_table(
-                    ["DOT", "المتبقي", "تكلفة الشراء"],
-                    [(ltr(dot) if dot else "—", ltr(str(on_hand)), ltr(fmt(unit_cost)))
-                     for _id, _ref, dot, _received, _qty_in, on_hand, unit_cost in lots])
+                    ["DOT / مرجع الدفعة", "المتبقي", "تكلفة الشراء"],
+                    [(f"{ltr(dot) if dot else '—'}\n{ltr(ref)}",
+                      ltr(str(on_hand)), ltr(fmt(unit_cost)))
+                     for _id, ref, dot, _received, _qty_in, on_hand, unit_cost in lots],
+                    multiline_rows=True)
                 self.summary_note("تكلفة الشراء التاريخية للدفعات مستقلة عن تقييم FIFO والقيمة الدفترية.")
             else:
                 self.summary_table(
-                    ["DOT", "المتبقي"],
-                    [(ltr(dot) if dot else "—", ltr(str(on_hand)))
-                     for _id, _ref, dot, _received, _qty_in, on_hand, _unit_cost in lots])
-            self.summary_details([("مرجع الدفعة", ltr(ref))
-                                  for _id, ref, _dot, _received, _qty_in, _on_hand, _unit_cost in lots])
+                    ["DOT / مرجع الدفعة", "المتبقي"],
+                    [(f"{ltr(dot) if dot else '—'}\n{ltr(ref)}", ltr(str(on_hand)))
+                     for _id, ref, dot, _received, _qty_in, on_hand, _unit_cost in lots],
+                    multiline_rows=True)
         else:
             self.summary_note("لا رصيد لهذا الصنف.")
         self.summary_note("تسويات الجرد (زيادة أو نقص أو تلف) غير مفعّلة بعد؛ تُضاف مع دفتر التسويات.")
