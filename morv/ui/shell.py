@@ -21,6 +21,7 @@ from morv.ui.sales_page import SalesPage
 from morv.ui.settings_page import SettingsPage
 from morv.ui.shell_placeholder import placeholder
 from morv.ui.suppliers_page import SuppliersPage
+from morv.ui.treasury_page import TreasuryPage
 from morv.ui.widgets import ask
 
 SIDE_WIDE = 244     # sidebar width when open
@@ -81,7 +82,8 @@ class MainWindow(QMainWindow):
         # Pages built on first navigation, not at startup. Only "home" is built immediately.
         self._builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
                           "inventory": InventoryPage, "purchases": PurchasesPage, "sales": SalesPage,
-                          "pos": PosPage, "installments": InstallmentsPage}
+                          "pos": PosPage, "installments": InstallmentsPage,
+                          "treasury": TreasuryPage}
         for key, _title, _icon, phase in NAV:
             if key == "home":
                 page = DashboardPage(session, on_navigate=self.dashboard_navigate)
