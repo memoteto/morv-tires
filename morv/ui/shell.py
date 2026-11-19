@@ -206,10 +206,6 @@ class MainWindow(QMainWindow):
                     backup.copy_to_usb(self.con, self.session.user.username)
                 except backup.BackupError:
                     pass
-        # Stop any background fetch threads before Qt destroys child widgets.
-        for page in self.pages.values():
-            if hasattr(page, "_stop_thread"):
-                page._stop_thread()
         super().closeEvent(event)
 
     # ---------- Behaviour ----------

@@ -33,6 +33,8 @@ def get_app():
     from PySide6.QtWidgets import QApplication as App
     if _app is None:
         _app = App.instance() or App([])
+        from morv.ui import workers
+        workers.SYNC = True
         import atexit
         atexit.register(_shutdown)
     return _app
