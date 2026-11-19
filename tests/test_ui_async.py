@@ -100,6 +100,7 @@ class RunAsyncTest(unittest.TestCase):
             seen[0].execute("SELECT 1")
 
     def test_every_list_page_fetches_through_a_read_only_reader(self):
+        self.workers.SYNC = True    # pages load inline here; only fetch() is run on the reader
         from morv.infra import dashboard_view, users
         from morv.infra.db.connection import db_path, open_reader
         from morv.ui.customers_page import CustomersPage

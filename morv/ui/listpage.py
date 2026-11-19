@@ -407,7 +407,8 @@ class ListPage(QWidget):
             except ClosedDatabase:
                 return None
 
-        run_async(fetch_rows, lambda rows, err: self._on_fetch_done(rows, err, keep_id, gen), self, self.session.con)
+        run_async(fetch_rows, lambda rows, err: self._on_fetch_done(rows, err, keep_id, gen), self,
+                  getattr(self.session, "con", None))
 
     def _on_fetch_done(self, rows: list | None, err: str, keep_id: int | None, gen: int) -> None:
         if gen != self._fetch_gen:

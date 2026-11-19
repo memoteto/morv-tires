@@ -4,7 +4,7 @@ import atexit
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from shiboken6 import isValid
 
-from morv.infra.db.connection import db_path, open_reader
+from morv.infra.db.connection import ClosedDatabase, db_path, open_reader
 
 # Tests switch this on so reload() stays synchronous and deterministic.
 SYNC = False
@@ -47,8 +47,12 @@ class _Receiver(QObject):
     @Slot(object, str)
     def deliver(self, result, err) -> None:
         # The owner may have been destroyed while the fetch was running.
-        if isValid(self._owner):
+        if not isValid(self._owner):
+            return
+        try:
             self._on_done(result, err)
+        except ClosedDatabase:
+            pass    # the database was closed (shutdown or restore) while the fetch was running
 
     @Slot()
     def finish(self) -> None:
@@ -61,7 +65,7 @@ def run_async(fn, on_done, owner: QObject, con) -> None:
     fn gets a private read-only connection, so it never sees uncommitted writes of the UI thread.
     Tests and in-memory databases run fn(con) inline on the main connection instead.
     """
-    path = db_path(con)
+    path = db_path(con) if con is not None else ""
     if SYNC or not path:
         try:
             result, err = fn(con), ""
