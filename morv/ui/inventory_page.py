@@ -18,8 +18,8 @@ class InventoryPage(QWidget):
     def __init__(self, session):
         super().__init__()
         self._session = session
-        self._lots_tab: "LotsPage | None" = None
-        self._stock_tab: "StockPage | None" = None
+        self.lots_tab: "LotsPage | None" = None
+        self.stock_tab: "StockPage | None" = None
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 16, 24, 16)
         self.tabs = QTabWidget()
@@ -32,20 +32,24 @@ class InventoryPage(QWidget):
         lay.addWidget(self.tabs)
 
     def _refresh_tab(self, index: int) -> None:
-        page = self.tabs.currentWidget()
-        # Build lazy tabs on first access, then reload on every subsequent visit.
-        if index == 1 and self._lots_tab is None:
-            self._lots_tab = LotsPage(self._session)
+        # Build lazy tabs on first access; guard against re-entrant signal during insertTab.
+        if index == 1 and self.lots_tab is None:
+            self.tabs.currentChanged.disconnect(self._refresh_tab)
+            self.lots_tab = LotsPage(self._session)
             self.tabs.removeTab(1)
-            self.tabs.insertTab(1, self._lots_tab, "الدفعات (DOT)")
+            self.tabs.insertTab(1, self.lots_tab, "الدفعات (DOT)")
             self.tabs.setCurrentIndex(1)
+            self.tabs.currentChanged.connect(self._refresh_tab)
             return
-        if index == 2 and self._stock_tab is None:
-            self._stock_tab = StockPage(self._session)
+        if index == 2 and self.stock_tab is None:
+            self.tabs.currentChanged.disconnect(self._refresh_tab)
+            self.stock_tab = StockPage(self._session)
             self.tabs.removeTab(2)
-            self.tabs.insertTab(2, self._stock_tab, "الجرد والتسويات")
+            self.tabs.insertTab(2, self.stock_tab, "الجرد والتسويات")
             self.tabs.setCurrentIndex(2)
+            self.tabs.currentChanged.connect(self._refresh_tab)
             return
+        page = self.tabs.currentWidget()
         if page is not self.items_tab:
             page.reload()
 
