@@ -113,8 +113,11 @@ class SalePaymentsLookupMigrationTest(unittest.TestCase):
             if "FROM sales s" in sql and "FROM sale_payments p" in sql
         )
         plan = self.con.execute("EXPLAIN QUERY PLAN " + statement).fetchall()
+        # Newer SQLite (>=3.5x) inserts "EXISTS" into the step's text for an index-only EXISTS
+        # lookup ("SEARCH p EXISTS USING COVERING INDEX ..."); match loosely across versions.
         self.assertTrue(
-            any("SEARCH p USING COVERING INDEX sale_payments_sale_method" in row[3] for row in plan),
+            any(row[3].startswith("SEARCH p") and "COVERING INDEX sale_payments_sale_method" in row[3]
+                for row in plan),
             plan,
         )
         self.assertEqual(
