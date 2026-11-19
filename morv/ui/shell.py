@@ -1,5 +1,7 @@
 """Main window shell: collapsible sidebar, top bar and the page area."""
 from datetime import date
+import os
+from time import perf_counter
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
@@ -10,6 +12,7 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget,
 from morv import APP_NAME, VERSION
 from morv.core import security
 from morv.infra import backup, settings
+from morv.infra.logs import log
 from morv.ui import icons, theme
 from morv.ui.customers_page import CustomersPage
 from morv.ui.dashboard_page import DashboardPage
@@ -51,6 +54,8 @@ NAV = [
 class MainWindow(QMainWindow):
     def __init__(self, session, app: QApplication):
         super().__init__()
+        profile_startup = os.environ.get("MORV_PROFILE_STARTUP") == "1"
+        shell_started = perf_counter() if profile_startup else 0.0
         self.session = session
         con = self.con = session.con
         self.app = app
@@ -81,7 +86,10 @@ class MainWindow(QMainWindow):
         builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
                     "inventory": InventoryPage, "purchases": PurchasesPage, "sales": SalesPage,
                     "pos": PosPage, "installments": InstallmentsPage}
+        if profile_startup:
+            log.info("PROFILE shell_before_pages_ms=%.1f", (perf_counter() - shell_started) * 1000)
         for key, _title, _icon, phase in NAV:
+            page_started = perf_counter() if profile_startup else 0.0
             if key == "home":
                 page = DashboardPage(session, on_navigate=self.dashboard_navigate)
             elif key in builders:
@@ -90,6 +98,8 @@ class MainWindow(QMainWindow):
                 page = placeholder(phase)
             self.pages[key] = page
             self.stack.addWidget(page)
+            if profile_startup:
+                log.info("PROFILE page=%s init_ms=%.1f", key, (perf_counter() - page_started) * 1000)
         self.pages["pos"].contract_needed.connect(self.open_contract)
         col.addWidget(self.stack, 1)
         row.addWidget(main, 1)
@@ -104,6 +114,8 @@ class MainWindow(QMainWindow):
         self.health_timer = QTimer(self)
         self.health_timer.timeout.connect(self.refresh_health)
         self.health_timer.start(60_000)
+        if profile_startup:
+            log.info("PROFILE shell_total_ms=%.1f", (perf_counter() - shell_started) * 1000)
 
     # ---------- Building ----------
     def _build_side(self) -> QWidget:
