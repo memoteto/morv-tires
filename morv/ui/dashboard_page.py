@@ -34,6 +34,7 @@ class DashboardPage(QWidget):
         self.period = "today"
         self.kpi_values: dict[str, tuple] = {}
         self.period_buttons: dict[str, QPushButton] = {}
+        self._fetch_thread: QThread | None = None
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -195,7 +196,7 @@ class DashboardPage(QWidget):
         return box
 
     def _stop_thread(self) -> None:
-        if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
+        if self._fetch_thread is not None and self._fetch_thread.isRunning():
             self._fetch_thread.quit()
             self._fetch_thread.wait()
 
@@ -207,7 +208,7 @@ class DashboardPage(QWidget):
         period = self.period
         con = self.session.con
         # Cancel any in-flight fetch before starting a new one.
-        if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
+        if self._fetch_thread is not None and self._fetch_thread.isRunning():
             self._fetch_thread.quit()
             self._fetch_thread.wait()
         worker = _DashWorker(lambda: dashboard_view.get(con, period=period))

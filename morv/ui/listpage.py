@@ -171,6 +171,7 @@ class ListPage(QWidget):
         self.session = session
         self.filter_key = self.filters[0][0] if self.filters else None
         self.offset = 0
+        self._fetch_thread: QThread | None = None
         root = QVBoxLayout(self)
         root.setContentsMargins(LAYOUT["page_margin"], 16, LAYOUT["page_margin"], 16)
         root.setSpacing(LAYOUT["pane_gap"])
@@ -386,7 +387,7 @@ class ListPage(QWidget):
         self.reload()
 
     def _stop_thread(self) -> None:
-        if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
+        if self._fetch_thread is not None and self._fetch_thread.isRunning():
             self._fetch_thread.quit()
             self._fetch_thread.wait()
 
