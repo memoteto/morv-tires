@@ -387,24 +387,35 @@ class ListPage(QWidget):
 
     def reload(self, keep_id: int | None = None) -> None:
         self.offset = 0
+        # Generation counter: results from an older generation are silently dropped.
+        self._fetch_gen = getattr(self, "_fetch_gen", 0) + 1
+        gen = self._fetch_gen
         query = self.search.text()
         filter_key = self.filter_key
-        # Cancel any in-flight fetch before starting a new one.
+        # Safe thread teardown: wait for any running thread before discarding it.
         if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
             self._fetch_thread.quit()
-            self._fetch_thread.wait(200)
+            self._fetch_thread.wait()   # no timeout — wait until it actually finishes
         worker = _FetchWorker(lambda: self.fetch(query, filter_key, 0))
-        thread = QThread(self)
+        thread = QThread()   # no parent — parent-owned threads can be destroyed too early
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.done.connect(lambda rows: self._on_fetch_done(rows, keep_id))
+        worker.done.connect(lambda rows, err, g=gen: self._on_fetch_done(rows, err, keep_id, g))
         worker.done.connect(thread.quit)
-        worker.done.connect(worker.deleteLater)
+        thread.finished.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
         self._fetch_thread = thread
         thread.start()
 
-    def _on_fetch_done(self, rows: list, keep_id: int | None) -> None:
+    def _on_fetch_done(self, rows: list, err: str, keep_id: int | None, gen: int) -> None:
+        if gen != self._fetch_gen:   # stale result — a newer reload() was already called
+            return
+        if err:
+            self.empty_label.setText(f"تعذّر تحميل البيانات")
+            self.empty_label.setVisible(True)
+            self.model.reset_rows([])
+            return
+        self.empty_label.setText(getattr(self, "empty_message", "لا توجد نتائج"))
         self.model.reset_rows(rows)
         self.view.resizeColumnsToContents()
         self.more_btn.setVisible(len(rows) == PAGE)
@@ -690,8 +701,8 @@ class ListPage(QWidget):
 
 
 class _FetchWorker(QObject):
-    """Runs a fetch callable in a worker thread and emits results back to the UI thread."""
-    done = Signal(list)
+    """Runs a fetch callable in a worker thread and emits (rows, error) back to the UI thread."""
+    done = Signal(list, str)
 
     def __init__(self, fn):
         super().__init__()
@@ -699,6 +710,6 @@ class _FetchWorker(QObject):
 
     def run(self) -> None:
         try:
-            self.done.emit(self._fn())
-        except Exception:
-            self.done.emit([])
+            self.done.emit(self._fn(), "")
+        except Exception as e:
+            self.done.emit([], str(e))
