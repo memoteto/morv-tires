@@ -138,7 +138,7 @@ class PartialModificationMigrationTest(unittest.TestCase):
         try:
             con = open_db(folder / "old.db", create=True)
             all_migrations = load_migrations()
-            self.assertEqual(all_migrations[-1].version, 15)
+            self.assertEqual(all_migrations[-1].version, 16)
             migrate(con, all_migrations[:14])
             self.assertEqual(current_version(con), 14)
             manager = users.create_user(con, None, "partial_eir_manager",
@@ -194,7 +194,7 @@ class PartialModificationMigrationTest(unittest.TestCase):
                 code: ledger.account_balance(con, code)
                 for code in ("1110", "1220", "1320", "2410", "4140", "4190")
             }
-            self.assertEqual(migrate(con), [15])
+            self.assertEqual(migrate(con, all_migrations[:15]), [15])
             self.assertEqual(current_version(con), 15)
             self.assertEqual({
                 name: tuple(con.execute(f"SELECT * FROM {name} ORDER BY rowid"))
@@ -208,7 +208,7 @@ class PartialModificationMigrationTest(unittest.TestCase):
             self.assertEqual(con.execute("PRAGMA foreign_keys").fetchone()[0], 1)
             self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
             self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
-            self.assertEqual(migrate(con), [])
+            self.assertEqual(migrate(con, all_migrations[:15]), [])
 
             entry_id = con.execute(
                 "SELECT journal_entry_id FROM sale_returns WHERE id=?", (ret.id,),
