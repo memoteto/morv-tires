@@ -1,4 +1,6 @@
 """Home dashboard: quick actions, period KPIs, a sales chart, alerts, recent invoices and top sellers."""
+import os
+from time import perf_counter
 from typing import Callable
 
 from PySide6.QtCore import Qt
@@ -8,6 +10,7 @@ from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QPushBu
 from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import dashboard_view
+from morv.infra.logs import log
 from morv.ui import icons
 from morv.ui.pos_page import PAYMENT_LABELS
 from morv.ui.widgets import Notice, card, muted
@@ -29,6 +32,9 @@ QUICK_ACTIONS = (("pos", "pos", "فاتورة بيع جديدة", "نقطة ال
 class DashboardPage(QWidget):
     def __init__(self, session, on_navigate: Callable[[str], None] | None = None, parent=None):
         super().__init__(parent)
+        self._profile_startup = os.environ.get("MORV_PROFILE_STARTUP") == "1"
+        page_started = perf_counter() if self._profile_startup else 0.0
+        self._profile_reload_count = 0
         self.session = session
         self.on_navigate = on_navigate
         self.period = "today"
@@ -66,6 +72,8 @@ class DashboardPage(QWidget):
         row2.addWidget(self._breakdown_card(), 1)
         root.addLayout(row2)
         root.addStretch(1)
+        if self._profile_startup:
+            log.info("PROFILE dashboard_widgets_ms=%.1f", (perf_counter() - page_started) * 1000)
         self.reload()
 
     def _header(self) -> QFrame:
@@ -195,7 +203,9 @@ class DashboardPage(QWidget):
         return box
 
     def reload(self) -> None:
+        started = perf_counter() if self._profile_startup else 0.0
         v = dashboard_view.get(self.session.con, period=self.period)
+        queried = perf_counter() if self._profile_startup else 0.0
         period_label = dict(PERIODS)[self.period]
         self.kpi_values["sales"][0].setText(ltr(fmt(v.sales_total)))
         self.kpi_values["sales"][1].setText(f"{v.sales_count} فاتورة · {period_label}")
@@ -212,6 +222,11 @@ class DashboardPage(QWidget):
         self._fill_alerts(v.alerts)
         self._fill_recent(v.recent)
         self._fill_breakdown(v.pay_today, v.top_month)
+        if self._profile_startup:
+            self._profile_reload_count += 1
+            log.info("PROFILE dashboard_reload call=%d data_ms=%.1f widgets_ms=%.1f",
+                     self._profile_reload_count, (queried - started) * 1000,
+                     (perf_counter() - queried) * 1000)
 
     def _fill_chart(self, days: tuple) -> None:
         self._clear(self.chart_row)
