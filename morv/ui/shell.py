@@ -101,13 +101,25 @@ class MainWindow(QMainWindow):
             if profile_startup:
                 log.info("PROFILE page=%s init_ms=%.1f", key, (perf_counter() - page_started) * 1000)
         post_pages_started = perf_counter() if profile_startup else 0.0
+        step_started = post_pages_started
         self.pages["pos"].contract_needed.connect(self.open_contract)
         col.addWidget(self.stack, 1)
         row.addWidget(main, 1)
+        if profile_startup:
+            log.info("PROFILE shell_step=attach_layout ms=%.1f", (perf_counter() - step_started) * 1000)
+            step_started = perf_counter()
         self.setCentralWidget(root)
+        if profile_startup:
+            log.info("PROFILE shell_step=set_central_widget ms=%.1f", (perf_counter() - step_started) * 1000)
+            step_started = perf_counter()
 
         self.nav.currentRowChanged.connect(self.go)
+        if profile_startup:
+            log.info("PROFILE shell_step=connect_nav ms=%.1f", (perf_counter() - step_started) * 1000)
+            step_started = perf_counter()
         self.nav.setCurrentRow(0)
+        if profile_startup:
+            log.info("PROFILE shell_step=select_home ms=%.1f", (perf_counter() - step_started) * 1000)
         if profile_startup:
             log.info("PROFILE shell_navigation_ms=%.1f", (perf_counter() - post_pages_started) * 1000)
             post_pages_started = perf_counter()
