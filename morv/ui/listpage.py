@@ -411,7 +411,7 @@ class ListPage(QWidget):
         if gen != self._fetch_gen:   # stale result — a newer reload() was already called
             return
         if err:
-            self.empty_label.setText(f"تعذّر تحميل البيانات")
+            self.empty_label.setText("تعذّر تحميل البيانات")
             self.empty_label.setVisible(True)
             self.model.reset_rows([])
             return

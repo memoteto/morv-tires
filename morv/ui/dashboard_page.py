@@ -200,9 +200,9 @@ class DashboardPage(QWidget):
         # Cancel any in-flight fetch before starting a new one.
         if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
             self._fetch_thread.quit()
-            self._fetch_thread.wait(200)
+            self._fetch_thread.wait()
         worker = _DashWorker(lambda: dashboard_view.get(con, period=period))
-        thread = QThread(self)
+        thread = QThread()  # no parent: parent-owned threads crash on widget destruction
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.done.connect(self._on_data)
