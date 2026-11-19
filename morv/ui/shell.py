@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
                     "pos": PosPage, "installments": InstallmentsPage}
         for key, _title, _icon, phase in NAV:
             if key == "home":
-                page = DashboardPage(session, on_navigate=self.go_key)
+                page = DashboardPage(session, on_navigate=self.dashboard_navigate)
             elif key in builders:
                 page = builders[key](session)
             else:
@@ -225,6 +225,11 @@ class MainWindow(QMainWindow):
                 self.nav.setCurrentRow(i)
                 return
         raise KeyError(key)
+
+    def dashboard_navigate(self, key: str) -> None:
+        self.go_key(key)
+        if key == "purchases":
+            self.pages["purchases"].open_form()
 
     def apply_theme(self) -> dict:
         family = settings.get(self.con, "ui.font_family", theme.DEFAULT_FONT)
