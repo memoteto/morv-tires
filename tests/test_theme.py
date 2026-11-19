@@ -32,6 +32,19 @@ class TooltipTest(unittest.TestCase):
             self.assertGreaterEqual(contrast(bg, fg), 4.5, f"تلميح غير مقروء في الوضع {name}")
 
 
+class TableCornerThemeTest(unittest.TestCase):
+    def test_table_corner_uses_header_palette_in_both_themes(self):
+        from morv.ui.tokens import DARK, LIGHT
+
+        for name, palette in (("light", LIGHT), ("dark", DARK)):
+            css = qss_text({**palette, "fs": 14})
+            corner = re.search(r"QTableCornerButton::section\s*\{([^}]*)\}", css)
+            self.assertIsNotNone(corner, name)
+            self.assertIn(f"background:{palette['surface2']}", corner.group(1), name)
+            self.assertIn(f"border-bottom:1px solid {palette['border']}", corner.group(1), name)
+            self.assertEqual(css.count("QTableCornerButton::section"), 1, name)
+
+
 class GlobalScrollbarStyleTest(unittest.TestCase):
     def test_scrollbars_share_one_theme_in_both_modes(self):
         from morv.ui.tokens import DARK, LIGHT

@@ -112,6 +112,8 @@ QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2
 QTableView::item {{ padding:0 10px; }}
 QHeaderView::section {{ background:{t['surface2']}; color:{t['muted']}; border:0;
                        border-bottom:1px solid {t['border']}; padding:0 8px; height:36px; font-weight:600; }}
+QTableCornerButton::section {{ background:{t['surface2']}; border:0;
+                              border-bottom:1px solid {t['border']}; }}
 QLabel#cardTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
 QFrame#summarySection {{ border:0; border-bottom:1px solid {t['border']}; }}
 QLabel#summarySectionTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
