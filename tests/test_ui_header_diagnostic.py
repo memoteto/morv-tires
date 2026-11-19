@@ -98,6 +98,10 @@ class HeaderGapDiagnosticTest(unittest.TestCase):
                 flush=True,
             )
             self.assertGreaterEqual(hi - lo + 1, 15)
+            self.assertEqual(
+                color.name().lower(), t["surface2"].lower(),
+                "Unoccupied header must use the same background as header sections",
+            )
         finally:
             if table is not None:
                 table.close()

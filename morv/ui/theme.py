@@ -110,6 +110,7 @@ QPushButton#qaMain QLabel#qaIcon {{ background:rgba(255,255,255,0.18); }}
 QTableView {{ background:{t['surface']}; alternate-background-color:{t['surface2']}; border:0;
              gridline-color:{t['border']}; selection-background-color:{t['select']}; selection-color:{t['text']}; }}
 QTableView::item {{ padding:0 10px; }}
+QHeaderView {{ background:{t['surface2']}; }}
 QHeaderView::section {{ background:{t['surface2']}; color:{t['muted']}; border:0;
                        border-bottom:1px solid {t['border']}; padding:0 8px; height:36px; font-weight:600; }}
 QTableCornerButton::section {{ background:{t['surface2']}; border:0;
