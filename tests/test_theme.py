@@ -32,23 +32,30 @@ class TooltipTest(unittest.TestCase):
             self.assertGreaterEqual(contrast(bg, fg), 4.5, f"تلميح غير مقروء في الوضع {name}")
 
 
-class SummaryTableScrollbarTest(unittest.TestCase):
-    def test_vertical_scrollbar_uses_central_theme_in_both_modes(self):
+class GlobalScrollbarStyleTest(unittest.TestCase):
+    def test_scrollbars_share_one_theme_in_both_modes(self):
         from morv.ui.tokens import DARK, LIGHT
 
         for name, palette in (("light", LIGHT), ("dark", DARK)):
             css = qss_text({**palette, "fs": 14})
-            track = re.search(
-                r"QTableView#summaryTable QScrollBar:vertical\s*\{([^}]*)\}", css)
-            self.assertIsNotNone(track, name)
-            self.assertIn(f"background:{palette['surface2']}", track.group(1), name)
-            self.assertIn("width:10px", track.group(1), name)
-            handle = re.search(
-                r"QTableView#summaryTable QScrollBar::handle:vertical\s*\{([^}]*)\}", css)
-            self.assertIsNotNone(handle, name)
-            self.assertIn(f"background:{palette['border_strong']}", handle.group(1), name)
-            self.assertIn("QTableView#summaryTable QScrollBar::add-line:vertical", css)
-            self.assertIn("QTableView#summaryTable QScrollBar::add-page:vertical", css)
+            for direction, size_key, size in (
+                ("vertical", "width", 8), ("horizontal", "height", 10)
+            ):
+                track = re.search(
+                    rf"(?m)^QScrollBar:{direction}\\s*\\{{([^}}]*)\\}}", css)
+                self.assertIsNotNone(track, f"{name} {direction}")
+                self.assertIn(f"{size_key}:{size}px", track.group(1))
+                self.assertIn(f"background:{palette['surface2']}", track.group(1))
+                handle = re.search(
+                    rf"(?m)^QScrollBar::handle:{direction}\\s*\\{{([^}}]*)\\}}", css)
+                self.assertIsNotNone(handle, f"{name} {direction}")
+                self.assertIn(f"background:{palette['border_strong']}", handle.group(1))
+                self.assertIn(f"QScrollBar::add-line:{direction}", css)
+                self.assertIn(f"QScrollBar::sub-line:{direction}", css)
+                self.assertIn(f"QScrollBar::add-page:{direction}", css)
+                self.assertIn(f"QScrollBar::sub-page:{direction}", css)
+            # POS, preview, tables, lists, and dialogs inherit the same stylesheet.
+            self.assertNotRegex(css, r"(?:QScrollArea|QTableView)#[A-Za-z]+\\s+QScrollBar")
 
 
 class ObjectNamesTest(unittest.TestCase):

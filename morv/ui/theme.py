@@ -123,42 +123,26 @@ QFrame#summaryNote {{ background:{t['surface2']}; border:1px solid {t['border']}
 QTableView#summaryTable {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:8px; }}
 QWidget#summaryAdaptiveTable {{ background:transparent; }}
 QScrollArea#summaryCardsScroll {{ background:transparent; border:0; }}
-QTableView#summaryTable QScrollBar:horizontal {{
-    height:10px; background:{t['surface2']}; border:0; margin:0;
+QScrollBar:vertical {{
+    width:8px; background:{t['surface2']}; border:0; margin:0; border-radius:4px;
 }}
-QTableView#summaryTable QScrollBar::handle:horizontal {{
+QScrollBar::handle:vertical {{
+    background:{t['border_strong']}; min-height:28px; border-radius:4px;
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height:0; border:0;
+}}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background:transparent; }}
+QScrollBar:horizontal {{
+    height:10px; background:{t['surface2']}; border:0; margin:0; border-radius:4px;
+}}
+QScrollBar::handle:horizontal {{
     background:{t['border_strong']}; min-width:28px; border-radius:4px;
 }}
-QTableView#summaryTable QScrollBar::add-line:horizontal,
-QTableView#summaryTable QScrollBar::sub-line:horizontal {{
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     width:0; border:0;
 }}
-QTableView#summaryTable QScrollBar::add-page:horizontal,
-QTableView#summaryTable QScrollBar::sub-page:horizontal {{ background:transparent; }}
-QTableView#summaryTable QScrollBar:vertical {{
-    width:10px; background:{t['surface2']}; border:0; margin:0;
-}}
-QTableView#summaryTable QScrollBar::handle:vertical {{
-    background:{t['border_strong']}; min-height:28px; border-radius:4px;
-}}
-QTableView#summaryTable QScrollBar::add-line:vertical,
-QTableView#summaryTable QScrollBar::sub-line:vertical {{
-    height:0; border:0;
-}}
-QTableView#summaryTable QScrollBar::add-page:vertical,
-QTableView#summaryTable QScrollBar::sub-page:vertical {{ background:transparent; }}
-QScrollArea#summaryCardsScroll QScrollBar:vertical {{
-    width:8px; background:{t['surface2']}; border:0; margin:0;
-}}
-QScrollArea#summaryCardsScroll QScrollBar::handle:vertical {{
-    background:{t['border_strong']}; min-height:28px; border-radius:4px;
-}}
-QScrollArea#summaryCardsScroll QScrollBar::add-line:vertical,
-QScrollArea#summaryCardsScroll QScrollBar::sub-line:vertical {{
-    height:0; border:0;
-}}
-QScrollArea#summaryCardsScroll QScrollBar::add-page:vertical,
-QScrollArea#summaryCardsScroll QScrollBar::sub-page:vertical {{ background:transparent; }}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background:transparent; }}
 QWidget#summaryDetailRow {{ background:transparent; }}
 QFrame#summaryRecord {{ background:{t['surface2']}; border:1px solid {t['border']};
                         border-radius:10px; }}
@@ -225,10 +209,6 @@ QWidget#modalBody {{ background:{t['surface']}; }}
 QWidget#modalFooter {{ background:{t['surface2']}; border-top:1px solid {t['border']}; border-bottom-left-radius:14px; border-bottom-right-radius:14px; }}
 QScrollArea {{ background:transparent; border:0; }}
 QScrollArea > QWidget > QWidget {{ background:transparent; }}
-QScrollArea#previewScroll QScrollBar:vertical {{ background:{t['surface2']}; width:8px; margin:0; border:0; border-radius:4px; }}
-QScrollArea#previewScroll QScrollBar::handle:vertical {{ background:{t['border_strong']}; min-height:28px; border-radius:4px; }}
-QScrollArea#previewScroll QScrollBar::add-line:vertical, QScrollArea#previewScroll QScrollBar::sub-line:vertical {{ height:0; border:0; }}
-QScrollArea#previewScroll QScrollBar::add-page:vertical, QScrollArea#previewScroll QScrollBar::sub-page:vertical {{ background:transparent; }}
 QSpinBox {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px; padding:0 10px; }}
 QPlainTextEdit {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; padding:6px 10px; }}
 QToolTip {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']};
