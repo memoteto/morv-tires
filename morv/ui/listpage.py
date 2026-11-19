@@ -589,7 +589,7 @@ class ListPage(QWidget):
 
     def summary_table(self, headers: list[str], rows: list[tuple], *,
                       column_alignments=None, one_line_dates: bool = False,
-                      keep_table: bool = False) -> QTableView:
+                      keep_table: bool = False, multiline_rows: bool = False) -> QTableView:
         table = QTableView()
         table.setObjectName("summaryTable")
         model = TupleModel(
@@ -609,8 +609,13 @@ class ListPage(QWidget):
                                  for row in rows)]
         row_height = (LAYOUT["summary_table_datetime_row_height"]
                       if timestamp_columns and not one_line_dates else LAYOUT["summary_table_row_height"])
+        if multiline_rows:
+            row_height = max(row_height, 2 * LAYOUT["summary_table_row_height"])
         table.verticalHeader().setDefaultSectionSize(row_height)
-        table.setWordWrap(not one_line_dates)
+        table.setWordWrap(multiline_rows or not one_line_dates)
+        if multiline_rows:
+            table.verticalHeader().setMinimumSectionSize(row_height)
+            table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         header = table.horizontalHeader()
         header.setMinimumSectionSize(LAYOUT["summary_table_min_column"])
         if len(headers) <= 3:
