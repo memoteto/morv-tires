@@ -385,6 +385,15 @@ class ListPage(QWidget):
             b.setChecked(k == key)
         self.reload()
 
+    def _stop_thread(self) -> None:
+        if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
+            self._fetch_thread.quit()
+            self._fetch_thread.wait()
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self._stop_thread()
+        super().hideEvent(event)
+
     def reload(self, keep_id: int | None = None) -> None:
         self.offset = 0
         # Generation counter: results from an older generation are silently dropped.
@@ -392,10 +401,7 @@ class ListPage(QWidget):
         gen = self._fetch_gen
         query = self.search.text()
         filter_key = self.filter_key
-        # Safe thread teardown: wait for any running thread before discarding it.
-        if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
-            self._fetch_thread.quit()
-            self._fetch_thread.wait()   # no timeout — wait until it actually finishes
+        self._stop_thread()
         worker = _FetchWorker(lambda: self.fetch(query, filter_key, 0))
         thread = QThread()   # no parent — parent-owned threads can be destroyed too early
         worker.moveToThread(thread)

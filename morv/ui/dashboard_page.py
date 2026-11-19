@@ -194,6 +194,15 @@ class DashboardPage(QWidget):
         lay.addLayout(self.top_col)
         return box
 
+    def _stop_thread(self) -> None:
+        if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
+            self._fetch_thread.quit()
+            self._fetch_thread.wait()
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self._stop_thread()
+        super().hideEvent(event)
+
     def reload(self) -> None:
         period = self.period
         con = self.session.con
