@@ -1,7 +1,7 @@
 """Shared list-and-preview skeleton for the master-data screens."""
 import re
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QTimer
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QPushButton, QScrollArea, QSizePolicy, QStackedLayout, QTableView,
@@ -387,7 +387,24 @@ class ListPage(QWidget):
 
     def reload(self, keep_id: int | None = None) -> None:
         self.offset = 0
-        rows = self.fetch(self.search.text(), self.filter_key, 0)
+        query = self.search.text()
+        filter_key = self.filter_key
+        # Cancel any in-flight fetch before starting a new one.
+        if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
+            self._fetch_thread.quit()
+            self._fetch_thread.wait(200)
+        worker = _FetchWorker(lambda: self.fetch(query, filter_key, 0))
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.done.connect(lambda rows: self._on_fetch_done(rows, keep_id))
+        worker.done.connect(thread.quit)
+        worker.done.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._fetch_thread = thread
+        thread.start()
+
+    def _on_fetch_done(self, rows: list, keep_id: int | None) -> None:
         self.model.reset_rows(rows)
         self.view.resizeColumnsToContents()
         self.more_btn.setVisible(len(rows) == PAGE)
@@ -670,3 +687,18 @@ class ListPage(QWidget):
         self.preview_footer_layout.addWidget(w)
         self.preview_footer.show()
         self._arrange_actions(max(0, self.preview.width() - 2 * LAYOUT["preview_padding"]))
+
+
+class _FetchWorker(QObject):
+    """Runs a fetch callable in a worker thread and emits results back to the UI thread."""
+    done = Signal(list)
+
+    def __init__(self, fn):
+        super().__init__()
+        self._fn = fn
+
+    def run(self) -> None:
+        try:
+            self.done.emit(self._fn())
+        except Exception:
+            self.done.emit([])

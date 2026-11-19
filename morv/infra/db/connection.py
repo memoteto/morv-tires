@@ -74,6 +74,8 @@ def open_db(path, create: bool = False) -> sqlite3.Connection:
     # A file with no tables is a creation that failed before; only create may finish it
     if exists and read_app_id(p) != APP_ID and not (create and _is_empty(p)):
         raise UnsafeDatabase(f"هذه ليست قاعدة Morv Tires، تم الرفض: {p}")
-    con = sqlite3.connect(p, isolation_level=None)
+    # check_same_thread=False allows read queries from worker threads (e.g. background fetch).
+    # Writes always happen on the UI thread via transaction(); workers only SELECT.
+    con = sqlite3.connect(p, isolation_level=None, check_same_thread=False)
     _apply_pragmas(con)
     return con

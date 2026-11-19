@@ -1,7 +1,7 @@
 """Home dashboard: quick actions, period KPIs, a sales chart, alerts, recent invoices and top sellers."""
 from typing import Callable
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
                                QWidget)
 
@@ -195,7 +195,26 @@ class DashboardPage(QWidget):
         return box
 
     def reload(self) -> None:
-        v = dashboard_view.get(self.session.con, period=self.period)
+        period = self.period
+        con = self.session.con
+        # Cancel any in-flight fetch before starting a new one.
+        if hasattr(self, "_fetch_thread") and self._fetch_thread.isRunning():
+            self._fetch_thread.quit()
+            self._fetch_thread.wait(200)
+        worker = _DashWorker(lambda: dashboard_view.get(con, period=period))
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.done.connect(self._on_data)
+        worker.done.connect(thread.quit)
+        worker.done.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._fetch_thread = thread
+        thread.start()
+
+    def _on_data(self, v) -> None:
+        if v is None:
+            return
         period_label = dict(PERIODS)[self.period]
         self.kpi_values["sales"][0].setText(ltr(fmt(v.sales_total)))
         self.kpi_values["sales"][1].setText(f"{v.sales_count} فاتورة · {period_label}")
@@ -207,7 +226,6 @@ class DashboardPage(QWidget):
         self.kpi_values["cash"][1].setText("الصندوق والحسابات الإلكترونية")
         for code, amount in v.account_balances:
             self.balance_values[code].setText(ltr(fmt(amount)))
-
         self._fill_chart(v.chart_days)
         self._fill_alerts(v.alerts)
         self._fill_recent(v.recent)
@@ -315,3 +333,18 @@ class DashboardPage(QWidget):
             item = layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+
+
+class _DashWorker(QObject):
+    """Fetches dashboard data in a worker thread and emits the result back to the UI thread."""
+    done = Signal(object)
+
+    def __init__(self, fn):
+        super().__init__()
+        self._fn = fn
+
+    def run(self) -> None:
+        try:
+            self.done.emit(self._fn())
+        except Exception:
+            self.done.emit(None)
