@@ -370,8 +370,9 @@ class PurchasesUiTest(unittest.TestCase):
         from morv.ui.shell import MainWindow
         w = self.destroy_on_cleanup(MainWindow(self.session, self.app))
         w.health_timer.stop()
-        self.assertIsInstance(w.pages["purchases"], PurchasesPage)
+        # Page is built on first navigation (lazy).
         w.go_key("purchases")
+        self.assertIsInstance(w.pages["purchases"], PurchasesPage)
         self.assertEqual(w.title.text(), "المشتريات")
 
 

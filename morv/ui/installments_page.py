@@ -26,6 +26,7 @@ class InstallmentsPage(QStackedWidget):
         super().__init__(parent)
         self.session = session
         self.list_page = ContractsPage(session, self)
+        self.refresh = self.list_page.refresh
         self.form_page = None
         self.collect_page = None
         self.addWidget(self.list_page)
@@ -85,8 +86,8 @@ class ContractsPage(ListPage):
         self._kpi_buttons: dict[str, QPushButton] = {}
         super().__init__(session)       # Qt refuses attributes set before its own init
 
-    def can_edit(self) -> bool:
-        return self.session.can("installments.manage")
+    def can_edit(self, con=None) -> bool:
+        return self.session.can("installments.manage", con)
 
     def extra_header(self) -> QWidget:
         box = QWidget()
@@ -125,17 +126,18 @@ class ContractsPage(ListPage):
             b.setChecked(k == key)
         self.reload()
 
-    def fetch(self, query, filter_key, offset):
-        if not self.can_edit():
+    def fetch(self, con, query, filter_key, offset):
+        if not self.can_edit(con):
             return []
-        view = installment_view.list_view(self.session.con, query=query, filter_key=filter_key or "all")
-        self._kpis = view.kpis
-        return [(r.contract_id, r.number, r.customer_name, r.customer_mobile, r.next_due, r.amount_now,
-                r.status, r.progress_text, r.remaining_total, r.can_collect) for r in view.rows]
+        view = installment_view.list_view(con, query=query, filter_key=filter_key or "all")
+        rows = _RowsWithKpis(
+            (r.contract_id, r.number, r.customer_name, r.customer_mobile, r.next_due, r.amount_now,
+             r.status, r.progress_text, r.remaining_total, r.can_collect) for r in view.rows)
+        rows.kpis = view.kpis
+        return rows
 
-    def reload(self, keep_id: int | None = None) -> None:
-        super().reload(keep_id)
-        k = self._kpis
+    def on_loaded(self, rows: list) -> None:
+        k = self._kpis = getattr(rows, "kpis", None)
         if k is None:
             return
         self._kpi_values["late"][0].setText(ltr(fmt(k.late_amount)))
@@ -689,3 +691,8 @@ class CollectPage(QWidget):
         finally:
             self._busy = False
             self._recompute()
+
+
+class _RowsWithKpis(list):
+    """Rows plus the KPI totals computed in the same read, so both come from one snapshot."""
+    kpis = None

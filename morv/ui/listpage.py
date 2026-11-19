@@ -12,6 +12,7 @@ from morv.infra.db.connection import ClosedDatabase
 from morv.ui import icons
 from morv.ui.tokens import LAYOUT
 from morv.ui.widgets import muted, primary_button
+from morv.ui.workers import run_async
 
 PAGE = 300
 
@@ -171,6 +172,7 @@ class ListPage(QWidget):
         self.session = session
         self.filter_key = self.filters[0][0] if self.filters else None
         self.offset = 0
+        self._fetch_gen = 0
         root = QVBoxLayout(self)
         root.setContentsMargins(LAYOUT["page_margin"], 16, LAYOUT["page_margin"], 16)
         root.setSpacing(LAYOUT["pane_gap"])
@@ -302,8 +304,14 @@ class ListPage(QWidget):
     def can_edit(self) -> bool:
         return True
 
-    def fetch(self, query: str, filter_key, offset: int) -> list:
+    def fetch(self, con, query: str, filter_key, offset: int) -> list:
         raise NotImplementedError
+
+    def refresh(self) -> None:
+        self.reload(self.current_id)
+
+    def on_loaded(self, rows: list) -> None:
+        """Hook for extra widgets that depend on the freshly loaded result, on the UI thread."""
 
     def total(self) -> str:
         return ""
@@ -387,8 +395,34 @@ class ListPage(QWidget):
 
     def reload(self, keep_id: int | None = None) -> None:
         self.offset = 0
-        rows = self.fetch(self.search.text(), self.filter_key, 0)
+        # A newer reload() makes older in-flight results stale; they are dropped on arrival.
+        self._fetch_gen += 1
+        gen = self._fetch_gen
+        query = self.search.text()
+        filter_key = self.filter_key
+
+        def fetch_rows(con):
+            try:
+                return self.fetch(con, query, filter_key, 0)
+            except ClosedDatabase:
+                return None
+
+        run_async(fetch_rows, lambda rows, err: self._on_fetch_done(rows, err, keep_id, gen), self,
+                  getattr(self.session, "con", None))
+
+    def _on_fetch_done(self, rows: list | None, err: str, keep_id: int | None, gen: int) -> None:
+        if gen != self._fetch_gen:
+            return
+        if rows is None and not err:
+            return
+        if err:
+            self.empty_label.setText("تعذّر تحميل البيانات")
+            self.empty_label.setVisible(True)
+            self.model.reset_rows([])
+            return
+        self.empty_label.setText(getattr(self, "empty_message", "لا توجد نتائج"))
         self.model.reset_rows(rows)
+        self.on_loaded(rows)
         self.view.resizeColumnsToContents()
         self.more_btn.setVisible(len(rows) == PAGE)
         self.empty_label.setVisible(not rows)
@@ -406,7 +440,7 @@ class ListPage(QWidget):
 
     def load_more(self) -> None:
         self.offset += PAGE
-        rows = self.fetch(self.search.text(), self.filter_key, self.offset)
+        rows = self.fetch(self.session.con, self.search.text(), self.filter_key, self.offset)
         self.model.append_rows(rows)
         self.more_btn.setVisible(len(rows) == PAGE)
 

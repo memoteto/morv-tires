@@ -120,6 +120,8 @@ def dispose(widget, app) -> None:
     from PySide6.QtCore import QEvent
     if widget is None:
         return
+    from morv.ui.workers import wait_all
+    wait_all()
     widget.deleteLater()
     app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     app.processEvents()

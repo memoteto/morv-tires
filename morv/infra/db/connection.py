@@ -77,3 +77,19 @@ def open_db(path, create: bool = False) -> sqlite3.Connection:
     con = sqlite3.connect(p, isolation_level=None)
     _apply_pragmas(con)
     return con
+
+
+def db_path(con: sqlite3.Connection) -> str:
+    """File behind an open connection, or an empty string for an in-memory database."""
+    return con.execute("PRAGMA database_list").fetchone()[2] or ""
+
+
+def open_reader(path) -> sqlite3.Connection:
+    """Short-lived read-only connection for one background fetch; the caller closes it."""
+    p = Path(path)
+    if p.name.lower() in FORBIDDEN_NAMES:
+        raise UnsafeDatabase(f"رفض فتح قاعدة البرنامج القديم: {p}")
+    con = sqlite3.connect(f"{p.resolve().as_uri()}?mode=ro", uri=True)
+    con.execute("PRAGMA query_only=ON")
+    con.execute("PRAGMA busy_timeout=3000")
+    return con

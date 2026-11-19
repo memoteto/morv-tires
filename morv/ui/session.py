@@ -12,8 +12,8 @@ class Session:
     on_logout: Callable[[], None] = field(default=lambda: None)
     on_restore: Callable[[str, str], None] = field(default=lambda path, secret: None)
 
-    def can(self, perm: str) -> bool:
-        return users.has_permission(self.con, self.user, perm)
+    def can(self, perm: str, con=None) -> bool:
+        return users.has_permission(con or self.con, self.user, perm)
 
     def refresh_user(self) -> None:
         self.user = users.get_user(self.con, self.user.id)

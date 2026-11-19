@@ -31,9 +31,9 @@ class CustomersPage(ListPage):
     def can_edit(self) -> bool:
         return self.session.can("customers.manage")
 
-    def fetch(self, query, filter_key, offset):
+    def fetch(self, con, query, filter_key, offset):
         level = filter_key if filter_key in ("wholesale", "super") else None
-        return customers.search(self.session.con, query, level=level, include_inactive=filter_key == "inactive",
+        return customers.search(con, query, level=level, include_inactive=filter_key == "inactive",
                                 offset=offset)
 
     def total(self) -> str:

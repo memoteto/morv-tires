@@ -32,6 +32,7 @@ class PurchasesPage(QStackedWidget):
         super().__init__(parent)
         self.session = session
         self.list_page = PurchasesListPage(session, self)
+        self.refresh = self.list_page.refresh
         self.form_page = None
         self.addWidget(self.list_page)
 
@@ -67,13 +68,13 @@ class PurchasesListPage(ListPage):
     def can_edit(self) -> bool:
         return self.session.can("purchases.post")
 
-    def can_view(self) -> bool:
-        return self.session.can("purchases.post") or self.session.can("items.cost_view")
+    def can_view(self, con=None) -> bool:
+        return self.session.can("purchases.post", con) or self.session.can("items.cost_view", con)
 
-    def fetch(self, query, filter_key, offset):
-        if not self.can_view():
+    def fetch(self, con, query, filter_key, offset):
+        if not self.can_view(con):
             return []
-        return purchase_view.list_invoices(self.session.con, query, offset=offset)
+        return purchase_view.list_invoices(con, query, offset=offset)
 
     def total(self) -> str:
         if not self.can_view():

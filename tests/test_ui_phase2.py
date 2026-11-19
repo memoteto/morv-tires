@@ -214,8 +214,12 @@ class ShellPagesTest(_Base):
         w.health_timer.stop()
         from morv.ui.widgets import dispose
         self.addCleanup(dispose, w, self.app)
+        # Pages are built on first navigation (lazy); trigger each before asserting type.
+        w.go_key("customers")
         self.assertIsInstance(w.pages["customers"], CustomersPage)
+        w.go_key("suppliers")
         self.assertIsInstance(w.pages["suppliers"], SuppliersPage)
+        w.go_key("inventory")
         self.assertIsInstance(w.pages["inventory"], InventoryPage)
 
 

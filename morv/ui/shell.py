@@ -78,19 +78,17 @@ class MainWindow(QMainWindow):
         col.addWidget(self._build_topbar())
         self.stack = QStackedWidget()
         self.pages = {}
-        builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
-                    "inventory": InventoryPage, "purchases": PurchasesPage, "sales": SalesPage,
-                    "pos": PosPage, "installments": InstallmentsPage}
+        # Pages built on first navigation, not at startup. Only "home" is built immediately.
+        self._builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
+                          "inventory": InventoryPage, "purchases": PurchasesPage, "sales": SalesPage,
+                          "pos": PosPage, "installments": InstallmentsPage}
         for key, _title, _icon, phase in NAV:
             if key == "home":
                 page = DashboardPage(session, on_navigate=self.dashboard_navigate)
-            elif key in builders:
-                page = builders[key](session)
             else:
                 page = placeholder(phase)
             self.pages[key] = page
             self.stack.addWidget(page)
-        self.pages["pos"].contract_needed.connect(self.open_contract)
         col.addWidget(self.stack, 1)
         row.addWidget(main, 1)
         self.setCentralWidget(root)
@@ -214,9 +212,25 @@ class MainWindow(QMainWindow):
     def go(self, row: int) -> None:
         if row < 0:
             return
+        key = NAV[row][0]
+        first_visit = key in self._builders
+        # Build the page on first visit if it was deferred.
+        if first_visit:
+            page = self._builders.pop(key)(self.session)
+            self.pages[key] = page
+            self.stack.insertWidget(row, page)
+            old = self.stack.widget(row + 1)   # the placeholder is now one slot higher
+            self.stack.removeWidget(old)
+            old.deleteLater()
+            # Wire up signals that require the real page.
+            if key == "pos":
+                page.contract_needed.connect(self.open_contract)
         self.stack.setCurrentIndex(row)
         self.title.setText(NAV[row][1])
-        if NAV[row][0] == "settings" and hasattr(self, "health_pill"):
+        # Other screens may have changed the data since this one was last shown; home refreshes itself.
+        if not first_visit and hasattr(self.pages[key], "refresh"):
+            self.pages[key].refresh()
+        if key == "settings" and hasattr(self, "health_pill"):
             self.refresh_health()
 
     def go_key(self, key: str) -> None:

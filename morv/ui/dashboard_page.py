@@ -1,7 +1,7 @@
 """Home dashboard: quick actions, period KPIs, a sales chart, alerts, recent invoices and top sellers."""
 from typing import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
                                QWidget)
 
@@ -11,6 +11,7 @@ from morv.infra import dashboard_view
 from morv.ui import icons
 from morv.ui.pos_page import PAYMENT_LABELS
 from morv.ui.widgets import Notice, card, muted
+from morv.ui.workers import run_async
 
 PERIODS = dashboard_view.PERIODS
 ALERT_LEVEL = {"bad": "error", "warn": "warn", "ok": "success"}
@@ -34,6 +35,7 @@ class DashboardPage(QWidget):
         self.period = "today"
         self.kpi_values: dict[str, tuple] = {}
         self.period_buttons: dict[str, QPushButton] = {}
+        self._fetch_gen = 0
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -66,7 +68,7 @@ class DashboardPage(QWidget):
         row2.addWidget(self._breakdown_card(), 1)
         root.addLayout(row2)
         root.addStretch(1)
-        self.reload()
+        # Data loaded in showEvent only; no eager reload here to avoid blocking startup.
 
     def _header(self) -> QFrame:
         w = QFrame()
@@ -195,7 +197,19 @@ class DashboardPage(QWidget):
         return box
 
     def reload(self) -> None:
-        v = dashboard_view.get(self.session.con, period=self.period)
+        self._fetch_gen += 1
+        gen = self._fetch_gen
+        period = self.period
+
+        def on_done(view, _err):
+            if gen == self._fetch_gen:
+                self._on_data(view)
+
+        run_async(lambda con: dashboard_view.get(con, period=period), on_done, self, self.session.con)
+
+    def _on_data(self, v) -> None:
+        if v is None:
+            return
         period_label = dict(PERIODS)[self.period]
         self.kpi_values["sales"][0].setText(ltr(fmt(v.sales_total)))
         self.kpi_values["sales"][1].setText(f"{v.sales_count} فاتورة · {period_label}")
@@ -207,7 +221,6 @@ class DashboardPage(QWidget):
         self.kpi_values["cash"][1].setText("الصندوق والحسابات الإلكترونية")
         for code, amount in v.account_balances:
             self.balance_values[code].setText(ltr(fmt(amount)))
-
         self._fill_chart(v.chart_days)
         self._fill_alerts(v.alerts)
         self._fill_recent(v.recent)
@@ -305,7 +318,9 @@ class DashboardPage(QWidget):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        self.reload()   # other screens keep posting sales/payments while this page sits hidden
+        # Defer reload until after Qt finishes painting the frame, so the window is
+        # responsive before the DB queries run. singleShot(0) posts to the event loop.
+        QTimer.singleShot(0, self.reload)
 
     @staticmethod
     def _clear(layout) -> None:

@@ -10,8 +10,8 @@ from morv.ui.widgets import info
 MOVE_LABELS = {"receipt": "استلام", "issue": "صرف", "return": "مرتجع"}
 
 
-def _cost_ok(session) -> bool:
-    return session.can("purchases.post") or session.can("items.cost_view")
+def _cost_ok(session, con=None) -> bool:
+    return session.can("purchases.post", con) or session.can("items.cost_view", con)
 
 
 class LotsPage(ListPage):
@@ -35,9 +35,9 @@ class LotsPage(ListPage):
     def can_edit(self) -> bool:
         return False
 
-    def fetch(self, query, filter_key, offset):
-        rows = stock_view.lots(self.session.con, query, in_stock_only=filter_key == "stock", offset=offset)
-        if _cost_ok(self.session):
+    def fetch(self, con, query, filter_key, offset):
+        rows = stock_view.lots(con, query, in_stock_only=filter_key == "stock", offset=offset)
+        if _cost_ok(self.session, con):
             return rows
         return [r[:8] + (None,) for r in rows]
 
@@ -98,9 +98,9 @@ class StockPage(ListPage):
     def can_edit(self) -> bool:
         return _cost_ok(self.session)
 
-    def fetch(self, query, filter_key, offset):
-        rows = stock_view.summary(self.session.con, query, filter_key, offset=offset)
-        if _cost_ok(self.session):
+    def fetch(self, con, query, filter_key, offset):
+        rows = stock_view.summary(con, query, filter_key, offset=offset)
+        if _cost_ok(self.session, con):
             return rows
         return [r[:6] + (None,) + r[7:] for r in rows]
 

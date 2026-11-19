@@ -13,7 +13,7 @@ class PreviewLayoutTest(unittest.TestCase):
         class SamplePage(ListPage):
             columns = [("السجل", lambda r: r[1])]
 
-            def fetch(self, query, filter_key, offset):
+            def fetch(self, con, query, filter_key, offset):
                 return [(1, "الأول"), (2, "الثاني"), (3, "بلا أزرار")]
 
             def build_preview(self, row_id):

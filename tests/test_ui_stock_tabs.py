@@ -180,11 +180,17 @@ class StockTabsTest(unittest.TestCase):
         from morv.ui.inventory_page import InventoryPage
         from morv.ui.stock_pages import LotsPage, StockPage
         page = self.destroy_on_cleanup(InventoryPage(self.session))
-        self.assertIsInstance(page.tabs.widget(1), LotsPage)
-        self.assertIsInstance(page.tabs.widget(2), StockPage)
+        # Tabs are lazy: placeholder QWidgets until first selection.
+        self.assertNotIsInstance(page.tabs.widget(1), LotsPage)
+        self.assertNotIsInstance(page.tabs.widget(2), StockPage)
+        # First selection builds and loads the real tab.
         inventory.issue(self.con, self.admin, self.battery, 3, source_type="t", source_id=3, source_line_id=1)
         page.tabs.setCurrentIndex(1)
+        self.assertIsInstance(page.tabs.widget(1), LotsPage)
         self.assertEqual(len(page.lots_tab.model.rows), 2)      # the battery lot is empty and leaves the in-stock filter
+        # Second tab also builds on first selection.
+        page.tabs.setCurrentIndex(2)
+        self.assertIsInstance(page.tabs.widget(2), StockPage)
 
     def test_item_and_supplier_previews_show_real_numbers(self):
         from PySide6.QtWidgets import QLabel

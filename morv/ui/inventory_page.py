@@ -17,19 +17,42 @@ from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, p
 class InventoryPage(QWidget):
     def __init__(self, session):
         super().__init__()
+        self._session = session
+        self.lots_tab: "LotsPage | None" = None
+        self.stock_tab: "StockPage | None" = None
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 16, 24, 16)
         self.tabs = QTabWidget()
         self.items_tab = ItemsPage(session)
         self.tabs.addTab(self.items_tab, "الأصناف")
-        self.lots_tab = LotsPage(session)
-        self.stock_tab = StockPage(session)
-        self.tabs.addTab(self.lots_tab, "الدفعات (DOT)")
-        self.tabs.addTab(self.stock_tab, "الجرد والتسويات")
+        # Lots and stock tabs are built on first selection to avoid blocking startup.
+        self.tabs.addTab(QWidget(), "الدفعات (DOT)")
+        self.tabs.addTab(QWidget(), "الجرد والتسويات")
         self.tabs.currentChanged.connect(self._refresh_tab)
         lay.addWidget(self.tabs)
 
-    def _refresh_tab(self, _index: int) -> None:
+    def refresh(self) -> None:
+        page = self.tabs.currentWidget()
+        page.refresh() if hasattr(page, "refresh") else page.reload()
+
+    def _refresh_tab(self, index: int) -> None:
+        # Build lazy tabs on first access; guard against re-entrant signal during insertTab.
+        if index == 1 and self.lots_tab is None:
+            self.tabs.currentChanged.disconnect(self._refresh_tab)
+            self.lots_tab = LotsPage(self._session)
+            self.tabs.removeTab(1)
+            self.tabs.insertTab(1, self.lots_tab, "الدفعات (DOT)")
+            self.tabs.setCurrentIndex(1)
+            self.tabs.currentChanged.connect(self._refresh_tab)
+            return
+        if index == 2 and self.stock_tab is None:
+            self.tabs.currentChanged.disconnect(self._refresh_tab)
+            self.stock_tab = StockPage(self._session)
+            self.tabs.removeTab(2)
+            self.tabs.insertTab(2, self.stock_tab, "الجرد والتسويات")
+            self.tabs.setCurrentIndex(2)
+            self.tabs.currentChanged.connect(self._refresh_tab)
+            return
         page = self.tabs.currentWidget()
         if page is not self.items_tab:
             page.reload()
@@ -59,9 +82,9 @@ class ItemsPage(ListPage):
     def can_edit(self) -> bool:
         return self.session.can("items.manage")
 
-    def fetch(self, query, filter_key, offset):
+    def fetch(self, con, query, filter_key, offset):
         kind = filter_key if filter_key in items.KINDS else None
-        return items.search(self.session.con, query, kind=kind, include_inactive=filter_key == "inactive", offset=offset)
+        return items.search(con, query, kind=kind, include_inactive=filter_key == "inactive", offset=offset)
 
     def total(self) -> str:
         return f"{items.count(self.session.con)} صنف نشط"

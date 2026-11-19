@@ -12,7 +12,7 @@ class SharedSummaryComponentsTest(unittest.TestCase):
         class Example(ListPage):
             columns = [("السجل", lambda r: r[1])]
 
-            def fetch(self, query, filter_key, offset):
+            def fetch(self, con, query, filter_key, offset):
                 return [(1, "الملخص")]
 
             def build_preview(self, row_id):
