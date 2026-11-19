@@ -100,6 +100,7 @@ class MainWindow(QMainWindow):
             self.stack.addWidget(page)
             if profile_startup:
                 log.info("PROFILE page=%s init_ms=%.1f", key, (perf_counter() - page_started) * 1000)
+        post_pages_started = perf_counter() if profile_startup else 0.0
         self.pages["pos"].contract_needed.connect(self.open_contract)
         col.addWidget(self.stack, 1)
         row.addWidget(main, 1)
@@ -107,10 +108,24 @@ class MainWindow(QMainWindow):
 
         self.nav.currentRowChanged.connect(self.go)
         self.nav.setCurrentRow(0)
+        if profile_startup:
+            log.info("PROFILE shell_navigation_ms=%.1f", (perf_counter() - post_pages_started) * 1000)
+            post_pages_started = perf_counter()
         self._apply_collapse()
+        if profile_startup:
+            log.info("PROFILE shell_collapse_ms=%.1f", (perf_counter() - post_pages_started) * 1000)
+            post_pages_started = perf_counter()
         self._refresh_icons()
+        if profile_startup:
+            log.info("PROFILE shell_icons_ms=%.1f", (perf_counter() - post_pages_started) * 1000)
+            post_pages_started = perf_counter()
         self._shortcuts()
+        if profile_startup:
+            log.info("PROFILE shell_shortcuts_ms=%.1f", (perf_counter() - post_pages_started) * 1000)
+            post_pages_started = perf_counter()
         self.refresh_health()
+        if profile_startup:
+            log.info("PROFILE shell_health_ms=%.1f", (perf_counter() - post_pages_started) * 1000)
         self.health_timer = QTimer(self)
         self.health_timer.timeout.connect(self.refresh_health)
         self.health_timer.start(60_000)
