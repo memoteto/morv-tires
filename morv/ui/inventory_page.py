@@ -17,20 +17,35 @@ from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, p
 class InventoryPage(QWidget):
     def __init__(self, session):
         super().__init__()
+        self._session = session
+        self._lots_tab: "LotsPage | None" = None
+        self._stock_tab: "StockPage | None" = None
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 16, 24, 16)
         self.tabs = QTabWidget()
         self.items_tab = ItemsPage(session)
         self.tabs.addTab(self.items_tab, "الأصناف")
-        self.lots_tab = LotsPage(session)
-        self.stock_tab = StockPage(session)
-        self.tabs.addTab(self.lots_tab, "الدفعات (DOT)")
-        self.tabs.addTab(self.stock_tab, "الجرد والتسويات")
+        # Lots and stock tabs are built on first selection to avoid blocking startup.
+        self.tabs.addTab(QWidget(), "الدفعات (DOT)")
+        self.tabs.addTab(QWidget(), "الجرد والتسويات")
         self.tabs.currentChanged.connect(self._refresh_tab)
         lay.addWidget(self.tabs)
 
-    def _refresh_tab(self, _index: int) -> None:
+    def _refresh_tab(self, index: int) -> None:
         page = self.tabs.currentWidget()
+        # Build lazy tabs on first access, then reload on every subsequent visit.
+        if index == 1 and self._lots_tab is None:
+            self._lots_tab = LotsPage(self._session)
+            self.tabs.removeTab(1)
+            self.tabs.insertTab(1, self._lots_tab, "الدفعات (DOT)")
+            self.tabs.setCurrentIndex(1)
+            return
+        if index == 2 and self._stock_tab is None:
+            self._stock_tab = StockPage(self._session)
+            self.tabs.removeTab(2)
+            self.tabs.insertTab(2, self._stock_tab, "الجرد والتسويات")
+            self.tabs.setCurrentIndex(2)
+            return
         if page is not self.items_tab:
             page.reload()
 

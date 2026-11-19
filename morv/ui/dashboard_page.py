@@ -66,7 +66,7 @@ class DashboardPage(QWidget):
         row2.addWidget(self._breakdown_card(), 1)
         root.addLayout(row2)
         root.addStretch(1)
-        self.reload()
+        # Data loaded in showEvent only; no eager reload here to avoid blocking startup.
 
     def _header(self) -> QFrame:
         w = QFrame()
