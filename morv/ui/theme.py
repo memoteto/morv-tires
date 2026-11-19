@@ -208,6 +208,7 @@ QLabel#modalTitle {{ font-size:{t['fs']+2}px; font-weight:700; }}
 QWidget#modalBody {{ background:{t['surface']}; }}
 QWidget#modalFooter {{ background:{t['surface2']}; border-top:1px solid {t['border']}; border-bottom-left-radius:14px; border-bottom-right-radius:14px; }}
 QScrollArea {{ background:transparent; border:0; }}
+QScrollArea#previewScroll {{ background:transparent; border:0; }}
 QScrollArea > QWidget > QWidget {{ background:transparent; }}
 QSpinBox {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px; padding:0 10px; }}
 QPlainTextEdit {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; border-radius:8px; padding:6px 10px; }}
