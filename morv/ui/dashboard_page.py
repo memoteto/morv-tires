@@ -1,7 +1,7 @@
 """Home dashboard: quick actions, period KPIs, a sales chart, alerts, recent invoices and top sellers."""
 from typing import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
                                QWidget)
 
@@ -305,7 +305,9 @@ class DashboardPage(QWidget):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        self.reload()   # other screens keep posting sales/payments while this page sits hidden
+        # Defer reload until after Qt finishes painting the frame, so the window is
+        # responsive before the DB queries run. singleShot(0) posts to the event loop.
+        QTimer.singleShot(0, self.reload)
 
     @staticmethod
     def _clear(layout) -> None:
