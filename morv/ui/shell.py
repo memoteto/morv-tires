@@ -9,7 +9,10 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget,
 
 from morv import APP_NAME, VERSION
 from morv.core import security
+import time as _diag_time
+
 from morv.infra import backup, settings
+from morv.infra.logs import log as _diag_log
 from morv.ui import icons, theme
 from morv.ui.customers_page import CustomersPage
 from morv.ui.dashboard_page import DashboardPage
@@ -81,15 +84,19 @@ class MainWindow(QMainWindow):
         builders = {"settings": SettingsPage, "customers": CustomersPage, "suppliers": SuppliersPage,
                     "inventory": InventoryPage, "purchases": PurchasesPage, "sales": SalesPage,
                     "pos": PosPage, "installments": InstallmentsPage}
+        _diag_t0 = _diag_time.perf_counter()
         for key, _title, _icon, phase in NAV:
+            _diag_t = _diag_time.perf_counter()
             if key == "home":
                 page = DashboardPage(session, on_navigate=self.dashboard_navigate)
             elif key in builders:
                 page = builders[key](session)
             else:
                 page = placeholder(phase)
+            _diag_log.info("[TIMING] %s: %dms", key, (_diag_time.perf_counter() - _diag_t) * 1000)
             self.pages[key] = page
             self.stack.addWidget(page)
+        _diag_log.info("[TIMING] total pages: %dms", (_diag_time.perf_counter() - _diag_t0) * 1000)
         self.pages["pos"].contract_needed.connect(self.open_contract)
         col.addWidget(self.stack, 1)
         row.addWidget(main, 1)
