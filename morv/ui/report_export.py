@@ -1,4 +1,5 @@
 """PDF export of a report Table through Qt's rich-text engine, RTL, A4, numbers kept left-to-right."""
+import re
 from html import escape
 
 from PySide6.QtGui import QPageLayout, QPageSize, QPdfWriter, QTextDocument
@@ -10,9 +11,14 @@ _STYLE = ("body { font-size: 10pt; } th { background: #e8ecf3; } td, th { paddin
           ".total { font-weight: bold; background: #f1f3f7; } .head { font-weight: bold; }")
 
 
+def _rich(text: str) -> str:
+    """Escaped text with every date and number kept left-to-right inside the RTL line."""
+    return re.sub(r"[\d][\d,.\-:/]*", lambda m: f"<span dir='ltr'>{m.group(0)}</span>", escape(text))
+
+
 def table_html(table: Table) -> str:
     out = [f"<html><head><style>{_STYLE}</style></head><body dir='rtl'>",
-           f"<h2>{escape(table.title)}</h2><p>{escape(table.subtitle)}</p>",
+           f"<p style='font-size:16pt; font-weight:bold'>{_rich(table.title)}</p><p>{_rich(table.subtitle)}</p>",
            "<table width='100%' cellspacing='0'><tr>" + "".join(f"<th>{escape(h)}</th>" for h in table.headers) + "</tr>"]
     for kind, cells in table.rows:
         css = {"head": "head", "total": "total", "grand": "total"}.get(kind, "")

@@ -62,6 +62,14 @@ class ReportsPageTest(unittest.TestCase):
         with open(os.path.join(self.tmp, "r.pdf"), "rb") as f:
             self.assertEqual(f.read(4), b"%PDF")
 
+    def test_pdf_header_is_a_visible_paragraph_with_ltr_dates(self):
+        from morv.ui.report_export import table_html
+        page = self.page()
+        html = table_html(page.table)
+        self.assertNotIn("<h2>", html)
+        self.assertIn("font-size:16pt", html)
+        self.assertIn("<span dir='ltr'>", html.split("</p>")[1])      # the subtitle line
+
     def test_custom_period_shows_dates_and_reports_bad_input_inline(self):
         page = self.page()
         page.set_filter("custom")
