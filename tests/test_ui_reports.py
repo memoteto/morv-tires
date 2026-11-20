@@ -41,15 +41,38 @@ class ReportsPageTest(unittest.TestCase):
     def test_manager_sees_the_statement_ending_with_the_net_result(self):
         page = self.page()
         self.assertEqual(page.model.rows[-1][1], "grand")
-        self.assertEqual(page.model.rows[-1][4], 100000)
+        self.assertEqual(page.model.rows[-1][2][2], 100000)
 
-    def test_suspended_balances_dialog_opens_read_only(self):
-        from morv.ui.suspended_dialogs import SuspendedBalancesDialog
+    def test_report_picker_switches_tables_and_exports(self):
+        import os
         page = self.page()
-        self.assertTrue(hasattr(page, "suspended_btn"))
-        dlg = SuspendedBalancesDialog(self.session, None)
-        self.addCleanup(dlg.deleteLater)
-        self.assertEqual((dlg.report.shortages, dlg.report.overages), ((), ()))
+        self.assertEqual([page.report_combo.itemData(i) for i in range(page.report_combo.count())],
+                         ["income", "trial", "ledger", "suspended"])
+        for key in ("trial", "ledger", "suspended", "income"):
+            page.report_combo.setCurrentIndex(page.report_combo.findData(key))
+            self.assertEqual(page.table.key, key)
+            self.assertEqual(page.model.columnCount(), len(page.table.headers))
+        self.assertTrue(page.account_combo.isHidden())
+        page.report_combo.setCurrentIndex(page.report_combo.findData("ledger"))
+        self.assertFalse(page.account_combo.isHidden())
+        for ext, fn in (("csv", page.export_csv_to), ("pdf", page.export_pdf_to)):
+            path = os.path.join(self.tmp, f"r.{ext}")
+            fn(path)
+            self.assertGreater(os.path.getsize(path), 100)
+        with open(os.path.join(self.tmp, "r.pdf"), "rb") as f:
+            self.assertEqual(f.read(4), b"%PDF")
+
+    def test_custom_period_shows_dates_and_reports_bad_input_inline(self):
+        page = self.page()
+        page.set_filter("custom")
+        self.assertFalse(page.from_edit.isHidden())
+        page.from_edit.setText("2026-02-01")
+        page.to_edit.setText("2026-01-01")
+        page.reload()
+        self.assertIn("بعد", page.count_label.text())
+        page.to_edit.setText("2026-12-31")
+        page.reload()
+        self.assertIsNotNone(page.table)
 
     def test_period_filter_is_a_dropdown_that_switches_the_statement(self):
         page = self.page()
