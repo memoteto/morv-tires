@@ -52,7 +52,7 @@ def _range(start: str, end: str) -> tuple[str, str]:
 
 
 def previous_range(start: str, end: str) -> tuple[str, str]:
-    """Same span one calendar month or year earlier when the range sits in one month or year; else shifted back."""
+    """Same span a month or year earlier when inside one; otherwise an equal span just before."""
     s, e = date.fromisoformat(start), date.fromisoformat(end)
     if s.year < 2:
         raise ReportError("لا توجد فترة سابقة لهذه الفترة")
