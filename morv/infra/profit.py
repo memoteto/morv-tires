@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from morv.core import profit_rules
-from morv.infra import income_statement, ledger, settings
+from morv.infra import income_statement, ledger, period_lock, settings
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, has_permission
 
@@ -151,6 +151,10 @@ def preview(con: sqlite3.Connection, through_date: str) -> Preview:
     locked = ledger.locked_through(con)
     if not locked or through > locked:
         raise ProfitError("لا يُوزَّع ربح فترة غير مقفلة؛ اقفل الفترة أولًا")
+    # a lock made before a rule existed must not let an unreviewed period be distributed
+    problems = period_lock.blockers(con, through)
+    if problems:
+        raise ProfitError("سلامة الفترة غير مكتملة: " + "؛ ".join(problems))
     last = latest_distribution(con)
     if last:
         from_date = (date.fromisoformat(last[2]) + timedelta(days=1)).isoformat()

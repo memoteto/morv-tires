@@ -30,7 +30,7 @@ class PeriodLockDialog(Modal):
         self.body.addLayout(f)
         self.blockers = muted("")
         self.body.addWidget(self.blockers)
-        self.through.textChanged.connect(self._check)
+        self.through.editingFinished.connect(self._check)
         self.unlock_btn = danger_button("فتح آخر قفل")
         self.unlock_btn.setVisible(latest is not None)
         self.unlock_btn.clicked.connect(self.unlock_last)

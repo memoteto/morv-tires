@@ -58,13 +58,37 @@ def last_closed_date(con: sqlite3.Connection) -> str | None:
     return row[2] if row else None
 
 
+@dataclass(frozen=True)
+class Coverage:
+    never_closed: bool            # till activity exists but no live closing at all
+    missing_days: tuple[str, ...]  # days with till activity and no live closing dated that day
+    late_lines: int               # till lines dated in range but posted after the newest closing's cutoff
+
+
+def coverage(con: sqlite3.Connection, through: str) -> Coverage:
+    """Review state of the till up to a date; the one rule behind the period lock and the dashboard count.
+
+    Days are checked from the first live closing on, since that closing counted all cash before it.
+    """
+    live = con.execute(
+        "SELECT closing_date, cutoff_line_id FROM cash_closings c WHERE kind = 'close' "
+        "AND NOT EXISTS (SELECT 1 FROM cash_closings x WHERE x.cancels_id = c.id)").fetchall()
+    first = min((d for d, _ in live), default="")
+    days = [r[0] for r in con.execute(
+        "SELECT DISTINCT e.entry_date FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id "
+        "WHERE e.status = 'posted' AND l.account_code = ? AND e.entry_date >= ? AND e.entry_date <= ? "
+        "ORDER BY e.entry_date", (CASH, first, through))]
+    closed_days = {d for d, _ in live}
+    late = con.execute(
+        "SELECT count(*) FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id "
+        "WHERE e.status = 'posted' AND l.account_code = ? AND e.entry_date <= ? AND e.source_type <> 'cash_closing' "
+        "AND l.id > ?", (CASH, through, max((c for _, c in live), default=0))).fetchone()[0]
+    return Coverage(not live and bool(days), tuple(d for d in days if d not in closed_days), late)
+
+
 def unclosed_days(con: sqlite3.Connection, today: str | None = None) -> int:
-    """Dates with till activity after the last closed date, up to today."""
-    last = last_closed_date(con) or ""
-    return con.execute(
-        "SELECT count(DISTINCT e.entry_date) FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id "
-        "WHERE e.status = 'posted' AND l.account_code = ? AND e.entry_date > ? AND e.entry_date <= ?",
-        (CASH, last, today or date.today().isoformat())).fetchone()[0]
+    """Dates with till activity and no live closing, up to today (all of them while nothing was closed)."""
+    return len(coverage(con, today or date.today().isoformat()).missing_days)
 
 
 def _diff_lines(difference: int, reverse: bool = False) -> list:
