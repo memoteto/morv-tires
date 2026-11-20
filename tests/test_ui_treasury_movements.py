@@ -152,7 +152,7 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         self.addCleanup(dispose, dlg, self.app)
         dlg.counted.setText("1000")
         dlg.hand_check.setChecked(True)
-        dlg.hand_to.setCurrentIndex(dlg.hand_to.findData(("bank", "1210")))
+        dlg.hand_to.setCurrentIndex(dlg.hand_to.findData("bank:1210"))
         dlg.keep.setText("100")
         dlg.save()
         self.assertIsNotNone(dlg.saved)
@@ -165,11 +165,12 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         from morv.infra import ledger, treasury
         from morv.ui.treasury_dialogs import CloseDialog
         from morv.ui.widgets import dispose
-        treasury.add_partner(self.con, self.session.user, "أحمد")
+        partner = treasury.add_partner(self.con, self.session.user, "أحمد")
         dlg = CloseDialog(self.session)
         self.addCleanup(dispose, dlg, self.app)
         dlg.counted.setText("1000")
         dlg.hand_check.setChecked(True)
+        dlg.hand_to.setCurrentIndex(dlg.hand_to.findData(f"partner:{partner.id}"))
         with mock.patch("morv.ui.treasury_dialogs.ask", return_value=False):
             dlg.save()
         self.assertIsNone(dlg.saved)

@@ -197,9 +197,9 @@ class CloseDialog(Modal):
         self.hand_to = QComboBox()
         names = treasury_view.account_names(con, treasury_view.ACCOUNTS)
         for code in treasury_view.ACCOUNTS[1:]:
-            self.hand_to.addItem(f"تحويل إلى: {names[code]}", ("bank", code))
+            self.hand_to.addItem(f"تحويل إلى: {names[code]}", f"bank:{code}")
         for pid, name, _acc, _active, _bal in treasury.list_partners(con, active_only=True):
-            self.hand_to.addItem(f"سحب شريك: {name}", ("partner", pid))
+            self.hand_to.addItem(f"سحب شريك: {name}", f"partner:{pid}")
         self.keep = ltr_edit("0.00")
         self.keep.setText("0.00")
         hf.addRow("الوجهة", self.hand_to)
@@ -261,8 +261,9 @@ class CloseDialog(Modal):
         return (amount, self.hand_to.currentData()) if amount > 0 else None
 
     def _close_and_hand_over(self, args: dict, handover: tuple):
-        amount, (kind, target) = handover
-        extra = dict(handover=amount, partner_id=target if kind == "partner" else None,
+        amount, destination = handover
+        kind, target = destination.split(":")
+        extra = dict(handover=amount, partner_id=int(target) if kind == "partner" else None,
                      bank_account=target if kind == "bank" else None)
         try:
             return treasury.close_and_hand_over(self.session.con, self.session.user, **args, **extra)
