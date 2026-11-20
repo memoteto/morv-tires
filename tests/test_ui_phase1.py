@@ -173,7 +173,8 @@ class SettingsTest(_Base):
         from PySide6.QtWidgets import QScrollArea
         from morv.ui.settings_page import SettingsPage
         self.make_admin()
-        tab = SettingsPage(self.session()).users_tab
+        page = SettingsPage(self.session())          # kept alive, or Qt deletes the tabs
+        tab = page.users_tab
         box = next(iter(tab.checks.values())).parentWidget()
         self.assertTrue(any(isinstance(w, QScrollArea) for w in _ancestors(box)))
         self.assertFalse(any(isinstance(w, QScrollArea) for w in _ancestors(tab.pw_btn)))
