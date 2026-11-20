@@ -10,6 +10,7 @@ from morv.infra.customers import Customer, Vehicle
 from morv.ui.customer_statement_dialog import CustomerStatementDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
+from morv.ui.receipt_dialogs import ReceiptDialog
 from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
 
 
@@ -74,20 +75,28 @@ class CustomersPage(ListPage):
         self.summary_note("آخر زيارة ومواعيد الصيانة تظهر هنا في إصدار لاحق.")
         statement = QPushButton("كشف الحساب")
         statement.clicked.connect(lambda: self.open_statement(c))
+        receipt = QPushButton("سند قبض")
+        receipt.clicked.connect(lambda: self.open_receipt(c))
+        receipt.setEnabled(self.session.can("receipts.post"))
         if self.can_edit():
             edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(c.id))
             toggle = danger_button("إيقاف" if c.active else "تفعيل", "pause" if c.active else "play")
             toggle.clicked.connect(lambda: self.toggle_active(c))
-            self.actions(edit, toggle, statement)
+            self.actions(edit, toggle, receipt, statement)
         else:
-            self.actions(statement)
+            self.actions(receipt, statement)
 
     def open_statement(self, c: Customer) -> None:
         con = self.session.con
         dlg = CustomerStatementDialog(
             c.name, lambda date_from, date_to: customer_statement.statement(con, c.id, date_from, date_to), self)
         dlg.exec()
+
+    def open_receipt(self, c: Customer) -> None:
+        dlg = ReceiptDialog(self.session, c.id, c.name, self)
+        if dlg.exec() == QDialog.Accepted:
+            self.reload(keep_id=c.id)
 
     def toggle_active(self, c: Customer) -> None:
         verb = "إيقاف" if c.active else "تفعيل"

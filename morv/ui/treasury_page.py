@@ -10,7 +10,7 @@ from morv.ui.widgets import danger_button, muted, primary_button
 
 ACCOUNT_NAMES = {"1110": "الصندوق", "1130": "الخزنة", "1210": "بنك التحويلات", "1220": "بنك البطاقات", "1230": "المحافظ الإلكترونية"}
 SOURCE_LABELS = {"sale": "فاتورة بيع", "sale_return": "مرتجع بيع", "purchase_invoice": "فاتورة شراء",
-                 "installment_payment": "تحصيل قسط", "installment_contract": "عقد تقسيط",
+                 "installment_payment": "تحصيل قسط", "customer_receipt": "سند قبض عميل", "installment_contract": "عقد تقسيط",
                  "treasury_movement": "حركة خزينة", "cash_closing": "فرق إقفال الصندوق", "safe_count": "فرق جرد الخزنة"}
 
 

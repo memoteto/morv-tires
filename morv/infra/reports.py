@@ -271,6 +271,7 @@ def partner_statement(con, account: str, start: str, end: str) -> Table:
 SOURCE_TEXT = {"sale": "بيع", "sale_return": "مرتجع بيع", "purchase_invoice": "فاتورة شراء",
                "treasury_movement": "حركة خزينة", "cash_closing": "إقفال صندوق", "safe_count": "جرد خزنة",
                "installment_contract": "عقد تقسيط", "installment_payment": "تحصيل قسط",
+               "customer_receipt": "سند قبض",
                "interest_recognition": "فوائد تقسيط", "profit_distribution": "توزيع أرباح",
                "stock_issue": "صرف مخزون"}
 
