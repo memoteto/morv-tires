@@ -81,6 +81,7 @@ def count_safe(con: sqlite3.Connection, by, *, request_key: str, count_date: str
         last = latest_count(con)
         if last and day <= last[2]:
             raise ClosingError(f"التاريخ يجب أن يلي آخر جرد معتمد ({last[2]})")
+        cash_closing.refuse_locked(con, day)
         cutoff, book = cash_closing.book_snapshot(con, SAFE)
         if book != expected_book:
             raise ClosingError("تغيّر رصيد الخزنة الدفتري أثناء العدّ؛ أعد فتح الجرد وعُدّ من جديد")

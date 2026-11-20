@@ -45,3 +45,17 @@ class ReportsPageTest(unittest.TestCase):
 
     def test_cashier_sees_nothing(self):
         self.assertEqual(self.page(self.cashier_session).model.rows, [])
+
+    def test_lock_dialog_locks_and_reports_page_shows_it(self):
+        from morv.infra import ledger
+        from morv.ui.period_dialogs import PeriodLockDialog
+        from morv.ui.widgets import dispose
+        page = self.page()
+        self.assertTrue(page.can_edit())
+        self.assertFalse(self.page(self.cashier_session).can_edit())
+        dlg = PeriodLockDialog(self.session)
+        self.addCleanup(dispose, dlg, self.app)
+        dlg.save()
+        self.assertIsNotNone(dlg.saved)
+        self.assertEqual(ledger.locked_through(self.con), dlg.through.text())
+        self.assertIn("مقفلة حتى", self.page().total())

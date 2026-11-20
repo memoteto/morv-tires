@@ -223,6 +223,9 @@ def _prepare(con, by, request_key, kind, amount, memo, money_account, other_acco
         day = ledger.valid_date(movement_date or date.today().isoformat(), "تاريخ الحركة")
     except ledger.LedgerError as e:
         raise TreasuryError(str(e)) from e
+    locked = ledger.locked_through(con)
+    if locked and day <= locked:
+        raise TreasuryError(f"التاريخ داخل فترة مالية مقفلة حتى {locked}")
     if money_account not in MONEY_ACCOUNTS:
         raise TreasuryError("حساب الخزينة يجب أن يكون الصندوق أو أحد حسابات البنوك والمحافظ")
     if kind == "transfer" and (other_account not in MONEY_ACCOUNTS or other_account == money_account):
