@@ -1,5 +1,5 @@
 """Reports screen: read-only income statement for a chosen period."""
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QPushButton, QWidget
 
 from morv.core.money import fmt
 from morv.core.text import ltr
@@ -7,6 +7,7 @@ from morv.infra import income_statement, ledger
 from morv.ui.listpage import ListPage
 from morv.ui.period_dialogs import PeriodLockDialog
 from morv.ui.profit_dialogs import DistributionDialog
+from morv.ui.suspended_dialogs import SuspendedBalancesDialog
 from morv.ui.widgets import primary_button
 
 _KIND_PREFIX = {"head": "", "line": "    ", "total": "", "grand": ""}
@@ -34,14 +35,16 @@ class ReportsPage(ListPage):
 
     def extra_header(self) -> QWidget | None:
         self.distribute_btn = None
-        if not self.session.can("profit.manage"):
-            return None
         host = QWidget()
         row = QHBoxLayout(host)
         row.setContentsMargins(0, 0, 0, 0)
-        self.distribute_btn = primary_button("توزيع الأرباح")
-        self.distribute_btn.clicked.connect(self.distribute)
-        row.addWidget(self.distribute_btn)
+        if self.session.can("profit.manage"):
+            self.distribute_btn = primary_button("توزيع الأرباح")
+            self.distribute_btn.clicked.connect(self.distribute)
+            row.addWidget(self.distribute_btn)
+        self.suspended_btn = QPushButton("الأرصدة المعلّقة")
+        self.suspended_btn.clicked.connect(lambda: SuspendedBalancesDialog(self.session, self).exec())
+        row.addWidget(self.suspended_btn)
         row.addStretch(1)
         return host
 
