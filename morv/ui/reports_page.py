@@ -60,9 +60,7 @@ class ReportsPage(ListPage):
         for key in reports.KEYS:
             self.report_combo.addItem(reports.TITLES[key], key)
         self.account_combo = QComboBox()
-        for code, label in reports.account_choices(self.session.con):
-            self.account_combo.addItem(label, code)
-        self.account_combo.setCurrentIndex(max(0, self.account_combo.findData("1110")))
+        self._filled_for = None
         self.from_edit, self.to_edit = ltr_edit("YYYY-MM-DD"), ltr_edit("YYYY-MM-DD")
         self.range_labels = (muted("من"), muted("إلى"))
         self.export_csv_btn = QPushButton("تصدير Excel")
@@ -88,8 +86,23 @@ class ReportsPage(ListPage):
     def _key(self) -> str:
         return self.report_combo.currentData()
 
+    def _fill_params(self, key: str) -> None:
+        """Accounts for the statement, partners for the partner statement; refilled only when the kind changes."""
+        kind = "partner" if key == "partner" else "account"
+        if kind == self._filled_for:
+            return
+        self._filled_for = kind
+        self.account_combo.blockSignals(True)
+        self.account_combo.clear()
+        for value, label in reports.param_choices(self.session.con, key):
+            self.account_combo.addItem(label, value)
+        self.account_combo.setCurrentIndex(max(0, self.account_combo.findData("1110")))
+        self.account_combo.blockSignals(False)
+
     def _sync_controls(self) -> None:
         key = self._key()
+        if key in reports.NEEDS_ACCOUNT:
+            self._fill_params(key)
         self.account_combo.setVisible(key in reports.NEEDS_ACCOUNT)
         custom = self.filter_key == CUSTOM
         for w in (self.from_edit, self.to_edit, *self.range_labels):

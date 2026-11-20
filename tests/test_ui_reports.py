@@ -43,12 +43,23 @@ class ReportsPageTest(unittest.TestCase):
         self.assertEqual(page.model.rows[-1][1], "grand")
         self.assertEqual(page.model.rows[-1][2][2], 100000)
 
+    def test_partner_report_lists_partners_and_account_report_lists_accounts(self):
+        page = self.page()
+        page.report_combo.setCurrentIndex(page.report_combo.findData("ledger"))
+        self.assertGreater(page.account_combo.count(), 10)
+        page.report_combo.setCurrentIndex(page.report_combo.findData("partner"))
+        self.assertEqual(page.account_combo.count(), 0)          # no partners in this fixture
+        self.assertIn("شريكًا", page.count_label.text())
+        page.report_combo.setCurrentIndex(page.report_combo.findData("ledger"))
+        self.assertGreater(page.account_combo.count(), 10)
+
     def test_report_picker_switches_tables_and_exports(self):
         import os
+        from morv.infra.reports import KEYS as reports_keys
         page = self.page()
         self.assertEqual([page.report_combo.itemData(i) for i in range(page.report_combo.count())],
-                         ["income", "trial", "ledger", "suspended"])
-        for key in ("trial", "ledger", "suspended", "income"):
+                         list(reports_keys))
+        for key in ("trial", "ledger", "sales_profit", "aging", "suspended", "income"):
             page.report_combo.setCurrentIndex(page.report_combo.findData(key))
             self.assertEqual(page.table.key, key)
             self.assertEqual(page.model.columnCount(), len(page.table.headers))
