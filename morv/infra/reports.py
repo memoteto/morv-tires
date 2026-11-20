@@ -258,7 +258,7 @@ def installment_aging(con, end: str) -> Table:
 
 
 def credit_aging(con, end: str) -> Table:
-    """Open credit invoices per customer by days past due; returns hit their invoice, receipts go oldest first."""
+    """Open credit invoices per customer by days past due; receipts settle the oldest first."""
     _s, end = _range("0001-01-01", end)
     today = date.fromisoformat(end)
     invoices: dict[int, list] = {}      # customer -> [name, [[sale_id, due, open]]]
