@@ -66,6 +66,35 @@ class ReportsTest(unittest.TestCase):
             for _kind, cells in t.rows:
                 self.assertEqual(len(cells), len(t.headers), key)
 
+    def test_previous_range_is_the_same_span_one_month_or_year_back(self):
+        self.assertEqual(reports.previous_range("2026-11-01", "2026-11-20"), ("2026-10-01", "2026-10-20"))
+        self.assertEqual(reports.previous_range("2026-03-01", "2026-03-31"), ("2026-02-01", "2026-02-28"))
+        self.assertEqual(reports.previous_range("2026-01-01", "2026-11-20"), ("2025-01-01", "2025-11-20"))
+        self.assertEqual(reports.previous_range("2024-01-01", "2024-02-29"), ("2023-01-01", "2023-02-28"))
+        self.assertEqual(reports.previous_range("2026-11-05", "2026-11-14"), ("2026-10-26", "2026-11-04"))
+        with self.assertRaises(reports.ReportError):
+            reports.previous_range("0001-01-01", "2026-11-20")
+
+    def test_income_comparison_aligns_accounts_and_computes_change(self):
+        self.post("2026-12-05", "1110", "4110", 20_000)
+        self.post("2026-12-06", "5110", "1410", 8_000)
+        self.post("2026-12-07", "5110", "1410", 1_000)
+        t = reports.income(self.con, "2026-12-01", "2026-12-31", compare=True)
+        self.assertIn("2026-11-01 إلى 2026-11-30", t.subtitle)
+        rows = {cells[0]: cells for kind, cells in t.rows if kind == "line"}
+        self.assertEqual(rows["4110"][2:5], (20_000, 5_000, 15_000))          # November had 5,000
+        self.assertEqual(rows["4110"][5], "300.0%")
+        self.assertEqual(rows["5110"][2:5], (9_000, 0, 9_000))                 # cost only in December
+        self.assertEqual(rows["5110"][5], "")
+        net = t.rows[-1][1]
+        self.assertEqual((net[2], net[3], net[4]), (20_000 - 9_000, 5_000, 20_000 - 9_000 - 5_000))
+
+    def test_account_only_in_the_previous_period_still_appears(self):
+        t = reports.income(self.con, "2026-12-01", "2026-12-31", compare=True)
+        rows = {cells[0]: cells for kind, cells in t.rows if kind == "line"}
+        self.assertEqual(rows["4110"][2:5], (0, 5_000, -5_000))
+        self.assertEqual(len(t.headers), len(t.rows[0][1]))
+
     def test_csv_export_is_excel_friendly(self):
         path = str(Path(self.tmp.name) / "r.csv")
         reports.to_csv(reports.trial_balance(self.con, "2026-11-30"), path)
