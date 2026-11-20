@@ -10,11 +10,12 @@ from morv.infra import income_statement, ledger, suspended_balances
 
 TEXT, CODE, MONEY, DATE = "text", "code", "money", "date"
 KEYS = ("income", "daily_sales", "top_items", "sales_profit", "slow_moving", "journal", "trial", "ledger",
-        "aging", "suppliers", "partner", "suspended")
+        "aging", "credit_aging", "suppliers", "partner", "suspended")
 TITLES = {"income": "قائمة الدخل", "daily_sales": "ملخص المبيعات اليومي", "top_items": "الأصناف الأكثر مبيعًا",
           "sales_profit": "المبيعات وربحية الأصناف", "slow_moving": "الأصناف بطيئة الحركة",
           "journal": "دفتر اليومية", "trial": "ميزان المراجعة", "ledger": "كشف حساب",
-          "aging": "أعمار ديون التقسيط", "suppliers": "أرصدة الموردين", "partner": "كشف حساب الشريك",
+          "aging": "أعمار ديون التقسيط", "credit_aging": "أعمار البيع الآجل",
+          "suppliers": "أرصدة الموردين", "partner": "كشف حساب الشريك",
           "suspended": "الأرصدة المعلّقة"}
 NEEDS_PARAM = {"ledger": "account", "partner": "partner", "slow_moving": "days"}   # one choice from param_choices
 IDLE_DAYS = (30, 60, 90, 180, 365)
@@ -256,6 +257,54 @@ def installment_aging(con, end: str) -> Table:
                  (CODE, TEXT, *([MONEY] * (len(BUCKETS) + 1))), tuple(rows), 1)
 
 
+def credit_aging(con, end: str) -> Table:
+    """Open credit invoices per customer by days past due; receipts settle the oldest first."""
+    _s, end = _range("0001-01-01", end)
+    today = date.fromisoformat(end)
+    invoices: dict[int, list] = {}      # customer -> [name, [[sale_id, due, open]]]
+    by_sale: dict[int, list] = {}
+    for sid, cid, name, day, days, amount in con.execute(
+            "SELECT s.id, s.customer_id, cu.name, s.sale_date, cu.credit_days, sum(p.amount) FROM sales s "
+            "JOIN sale_payments p ON p.sale_id = s.id AND p.method = 'credit' JOIN customers cu ON cu.id = s.customer_id "
+            "WHERE s.sale_date <= ? GROUP BY s.id ORDER BY s.sale_date, s.id", (end,)):
+        due = (date.fromisoformat(day) + timedelta(days=days)).isoformat()
+        entry = [sid, due, amount]
+        invoices.setdefault(cid, [name, []])[1].append(entry)
+        by_sale[sid] = entry
+    for sid, refunded in con.execute(
+            "SELECT sale_id, sum(total) FROM sale_returns WHERE refund_method = 'credit' AND return_date <= ? "
+            "GROUP BY sale_id", (end,)):
+        if sid in by_sale:
+            by_sale[sid][2] -= min(refunded, by_sale[sid][2])
+    for cid, net in con.execute(
+            "SELECT customer_id, sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END) "
+            "FROM customer_receipts WHERE receipt_date <= ? GROUP BY customer_id", (end,)):
+        left = net
+        for entry in invoices.get(cid, (None, []))[1]:
+            take = min(left, entry[2])
+            entry[2] -= take
+            left -= take
+    rows = []
+    for name, entries in sorted(invoices.values()):
+        buckets = [0] * len(BUCKETS)
+        for _sid, due, remaining in entries:
+            if remaining > 0:
+                late = (today - date.fromisoformat(due)).days
+                buckets[next(i for i, (limit, _t) in enumerate(BUCKETS) if limit is None or late <= limit)] += remaining
+        if sum(buckets):
+            rows.append(("line", (name, *buckets, sum(buckets))))
+    totals = [sum(r[1][1 + i] for r in rows) for i in range(len(BUCKETS) + 1)]
+    rows.append(("grand", ("الإجمالي", *totals)))
+    ledger_1310 = con.execute(
+        "SELECT coalesce(sum(l.debit) - sum(l.credit), 0) FROM journal_lines l JOIN journal_entries e "
+        "ON e.id = l.entry_id WHERE e.status = 'posted' AND l.account_code = '1310' AND e.entry_date <= ?",
+        (end,)).fetchone()[0]
+    tie = "يطابق الدفتر" if ledger_1310 == totals[-1] else f"تحذير: الدفتر 1310 = {fmt(ledger_1310)}"
+    return Table("credit_aging", TITLES["credit_aging"], f"حتى {end} · حسب تاريخ استحقاق الفاتورة · {tie}",
+                 ("العميل", *(t for _l, t in BUCKETS), "الإجمالي"), (TEXT, *([MONEY] * (len(BUCKETS) + 1))),
+                 tuple(rows), 0)
+
+
 def partner_statement(con, account: str, start: str, end: str) -> Table:
     """The partner's current account: a positive balance is owed to the partner by the shop."""
     row = con.execute("SELECT name, capital_account FROM partners WHERE current_account = ?", (account,)).fetchone()
@@ -425,6 +474,8 @@ def build(con, key: str, start: str, end: str, account: str = "", compare: bool 
         return sales_profit(con, start, end)
     if key == "aging":
         return installment_aging(con, end)
+    if key == "credit_aging":
+        return credit_aging(con, end)
     if key == "partner":
         return partner_statement(con, account, start, end)
     if key == "daily_sales":
