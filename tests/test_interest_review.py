@@ -48,11 +48,23 @@ class InterestReviewTest(unittest.TestCase):
         self.assertTrue(all(i.amount > 0 for i in items))
         self.assertEqual(self.con.execute("SELECT count(*) FROM interest_recognitions").fetchone()[0], 0)
 
-    def test_a_late_installment_puts_the_month_beyond_the_engine_with_its_reason_and_amount(self):
+    def test_a_late_installment_does_not_block_contractual_interest(self):
         items = R.review(self.con, "2025-08-31")          # the 13 August installment is unpaid at month end
-        self.assertEqual([(i.period, i.status) for i in items], [("2025-07", R.READY), ("2025-08", R.BLOCKED)])
-        self.assertIn("التحصيلات", items[1].reason)
-        self.assertGreater(items[1].amount, 0)
+        self.assertEqual([(i.period, i.status) for i in items], [("2025-07", R.READY), ("2025-08", R.READY)])
+
+    def add_return(self):
+        sale_id, entry = self.con.execute("SELECT id, journal_entry_id FROM sales").fetchone()
+        self.con.execute(
+            "INSERT INTO sale_returns (number, request_key, payload_hash, sale_id, return_date, total, cost_total, "
+            "reason, refund_method, journal_entry_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ("IR-RET-001", "irev-return-test", "legacy", sale_id, "2025-07-20", 0, 0, "synthetic", "installment", entry))
+
+    def test_a_returned_sale_is_beyond_the_engine_with_its_reason_and_amount(self):
+        self.add_return()
+        items = R.review(self.con, "2025-07-31")
+        self.assertEqual([(i.period, i.status) for i in items], [("2025-07", R.BLOCKED)])
+        self.assertIn("مرتجع", items[0].reason)
+        self.assertGreater(items[0].amount, 0)
 
     def test_recognised_months_leave_the_review_and_misdated_ones_are_reported(self):
         self.recognise("2025-07", "2025-08-01")           # July interest dated in August
@@ -70,12 +82,19 @@ class InterestReviewTest(unittest.TestCase):
             "SELECT (SELECT count(*) FROM journal_entries), (SELECT count(*) FROM audit_log)").fetchone(), before)
 
     def test_lock_blockers_name_the_contract_month_amount_and_reason(self):
+        self.add_return()
+        text = "\n".join(period_lock.blockers(self.con, "2025-08-31"))
+        self.assertIn(self.contract.number, text)
+        self.assertIn("2025-07", text)
+        self.assertIn("153.74", text)
+        self.assertIn("خارج نطاق الاعتراف الآلي", text)
+        self.assertIn("مرتجع", text)
+
+    def test_lock_blockers_name_unrecognised_ready_interest(self):
         text = "\n".join(period_lock.blockers(self.con, "2025-08-31"))
         self.assertIn("لم يُعترف بها", text)
         self.assertIn(self.contract.number, text)
-        self.assertIn("2025-07", text)
-        self.assertIn("خارج نطاق الاعتراف الآلي", text)
-        self.assertIn("التحصيلات", text)
+        self.assertIn("2025-08", text)
 
     def test_blockers_clear_once_everything_is_recognised_at_month_end(self):
         self.pay("2025-08-13", "irev-pay-0002")
@@ -93,15 +112,14 @@ if __name__ == "__main__":
     unittest.main()
 
 
-    def test_post_ready_posts_at_month_end_and_stops_a_contract_at_its_first_refusal(self):
-        items = R.review(self.con, "2025-08-31")          # July ready, August refused (late installment)
-        result = R.post_ready(self.con, self.admin, items)
-        self.assertEqual(result.posted, 1)
-        self.assertEqual(result.failed, ())
+    def test_post_ready_posts_at_month_end_even_when_installments_are_late(self):
+        result = R.post_ready(self.con, self.admin, R.review(self.con, "2025-08-31"))
+        self.assertEqual((result.posted, result.failed), (2, ()))
         dates = [r[0] for r in self.con.execute(
-            "SELECT e.entry_date FROM interest_recognitions r JOIN journal_entries e ON e.id=r.journal_entry_id")]
-        self.assertEqual(dates, ["2025-07-31"])
-        self.assertEqual([i.status for i in R.review(self.con, "2025-08-31")], [R.BLOCKED])
+            "SELECT e.entry_date FROM interest_recognitions r JOIN journal_entries e ON e.id=r.journal_entry_id "
+            "ORDER BY e.entry_date")]
+        self.assertEqual(dates, ["2025-07-31", "2025-08-31"])
+        self.assertEqual(R.review(self.con, "2025-08-31"), [])
 
     def test_post_ready_chains_months_in_order_and_is_not_misdated(self):
         self.pay("2025-08-13", "irev-pay-0002")

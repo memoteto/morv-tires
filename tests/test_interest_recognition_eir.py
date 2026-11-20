@@ -102,49 +102,30 @@ class EirPostingTest(unittest.TestCase):
         self.assertEqual(self.con.execute("SELECT count(*) FROM interest_recognitions").fetchone()[0], 2)
         self.assertEqual(ledger.account_balance(self.con, "4140"), -(a.amount + b.amount))
 
-    def test_past_months_post_in_order_and_exact_due_date_collections_work(self):
+    def test_past_months_post_in_order(self):
         contract, _sale = self.contract()
         with self.assertRaisesRegex(RecognitionError, "السابقة"):
             self.recognition(contract.id, "2025-08")
         self.recognition(contract.id, "2025-07")
-        with self.assertRaisesRegex(RecognitionError, "التحصيلات"):
-            self.recognition(contract.id, "2025-08")
-        self.con.execute("SELECT 1")  # The refusal must not close the database connection.
-        installments.collect_payment(
-            self.con, self.manager, request_key="eir-pmt-ontime-001",
-            contract_id=contract.id, amount=115000, method="cash", payment_date="2025-08-13",
-        )
         before_receivable = ledger.account_balance(self.con, "1320")
         august = self.recognition(contract.id, "2025-08")
         self.assertGreater(august.amount, 0)
         self.assertEqual(ledger.account_balance(self.con, "1320"), before_receivable)
-        self.assertEqual(self.con.execute("SELECT count(*) FROM installment_payments").fetchone()[0], 1)
 
-    def test_early_or_late_collection_is_refused_until_timing_policy_exists(self):
-        for payment_date in ("2025-08-01", "2025-09-01"):
-            with self.subTest(payment_date=payment_date):
+    def test_collection_timing_never_changes_contractual_interest(self):
+        baseline, _ = self.contract()
+        self.recognition(baseline.id, "2025-07")
+        expected = self.recognition(baseline.id, "2025-08").amount
+        cases = (("2025-08-01", 115000), ("2025-09-01", 115000), ("2025-08-13", 20000))
+        for payment_date, amount in cases:
+            with self.subTest(payment_date=payment_date, amount=amount):
                 contract, _sale = self.contract()
                 self.recognition(contract.id, "2025-07")
                 installments.collect_payment(
                     self.con, self.manager, request_key=f"eir-pay-{self.serial:04d}",
-                    contract_id=contract.id, amount=115000, method="cash", payment_date=payment_date,
+                    contract_id=contract.id, amount=amount, method="cash", payment_date=payment_date,
                 )
-                before = self.state()
-                with self.assertRaises(RecognitionError):
-                    self.recognition(contract.id, "2025-08")
-                self.assertEqual(self.state(), before)
-
-    def test_partial_receipt_on_due_date_cannot_masquerade_as_full_receipt(self):
-        contract, _ = self.contract()
-        self.recognition(contract.id)
-        installments.collect_payment(
-            self.con, self.manager, request_key="eir-partial-pay-001",
-            contract_id=contract.id, amount=20000, method="cash", payment_date="2025-08-13",
-        )
-        before = self.state()
-        with self.assertRaisesRegex(RecognitionError, "التحصيلات"):
-            self.recognition(contract.id, "2025-08")
-        self.assertEqual(self.state(), before)
+                self.assertEqual(self.recognition(contract.id, "2025-08").amount, expected)
 
     def test_unclosed_period_and_backdating_are_refused_without_mutation(self):
         contract, _sale = self.contract()

@@ -51,32 +51,6 @@ def _schedule_hash(contract, rows, schedule) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
-def _verify_receipts(con: sqlite3.Connection, contract_id: int, closed_on: str) -> None:
-    """Prevent posting a theoretical EIR when collections deviate from contractual dates."""
-    rows = con.execute(
-        "SELECT r.id, r.due_date, r.amount, "
-        "coalesce(sum(CASE WHEN p.payment_date <= ? THEN l.amount ELSE 0 END), 0) "
-        "FROM installment_rows r "
-        "LEFT JOIN installment_payment_lines l ON l.row_id=r.id "
-        "LEFT JOIN installment_payments p ON p.id=l.payment_id "
-        "WHERE r.contract_id=? GROUP BY r.id ORDER BY r.no",
-        (closed_on, contract_id),
-    ).fetchall()
-    for _row_id, due_date, amount, paid in rows:
-        expected_paid = amount if due_date <= closed_on else 0
-        if paid != expected_paid:
-            raise RecognitionError("توقفت الفوائد: التحصيلات لا تطابق جدول العقد في نهاية الشهر")
-    mismatch = con.execute(
-        "SELECT 1 FROM installment_payment_lines l "
-        "JOIN installment_payments p ON p.id=l.payment_id "
-        "JOIN installment_rows r ON r.id=l.row_id "
-        "WHERE r.contract_id=? AND p.payment_date <= ? AND p.payment_date != r.due_date LIMIT 1",
-        (contract_id, closed_on),
-    ).fetchone()
-    if mismatch:
-        raise RecognitionError("توقفت الفوائد: تاريخ تحصيل يختلف عن تاريخ استحقاق القسط")
-
-
 def recognise_month(con: sqlite3.Connection, by, *, contract_id: int,
                     period: str, entry_date: str | None = None) -> PostedRecognition | None:
     """Post one closed month for one contract; zero-interest months create no journal."""
@@ -156,7 +130,6 @@ def evaluate(con: sqlite3.Connection, contract_id: int, period: str, closed_on: 
         raise RecognitionError("يجب ترحيل أشهر الفوائد السابقة لهذا العقد أولًا")
     if any(older_period > period for older_period in posted):
         raise RecognitionError("لا يجوز إدراج قيد شهر أقدم بعد قيد لاحق")
-    _verify_receipts(con, contract_id, closed_on.isoformat())
     if sum(item[1] for item in posted.values()) + amount > markup:
         raise RecognitionError("المبلغ المعترف به يتجاوز فوائد العقد")
     return ("ready", amount, fingerprint, number, str(schedule.annual_rate))
