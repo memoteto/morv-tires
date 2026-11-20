@@ -149,6 +149,17 @@ def icon_button(text: str, icon_name: str, color: str = "#8792A3") -> QPushButto
     return b
 
 
+def action_row(*buttons: QPushButton) -> QHBoxLayout:
+    """Buttons at their natural width, packed to the start, so they never stretch across the page."""
+    row = QHBoxLayout()
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(8)
+    for b in buttons:
+        row.addWidget(b)
+    row.addStretch(1)
+    return row
+
+
 def ask(parent, title: str, text: str, danger: bool = False) -> bool:
     from morv.ui.modal import ask as _ask
     return _ask(parent, title, text, danger)

@@ -51,6 +51,15 @@ class ReportsPageTest(unittest.TestCase):
         self.addCleanup(dlg.deleteLater)
         self.assertEqual((dlg.report.shortages, dlg.report.overages), ((), ()))
 
+    def test_period_filter_is_a_dropdown_that_switches_the_statement(self):
+        page = self.page()
+        self.assertIsNotNone(page.filter_combo)
+        self.assertEqual(page.filter_buttons, {})
+        page.filter_combo.setCurrentIndex(page.filter_combo.findData("last_year"))
+        self.assertEqual(page.filter_key, "last_year")
+        page.set_filter("month")
+        self.assertEqual(page.filter_combo.currentData(), "month")
+
     def test_cashier_sees_nothing(self):
         self.assertEqual(self.page(self.cashier_session).model.rows, [])
 

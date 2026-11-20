@@ -51,7 +51,8 @@ class InstallmentsUiTest(unittest.TestCase):
         self.addCleanup(dlg.deleteLater)
         self.assertIsNone(dlg.saved)
         self.assertEqual(self.con.execute("SELECT count(*) FROM interest_recognitions").fetchone()[0], 0)
-        self.assertTrue(hasattr(self.page().list_page, "interest_btn"))
+        btn = self.page().list_page.interest_btn
+        self.assertTrue(btn.isEnabled() and not btn.isHidden())
 
     def opened_form(self):
         p = self.page()

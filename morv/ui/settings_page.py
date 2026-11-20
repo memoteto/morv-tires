@@ -2,9 +2,9 @@
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout,
-                               QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
-                               QTableView, QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
+                               QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+                               QPushButton, QScrollArea, QTableView, QTabWidget, QVBoxLayout, QWidget)
 
 from morv.core import security
 from morv.core.text import ltr
@@ -209,11 +209,20 @@ class UsersTab(QWidget):
         inner.addLayout(f)
         inner.addWidget(muted("الصلاحيات (المدير يملكها كلها دائمًا):"))
         self.checks: dict[str, QCheckBox] = {}
-        for key, label in security.PERMISSIONS.items():
+        perms_box = QWidget()
+        grid = QGridLayout(perms_box)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(24)
+        for i, (key, label) in enumerate(security.PERMISSIONS.items()):
             cb = QCheckBox(label)
             cb.toggled.connect(lambda on, k=key: self._perm_changed(k, on))
             self.checks[key] = cb
-            inner.addWidget(cb)
+            grid.addWidget(cb, i // 2, i % 2)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(perms_box)
+        inner.addWidget(scroll, 1)       # permissions scroll; the buttons below always stay visible
         btns = QHBoxLayout()
         self.pw_btn = QPushButton("إعادة تعيين كلمة المرور")
         self.pw_btn.clicked.connect(self.reset_password)
@@ -225,7 +234,6 @@ class UsersTab(QWidget):
         inner.addLayout(btns)
         self.notice = Notice()
         inner.addWidget(self.notice)
-        inner.addStretch(1)
         row.addWidget(self.detail, 2)
         self._loading = False
         self.reload()

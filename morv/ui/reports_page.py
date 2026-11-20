@@ -1,5 +1,5 @@
 """Reports screen: read-only income statement for a chosen period."""
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QPushButton, QWidget
+from PySide6.QtWidgets import QDialog, QPushButton
 
 from morv.core.money import fmt
 from morv.core.text import ltr
@@ -8,7 +8,6 @@ from morv.ui.listpage import ListPage
 from morv.ui.period_dialogs import PeriodLockDialog
 from morv.ui.profit_dialogs import DistributionDialog
 from morv.ui.suspended_dialogs import SuspendedBalancesDialog
-from morv.ui.widgets import primary_button
 
 _KIND_PREFIX = {"head": "", "line": "    ", "total": "", "grand": ""}
 
@@ -23,6 +22,7 @@ class ReportsPage(ListPage):
     add_icon = "lock"
     search_placeholder = "بحث في البنود (F2)"
     empty_message = "لا توجد قيود في هذه الفترة"
+    filters_as_dropdown = True
     filters = list(income_statement.PERIODS)
     columns = [
         ("الحساب", lambda r: ltr(r[2])),
@@ -33,20 +33,17 @@ class ReportsPage(ListPage):
     def __init__(self, session):
         super().__init__(session)
 
-    def extra_header(self) -> QWidget | None:
+    def extra_actions(self) -> list:
         self.distribute_btn = None
-        host = QWidget()
-        row = QHBoxLayout(host)
-        row.setContentsMargins(0, 0, 0, 0)
+        buttons = []
         if self.session.can("profit.manage"):
-            self.distribute_btn = primary_button("توزيع الأرباح")
+            self.distribute_btn = QPushButton("توزيع الأرباح")
             self.distribute_btn.clicked.connect(self.distribute)
-            row.addWidget(self.distribute_btn)
+            buttons.append(self.distribute_btn)
         self.suspended_btn = QPushButton("الأرصدة المعلّقة")
         self.suspended_btn.clicked.connect(lambda: SuspendedBalancesDialog(self.session, self).exec())
-        row.addWidget(self.suspended_btn)
-        row.addStretch(1)
-        return host
+        buttons.append(self.suspended_btn)
+        return buttons
 
     def distribute(self) -> None:
         if DistributionDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
