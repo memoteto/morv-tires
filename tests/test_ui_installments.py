@@ -45,6 +45,14 @@ class InstallmentsUiTest(unittest.TestCase):
         self.addCleanup(p.deleteLater)
         return p
 
+    def test_dialog_previews_and_the_button_exists_without_posting(self):
+        from morv.ui.interest_dialogs import InterestRecognitionDialog
+        dlg = InterestRecognitionDialog(self.session, None, through="2026-11-30")
+        self.addCleanup(dlg.deleteLater)
+        self.assertIsNone(dlg.saved)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM interest_recognitions").fetchone()[0], 0)
+        self.assertTrue(hasattr(self.page().list_page, "interest_btn"))
+
     def opened_form(self):
         p = self.page()
         p.list_page.open_dialog(None)
@@ -185,3 +193,4 @@ class PosToContractTest(unittest.TestCase):
         p.post()
         self.assertIsNone(p.posted)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sales").fetchone()[0], 0)
+

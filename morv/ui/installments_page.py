@@ -12,6 +12,7 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
 from morv.infra import installment_view, installments
 from morv.infra.installments import ContractError, Guarantor
+from morv.ui.interest_dialogs import InterestRecognitionDialog
 from morv.ui.listpage import ListPage, TupleModel
 from morv.ui.widgets import Notice, card, field, ltr_edit, muted, primary_button, ro_field
 
@@ -115,7 +116,18 @@ class ContractsPage(ListPage):
             self._kpi_buttons[key] = btn
             grid.addWidget(btn, 0, i)
         col.addLayout(grid)
+        self.interest_btn = QPushButton("اعتراف بفوائد الأشهر المنتهية")
+        self.interest_btn.clicked.connect(self.recognise_interest)
+        col.addWidget(self.interest_btn)
         return box
+
+    def recognise_interest(self) -> None:
+        if not self.session.can("installments.manage", self.session.con):
+            self.notice.show_message("لا تملك صلاحية الاعتراف بفوائد التقسيط")
+            return
+        dlg = InterestRecognitionDialog(self.session, self)
+        if dlg.exec() and dlg.saved:
+            self.notice.show_message(f"رُحِّلت فوائد {dlg.saved.posted} شهر", "success")
 
     def _pick_kpi(self, key: str) -> None:
         self.set_filter("all" if self.filter_key == key else key)

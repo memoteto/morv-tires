@@ -62,6 +62,17 @@ class ProfitTest(unittest.TestCase):
         self.shares()
         self.assertEqual(profit.preview(self.con, D[6]).max_amount, 50_000)
 
+    def test_distribution_rechecks_integrity_even_under_an_old_lock(self):
+        from unittest import mock
+        self.shares()
+        with mock.patch.object(period_lock, "blockers", return_value=["فوائد تقسيط مستحقة لم يُعترف بها"]):
+            with self.assertRaises(ProfitError) as ctx:
+                profit.preview(self.con, D[6])
+            self.assertIn("سلامة الفترة", str(ctx.exception))
+            with self.assertRaises(ProfitError):
+                self.dist(1_000)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM profit_distributions").fetchone()[0], 0)
+
     def test_unlocked_ledger_cannot_be_distributed(self):
         period_lock.unlock_period(self.con, self.admin, request_key=self.key(),
                                   lock_id=period_lock.latest_lock(self.con)[0], memo="x")

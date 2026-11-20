@@ -5,7 +5,8 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import date
 
-from morv.infra import cash_closing, ledger
+from morv.core.money import fmt
+from morv.infra import cash_closing, interest_review, ledger
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, has_permission
 
@@ -39,12 +40,48 @@ def latest_lock(con: sqlite3.Connection) -> tuple | None:
         "ORDER BY through_date DESC, id DESC LIMIT 1").fetchone()
 
 
+def _till_blockers(con: sqlite3.Connection, through: str) -> list[str]:
+    cov = cash_closing.coverage(con, through)
+    if cov.never_closed:
+        return ["يوجد في الصندوق حركات ولم يُقفل الصندوق قط؛ أقفل الصندوق أولًا"]
+    out = []
+    if cov.missing_days:
+        shown = "، ".join(cov.missing_days[:5]) + (" ..." if len(cov.missing_days) > 5 else "")
+        out.append(f"{len(cov.missing_days)} يوم بحركة صندوق بلا إقفال: {shown}")
+    if cov.late_lines:
+        out.append(f"{cov.late_lines} حركة صندوق مؤرخة داخل الفترة رُحِّلت بعد آخر إقفال؛ "
+                   "أقفل الصندوق مرة أخرى ثم أعد المحاولة")
+    return out
+
+
+def _interest_blockers(con: sqlite3.Connection, through: str) -> list[str]:
+    items = interest_review.review(con, through)
+    out = []
+
+    def lines(found, template):
+        shown = [template(i) for i in found[:5]]
+        return shown + ([f"... و{len(found) - 5} غيرها"] if len(found) > 5 else [])
+
+    ready = [i for i in items if i.status == interest_review.READY]
+    if ready:
+        total = sum(i.amount for i in ready)
+        out.append(f"فوائد تقسيط مستحقة لم يُعترف بها: {len(ready)} شهرًا بمجموع {fmt(total)}؛ اعترف بها من شاشة التقسيط")
+        out += lines(ready, lambda i: f"   • عقد {i.number} شهر {i.period}: {fmt(i.amount)}")
+    blocked = [i for i in items if i.status == interest_review.BLOCKED]
+    if blocked:
+        out.append(f"{len(blocked)} عقد خارج نطاق الاعتراف الآلي ولا يُقفل ما دام على حاله:")
+        out += lines(blocked, lambda i: f"   • عقد {i.number} شهر {i.period}"
+                     + (f" ({fmt(i.amount)})" if i.amount else "") + f": {i.reason}")
+    late = [i for i in items if i.status == interest_review.MISDATED]
+    if late:
+        out.append("فوائد مُعترف بها بتاريخ بعد نهاية الفترة، فإيرادها خارجها:")
+        out += lines(late, lambda i: f"   • عقد {i.number} شهر {i.period}: {fmt(i.amount)} {i.reason}")
+    return out
+
+
 def blockers(con: sqlite3.Connection, through: str) -> list[str]:
     """Reasons a lock through that date would strand work; empty when it is safe."""
-    out = []
-    unclosed = cash_closing.unclosed_days(con, through)
-    if unclosed:
-        out.append(f"يوجد {unclosed} يوم بحركة صندوق لم يُقفل حتى {through}")
+    out = _till_blockers(con, through) + _interest_blockers(con, through)
     opened = con.execute("SELECT count(*) FROM journal_entries WHERE status <> 'posted' AND entry_date <= ?",
                          (through,)).fetchone()[0]
     if opened:

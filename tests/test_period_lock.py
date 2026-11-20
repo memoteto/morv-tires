@@ -109,6 +109,36 @@ class PeriodLockTest(unittest.TestCase):
         self.lock(D[2])                                  # moving forward is fine
         self.assertEqual(ledger.locked_through(self.con), D[2])
 
+    def test_a_skipped_day_between_two_closings_blocks_the_lock(self):
+        self.post(D[3], "1110", "4110", 500)               # till activity on a day nobody closed
+        self.close_till(D[4])
+        self.close_till(D[2])
+        with self.assertRaises(LockError) as ctx:
+            self.lock(D[1])
+        self.assertIn(D[3], str(ctx.exception))
+        self.assertEqual(cash_closing.unclosed_days(self.con), 1)       # the dashboard uses the same rule
+
+    def test_days_before_the_first_closing_do_not_block(self):
+        self.post(D[5], "1110", "4110", 700)
+        self.close_till(D[4])                              # this first closing counted all earlier cash
+        self.assertEqual(self.lock(D[3]).through_date, D[3])
+
+    def test_movement_posted_after_the_closing_blocks_until_the_next_closing(self):
+        self.close_till(D[4])
+        self.close_till(D[3])
+        self.post(D[4], "1110", "4110", 300)               # discovered later, dated inside the period
+        with self.assertRaises(LockError) as ctx:
+            self.lock(D[3])
+        self.assertIn("أقفل الصندوق مرة أخرى", str(ctx.exception))
+        self.close_till(D[2])                              # the safe path: the next closing counts it
+        self.assertEqual(self.lock(D[3]).through_date, D[3])
+
+    def test_the_closing_difference_entry_itself_is_not_a_late_movement(self):
+        book = cash_closing.book_snapshot(self.con)[1]
+        cash_closing.close_day(self.con, self.admin, request_key=self.key(), closing_date=D[4], counted=book - 100,
+                               expected_book=book, memo="عجز")
+        self.assertEqual(self.lock(D[3]).through_date, D[3])
+
     def test_open_entry_blocks_the_lock(self):
         self.close_till(D[4])
         with transaction(self.con):
