@@ -59,7 +59,8 @@ class ReportsPageTest(unittest.TestCase):
         page = self.page()
         self.assertEqual([page.report_combo.itemData(i) for i in range(page.report_combo.count())],
                          list(reports_keys))
-        for key in ("trial", "ledger", "sales_profit", "aging", "suspended", "income"):
+        for key in ("trial", "ledger", "sales_profit", "aging", "suspended", "daily_sales", "top_items",
+                    "slow_moving", "journal", "suppliers", "income"):
             page.report_combo.setCurrentIndex(page.report_combo.findData(key))
             self.assertEqual(page.table.key, key)
             self.assertEqual(page.model.columnCount(), len(page.table.headers))
@@ -80,6 +81,18 @@ class ReportsPageTest(unittest.TestCase):
         self.assertNotIn("<h2>", html)
         self.assertIn("font-size:16pt", html)
         self.assertIn("<span dir='ltr'>", html.split("</p>")[1])      # the subtitle line
+
+    def test_slow_moving_offers_day_thresholds_and_journal_exports_everything(self):
+        import os
+        page = self.page()
+        page.report_combo.setCurrentIndex(page.report_combo.findData("slow_moving"))
+        self.assertEqual([page.account_combo.itemData(i) for i in range(page.account_combo.count())],
+                         ["30", "60", "90", "180", "365"])
+        self.assertEqual(page.account_combo.currentData(), "90")
+        page.report_combo.setCurrentIndex(page.report_combo.findData("journal"))
+        path = os.path.join(self.tmp, "journal.csv")
+        page.export_csv_to(path)
+        self.assertGreater(os.path.getsize(path), 50)
 
     def test_compare_checkbox_adds_the_previous_period_columns_for_income_only(self):
         page = self.page()

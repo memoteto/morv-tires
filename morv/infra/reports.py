@@ -9,11 +9,17 @@ from morv.core.money import fmt
 from morv.infra import income_statement, ledger, suspended_balances
 
 TEXT, CODE, MONEY, DATE = "text", "code", "money", "date"
-KEYS = ("income", "sales_profit", "trial", "ledger", "aging", "partner", "suspended")
-TITLES = {"income": "قائمة الدخل", "sales_profit": "المبيعات وربحية الأصناف", "trial": "ميزان المراجعة",
-          "ledger": "كشف حساب", "aging": "أعمار ديون التقسيط", "partner": "كشف حساب الشريك",
+KEYS = ("income", "daily_sales", "top_items", "sales_profit", "slow_moving", "journal", "trial", "ledger",
+        "aging", "suppliers", "partner", "suspended")
+TITLES = {"income": "قائمة الدخل", "daily_sales": "ملخص المبيعات اليومي", "top_items": "الأصناف الأكثر مبيعًا",
+          "sales_profit": "المبيعات وربحية الأصناف", "slow_moving": "الأصناف بطيئة الحركة",
+          "journal": "دفتر اليومية", "trial": "ميزان المراجعة", "ledger": "كشف حساب",
+          "aging": "أعمار ديون التقسيط", "suppliers": "أرصدة الموردين", "partner": "كشف حساب الشريك",
           "suspended": "الأرصدة المعلّقة"}
-NEEDS_ACCOUNT = {"ledger", "partner"}   # reports that need one choice from param_choices
+NEEDS_PARAM = {"ledger": "account", "partner": "partner", "slow_moving": "days"}   # one choice from param_choices
+IDLE_DAYS = (30, 60, 90, 180, 365)
+DEFAULT_IDLE_DAYS = 90
+JOURNAL_LIMIT = 3000
 
 
 @dataclass(frozen=True)
@@ -38,6 +44,8 @@ def account_choices(con: sqlite3.Connection) -> list[tuple[str, str]]:
 def param_choices(con: sqlite3.Connection, key: str) -> list[tuple[str, str]]:
     if key == "partner":
         return list(con.execute("SELECT current_account, name FROM partners ORDER BY name"))
+    if key == "slow_moving":
+        return [(str(d), f"{d} يومًا") for d in IDLE_DAYS]
     return account_choices(con)
 
 
@@ -260,7 +268,152 @@ def partner_statement(con, account: str, start: str, end: str) -> Table:
                  table.headers, table.kinds, table.rows, table.stretch)
 
 
-def build(con, key: str, start: str, end: str, account: str = "", compare: bool = False) -> Table:
+SOURCE_TEXT = {"sale": "بيع", "sale_return": "مرتجع بيع", "purchase_invoice": "فاتورة شراء",
+               "treasury_movement": "حركة خزينة", "cash_closing": "إقفال صندوق", "safe_count": "جرد خزنة",
+               "installment_contract": "عقد تقسيط", "installment_payment": "تحصيل قسط",
+               "interest_recognition": "فوائد تقسيط", "profit_distribution": "توزيع أرباح",
+               "stock_issue": "صرف مخزون"}
+
+
+def journal(con, start: str, end: str, full: bool = False) -> Table:
+    """Posted entries with all their lines, oldest first; the screen stops at a line limit, exports do not."""
+    start, end = _range(start, end)
+    rows, shown, truncated = [], 0, False
+    debit_total = credit_total = 0
+    entries = con.execute("SELECT id, entry_date, source_type, source_id, coalesce(memo, '') FROM journal_entries "
+                          "WHERE status = 'posted' AND entry_date BETWEEN ? AND ? ORDER BY entry_date, id",
+                          (start, end)).fetchall()
+    for entry_id, day, source, source_id, memo in entries:
+        lines = con.execute("SELECT l.account_code, a.name, l.debit, l.credit FROM journal_lines l "
+                            "JOIN accounts a ON a.code = l.account_code WHERE l.entry_id = ? ORDER BY l.line_no",
+                            (entry_id,)).fetchall()
+        if not full and shown + len(lines) > JOURNAL_LIMIT:
+            truncated = True
+            break
+        rows.append(("head", (day, f"{SOURCE_TEXT.get(source, source)} #{source_id}", memo, "", None, None)))
+        for code, name, debit, credit in lines:
+            rows.append(("line", ("", "", "", f"{code} {name}", debit, credit)))
+            debit_total, credit_total = debit_total + debit, credit_total + credit
+        shown += len(lines)
+    rows.append(("grand", ("", "", "الإجمالي", "", debit_total, credit_total)))
+    note = f" · عُرضت أول {shown} سطرًا فقط؛ ضيّق الفترة أو صدّر التقرير للكل" if truncated else ""
+    return Table("journal", TITLES["journal"], f"من {start} إلى {end} · {len(entries)} قيدًا{note}",
+                 ("التاريخ", "المستند", "البيان", "الحساب", "مدين", "دائن"),
+                 (DATE, CODE, TEXT, TEXT, MONEY, MONEY), tuple(rows), 2)
+
+
+def daily_sales(con, start: str, end: str) -> Table:
+    """Per day: invoices, sales, returns and net, with sales split by how they were paid."""
+    start, end = _range(start, end)
+    days: dict[str, list] = {}
+
+    def day(d):
+        return days.setdefault(d, [0, 0, 0, 0, 0, 0])      # invoices, sales, returns, cash, electronic, credit
+
+    for d, count, total in con.execute("SELECT sale_date, count(*), sum(total) FROM sales "
+                                       "WHERE sale_date BETWEEN ? AND ? GROUP BY sale_date", (start, end)):
+        day(d)[0], day(d)[1] = count, total
+    for d, method, amount in con.execute(
+            "SELECT s.sale_date, p.method, sum(p.amount) FROM sale_payments p JOIN sales s ON s.id = p.sale_id "
+            "WHERE s.sale_date BETWEEN ? AND ? GROUP BY s.sale_date, p.method", (start, end)):
+        day(d)[{"cash": 3, "credit": 5}.get(method, 4)] += amount
+    for d, total in con.execute("SELECT return_date, sum(total) FROM sale_returns "
+                                "WHERE return_date BETWEEN ? AND ? GROUP BY return_date", (start, end)):
+        day(d)[2] = total
+    rows, totals = [], [0] * 6
+    for d in sorted(days):
+        invoices, sales, returns, cash, electronic, credit = days[d]
+        rows.append(("line", (d, str(invoices), sales, returns, sales - returns, cash, electronic, credit)))
+        totals = [a + b for a, b in zip(totals, days[d], strict=True)]
+    rows.append(("grand", ("الإجمالي", str(totals[0]), totals[1], totals[2], totals[1] - totals[2],
+                           totals[3], totals[4], totals[5])))
+    return Table("daily_sales", TITLES["daily_sales"], f"من {start} إلى {end} · الصافي بعد المرتجعات",
+                 ("التاريخ", "الفواتير", "المبيعات", "المرتجعات", "الصافي", "نقدي", "بطاقة وتحويل ومحفظة", "آجل وتقسيط"),
+                 (DATE, CODE, MONEY, MONEY, MONEY, MONEY, MONEY, MONEY), tuple(rows), 0)
+
+
+def top_items(con, start: str, end: str) -> Table:
+    """Items ranked by net sales value after returns, with each item's share of the total."""
+    start, end = _range(start, end)
+    items: dict[int, list] = {}
+    for item_id, code, name, qty, net in con.execute(
+            "SELECT i.id, i.code, i.name, sum(sl.qty), sum(sl.net_total) FROM sale_lines sl JOIN sales s "
+            "ON s.id = sl.sale_id JOIN items i ON i.id = sl.item_id WHERE s.sale_date BETWEEN ? AND ? "
+            "GROUP BY i.id", (start, end)):
+        items[item_id] = [code, name, qty, net]
+    for item_id, qty, value in con.execute(
+            "SELECT sl.item_id, sum(rl.qty), sum(rl.value) FROM sale_return_lines rl JOIN sale_returns r "
+            "ON r.id = rl.return_id JOIN sale_lines sl ON sl.id = rl.sale_line_id "
+            "WHERE r.return_date BETWEEN ? AND ? GROUP BY sl.item_id", (start, end)):
+        if item_id in items:
+            items[item_id][2] -= qty
+            items[item_id][3] -= value
+    ranked = sorted((v for v in items.values() if v[3] > 0 or v[2] > 0), key=lambda v: (-v[3], v[0]))
+    total = sum(v[3] for v in ranked)
+    rows = [("line", (str(i), code, name, str(qty), net, _bp_text(net, total)))
+            for i, (code, name, qty, net) in enumerate(ranked, start=1)]
+    rows.append(("grand", ("", "", "الإجمالي", str(sum(v[2] for v in ranked)), total, _bp_text(total, total))))
+    return Table("top_items", TITLES["top_items"], f"من {start} إلى {end} · مرتبة بقيمة المبيعات الصافية",
+                 ("الترتيب", "الكود", "الصنف", "الكمية الصافية", "المبيعات الصافية", "النسبة"),
+                 (CODE, CODE, TEXT, CODE, MONEY, CODE), tuple(rows), 2)
+
+
+def slow_moving(con, end: str, days: str) -> Table:
+    """Stocked items idle N days or more since their last sale, or first receipt if never sold."""
+    _s, end = _range("0001-01-01", end)
+    try:
+        limit = int(days)
+    except (TypeError, ValueError) as e:
+        raise ReportError("اختر عدد الأيام") from e
+    today, rows, total = date.fromisoformat(end), [], 0
+    data = con.execute(
+        "SELECT i.code, i.name, sum(l.qty_on_hand), min(l.received_date), "
+        "(SELECT max(s.sale_date) FROM sale_lines sl JOIN sales s ON s.id = sl.sale_id WHERE sl.item_id = i.id "
+        "AND s.sale_date <= ?), coalesce((SELECT sum(c.cost_remaining) FROM cost_layers c WHERE c.item_id = i.id), 0) "
+        "FROM items i JOIN stock_lots l ON l.item_id = i.id WHERE i.kind <> 'service' AND l.received_date <= ? "
+        "GROUP BY i.id HAVING sum(l.qty_on_hand) > 0", (end, end)).fetchall()
+    for code, name, qty, first_in, last_sale, value in data:
+        basis = last_sale or first_in
+        idle = (today - date.fromisoformat(basis)).days
+        if idle >= limit:
+            rows.append((idle, ("line", (code, name, str(qty), value, last_sale or "لم يُبع", str(idle)))))
+            total += value
+    out = [r for _idle, r in sorted(rows, key=lambda x: (-x[0], x[1][1][0]))]
+    out.append(("grand", ("", "الإجمالي", "", total, "", "")))
+    return Table("slow_moving", TITLES["slow_moving"],
+                 f"حتى {end} · بلا بيع منذ {limit} يومًا فأكثر · الرصيد والقيمة حاليان",
+                 ("الكود", "الصنف", "الرصيد", "القيمة الدفترية", "آخر بيع", "أيام بلا بيع"),
+                 (CODE, TEXT, CODE, MONEY, DATE, CODE), tuple(out), 1)
+
+
+def supplier_balances(con, end: str) -> Table:
+    """Per supplier: invoices less payments up to the end date, tied back to ledger account 2110."""
+    _s, end = _range("0001-01-01", end)
+    per: dict[int, list] = {}
+    for sid, name, total in con.execute(
+            "SELECT s.id, s.name, sum(p.total) FROM purchase_invoices p JOIN suppliers s ON s.id = p.supplier_id "
+            "JOIN journal_entries e ON e.id = p.journal_entry_id WHERE e.entry_date <= ? GROUP BY s.id", (end,)):
+        per[sid] = [name, total, 0]
+    for sid, name, paid in con.execute(
+            "SELECT s.id, s.name, sum(CASE m.kind WHEN 'supplier_payment' THEN m.amount ELSE -m.amount END) "
+            "FROM treasury_movements m JOIN suppliers s ON s.id = m.supplier_id "
+            "JOIN journal_entries e ON e.id = m.journal_entry_id WHERE e.entry_date <= ? GROUP BY s.id", (end,)):
+        per.setdefault(sid, [name, 0, 0])[2] = paid
+    rows = [("line", (name, invoiced, paid, invoiced - paid)) for name, invoiced, paid in sorted(per.values())
+            if invoiced or paid]
+    totals = [sum(r[1][i] for r in rows) for i in (1, 2, 3)]
+    rows.append(("grand", ("الإجمالي", *totals)))
+    ledger_2110 = con.execute(
+        "SELECT coalesce(sum(l.credit) - sum(l.debit), 0) FROM journal_lines l JOIN journal_entries e "
+        "ON e.id = l.entry_id WHERE e.status = 'posted' AND l.account_code = '2110' AND e.entry_date <= ?",
+        (end,)).fetchone()[0]
+    tie = "يطابق الدفتر" if ledger_2110 == totals[2] else f"تحذير: الدفتر 2110 = {fmt(ledger_2110)}"
+    return Table("suppliers", TITLES["suppliers"], f"حتى {end} · {tie}",
+                 ("المورد", "الفواتير", "المسدَّد", "المتبقي"), (TEXT, MONEY, MONEY, MONEY), tuple(rows), 0)
+
+
+def build(con, key: str, start: str, end: str, account: str = "", compare: bool = False,
+          full: bool = False) -> Table:
     if key == "income":
         return income(con, start, end, compare)
     if key == "trial":
@@ -273,6 +426,16 @@ def build(con, key: str, start: str, end: str, account: str = "", compare: bool 
         return installment_aging(con, end)
     if key == "partner":
         return partner_statement(con, account, start, end)
+    if key == "daily_sales":
+        return daily_sales(con, start, end)
+    if key == "top_items":
+        return top_items(con, start, end)
+    if key == "slow_moving":
+        return slow_moving(con, end, account)
+    if key == "journal":
+        return journal(con, start, end, full)
+    if key == "suppliers":
+        return supplier_balances(con, end)
     if key == "suspended":
         return suspended(con)
     raise ReportError("تقرير غير معروف")
