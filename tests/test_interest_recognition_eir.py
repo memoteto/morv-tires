@@ -246,9 +246,9 @@ class HistoricMigrationTest(unittest.TestCase):
                 "SELECT version, checksum FROM schema_migrations WHERE version<=13 ORDER BY version")), before)
             self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
             self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
-            self.assertEqual(migrate(con), [15, 16])
+            self.assertEqual(migrate(con, migrations[:16]), [15, 16])
             self.assertEqual(current_version(con), 16)
-            self.assertEqual(migrate(con), [])
+            self.assertEqual(migrate(con, migrations[:16]), [])
         finally:
             if con is not None:
                 con.close()

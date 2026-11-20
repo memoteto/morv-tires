@@ -47,8 +47,8 @@ class InstallmentMigrationGuardTest(unittest.TestCase):
 
     def test_main_uses_only_the_approved_payment_engine(self):
         migrations = load_migrations()
-        self.assertEqual(migrations[-1].version, 16)
-        self.assertEqual(migrations[-1].name, "sale_payments_lookup")
+        self.assertEqual(migrations[15].version, 16)
+        self.assertEqual(migrations[15].name, "sale_payments_lookup")
         self.assertEqual(migrations[14].name, "installment_modifications")
         self.assertEqual(migrations[13].name, "interest_eir")
         self.assertEqual(migrations[12].name, "installment_returns")

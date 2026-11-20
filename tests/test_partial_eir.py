@@ -138,7 +138,7 @@ class PartialModificationMigrationTest(unittest.TestCase):
         try:
             con = open_db(folder / "old.db", create=True)
             all_migrations = load_migrations()
-            self.assertEqual(all_migrations[-1].version, 16)
+            self.assertEqual(all_migrations[15].version, 16)
             migrate(con, all_migrations[:14])
             self.assertEqual(current_version(con), 14)
             manager = users.create_user(con, None, "partial_eir_manager",

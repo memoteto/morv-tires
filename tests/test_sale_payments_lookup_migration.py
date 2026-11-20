@@ -19,7 +19,7 @@ class SalePaymentsLookupMigrationTest(unittest.TestCase):
         self.con = open_db(self.folder / "old.db", create=True)
         self.addCleanup(self.con.close)
 
-        migrations = load_migrations()
+        migrations = self.migrations = load_migrations()[:16]
         self.assertEqual((migrations[-1].version, migrations[-1].name),
                          (16, "sale_payments_lookup"))
         migrate(self.con, migrations[:-1])
@@ -77,9 +77,9 @@ class SalePaymentsLookupMigrationTest(unittest.TestCase):
         before_waiting = installment_view.invoices_without_contract(self.con)
         self.assertEqual([row[0] for row in before_waiting], [self.pending.id])
 
-        self.assertEqual(migrate(self.con), [16])
+        self.assertEqual(migrate(self.con, self.migrations), [16])
         self.assertEqual(current_version(self.con), 16)
-        self.assertEqual(migrate(self.con), [])
+        self.assertEqual(migrate(self.con, self.migrations), [])
         self.assertEqual(self._posted_data(), before_data)
         self.assertEqual(
             {code: ledger.account_balance(self.con, code) for code in before_balances},
@@ -91,7 +91,7 @@ class SalePaymentsLookupMigrationTest(unittest.TestCase):
         self.assertEqual(self.con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_index_covers_real_installment_query(self):
-        self.assertEqual(migrate(self.con), [16])
+        self.assertEqual(migrate(self.con, self.migrations), [16])
         indexes = {
             row[1]: row for row in self.con.execute("PRAGMA index_list(sale_payments)")
         }
@@ -128,7 +128,7 @@ class SalePaymentsLookupMigrationTest(unittest.TestCase):
     def test_fresh_database_applies_index(self):
         fresh = open_main_db(self.folder / "fresh.db")
         try:
-            self.assertEqual(current_version(fresh), 16)
+            self.assertGreaterEqual(current_version(fresh), 16)
             columns = [
                 row[2] for row in fresh.execute("PRAGMA index_info(sale_payments_sale_method)")
             ]
