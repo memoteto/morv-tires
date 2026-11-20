@@ -5,13 +5,14 @@ from dataclasses import dataclass
 from datetime import date
 
 from morv.core.money import fmt
-from morv.infra import income_statement, suspended_balances
+from morv.infra import income_statement, ledger, suspended_balances
 
 TEXT, CODE, MONEY, DATE = "text", "code", "money", "date"
-KEYS = ("income", "trial", "ledger", "suspended")
-TITLES = {"income": "قائمة الدخل", "trial": "ميزان المراجعة", "ledger": "كشف حساب", "suspended": "الأرصدة المعلّقة"}
-NEEDS_ACCOUNT = {"ledger"}
-NEEDS_RANGE = {"income", "ledger"}      # trial balance and suspended balances are as of the end date
+KEYS = ("income", "sales_profit", "trial", "ledger", "aging", "partner", "suspended")
+TITLES = {"income": "قائمة الدخل", "sales_profit": "المبيعات وربحية الأصناف", "trial": "ميزان المراجعة",
+          "ledger": "كشف حساب", "aging": "أعمار ديون التقسيط", "partner": "كشف حساب الشريك",
+          "suspended": "الأرصدة المعلّقة"}
+NEEDS_ACCOUNT = {"ledger", "partner"}   # reports that need one choice from param_choices
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,12 @@ class ReportError(ValueError):
 
 def account_choices(con: sqlite3.Connection) -> list[tuple[str, str]]:
     return list(con.execute("SELECT code, code || ' ' || name FROM accounts WHERE postable = 1 ORDER BY code"))
+
+
+def param_choices(con: sqlite3.Connection, key: str) -> list[tuple[str, str]]:
+    if key == "partner":
+        return list(con.execute("SELECT current_account, name FROM partners ORDER BY name"))
+    return account_choices(con)
 
 
 def _range(start: str, end: str) -> tuple[str, str]:
@@ -112,6 +119,98 @@ def suspended(con) -> Table:
                  (DATE, TEXT, CODE, TEXT), tuple(rows), 3)
 
 
+def _bp_text(part: int, whole: int) -> str:
+    """Percentage with one decimal from integers, empty when there is no base."""
+    if whole <= 0:
+        return ""
+    tenths = (abs(part) * 1000 + whole // 2) // whole
+    return f"{'-' if part < 0 else ''}{tenths // 10}.{tenths % 10}%"
+
+
+def sales_profit(con, start: str, end: str) -> Table:
+    """Per item: sales and returns against the real stock cost; services carry no cost."""
+    start, end = _range(start, end)
+    items: dict[int, list] = {}
+
+    def slot(item_id, code, name):
+        return items.setdefault(item_id, [code, name, 0, 0, 0, 0, 0])      # qty, sales, returns, cost, returned cost
+
+    for item_id, code, name, qty, net in con.execute(
+            "SELECT i.id, i.code, i.name, sum(sl.qty), sum(sl.net_total) FROM sale_lines sl JOIN sales s "
+            "ON s.id = sl.sale_id JOIN items i ON i.id = sl.item_id WHERE s.sale_date BETWEEN ? AND ? "
+            "GROUP BY i.id", (start, end)):
+        row = slot(item_id, code, name)
+        row[2], row[3] = qty, net
+    for item_id, cost in con.execute(
+            "SELECT si.item_id, sum(si.cost_total) FROM stock_issues si JOIN sales s ON s.id = si.source_id "
+            "WHERE si.source_type = 'sale' AND s.sale_date BETWEEN ? AND ? GROUP BY si.item_id", (start, end)):
+        if item_id in items:
+            items[item_id][5] = cost
+    for item_id, code, name, qty, value, cost in con.execute(
+            "SELECT i.id, i.code, i.name, sum(rl.qty), sum(rl.value), sum(rl.cost) FROM sale_return_lines rl "
+            "JOIN sale_returns r ON r.id = rl.return_id JOIN sale_lines sl ON sl.id = rl.sale_line_id "
+            "JOIN items i ON i.id = sl.item_id WHERE r.return_date BETWEEN ? AND ? GROUP BY i.id", (start, end)):
+        row = slot(item_id, code, name)
+        row[2] -= qty
+        row[4] += value
+        row[6] += cost
+    rows, totals = [], [0, 0, 0, 0]
+    for code, name, qty, sales, returns, cost, returned_cost in sorted(items.values()):
+        net_sales, net_cost = sales - returns, cost - returned_cost
+        profit = net_sales - net_cost
+        rows.append(("line", (code, name, str(qty), sales, returns, net_cost, profit, _bp_text(profit, net_sales))))
+        totals = [totals[0] + sales, totals[1] + returns, totals[2] + net_cost, totals[3] + profit]
+    rows.append(("grand", ("", "الإجمالي", "", totals[0], totals[1], totals[2], totals[3],
+                           _bp_text(totals[3], totals[0] - totals[1]))))
+    return Table("sales_profit", TITLES["sales_profit"],
+                 f"من {start} إلى {end} · التكلفة من تخصيص طبقات المخزون الفعلية",
+                 ("الكود", "الصنف", "الكمية الصافية", "المبيعات", "المرتجعات", "التكلفة", "الربح", "الهامش"),
+                 (CODE, TEXT, CODE, MONEY, MONEY, MONEY, MONEY, CODE), tuple(rows), 1)
+
+
+BUCKETS = ((0, "لم يحل"), (30, "1-30 يومًا"), (60, "31-60 يومًا"), (90, "61-90 يومًا"), (None, "أكثر من 90"))
+
+
+def installment_aging(con, end: str) -> Table:
+    """Unpaid instalment rows as of the end date, per contract, by how many days past due they are."""
+    _s, end = _range("0001-01-01", end)
+    today = date.fromisoformat(end)
+    per: dict[str, list] = {}
+    for number, name, due, remaining in con.execute(
+            "SELECT c.number, cu.name, r.due_date, r.amount - "
+            "coalesce((SELECT sum(l.amount) FROM installment_payment_lines l JOIN installment_payments p "
+            "ON p.id = l.payment_id WHERE l.row_id = r.id AND p.payment_date <= ?), 0) - "
+            "coalesce((SELECT sum(a.amount) FROM installment_return_allocations a JOIN sale_returns sr "
+            "ON sr.id = a.return_id WHERE a.row_id = r.id AND sr.return_date <= ?), 0) "
+            "FROM installment_rows r JOIN installment_contracts c ON c.id = r.contract_id "
+            "JOIN customers cu ON cu.id = c.customer_id WHERE c.contract_date <= ? ORDER BY c.number, r.no",
+            (end, end, end)):
+        if remaining <= 0:
+            continue
+        late = (today - date.fromisoformat(due)).days
+        idx = next(i for i, (limit, _t) in enumerate(BUCKETS) if limit is None or late <= limit)
+        row = per.setdefault(number, [name, [0] * len(BUCKETS)])
+        row[1][idx] += remaining
+    rows = [("line", (number, name, *buckets, sum(buckets))) for number, (name, buckets) in per.items()]
+    column_totals = [sum(r[1][2 + i] for r in rows) for i in range(len(BUCKETS) + 1)]
+    rows.append(("grand", ("", "الإجمالي", *column_totals)))
+    return Table("aging", TITLES["aging"], f"حتى {end} · حسب عمر القسط المستحق",
+                 ("العقد", "العميل", *(t for _l, t in BUCKETS), "الإجمالي"),
+                 (CODE, TEXT, *([MONEY] * (len(BUCKETS) + 1))), tuple(rows), 1)
+
+
+def partner_statement(con, account: str, start: str, end: str) -> Table:
+    """The partner's current account: a positive balance is owed to the partner by the shop."""
+    row = con.execute("SELECT name, capital_account FROM partners WHERE current_account = ?", (account,)).fetchone()
+    if row is None:
+        raise ReportError("اختر شريكًا")
+    table = account_statement(con, account, start, end)
+    capital = -ledger.account_balance(con, row[1])
+    return Table("partner", f"كشف حساب الشريك {row[0]}",
+                 f"{table.subtitle} · رأس المال {fmt(capital)} · الرصيد الموجب مستحق للشريك على المحل",
+                 table.headers, table.kinds, table.rows, table.stretch)
+
+
 def build(con, key: str, start: str, end: str, account: str = "") -> Table:
     if key == "income":
         return income(con, start, end)
@@ -119,6 +218,12 @@ def build(con, key: str, start: str, end: str, account: str = "") -> Table:
         return trial_balance(con, end)
     if key == "ledger":
         return account_statement(con, account, start, end)
+    if key == "sales_profit":
+        return sales_profit(con, start, end)
+    if key == "aging":
+        return installment_aging(con, end)
+    if key == "partner":
+        return partner_statement(con, account, start, end)
     if key == "suspended":
         return suspended(con)
     raise ReportError("تقرير غير معروف")
