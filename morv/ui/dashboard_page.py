@@ -277,6 +277,9 @@ class DashboardPage(QWidget):
         if a.kind == "old_dot":
             head = "إطار عمره 3 سنوات فأكثر" if a.count == 1 else f"{a.count} إطارات عمرها 3 سنوات فأكثر"
             return f"{head} — {a.detail}" if a.detail else head
+        if a.kind == "safe_count":
+            when = "لم تُجرد الخزنة بعد" if a.count < 0 else f"مضت {a.count} أيام على آخر جرد للخزنة"
+            return f"{when} · رصيدها {ltr(fmt(a.amount))}"
         return a.detail
 
     def _fill_recent(self, recent: tuple) -> None:

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLabel, QLineEdit, 
 
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
-from morv.infra import cash_closing, ledger, suppliers, treasury, treasury_view
+from morv.infra import cash_closing, ledger, safe_count, suppliers, treasury, treasury_view
 from morv.infra.cash_closing import ClosingError
 from morv.infra.treasury import NeedsConfirmation, TreasuryError
 from morv.ui.modal import Modal
@@ -298,6 +298,93 @@ class CancelClosingDialog(Modal):
         try:
             self.saved = cash_closing.cancel_closing(self.session.con, self.session.user, request_key=self._key,
                                                      closing_id=self.closing_id, memo=self.memo.text())
+        except (ClosingError, ledger.LedgerError) as e:
+            self.notice.show_message(str(e))
+            return
+        self.accept()
+
+
+class SafeCountDialog(Modal):
+    def __init__(self, session, parent=None):
+        super().__init__("جرد الخزنة", parent, width=520)
+        self.session, self.saved = session, None
+        self._key = uuid.uuid4().hex
+        con = session.con
+        _, self._book = cash_closing.book_snapshot(con, safe_count.SAFE)
+        self._last = last = safe_count.latest_count(con)
+        self.body.addWidget(muted("عُدّ النقد في الخزنة وأدخل المجموع. الفرق يحتاج سببًا ويُرحَّل على حساب عجز الخزنة أو زيادتها."))
+        self.body.addWidget(muted("آخر جرد: " + (f"{ltr(last[1])} · {ltr(last[2])} · {ltr(last[3])}" if last else "لا يوجد")))
+        f = form()
+        self.date = ltr_edit("YYYY-MM-DD")
+        self.date.setText(date.today().isoformat())
+        self.counted = ltr_edit("0.00")
+        self.diff_label = QLabel("—")
+        self.memo = QLineEdit()
+        self.memo.setPlaceholderText("سبب الفرق (إلزامي إن وُجد فرق)")
+        f.addRow("تاريخ الجرد", self.date)
+        f.addRow("رصيد الخزنة الدفتري", QLabel(ltr(fmt(self._book))))
+        f.addRow("العد الفعلي *", self.counted)
+        f.addRow("الفرق", self.diff_label)
+        f.addRow("سبب الفرق", self.memo)
+        self.body.addLayout(f)
+        self.counted.textChanged.connect(self._diff)
+        self.cancel_btn = danger_button("إلغاء آخر جرد")
+        self.cancel_btn.setVisible(last is not None)
+        self.cancel_btn.clicked.connect(self.cancel_last)
+        self.body.addWidget(self.cancel_btn)
+        self.add_footer("حفظ الجرد", self.save)
+        self.counted.setFocus()
+
+    def _diff(self) -> None:
+        try:
+            diff = parse_money(self.counted.text()) - self._book
+        except MoneyError:
+            self.diff_label.setText("—")
+            return
+        self.diff_label.setText(ltr(fmt(diff)) + (" (عجز)" if diff < 0 else " (زيادة)" if diff > 0 else " (مطابق)"))
+
+    def save(self) -> None:
+        try:
+            counted = parse_money(self.counted.text())
+        except MoneyError as e:
+            self.notice.show_message(f"العد الفعلي: {e}")
+            return
+        diff = counted - self._book
+        if diff and not ask(self, "تأكيد الفرق", f"الفرق {fmt(diff)} سيُرحَّل على حساب "
+                            + ("عجز الخزنة" if diff < 0 else "زيادة الخزنة قيد التحقيق") + ". المتابعة؟", danger=True):
+            return
+        try:
+            self.saved = safe_count.count_safe(self.session.con, self.session.user, request_key=self._key,
+                                               count_date=self.date.text().strip(), counted=counted,
+                                               expected_book=self._book, memo=self.memo.text())
+        except (ClosingError, ledger.LedgerError) as e:
+            self.notice.show_message(str(e))
+            return
+        self.accept()
+
+    def cancel_last(self) -> None:
+        dlg = CancelSafeCountDialog(self.session, self._last[0], self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.saved = dlg.saved
+            self.accept()
+
+
+class CancelSafeCountDialog(Modal):
+    def __init__(self, session, count_id: int, parent=None):
+        super().__init__("إلغاء جرد الخزنة", parent, width=480)
+        self.session, self.count_id, self.saved = session, count_id, None
+        self._key = uuid.uuid4().hex
+        self.body.addWidget(muted("يُسجَّل مستند إلغاء ويُعكس قيد الفرق إن وُجد، ثم يمكن جرد التاريخ من جديد."))
+        f = form()
+        self.memo = QLineEdit()
+        f.addRow("سبب الإلغاء *", self.memo)
+        self.body.addLayout(f)
+        self.add_footer("إلغاء الجرد", self.save)
+
+    def save(self) -> None:
+        try:
+            self.saved = safe_count.cancel_count(self.session.con, self.session.user, request_key=self._key,
+                                                 count_id=self.count_id, memo=self.memo.text())
         except (ClosingError, ledger.LedgerError) as e:
             self.notice.show_message(str(e))
             return
