@@ -113,3 +113,33 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         other = SettingsPage(self.cashier_session)
         self.addCleanup(dispose, other, self.app)
         self.assertNotIn("الشركاء", [other.tabs.tabText(i) for i in range(other.tabs.count())])
+
+    def test_close_dialog_closes_the_till_and_the_page_shows_the_note(self):
+        from morv.core.text import ltr
+        from morv.ui.treasury_dialogs import CloseDialog
+        from morv.ui.widgets import dispose
+        dlg = CloseDialog(self.session)
+        self.addCleanup(dispose, dlg, self.app)
+        dlg.counted.setText("1000")
+        self.assertIn("مطابق", dlg.diff_label.text())
+        dlg.save()
+        self.assertIsNotNone(dlg.saved)
+        page = self.page()
+        self.assertIn(ltr(dlg.date.text()), page.close_note.text())
+        again = CloseDialog(self.session)
+        self.addCleanup(dispose, again, self.app)
+        self.assertTrue(again.cancel_btn.isVisibleTo(again))
+
+    def test_difference_needs_a_reason_and_cashier_has_no_close_button(self):
+        from unittest import mock
+
+        from morv.ui.treasury_dialogs import CloseDialog
+        from morv.ui.widgets import dispose
+        dlg = CloseDialog(self.session)
+        self.addCleanup(dispose, dlg, self.app)
+        dlg.counted.setText("900")
+        with mock.patch("morv.ui.treasury_dialogs.ask", return_value=True):
+            dlg.save()
+        self.assertIsNone(dlg.saved)
+        self.assertIsNone(self.page(self.cashier_session).close_btn)
+        self.assertIsNotNone(self.page().close_btn)

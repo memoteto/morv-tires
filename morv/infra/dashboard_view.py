@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from morv.core.sales_rules import PAYMENT_ACCOUNT
-from morv.infra import backup, installment_view, ledger
+from morv.infra import backup, cash_closing, installment_view, ledger
 
 CASH_ACCOUNTS = ("1110", "1210", "1220", "1230")
 OLD_DOT_YEARS = 3
@@ -37,6 +37,8 @@ class DashboardView:
     pay_today: tuple              # (method, amount), today only
     top_month: tuple              # (item_name, qty), this month only
     account_balances: tuple[tuple[str, int], ...] = ()
+    last_closing: tuple | None = None     # (closing date, actual time, difference)
+    unclosed_days: int = 0
 
 
 def _period_start(period: str, today: date) -> str:
@@ -142,5 +144,9 @@ def get(con: sqlite3.Connection, period: str = "today", today: str | None = None
         "JOIN items i ON i.id = sl.item_id WHERE s.sale_date BETWEEN ? AND ? "
         "GROUP BY sl.item_id ORDER BY q DESC LIMIT 5", (month_start, today_s)).fetchall()
 
+    latest = cash_closing.latest_closing(con)
+    last_closing = (latest[2], latest[3], latest[4]) if latest else None
     return DashboardView(period, sales_total, sales_count, collected_total, due_count, due_amount, cash_balance,
-                         tuple(chart_days), tuple(alerts), tuple(recent), tuple(pay_today), tuple(top_month), account_balances)
+                         tuple(chart_days), tuple(alerts), tuple(recent), tuple(pay_today), tuple(top_month), account_balances,
+                         last_closing,
+                         cash_closing.unclosed_days(con, today_s))

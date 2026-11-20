@@ -562,7 +562,7 @@ class UpgradeTest(unittest.TestCase):
                 con.execute("INSERT INTO stock_issues (item_id, qty, cost_total, source_type, source_id, journal_entry_id) "
                             "VALUES (?,1,100,'legacy',1,?)", (item, e1))
             before = con.execute("SELECT id, entry_date, source_type, source_id FROM journal_entries ORDER BY id").fetchall()
-            self.assertEqual(migrator.migrate(con, allm), [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17])
+            self.assertEqual(migrator.migrate(con, allm), [m.version for m in allm if m.version >= 7])
             self.assertEqual(con.execute("SELECT id, entry_date, source_type, source_id FROM journal_entries ORDER BY id").fetchall(), before)
             self.assertEqual(con.execute("SELECT status, line_count, total FROM journal_entries ORDER BY id").fetchall(),
                              [("posted", 2, 100), ("posted", 3, 50)])
