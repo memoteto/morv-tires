@@ -75,6 +75,12 @@ def _diff_lines(difference: int, reverse: bool = False) -> list:
     return [(acct, c, d) for acct, d, c in lines] if reverse else lines
 
 
+def refuse_locked(con: sqlite3.Connection, day: str) -> None:
+    locked = ledger.locked_through(con)
+    if locked and day <= locked:
+        raise ClosingError(f"التاريخ داخل فترة مالية مقفلة حتى {locked}")
+
+
 def close_in_tx(con, by, key: str, day: str, counted: int, expected_book: int, memo: str | None) -> Closed:
     """Body of close_day; the caller owns the transaction."""
     h = _digest("close", day, counted, expected_book, memo)
@@ -87,6 +93,7 @@ def close_in_tx(con, by, key: str, day: str, counted: int, expected_book: int, m
     last = last_closed_date(con)
     if last and day <= last:
         raise ClosingError(f"التاريخ يجب أن يلي آخر إقفال معتمد ({last})")
+    refuse_locked(con, day)
     cutoff, book = book_snapshot(con)
     if book != expected_book:
         raise ClosingError("تغيّر رصيد الصندوق الدفتري أثناء العدّ؛ أعد فتح الإقفال وعُدّ من جديد")

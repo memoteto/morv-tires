@@ -19,6 +19,13 @@ def valid_date(text, what: str = "التاريخ") -> str:
     return d.isoformat()
 
 
+def locked_through(con: sqlite3.Connection) -> str | None:
+    """Last date of the live period lock, or None when no period is locked."""
+    return con.execute(
+        "SELECT max(l.through_date) FROM period_locks l WHERE l.kind = 'lock' "
+        "AND NOT EXISTS (SELECT 1 FROM period_locks x WHERE x.cancels_id = l.id)").fetchone()[0]
+
+
 def post_entry(con: sqlite3.Connection, by, entry_date: str, source_type: str, source_id: int,
                memo: str, lines: list) -> int:
     if not con.in_transaction:
@@ -31,9 +38,13 @@ def post_entry(con: sqlite3.Connection, by, entry_date: str, source_type: str, s
     if sum(d for _, d, _ in lines) != sum(c for _, _, c in lines):
         raise LedgerError("القيد غير متوازن")
     total = sum(d for _, d, _ in lines)
-    cur = con.execute(
-        "INSERT INTO journal_entries (entry_date, source_type, source_id, memo, line_count, total, user_id, status) "
-        "VALUES (?,?,?,?,?,?,?,'open')", (entry_date, source_type, source_id, memo, len(lines), total, by.id if by else None))
+    try:
+        cur = con.execute(
+            "INSERT INTO journal_entries (entry_date, source_type, source_id, memo, line_count, total, user_id, status) "
+            "VALUES (?,?,?,?,?,?,?,'open')",
+            (entry_date, source_type, source_id, memo, len(lines), total, by.id if by else None))
+    except sqlite3.IntegrityError as e:     # the period-lock trigger speaks Arabic; surface it as a ledger refusal
+        raise LedgerError(str(e)) from e
     entry_id = cur.lastrowid
     try:
         for no, (acc, d, c) in enumerate(lines, start=1):
