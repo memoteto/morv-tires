@@ -18,6 +18,7 @@ PERMISSIONS = {
     "sales.post": "ترحيل فواتير البيع",
     "sales.return": "ترحيل مرتجعات البيع",
     "installments.manage": "اعتماد عقود التقسيط",
+    "receipts.post": "سندات قبض العملاء وعكسها",
     "treasury.view": "الاطلاع على الخزينة وحركة الأموال",
     "treasury.manage": "تسجيل حركات الخزينة وإدارة الشركاء",
     "reports.view": "الاطلاع على التقارير المالية",
