@@ -3,20 +3,22 @@ from PySide6.QtWidgets import QDialog, QFrame, QGridLayout, QLabel, QVBoxLayout,
 
 from morv.core.money import fmt
 from morv.core.text import ltr
-from morv.infra import treasury, treasury_view
+from morv.infra import cash_closing, treasury, treasury_view
 from morv.ui.listpage import ListPage
-from morv.ui.treasury_dialogs import MovementDialog, ReverseDialog
-from morv.ui.widgets import danger_button, muted
+from morv.ui.treasury_dialogs import CloseDialog, MovementDialog, ReverseDialog
+from morv.ui.widgets import danger_button, muted, primary_button
 
 ACCOUNT_NAMES = {"1110": "الصندوق", "1210": "بنك التحويلات", "1220": "بنك البطاقات", "1230": "المحافظ الإلكترونية"}
 SOURCE_LABELS = {"sale": "فاتورة بيع", "sale_return": "مرتجع بيع", "purchase_invoice": "فاتورة شراء",
                  "installment_payment": "تحصيل قسط", "installment_contract": "عقد تقسيط",
-                 "treasury_movement": "حركة خزينة"}
+                 "treasury_movement": "حركة خزينة", "cash_closing": "فرق إقفال الصندوق"}
 
 
 class _RowsWithBalances(list):
     """Rows plus the account balances read in the same snapshot."""
     balances = None
+    closing = None
+    unclosed = 0
 
 
 class TreasuryPage(ListPage):
@@ -36,6 +38,8 @@ class TreasuryPage(ListPage):
 
     def __init__(self, session):
         self._balance_values: dict[str, QLabel] = {}
+        self.close_btn = None
+        self.close_note = None
         super().__init__(session)
 
     def can_edit(self) -> bool:
@@ -68,13 +72,25 @@ class TreasuryPage(ListPage):
             inner.addWidget(value)
             self._balance_values[key] = value
             grid.addWidget(box, 0, i)
+        if self.session.can("treasury.close"):
+            self.close_btn = primary_button("إقفال الصندوق")
+            self.close_btn.clicked.connect(self.close_day)
+            grid.addWidget(self.close_btn, 1, 0)
+            self.close_note = muted("")
+            grid.addWidget(self.close_note, 1, 1, 1, len(tiles) - 1)
         return grid_host
+
+    def close_day(self) -> None:
+        if CloseDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
+            self.reload(self.current_id)
 
     def fetch(self, con, query, filter_key, offset):
         if not self.can_view(con):
             return []
         rows = _RowsWithBalances(treasury_view.movements(con, filter_key, query, offset=offset))
         rows.balances = treasury_view.balances(con)
+        rows.closing = cash_closing.latest_closing(con)
+        rows.unclosed = cash_closing.unclosed_days(con)
         return rows
 
     def on_loaded(self, rows: list) -> None:
@@ -84,6 +100,10 @@ class TreasuryPage(ListPage):
         for code, amount in balances:
             self._balance_values[code].setText(ltr(fmt(amount)))
         self._balance_values["total"].setText(ltr(fmt(sum(amount for _, amount in balances))))
+        if self.close_note is not None:
+            last = rows.closing
+            text = f"آخر إقفال {ltr(last[2])} · {ltr(last[3])}" if last else "لم يُقفل الصندوق بعد"
+            self.close_note.setText(text + (f" · {rows.unclosed} يوم بلا إقفال" if rows.unclosed else ""))
 
     def total(self) -> str:
         if not self.can_view():

@@ -20,6 +20,7 @@ PERMISSIONS = {
     "installments.manage": "اعتماد عقود التقسيط",
     "treasury.view": "الاطلاع على الخزينة وحركة الأموال",
     "treasury.manage": "تسجيل حركات الخزينة وإدارة الشركاء",
+    "treasury.close": "إقفال الصندوق اليومي وإلغاء الإقفال",
     "stock.pick_lot": "اختيار دفعة DOT غير الأقدم عند الصرف",
     "users.manage": "المستخدمون والصلاحيات",
     "settings.edit": "الإعدادات العامة",

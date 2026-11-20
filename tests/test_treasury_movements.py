@@ -294,7 +294,7 @@ class RetiredAccountsMigrationTest(unittest.TestCase):
                     con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,1,'1110',100,0)", (e,))
                     con.execute("INSERT INTO journal_lines (entry_id,line_no,account_code,debit,credit) VALUES (?,2,'3100',0,100)", (e,))
                     con.execute("UPDATE journal_entries SET status='posted' WHERE id=?", (e,))
-                self.assertEqual(migrate(con, migrations), [17])
+                self.assertEqual(migrate(con, migrations[:17]), [17])
                 active = dict(con.execute("SELECT code, active FROM accounts WHERE code IN ('3100','3300')"))
                 self.assertEqual(active, {"3100": 1, "3300": 0})
             finally:

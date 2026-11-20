@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from morv.core.money import fmt
-from morv.infra import ledger
+from morv.infra import cash_closing, ledger
 from morv.infra.db.connection import transaction
 from morv.infra.treasury_view import ACCOUNTS as MONEY_ACCOUNTS
 from morv.infra.users import audit, has_permission
@@ -242,6 +242,9 @@ def _warnings(con, kind, day, amount, debit, credit, partner_id, supplier_id) ->
     out = []
     if credit in MONEY_ACCOUNTS and ledger.account_balance(con, credit) < amount:
         out.append("رصيد الحساب الدافع لا يكفي، وسيصبح سالبًا")
+    closed = cash_closing.last_closed_date(con)
+    if closed and day <= closed:
+        out.append(f"التاريخ يقع في فترة مُقفلة (آخر إقفال {closed})")
     if kind == "supplier_payment":
         owed = supplier_owed(con, supplier_id)
         if amount > owed:

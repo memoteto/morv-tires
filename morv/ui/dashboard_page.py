@@ -218,13 +218,21 @@ class DashboardPage(QWidget):
         self.kpi_values["due"][0].setText(ltr(fmt(v.due_amount)))
         self.kpi_values["due"][1].setText(f"{v.due_count} عقدًا")
         self.kpi_values["cash"][0].setText(ltr(fmt(v.cash_balance)))
-        self.kpi_values["cash"][1].setText("الصندوق والحسابات الإلكترونية")
+        self.kpi_values["cash"][1].setText(self._closing_text(v))
         for code, amount in v.account_balances:
             self.balance_values[code].setText(ltr(fmt(amount)))
         self._fill_chart(v.chart_days)
         self._fill_alerts(v.alerts)
         self._fill_recent(v.recent)
         self._fill_breakdown(v.pay_today, v.top_month)
+
+    @staticmethod
+    def _closing_text(v) -> str:
+        if v.last_closing is None:
+            text = "لم يُقفل الصندوق بعد"
+        else:
+            text = f"آخر إقفال {ltr(v.last_closing[0])} · {ltr(v.last_closing[1][11:16])}"
+        return text + (f" · {v.unclosed_days} يوم بلا إقفال" if v.unclosed_days else "")
 
     def _fill_chart(self, days: tuple) -> None:
         self._clear(self.chart_row)
