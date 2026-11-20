@@ -43,6 +43,14 @@ class ReportsPageTest(unittest.TestCase):
         self.assertEqual(page.model.rows[-1][1], "grand")
         self.assertEqual(page.model.rows[-1][4], 100000)
 
+    def test_suspended_balances_dialog_opens_read_only(self):
+        from morv.ui.suspended_dialogs import SuspendedBalancesDialog
+        page = self.page()
+        self.assertTrue(hasattr(page, "suspended_btn"))
+        dlg = SuspendedBalancesDialog(self.session, None)
+        self.addCleanup(dlg.deleteLater)
+        self.assertEqual((dlg.report.shortages, dlg.report.overages), ((), ()))
+
     def test_cashier_sees_nothing(self):
         self.assertEqual(self.page(self.cashier_session).model.rows, [])
 
