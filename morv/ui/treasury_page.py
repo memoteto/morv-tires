@@ -1,15 +1,17 @@
-"""Treasury screen: cash, bank and wallet balances with their ledger movements. Read-only."""
-from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
+"""Treasury screen: cash, bank and wallet balances, their ledger movements, and manual movements."""
+from PySide6.QtWidgets import QDialog, QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
 
 from morv.core.money import fmt
 from morv.core.text import ltr
-from morv.infra import treasury_view
+from morv.infra import treasury, treasury_view
 from morv.ui.listpage import ListPage
-from morv.ui.widgets import muted
+from morv.ui.treasury_dialogs import MovementDialog, ReverseDialog
+from morv.ui.widgets import danger_button, muted
 
 ACCOUNT_NAMES = {"1110": "الصندوق", "1210": "بنك التحويلات", "1220": "بنك البطاقات", "1230": "المحافظ الإلكترونية"}
 SOURCE_LABELS = {"sale": "فاتورة بيع", "sale_return": "مرتجع بيع", "purchase_invoice": "فاتورة شراء",
-                 "installment_payment": "تحصيل قسط", "installment_contract": "عقد تقسيط"}
+                 "installment_payment": "تحصيل قسط", "installment_contract": "عقد تقسيط",
+                 "treasury_movement": "حركة خزينة"}
 
 
 class _RowsWithBalances(list):
@@ -19,6 +21,7 @@ class _RowsWithBalances(list):
 
 class TreasuryPage(ListPage):
     title = "الخزينة وحركة الأموال"
+    add_label = "حركة جديدة"
     search_placeholder = "البيان أو التاريخ (F2)"
     empty_message = "لا توجد حركات مطابقة"
     filters = [("all", "كل الحسابات")] + [(code, name) for code, name in ACCOUNT_NAMES.items()]
@@ -34,10 +37,15 @@ class TreasuryPage(ListPage):
     def __init__(self, session):
         self._balance_values: dict[str, QLabel] = {}
         super().__init__(session)
-        self.add_btn.hide()
 
     def can_edit(self) -> bool:
-        return False
+        return self.session.can("treasury.manage")
+
+    def open_dialog(self, row_id) -> None:
+        if not self.can_edit():
+            return
+        if MovementDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
+            self.reload(self.current_id)
 
     def can_view(self, con=None) -> bool:
         return self.session.can("treasury.view", con)
@@ -88,6 +96,17 @@ class TreasuryPage(ListPage):
         details = [("تاريخ القيد", ltr(entry.entry_date)), ("وقت الترحيل", ltr(entry.posted_at))]
         if entry.user_name:
             details.append(("المستخدم", entry.user_name))
+        info = treasury.movement_info(self.session.con, entry.source_id) if entry.source_type == "treasury_movement" else None
+        if info:
+            details = [("رقم الحركة", ltr(info[0])), ("نوع الحركة", treasury.LABELS[info[1]])] + details
+            if info[3]:
+                details.append(("الطرف", info[3]))
+            if info[2]:
+                details.append(("المرجع", info[2]))
+            if info[4]:
+                details.append(("معكوسة بالحركة", ltr(info[4])))
+            if info[5]:
+                details.append(("تعكس الحركة", ltr(info[5])))
         self.summary_section("بيانات القيد", "calendar")
         self.summary_details(details)
         self.summary_section("سطور القيد", "cash")
@@ -95,3 +114,11 @@ class TreasuryPage(ListPage):
             ["الحساب", "مدين", "دائن"],
             [(f"{ltr(code)} {name}", ltr(fmt(debit)) if debit else "—", ltr(fmt(credit)) if credit else "—")
              for code, name, debit, credit in entry.lines])
+        if info and info[1] != "reversal" and info[4] is None and self.can_edit():
+            reverse = danger_button("عكس الحركة")
+            reverse.clicked.connect(lambda: self._reverse(entry.source_id, row_id))
+            self.actions(reverse)
+
+    def _reverse(self, movement_id: int, row_id: int) -> None:
+        if ReverseDialog(self.session, movement_id, self).exec() == QDialog.DialogCode.Accepted:
+            self.reload(row_id)

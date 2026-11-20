@@ -53,6 +53,11 @@ class SettingsPage(QWidget):
             from morv.ui.inventory_page import ItemFieldsTab   # local import to avoid a cycle
             self.fields_tab = ItemFieldsTab(session)
             self.tabs.addTab(self.fields_tab, "حقول بطاقة الصنف")
+        self.partners_tab = None
+        if session.can("treasury.manage"):
+            from morv.ui.partners_tab import PartnersTab
+            self.partners_tab = PartnersTab(session)
+            self.tabs.addTab(self.partners_tab, "الشركاء")
         self.appearance_tab = AppearanceTab(session)
         self.tabs.addTab(self.appearance_tab, "المظهر")
         self.tabs.addTab(ShortcutsTab(), "الاختصارات")

@@ -97,7 +97,9 @@ def set_active(con, by, supplier_id: int, active: bool) -> None:
 
 
 def has_documents(con, supplier_id: int) -> bool:
-    return False
+    return con.execute(
+        "SELECT EXISTS(SELECT 1 FROM purchase_invoices WHERE supplier_id=?) "
+        "OR EXISTS(SELECT 1 FROM treasury_movements WHERE supplier_id=?)", (supplier_id, supplier_id)).fetchone()[0] == 1
 
 
 def delete(con, by, supplier_id: int) -> None:

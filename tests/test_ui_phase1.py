@@ -153,7 +153,7 @@ class SettingsTest(_Base):
         self.make_admin()
         k = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
         admin_page = SettingsPage(self.session())        # kept in a variable, or Qt takes it and its tabs away
-        self.assertEqual(admin_page.tabs.count(), 7)     # shop, users, log, fields, appearance, shortcuts, backup
+        self.assertEqual(admin_page.tabs.count(), 8)     # shop, users, log, fields, partners, appearance, shortcuts, backup
         self.assertIsNotNone(admin_page.fields_tab)
         p = SettingsPage(self.session(k))
         self.assertEqual(p.tabs.count(), 3)               # appearance, shortcuts and backup only

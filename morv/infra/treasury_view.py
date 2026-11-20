@@ -10,6 +10,7 @@ _IN = "(" + ",".join(f"'{a}'" for a in ACCOUNTS) + ")"
 class EntryView:
     entry_date: str
     source_type: str
+    source_id: int
     memo: str
     posted_at: str
     user_name: str
@@ -47,13 +48,18 @@ def movements(con: sqlite3.Connection, account: str | None = None, query: str = 
         args + (limit, offset)).fetchall()
 
 
+def account_names(con: sqlite3.Connection, codes) -> dict[str, str]:
+    marks = ",".join("?" * len(codes))
+    return dict(con.execute(f"SELECT code, name FROM accounts WHERE code IN ({marks})", tuple(codes)).fetchall())
+
+
 def count(con: sqlite3.Connection) -> int:
     return con.execute(f"SELECT count(*) FROM journal_lines l WHERE l.account_code IN {_IN}").fetchone()[0]
 
 
 def get_entry(con: sqlite3.Connection, line_id: int) -> EntryView:
     head = con.execute(
-        "SELECT e.id, e.entry_date, e.source_type, coalesce(e.memo, ''), e.posted_at, coalesce(u.display_name, '') "
+        "SELECT e.id, e.entry_date, e.source_type, e.source_id, coalesce(e.memo, ''), e.posted_at, coalesce(u.display_name, '') "
         "FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id "
         "LEFT JOIN users u ON u.id = e.user_id WHERE l.id = ?", (line_id,)).fetchone()
     if head is None:
@@ -61,4 +67,4 @@ def get_entry(con: sqlite3.Connection, line_id: int) -> EntryView:
     lines = con.execute(
         "SELECT l.account_code, a.name, l.debit, l.credit FROM journal_lines l "
         "JOIN accounts a ON a.code = l.account_code WHERE l.entry_id = ? ORDER BY l.line_no", (head[0],)).fetchall()
-    return EntryView(head[1], head[2], head[3], head[4], head[5], tuple(lines))
+    return EntryView(head[1], head[2], head[3], head[4], head[5], head[6], tuple(lines))
