@@ -35,13 +35,13 @@ def _digest(*parts) -> str:
     return hashlib.sha256(json.dumps(list(parts), ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
-def book_snapshot(con: sqlite3.Connection) -> tuple[int, int]:
-    """(cutoff line id, till book balance): everything posted so far; later lines fall in the next cycle."""
+def book_snapshot(con: sqlite3.Connection, account: str = CASH) -> tuple[int, int]:
+    """(cutoff line id, book balance of account): all posted so far; later lines fall in the next cycle."""
     cutoff = con.execute("SELECT coalesce(max(l.id), 0) FROM journal_lines l JOIN journal_entries e "
                          "ON e.id = l.entry_id WHERE e.status = 'posted'").fetchone()[0]
     book = con.execute("SELECT coalesce(sum(l.debit) - sum(l.credit), 0) FROM journal_lines l JOIN journal_entries e "
                        "ON e.id = l.entry_id WHERE e.status = 'posted' AND l.account_code = ? AND l.id <= ?",
-                       (CASH, cutoff)).fetchone()[0]
+                       (account, cutoff)).fetchone()[0]
     return cutoff, book
 
 

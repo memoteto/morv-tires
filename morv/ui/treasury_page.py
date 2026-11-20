@@ -3,15 +3,15 @@ from PySide6.QtWidgets import QDialog, QFrame, QGridLayout, QLabel, QVBoxLayout,
 
 from morv.core.money import fmt
 from morv.core.text import ltr
-from morv.infra import cash_closing, treasury, treasury_view
+from morv.infra import cash_closing, safe_count, treasury, treasury_view
 from morv.ui.listpage import ListPage
-from morv.ui.treasury_dialogs import CloseDialog, MovementDialog, ReverseDialog
+from morv.ui.treasury_dialogs import CloseDialog, MovementDialog, ReverseDialog, SafeCountDialog
 from morv.ui.widgets import danger_button, muted, primary_button
 
 ACCOUNT_NAMES = {"1110": "الصندوق", "1130": "الخزنة", "1210": "بنك التحويلات", "1220": "بنك البطاقات", "1230": "المحافظ الإلكترونية"}
 SOURCE_LABELS = {"sale": "فاتورة بيع", "sale_return": "مرتجع بيع", "purchase_invoice": "فاتورة شراء",
                  "installment_payment": "تحصيل قسط", "installment_contract": "عقد تقسيط",
-                 "treasury_movement": "حركة خزينة", "cash_closing": "فرق إقفال الصندوق"}
+                 "treasury_movement": "حركة خزينة", "cash_closing": "فرق إقفال الصندوق", "safe_count": "فرق جرد الخزنة"}
 
 
 class _RowsWithBalances(list):
@@ -19,6 +19,7 @@ class _RowsWithBalances(list):
     balances = None
     closing = None
     unclosed = 0
+    safe = None
 
 
 class TreasuryPage(ListPage):
@@ -39,6 +40,7 @@ class TreasuryPage(ListPage):
     def __init__(self, session):
         self._balance_values: dict[str, QLabel] = {}
         self.close_btn = None
+        self.safe_btn = None
         self.close_note = None
         super().__init__(session)
 
@@ -76,9 +78,16 @@ class TreasuryPage(ListPage):
             self.close_btn = primary_button("إقفال الصندوق")
             self.close_btn.clicked.connect(self.close_day)
             grid.addWidget(self.close_btn, 1, 0)
+            self.safe_btn = primary_button("جرد الخزنة")
+            self.safe_btn.clicked.connect(self.count_safe)
+            grid.addWidget(self.safe_btn, 2, 0)
             self.close_note = muted("")
-            grid.addWidget(self.close_note, 1, 1, 1, len(tiles) - 1)
+            grid.addWidget(self.close_note, 1, 1, 2, len(tiles) - 1)
         return grid_host
+
+    def count_safe(self) -> None:
+        if SafeCountDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
+            self.reload(self.current_id)
 
     def close_day(self) -> None:
         if CloseDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
@@ -91,6 +100,7 @@ class TreasuryPage(ListPage):
         rows.balances = treasury_view.balances(con)
         rows.closing = cash_closing.latest_closing(con)
         rows.unclosed = cash_closing.unclosed_days(con)
+        rows.safe = safe_count.latest_count(con)
         return rows
 
     def on_loaded(self, rows: list) -> None:
@@ -103,7 +113,9 @@ class TreasuryPage(ListPage):
         if self.close_note is not None:
             last = rows.closing
             text = f"آخر إقفال {ltr(last[2])} · {ltr(last[3])}" if last else "لم يُقفل الصندوق بعد"
-            self.close_note.setText(text + (f" · {rows.unclosed} يوم بلا إقفال" if rows.unclosed else ""))
+            text += f" · {rows.unclosed} يوم بلا إقفال" if rows.unclosed else ""
+            safe = f"آخر جرد للخزنة {ltr(rows.safe[2])}" if rows.safe else "لم تُجرد الخزنة بعد"
+            self.close_note.setText(text + "\n" + safe)
 
     def total(self) -> str:
         if not self.can_view():

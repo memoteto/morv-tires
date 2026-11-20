@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from morv.core.sales_rules import PAYMENT_ACCOUNT
-from morv.infra import backup, cash_closing, installment_view, ledger
+from morv.infra import backup, cash_closing, installment_view, ledger, safe_count
 
 CASH_ACCOUNTS = ("1110", "1130", "1210", "1220", "1230")
 OLD_DOT_YEARS = 3
@@ -15,7 +15,7 @@ PERIODS = (("today", "اليوم"), ("week", "هذا الأسبوع"), ("month",
 @dataclass(frozen=True)
 class Alert:
     tone: str
-    kind: str              # "late", "due_today", "old_dot", or "backup"; the UI builds the wording and formats amounts
+    kind: str              # "late", "due_today", "old_dot", "safe_count", or "backup"; the UI builds the wording and formats amounts
     count: int
     amount: int
     detail: str             # a customer name, an item name, or the backup message verbatim; "" if none
@@ -87,6 +87,15 @@ def _due_alerts(con: sqlite3.Connection, today_s: str) -> list[Alert]:
     return alerts
 
 
+def _safe_alert(con: sqlite3.Connection, today_s: str) -> Alert | None:
+    """Warns when the safe holds money and was never counted, or not counted for a week."""
+    balance = ledger.account_balance(con, safe_count.SAFE)
+    days = safe_count.days_since_count(con, today_s)
+    if balance == 0 or (days is not None and days <= safe_count.ALERT_AFTER_DAYS):
+        return None
+    return Alert("warn", "safe_count", -1 if days is None else days, balance, "", "treasury")
+
+
 def _old_dot_alert(con: sqlite3.Connection, today: date) -> Alert | None:
     year = today.year - OLD_DOT_YEARS
     anniversary = date(year, today.month, min(today.day, monthrange(year, today.month)[1]))
@@ -129,6 +138,9 @@ def get(con: sqlite3.Connection, period: str = "today", today: str | None = None
     if old_dot:
         alerts.append(old_dot)
     level, msg = backup.health(con)
+    safe_alert = _safe_alert(con, today_s)
+    if safe_alert:
+        alerts.append(safe_alert)
     alerts.append(Alert({"ok": "ok", "warn": "warn", "danger": "bad"}[level], "backup", 0, 0, msg, "settings"))
 
     recent = con.execute(

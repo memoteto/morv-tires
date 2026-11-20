@@ -179,3 +179,21 @@ class TreasuryMovementsUiTest(unittest.TestCase):
             dlg.save()
         self.assertIsNotNone(dlg.saved)
         self.assertEqual(ledger.account_balance(self.con, "1110"), 0)
+
+    def test_safe_count_dialog_counts_and_cashier_has_no_button(self):
+        from morv.infra import ledger
+        from morv.infra.db.connection import transaction
+        from morv.ui.treasury_dialogs import SafeCountDialog
+        from morv.ui.widgets import dispose
+        with transaction(self.con):
+            ledger.post_entry(self.con, self.session.user, "2026-11-02", "treasury_movement", 77, "تسليم",
+                              [("1130", 5000, 0), ("1110", 0, 5000)])
+        dlg = SafeCountDialog(self.session)
+        self.addCleanup(dispose, dlg, self.app)
+        dlg.counted.setText("50")
+        self.assertIn("مطابق", dlg.diff_label.text())
+        dlg.save()
+        self.assertIsNotNone(dlg.saved)
+        self.assertIsNone(self.page(self.cashier_session).safe_btn)
+        page = self.page()
+        self.assertIn("آخر جرد للخزنة", page.close_note.text())
