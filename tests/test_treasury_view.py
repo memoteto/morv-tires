@@ -21,7 +21,7 @@ class TreasuryViewTest(unittest.TestCase):
             return ledger.post_entry(self.con, self.admin, day, source, 1, memo, lines)
 
     def test_empty_ledger_has_zero_balances_and_no_movements(self):
-        self.assertEqual(treasury_view.balances(self.con), (("1110", 0), ("1210", 0), ("1220", 0), ("1230", 0)))
+        self.assertEqual(treasury_view.balances(self.con), (("1110", 0), ("1130", 0), ("1210", 0), ("1220", 0), ("1230", 0)))
         self.assertEqual(treasury_view.movements(self.con), [])
         self.assertEqual(treasury_view.count(self.con), 0)
 
@@ -29,7 +29,7 @@ class TreasuryViewTest(unittest.TestCase):
         self.post("2026-11-01", "sale", "بيع", [("1110", 50000, 0), ("4110", 0, 50000)])
         self.post("2026-11-02", "sale", "بيع تحويل", [("1210", 30000, 0), ("4110", 0, 30000)])
         self.post("2026-11-03", "purchase_invoice", "شراء", [("1410", 20000, 0), ("1110", 0, 20000)])
-        self.assertEqual(dict(treasury_view.balances(self.con)), {"1110": 30000, "1210": 30000, "1220": 0, "1230": 0})
+        self.assertEqual(dict(treasury_view.balances(self.con)), {"1110": 30000, "1130": 0, "1210": 30000, "1220": 0, "1230": 0})
         self.assertEqual(treasury_view.count(self.con), 3)
 
     def test_movements_are_newest_first_and_skip_entries_without_money_lines(self):

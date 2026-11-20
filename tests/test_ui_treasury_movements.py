@@ -143,3 +143,39 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         self.assertIsNone(dlg.saved)
         self.assertIsNone(self.page(self.cashier_session).close_btn)
         self.assertIsNotNone(self.page().close_btn)
+
+    def test_close_dialog_hands_over_the_surplus_to_a_bank(self):
+        from morv.infra import ledger
+        from morv.ui.treasury_dialogs import CloseDialog
+        from morv.ui.widgets import dispose
+        dlg = CloseDialog(self.session)
+        self.addCleanup(dispose, dlg, self.app)
+        dlg.counted.setText("1000")
+        dlg.hand_check.setChecked(True)
+        dlg.hand_to.setCurrentIndex(dlg.hand_to.findData("bank:1210"))
+        dlg.keep.setText("100")
+        dlg.save()
+        self.assertIsNotNone(dlg.saved)
+        self.assertEqual(ledger.account_balance(self.con, "1110"), 10_000)
+        self.assertEqual(ledger.account_balance(self.con, "1210"), 90_000)
+
+    def test_close_dialog_partner_handover_asks_before_overdrawing(self):
+        from unittest import mock
+
+        from morv.infra import ledger, treasury
+        from morv.ui.treasury_dialogs import CloseDialog
+        from morv.ui.widgets import dispose
+        partner = treasury.add_partner(self.con, self.session.user, "أحمد")
+        dlg = CloseDialog(self.session)
+        self.addCleanup(dispose, dlg, self.app)
+        dlg.counted.setText("1000")
+        dlg.hand_check.setChecked(True)
+        dlg.hand_to.setCurrentIndex(dlg.hand_to.findData(f"partner:{partner.id}"))
+        with mock.patch("morv.ui.treasury_dialogs.ask", return_value=False):
+            dlg.save()
+        self.assertIsNone(dlg.saved)
+        self.assertEqual(ledger.account_balance(self.con, "1110"), 100_000)
+        with mock.patch("morv.ui.treasury_dialogs.ask", return_value=True):
+            dlg.save()
+        self.assertIsNotNone(dlg.saved)
+        self.assertEqual(ledger.account_balance(self.con, "1110"), 0)

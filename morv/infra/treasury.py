@@ -163,11 +163,52 @@ def _account_ok(con, code, what) -> None:
         raise TreasuryError(f"{what} غير صالح")
 
 
-def post_movement(con: sqlite3.Connection, by, *, request_key: str, kind: str, amount: int, memo: str,
-                  money_account: str, other_account: str | None = None, partner_id: int | None = None,
-                  supplier_id: int | None = None, movement_date: str | None = None,
-                  reference: str | None = None, confirmed: bool = False) -> PostedMovement:
-    """Posts one manual movement or writes nothing; unusual-but-valid ones need confirmed=True."""
+def _post_locked(con, by, key, kind, amount, memo, money_account, other_account, partner_id, supplier_id, day,
+                 reference, confirmed, skip_closed) -> PostedMovement:
+    """Body of post_movement; the caller owns the transaction."""
+    h = _digest(kind, day, amount, money_account, other_account, partner_id, supplier_id, memo, reference)
+    old = con.execute("SELECT id, number, amount, payload_hash FROM treasury_movements WHERE request_key=?",
+                      (key,)).fetchone()
+    if old:
+        if old[3] != h:
+            raise TreasuryError("مفتاح الطلب سبق استخدامه لحركة بمحتوى مختلف")
+        return PostedMovement(old[0], old[1], old[2], True)
+    partner_account = capital_account = None
+    if partner_id:
+        row = con.execute("SELECT current_account, capital_account, active FROM partners WHERE id=?",
+                          (partner_id,)).fetchone()
+        if row is None or not row[2]:
+            raise TreasuryError("الشريك غير موجود أو معطّل")
+        partner_account, capital_account = row[0], row[1]
+    if supplier_id:
+        row = con.execute("SELECT active FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
+        if row is None or not row[0]:
+            raise TreasuryError("المورد غير موجود أو موقوف")
+    debit, credit = _sides(kind, money_account, other_account, partner_account, capital_account)
+    _account_ok(con, debit, "الحساب المدين")
+    _account_ok(con, credit, "الحساب الدائن")
+
+    warnings = _warnings(con, kind, day, amount, debit, credit, partner_id, supplier_id, skip_closed)
+    if warnings and not confirmed:
+        raise NeedsConfirmation(warnings)
+
+    movement_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM treasury_movements").fetchone()[0]
+    number = f"TM-{day[:4]}-{movement_id:06d}"
+    entry_id = ledger.post_entry(con, by, day, "treasury_movement", movement_id,
+                                 f"{LABELS[kind]} {number}: {memo}", [(debit, amount, 0), (credit, 0, amount)])
+    con.execute(
+        "INSERT INTO treasury_movements (id, number, request_key, payload_hash, kind, movement_date, amount, "
+        "debit_account, credit_account, partner_id, supplier_id, reference, memo, journal_entry_id, user_id) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (movement_id, number, key, h, kind, day, amount, debit, credit, partner_id, supplier_id, reference,
+         memo, entry_id, by.id))
+    audit(con, by, "treasury.movement", "treasury_movement", movement_id, f"{number} · {kind} · {amount}")
+    return PostedMovement(movement_id, number, amount, False)
+
+
+def _prepare(con, by, request_key, kind, amount, memo, money_account, other_account, partner_id, supplier_id,
+             movement_date, reference) -> tuple:
+    """Validates a movement without writing; returns (key, memo, reference, day, partner, supplier)."""
     _require_manage(con, by)
     key = _key(request_key)
     if kind not in KINDS:
@@ -196,54 +237,28 @@ def post_movement(con: sqlite3.Connection, by, *, request_key: str, kind: str, a
         partner_id = None
     if kind != "supplier_payment":
         supplier_id = None
+    return key, memo, reference, day, partner_id, supplier_id
 
+
+def post_movement(con: sqlite3.Connection, by, *, request_key: str, kind: str, amount: int, memo: str,
+                  money_account: str, other_account: str | None = None, partner_id: int | None = None,
+                  supplier_id: int | None = None, movement_date: str | None = None,
+                  reference: str | None = None, confirmed: bool = False) -> PostedMovement:
+    """Posts one manual movement or writes nothing; unusual-but-valid ones need confirmed=True."""
+    key, memo, reference, day, partner_id, supplier_id = _prepare(
+        con, by, request_key, kind, amount, memo, money_account, other_account, partner_id, supplier_id,
+        movement_date, reference)
     with transaction(con):
-        h = _digest(kind, day, amount, money_account, other_account, partner_id, supplier_id, memo, reference)
-        old = con.execute("SELECT id, number, amount, payload_hash FROM treasury_movements WHERE request_key=?",
-                          (key,)).fetchone()
-        if old:
-            if old[3] != h:
-                raise TreasuryError("مفتاح الطلب سبق استخدامه لحركة بمحتوى مختلف")
-            return PostedMovement(old[0], old[1], old[2], True)
-        partner_account = capital_account = None
-        if partner_id:
-            row = con.execute("SELECT current_account, capital_account, active FROM partners WHERE id=?",
-                              (partner_id,)).fetchone()
-            if row is None or not row[2]:
-                raise TreasuryError("الشريك غير موجود أو معطّل")
-            partner_account, capital_account = row[0], row[1]
-        if supplier_id:
-            row = con.execute("SELECT active FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
-            if row is None or not row[0]:
-                raise TreasuryError("المورد غير موجود أو موقوف")
-        debit, credit = _sides(kind, money_account, other_account, partner_account, capital_account)
-        _account_ok(con, debit, "الحساب المدين")
-        _account_ok(con, credit, "الحساب الدائن")
-
-        warnings = _warnings(con, kind, day, amount, debit, credit, partner_id, supplier_id)
-        if warnings and not confirmed:
-            raise NeedsConfirmation(warnings)
-
-        movement_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM treasury_movements").fetchone()[0]
-        number = f"TM-{day[:4]}-{movement_id:06d}"
-        entry_id = ledger.post_entry(con, by, day, "treasury_movement", movement_id,
-                                     f"{LABELS[kind]} {number}: {memo}", [(debit, amount, 0), (credit, 0, amount)])
-        con.execute(
-            "INSERT INTO treasury_movements (id, number, request_key, payload_hash, kind, movement_date, amount, "
-            "debit_account, credit_account, partner_id, supplier_id, reference, memo, journal_entry_id, user_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (movement_id, number, key, h, kind, day, amount, debit, credit, partner_id, supplier_id, reference,
-             memo, entry_id, by.id))
-        audit(con, by, "treasury.movement", "treasury_movement", movement_id, f"{number} · {kind} · {amount}")
-    return PostedMovement(movement_id, number, amount, False)
+        return _post_locked(con, by, key, kind, amount, memo, money_account, other_account, partner_id, supplier_id,
+                            day, reference, confirmed, False)
 
 
-def _warnings(con, kind, day, amount, debit, credit, partner_id, supplier_id) -> list[str]:
+def _warnings(con, kind, day, amount, debit, credit, partner_id, supplier_id, skip_closed=False) -> list[str]:
     out = []
     if credit in MONEY_ACCOUNTS and ledger.account_balance(con, credit) < amount:
         out.append("رصيد الحساب الدافع لا يكفي، وسيصبح سالبًا")
     closed = cash_closing.last_closed_date(con)
-    if closed and day <= closed:
+    if closed and day < closed and not skip_closed:
         out.append(f"التاريخ يقع في فترة مُقفلة (آخر إقفال {closed})")
     if kind == "supplier_payment":
         owed = supplier_owed(con, supplier_id)
@@ -297,3 +312,27 @@ def reverse_movement(con: sqlite3.Connection, by, *, request_key: str, movement_
             (new_id, number, key, h, day, src[2], src[4], src[3], src[5], src[6], memo, movement_id, entry_id, by.id))
         audit(con, by, "treasury.reverse", "treasury_movement", new_id, f"{number} عكس {src[1]}")
     return PostedMovement(new_id, number, src[2], False)
+
+
+def close_and_hand_over(con: sqlite3.Connection, by, *, request_key: str, closing_date: str, counted: int,
+                        expected_book: int, memo: str | None, handover: int, partner_id: int | None = None,
+                        bank_account: str | None = None, confirmed: bool = False) -> cash_closing.Closed:
+    """Closes the till and moves the surplus out in one transaction; a failed handover undoes the closing."""
+    _require_manage(con, by)
+    if type(handover) is not int or not 0 < handover <= counted:
+        raise TreasuryError("مبلغ التسليم يجب أن يكون موجبًا ولا يزيد على العد الفعلي")
+    if bool(partner_id) == bool(bank_account):
+        raise TreasuryError("اختر شريكًا أو حسابًا بنكيًا للتسليم")
+    kind = "partner_withdrawal" if partner_id else "transfer"
+    today = date.today().isoformat()
+    other = bank_account if kind == "transfer" else None
+    ckey, cday = cash_closing.prepare_close(con, by, request_key, closing_date, counted)
+    # The closing key also derives the movement key, so a replay of the pair returns both unchanged.
+    key, memo_h, reference, day, pid, sid = _prepare(
+        con, by, ckey + ":h", kind, handover, "تسليم فائض الصندوق بعد الإقفال", "1110", other, partner_id, None,
+        today, None)
+    memo = (memo or "").strip() or None
+    with transaction(con):
+        closed = cash_closing.close_in_tx(con, by, ckey, cday, counted, expected_book, memo)
+        _post_locked(con, by, key, kind, handover, memo_h, "1110", other, pid, sid, day, reference, confirmed, True)
+    return closed

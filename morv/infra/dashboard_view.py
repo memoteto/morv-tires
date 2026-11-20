@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from morv.core.sales_rules import PAYMENT_ACCOUNT
 from morv.infra import backup, cash_closing, installment_view, ledger
 
-CASH_ACCOUNTS = ("1110", "1210", "1220", "1230")
+CASH_ACCOUNTS = ("1110", "1130", "1210", "1220", "1230")
 OLD_DOT_YEARS = 3
 PERIODS = (("today", "اليوم"), ("week", "هذا الأسبوع"), ("month", "هذا الشهر"))
 

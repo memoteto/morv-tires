@@ -16,7 +16,7 @@ from morv.ui.workers import run_async
 PERIODS = dashboard_view.PERIODS
 ALERT_LEVEL = {"bad": "error", "warn": "warn", "ok": "success"}
 ICON_PRIMARY = "#1F5FD6"
-BALANCE_LABELS = (("1110", "الصندوق"), ("1210", "بنك التحويلات"),
+BALANCE_LABELS = (("1110", "الصندوق"), ("1130", "الخزنة"), ("1210", "بنك التحويلات"),
                   ("1220", "البطاقات"), ("1230", "المحافظ الإلكترونية"))
 # Collect.dc.html/Purchase.dc.html/Statement.dc.html have no standalone search-first entry point yet,
 # so these route to the nearest existing screen instead of a deep link; see design_decisions.md #15.

@@ -75,9 +75,40 @@ def _diff_lines(difference: int, reverse: bool = False) -> list:
     return [(acct, c, d) for acct, d, c in lines] if reverse else lines
 
 
-def close_day(con: sqlite3.Connection, by, *, request_key: str, closing_date: str, counted: int,
-              expected_book: int, memo: str | None = None) -> Closed:
-    """Records the count; expected_book is what the cashier saw, so a sale in between forces a recount."""
+def close_in_tx(con, by, key: str, day: str, counted: int, expected_book: int, memo: str | None) -> Closed:
+    """Body of close_day; the caller owns the transaction."""
+    h = _digest("close", day, counted, expected_book, memo)
+    old = con.execute("SELECT id, number, difference, payload_hash FROM cash_closings WHERE request_key=?",
+                      (key,)).fetchone()
+    if old:
+        if old[3] != h:
+            raise ClosingError("مفتاح الطلب سبق استخدامه لإقفال بمحتوى مختلف")
+        return Closed(old[0], old[1], old[2], True)
+    last = last_closed_date(con)
+    if last and day <= last:
+        raise ClosingError(f"التاريخ يجب أن يلي آخر إقفال معتمد ({last})")
+    cutoff, book = book_snapshot(con)
+    if book != expected_book:
+        raise ClosingError("تغيّر رصيد الصندوق الدفتري أثناء العدّ؛ أعد فتح الإقفال وعُدّ من جديد")
+    difference = counted - book
+    if difference and not memo:
+        raise ClosingError("سبب الفرق مطلوب")
+    closing_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM cash_closings").fetchone()[0]
+    number = f"CC-{day[:4]}-{closing_id:06d}"
+    entry_id = None
+    if difference:
+        entry_id = ledger.post_entry(con, by, day, "cash_closing", closing_id,
+                                     f"فرق إقفال الصندوق {number}: {memo}", _diff_lines(difference))
+    con.execute(
+        "INSERT INTO cash_closings (id, number, request_key, payload_hash, kind, closing_date, cutoff_line_id, "
+        "book_balance, counted, difference, memo, journal_entry_id, user_id) VALUES (?,?,?,?,'close',?,?,?,?,?,?,?,?)",
+        (closing_id, number, key, h, day, cutoff, book, counted, difference, memo, entry_id, by.id))
+    audit(con, by, "cash.close", "cash_closing", closing_id, f"{number} · فرق {difference}")
+    return Closed(closing_id, number, difference, False)
+
+
+def prepare_close(con, by, request_key: str, closing_date: str, counted: int) -> tuple[str, str]:
+    """Validates a closing request without writing; returns (request key, closing date)."""
     _require_close(con, by)
     key = (request_key or "").strip()
     if len(key) < 8:
@@ -90,36 +121,16 @@ def close_day(con: sqlite3.Connection, by, *, request_key: str, closing_date: st
         raise ClosingError(str(e)) from e
     if day > date.today().isoformat():
         raise ClosingError("لا يُقفل تاريخ مستقبلي")
+    return key, day
+
+
+def close_day(con: sqlite3.Connection, by, *, request_key: str, closing_date: str, counted: int,
+              expected_book: int, memo: str | None = None) -> Closed:
+    """Records the count; expected_book is what the cashier saw, so a sale in between forces a recount."""
+    key, day = prepare_close(con, by, request_key, closing_date, counted)
     memo = (memo or "").strip() or None
     with transaction(con):
-        h = _digest("close", day, counted, expected_book, memo)
-        old = con.execute("SELECT id, number, difference, payload_hash FROM cash_closings WHERE request_key=?",
-                          (key,)).fetchone()
-        if old:
-            if old[3] != h:
-                raise ClosingError("مفتاح الطلب سبق استخدامه لإقفال بمحتوى مختلف")
-            return Closed(old[0], old[1], old[2], True)
-        last = last_closed_date(con)
-        if last and day <= last:
-            raise ClosingError(f"التاريخ يجب أن يلي آخر إقفال معتمد ({last})")
-        cutoff, book = book_snapshot(con)
-        if book != expected_book:
-            raise ClosingError("تغيّر رصيد الصندوق الدفتري أثناء العدّ؛ أعد فتح الإقفال وعُدّ من جديد")
-        difference = counted - book
-        if difference and not memo:
-            raise ClosingError("سبب الفرق مطلوب")
-        closing_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM cash_closings").fetchone()[0]
-        number = f"CC-{day[:4]}-{closing_id:06d}"
-        entry_id = None
-        if difference:
-            entry_id = ledger.post_entry(con, by, day, "cash_closing", closing_id,
-                                         f"فرق إقفال الصندوق {number}: {memo}", _diff_lines(difference))
-        con.execute(
-            "INSERT INTO cash_closings (id, number, request_key, payload_hash, kind, closing_date, cutoff_line_id, "
-            "book_balance, counted, difference, memo, journal_entry_id, user_id) VALUES (?,?,?,?,'close',?,?,?,?,?,?,?,?)",
-            (closing_id, number, key, h, day, cutoff, book, counted, difference, memo, entry_id, by.id))
-        audit(con, by, "cash.close", "cash_closing", closing_id, f"{number} · فرق {difference}")
-    return Closed(closing_id, number, difference, False)
+        return close_in_tx(con, by, key, day, counted, expected_book, memo)
 
 
 def cancel_closing(con: sqlite3.Connection, by, *, request_key: str, closing_id: int, memo: str) -> Closed:
