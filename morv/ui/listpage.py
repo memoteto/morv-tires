@@ -3,7 +3,7 @@ import re
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QPushButton, QScrollArea, QSizePolicy, QStackedLayout, QTableView,
                                QVBoxLayout, QWidget)
 
@@ -165,6 +165,7 @@ class ListPage(QWidget):
     add_icon = "plus"
     row_icon = None            # row -> icon name, for the name column
     filters: list = []          # [(key, title)]; empty means no filters
+    filters_as_dropdown = False  # a combo box instead of a row of buttons, for long filter lists
     search_placeholder = "بحث"
 
     def __init__(self, session):
@@ -180,6 +181,8 @@ class ListPage(QWidget):
         head = QHBoxLayout()
         self.count_label = muted("")
         head.addWidget(self.count_label, 1)
+        for extra_btn in self.extra_actions():
+            head.addWidget(extra_btn)
         self.add_btn = primary_button(self.add_label, self.add_icon)
         self.add_btn.clicked.connect(lambda: self.open_dialog(None))
         self.add_btn.setEnabled(self.can_edit())
@@ -211,7 +214,15 @@ class ListPage(QWidget):
         self.search.textChanged.connect(lambda _t: self._debounce.start())
         tools.addWidget(self.search, 0, 0)
         self.filter_buttons = {}
-        for key, label in self.filters:
+        self.filter_combo = None
+        if self.filters_as_dropdown and self.filters:
+            self.filter_combo = QComboBox()
+            for key, label in self.filters:
+                self.filter_combo.addItem(label, key)
+            self.filter_combo.currentIndexChanged.connect(
+                lambda _i: self.set_filter(self.filter_combo.currentData()))
+            tools.addWidget(self.filter_combo, 0, 1)
+        for key, label in ([] if self.filter_combo else self.filters):
             b = QPushButton(label)
             b.setCheckable(True)
             b.setObjectName("segment")
@@ -322,6 +333,10 @@ class ListPage(QWidget):
     def open_dialog(self, row_id: int | None) -> None:
         raise NotImplementedError
 
+    def extra_actions(self) -> list:
+        """Secondary buttons shown in the title row beside the primary add button; none by default."""
+        return []
+
     def extra_header(self) -> QWidget | None:
         """A widget placed between the add-button row and the search/table (e.g. KPI cards). None by default."""
         return None
@@ -354,7 +369,7 @@ class ListPage(QWidget):
         self._arrange_actions(max(0, preview_width - 2 * LAYOUT["preview_padding"]))
 
     def _arrange_filters(self, available: int) -> None:
-        buttons = list(self.filter_buttons.values())
+        buttons = [self.filter_combo] if self.filter_combo else list(self.filter_buttons.values())
         needed = LAYOUT["search_min"] + sum(b.sizeHint().width() for b in buttons) + 8 * len(buttons)
         wrapped = bool(buttons) and available < needed
         cols = (max(1, min(len(buttons), (available + 8) // (LAYOUT["filter_min"] + 8)))
@@ -391,6 +406,10 @@ class ListPage(QWidget):
         self.filter_key = key
         for k, b in self.filter_buttons.items():
             b.setChecked(k == key)
+        if self.filter_combo is not None and self.filter_combo.currentData() != key:
+            self.filter_combo.blockSignals(True)
+            self.filter_combo.setCurrentIndex(max(0, self.filter_combo.findData(key)))
+            self.filter_combo.blockSignals(False)
         self.reload()
 
     def reload(self, keep_id: int | None = None) -> None:

@@ -62,6 +62,7 @@ class ItemsPage(ListPage):
     title = "الأصناف والمخزون"
     add_label = "صنف جديد"
     search_placeholder = "الاسم، الكود، المقاس (205/55R16) أو الباركود (F2)"
+    filters_as_dropdown = True
     filters = [("all", "الكل"), ("tire", "إطارات"), ("battery", "بطاريات"), ("service", "خدمات"), ("inactive", "الموقوفة")]
     row_icon = staticmethod(lambda r: r[1])      # tire / battery / service
     columns = [

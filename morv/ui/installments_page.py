@@ -116,10 +116,13 @@ class ContractsPage(ListPage):
             self._kpi_buttons[key] = btn
             grid.addWidget(btn, 0, i)
         col.addLayout(grid)
+        return box
+
+    def extra_actions(self) -> list:
         self.interest_btn = QPushButton("اعتراف بفوائد الأشهر المنتهية")
         self.interest_btn.clicked.connect(self.recognise_interest)
-        col.addWidget(self.interest_btn)
-        return box
+        self.interest_btn.setVisible(self.session.can("installments.manage"))
+        return [self.interest_btn]
 
     def recognise_interest(self) -> None:
         if not self.session.can("installments.manage", self.session.con):

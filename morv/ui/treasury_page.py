@@ -27,6 +27,7 @@ class TreasuryPage(ListPage):
     add_label = "حركة جديدة"
     search_placeholder = "البيان أو التاريخ (F2)"
     empty_message = "لا توجد حركات مطابقة"
+    filters_as_dropdown = True
     filters = [("all", "كل الحسابات")] + [(code, name) for code, name in ACCOUNT_NAMES.items()]
     columns = [
         ("التاريخ", lambda r: ltr(r[1])),

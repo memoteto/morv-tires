@@ -8,7 +8,7 @@ from morv.core.text import ltr
 from morv.infra import profit, treasury
 from morv.ui.modal import Modal
 from morv.ui.profit_dialogs import ShareSetDialog
-from morv.ui.widgets import Notice, danger_button, form, ltr_edit, muted, primary_button
+from morv.ui.widgets import Notice, action_row, danger_button, form, ltr_edit, muted, primary_button
 
 
 class PartnersTab(QWidget):
@@ -19,29 +19,32 @@ class PartnersTab(QWidget):
         lay = QVBoxLayout(self)
         self.new_btn = primary_button("شريك جديد", "plus")
         self.new_btn.clicked.connect(self.new_partner)
-        lay.addWidget(self.new_btn)
+        lay.addLayout(action_row(self.new_btn))
         self.list = QListWidget()
         self.list.setObjectName("userList")
         self.list.setSpacing(2)
         lay.addWidget(self.list, 1)
         self.active_btn = danger_button("إيقاف الشريك")
         self.active_btn.clicked.connect(self.toggle_active)
-        lay.addWidget(self.active_btn)
         self.shares_btn = None
         self.reserve_edit = None
         if session.can("profit.manage"):
             self.shares_btn = primary_button("حصص الأرباح")
             self.shares_btn.clicked.connect(self.edit_shares)
-            lay.addWidget(self.shares_btn)
+            lay.addLayout(action_row(self.shares_btn, self.active_btn))
             row = QHBoxLayout()
             self.reserve_edit = ltr_edit("0")
+            self.reserve_edit.setMaximumWidth(120)
             self.reserve_edit.setText(profit_rules.fmt_percent(profit.reserve_bp(session.con)) or "0")
             save = primary_button("حفظ نسبة الاحتياطي")
             save.clicked.connect(self.save_reserve)
             row.addWidget(muted("نسبة الاحتياطي القانوني من ربح الفترة %"))
             row.addWidget(self.reserve_edit)
             row.addWidget(save)
+            row.addStretch(1)
             lay.addLayout(row)
+        else:
+            lay.addLayout(action_row(self.active_btn))
         lay.addWidget(muted("للمحل الذي له مالك واحد: أضِفه كشريك واحد. الرصيد الموجب مستحق للشريك على المحل."))
         self.notice = Notice()
         lay.addWidget(self.notice)

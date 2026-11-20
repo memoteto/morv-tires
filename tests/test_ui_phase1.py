@@ -146,6 +146,12 @@ class LoginTest(_Base):
         self.assertEqual(d.user.username, "admin")
 
 
+def _ancestors(widget):
+    while widget is not None:
+        yield widget
+        widget = widget.parentWidget()
+
+
 class SettingsTest(_Base):
     def test_tabs_by_permission(self):
         from morv.infra import users
@@ -162,6 +168,16 @@ class SettingsTest(_Base):
         self.assertFalse(p.backup_tab.pw_btn.isVisibleTo(p))      # the backup password is for a manager only
         self.assertFalse(p.backup_tab.usb_dir.isEnabled())
         self.assertTrue(p.backup_tab.backup_btn.isEnabled())
+
+    def test_permissions_scroll_so_the_action_buttons_stay_visible(self):
+        from PySide6.QtWidgets import QScrollArea
+        from morv.ui.settings_page import SettingsPage
+        self.make_admin()
+        page = SettingsPage(self.session())          # kept alive, or Qt deletes the tabs
+        tab = page.users_tab
+        box = next(iter(tab.checks.values())).parentWidget()
+        self.assertTrue(any(isinstance(w, QScrollArea) for w in _ancestors(box)))
+        self.assertFalse(any(isinstance(w, QScrollArea) for w in _ancestors(tab.pw_btn)))
 
     def test_users_tab_actions(self):
         from morv.infra import users
