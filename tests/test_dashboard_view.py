@@ -73,7 +73,7 @@ class DashboardViewTest(unittest.TestCase):
             ledger.post_entry(self.con, self.admin, "2026-11-11", "test_transfer", 1, "Transfer",
                               [("1110", 0, 600000), ("1210", 300000, 0),
                                ("1220", 200000, 0), ("1230", 100000, 0)])
-        expected = {"1110": -100000, "1210": 300000, "1220": 200000, "1230": 100000}
+        expected = {"1110": -100000, "1130": 0, "1210": 300000, "1220": 200000, "1230": 100000}
         for period in ("today", "week", "month"):
             with self.subTest(period=period):
                 view = dashboard_view.get(self.con, period=period, today="2026-11-16")
@@ -83,7 +83,7 @@ class DashboardViewTest(unittest.TestCase):
 
     def test_empty_accounts_are_present_with_zero_balances(self):
         view = dashboard_view.get(self.con, today="2026-11-16")
-        self.assertEqual(dict(view.account_balances), {"1110": 0, "1210": 0, "1220": 0, "1230": 0})
+        self.assertEqual(dict(view.account_balances), {"1110": 0, "1130": 0, "1210": 0, "1220": 0, "1230": 0})
 
     def test_seven_day_chart_is_oldest_first_and_covers_today(self):
         self._sale("2026-11-16")

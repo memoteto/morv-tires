@@ -2,7 +2,7 @@
 import uuid
 from datetime import date
 
-from PySide6.QtWidgets import QComboBox, QDialog, QLabel, QLineEdit
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLabel, QLineEdit, QWidget
 
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
@@ -191,6 +191,24 @@ class CloseDialog(Modal):
         f.addRow("الفرق", self.diff_label)
         f.addRow("سبب الفرق", self.memo)
         self.body.addLayout(f)
+        self.hand_check = QCheckBox("تسليم الفائض بعد الإقفال")
+        self.body.addWidget(self.hand_check)
+        hf = form()
+        self.hand_to = QComboBox()
+        names = treasury_view.account_names(con, treasury_view.ACCOUNTS)
+        for code in treasury_view.ACCOUNTS[1:]:
+            self.hand_to.addItem(f"تحويل إلى: {names[code]}", ("bank", code))
+        for pid, name, _acc, _active, _bal in treasury.list_partners(con, active_only=True):
+            self.hand_to.addItem(f"سحب شريك: {name}", ("partner", pid))
+        self.keep = ltr_edit("0.00")
+        self.keep.setText("0.00")
+        hf.addRow("الوجهة", self.hand_to)
+        hf.addRow("يبقى في الدُّرج", self.keep)
+        self.hand_box = QWidget()
+        self.hand_box.setLayout(hf)
+        self.hand_box.setVisible(False)
+        self.body.addWidget(self.hand_box)
+        self.hand_check.toggled.connect(self.hand_box.setVisible)
         self.counted.textChanged.connect(self._diff)
         self.cancel_btn = danger_button("إلغاء آخر إقفال")
         self.cancel_btn.setVisible(last is not None)
@@ -218,13 +236,41 @@ class CloseDialog(Modal):
                             + ("عجز الصندوق" if diff < 0 else "زيادة الصندوق قيد التحقيق") + ". المتابعة؟", danger=True):
             return
         try:
-            self.saved = cash_closing.close_day(self.session.con, self.session.user, request_key=self._key,
-                                                closing_date=self.date.text().strip(), counted=counted,
-                                                expected_book=self._book, memo=self.memo.text())
-        except (ClosingError, ledger.LedgerError) as e:
+            handover = self._handover(counted)
+        except MoneyError as e:
+            self.notice.show_message(f"المبلغ المتروك: {e}")
+            return
+        args = dict(request_key=self._key, closing_date=self.date.text().strip(), counted=counted,
+                    expected_book=self._book, memo=self.memo.text())
+        try:
+            if handover is None:
+                self.saved = cash_closing.close_day(self.session.con, self.session.user, **args)
+            else:
+                self.saved = self._close_and_hand_over(args, handover)
+        except (ClosingError, TreasuryError, ledger.LedgerError) as e:
             self.notice.show_message(str(e))
             return
-        self.accept()
+        if self.saved is not None:
+            self.accept()
+
+    def _handover(self, counted: int):
+        """(amount, destination) or None when no handover was asked for or nothing is left to hand over."""
+        if not self.hand_check.isChecked():
+            return None
+        amount = counted - parse_money(self.keep.text())
+        return (amount, self.hand_to.currentData()) if amount > 0 else None
+
+    def _close_and_hand_over(self, args: dict, handover: tuple):
+        amount, (kind, target) = handover
+        extra = dict(handover=amount, partner_id=target if kind == "partner" else None,
+                     bank_account=target if kind == "bank" else None)
+        try:
+            return treasury.close_and_hand_over(self.session.con, self.session.user, **args, **extra)
+        except NeedsConfirmation as e:
+            if not ask(self, "تأكيد التسليم", "\n".join(f"• {w}" for w in e.warnings) + "\n\nهل تريد المتابعة؟",
+                       danger=True):
+                return None
+            return treasury.close_and_hand_over(self.session.con, self.session.user, confirmed=True, **args, **extra)
 
     def cancel_last(self) -> None:
         if self._last is None:
