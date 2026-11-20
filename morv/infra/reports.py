@@ -1,8 +1,9 @@
 """Report catalog: each report builds one uniform read-only Table from posted ledger data."""
 import csv
 import sqlite3
-from dataclasses import dataclass
-from datetime import date
+from calendar import monthrange
+from dataclasses import dataclass, replace
+from datetime import date, timedelta
 
 from morv.core.money import fmt
 from morv.infra import income_statement, ledger, suspended_balances
@@ -50,12 +51,60 @@ def _range(start: str, end: str) -> tuple[str, str]:
     return start, end
 
 
-def income(con, start: str, end: str) -> Table:
+def previous_range(start: str, end: str) -> tuple[str, str]:
+    """Same span a month or year earlier when inside one; otherwise an equal span just before."""
+    s, e = date.fromisoformat(start), date.fromisoformat(end)
+    if s.year < 2:
+        raise ReportError("لا توجد فترة سابقة لهذه الفترة")
+    if s.day == 1 and (e.year, e.month) == (s.year, s.month):
+        last_prev = s - timedelta(days=1)
+        return last_prev.replace(day=1).isoformat(), last_prev.replace(day=min(e.day, last_prev.day)).isoformat()
+    if (s.month, s.day) == (1, 1) and e.year == s.year:
+        py = s.year - 1
+        return date(py, 1, 1).isoformat(), date(py, e.month, min(e.day, monthrange(py, e.month)[1])).isoformat()
+    span = (e - s).days
+    prev_end = s - timedelta(days=1)
+    return (prev_end - timedelta(days=span)).isoformat(), prev_end.isoformat()
+
+
+def _aligned(current: income_statement.Statement, prior: income_statement.Statement):
+    """Both statements with the union of accounts, so their flat rows line up one to one."""
+    def merge(a, b):
+        names = {line.code: line.name for line in (*a, *b)}
+        amounts = {line.code: line.amount for line in a}
+        return tuple(income_statement.Line(c, names[c], amounts.get(c, 0)) for c in sorted(names))
+    out = []
+    for st, other in ((current, prior), (prior, current)):
+        out.append(replace(st, revenue=merge(st.revenue, other.revenue),
+                           cost_of_sales=merge(st.cost_of_sales, other.cost_of_sales),
+                           expenses=merge(st.expenses, other.expenses)))
+    return out
+
+
+def income(con, start: str, end: str, compare: bool = False) -> Table:
     start, end = _range(start, end)
-    rows = tuple((kind, (code, name, amount)) for _i, kind, code, name, amount
-                 in income_statement.table_rows(income_statement.build(con, start, end)))
-    return Table("income", TITLES["income"], f"من {start} إلى {end}", ("الحساب", "البند", "المبلغ"),
-                 (CODE, TEXT, MONEY), rows, 1)
+    current = income_statement.build(con, start, end)
+    if not compare:
+        rows = tuple((kind, (code, name, amount)) for _i, kind, code, name, amount
+                     in income_statement.table_rows(current))
+        return Table("income", TITLES["income"], f"من {start} إلى {end}", ("الحساب", "البند", "المبلغ"),
+                     (CODE, TEXT, MONEY), rows, 1)
+    p_start, p_end = previous_range(start, end)
+    cur, prev = _aligned(current, income_statement.build(con, p_start, p_end))
+    rows, in_suspense = [], False
+    for a, b in zip(income_statement.table_rows(cur), income_statement.table_rows(prev), strict=True):
+        _i, kind, code, name, amount = a
+        in_suspense = in_suspense or name.startswith("أرصدة معلّقة")
+        if amount is None:
+            rows.append((kind, (code, name, None, None, None, "")))
+        elif in_suspense and kind == "line":
+            rows.append((kind, (code, name, amount, None, None, "")))      # balances, not period activity
+        else:
+            before = b[4]
+            rows.append((kind, (code, name, amount, before, amount - before, _bp_text(amount - before, abs(before)))))
+    return Table("income", TITLES["income"], f"من {start} إلى {end} مقارنة بـ {p_start} إلى {p_end}",
+                 ("الحساب", "البند", "الفترة", "الفترة السابقة", "التغيّر", "النسبة"),
+                 (CODE, TEXT, MONEY, MONEY, MONEY, CODE), tuple(rows), 1)
 
 
 def trial_balance(con, end: str) -> Table:
@@ -211,9 +260,9 @@ def partner_statement(con, account: str, start: str, end: str) -> Table:
                  table.headers, table.kinds, table.rows, table.stretch)
 
 
-def build(con, key: str, start: str, end: str, account: str = "") -> Table:
+def build(con, key: str, start: str, end: str, account: str = "", compare: bool = False) -> Table:
     if key == "income":
-        return income(con, start, end)
+        return income(con, start, end, compare)
     if key == "trial":
         return trial_balance(con, end)
     if key == "ledger":

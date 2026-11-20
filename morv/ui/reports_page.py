@@ -1,5 +1,5 @@
 """Reports screen: a report picker, period and account controls, and CSV or PDF export."""
-from PySide6.QtWidgets import QComboBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QPushButton, QWidget
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QPushButton, QWidget
 
 from morv.core.money import fmt
 from morv.core.text import ltr
@@ -51,7 +51,7 @@ class ReportsPage(ListPage):
 
     def extra_header(self) -> QWidget:
         self.table = None
-        self._params = ("income", "", "", "")
+        self._params = ("income", "", "", "", False)
         host = QWidget()
         row = QHBoxLayout(host)
         row.setContentsMargins(0, 0, 0, 0)
@@ -63,6 +63,7 @@ class ReportsPage(ListPage):
         self._filled_for = None
         self.from_edit, self.to_edit = ltr_edit("YYYY-MM-DD"), ltr_edit("YYYY-MM-DD")
         self.range_labels = (muted("من"), muted("إلى"))
+        self.compare_box = QCheckBox("مقارنة بالفترة السابقة")
         self.export_csv_btn = QPushButton("تصدير Excel")
         self.export_pdf_btn = QPushButton("طباعة / PDF")
         row.addWidget(muted("التقرير"))
@@ -72,11 +73,13 @@ class ReportsPage(ListPage):
         row.addWidget(self.from_edit)
         row.addWidget(self.range_labels[1])
         row.addWidget(self.to_edit)
+        row.addWidget(self.compare_box)
         row.addStretch(1)
         row.addWidget(self.export_csv_btn)
         row.addWidget(self.export_pdf_btn)
         self.report_combo.currentIndexChanged.connect(lambda _i: self._controls_changed())
         self.account_combo.currentIndexChanged.connect(lambda _i: self.reload())
+        self.compare_box.toggled.connect(lambda _on: self.reload())
         self.from_edit.editingFinished.connect(self.reload)
         self.to_edit.editingFinished.connect(self.reload)
         self.export_csv_btn.clicked.connect(self.export_csv)
@@ -104,6 +107,7 @@ class ReportsPage(ListPage):
         if key in reports.NEEDS_ACCOUNT:
             self._fill_params(key)
         self.account_combo.setVisible(key in reports.NEEDS_ACCOUNT)
+        self.compare_box.setVisible(key == "income")
         custom = self.filter_key == CUSTOM
         for w in (self.from_edit, self.to_edit, *self.range_labels):
             w.setVisible(custom)
@@ -121,7 +125,8 @@ class ReportsPage(ListPage):
 
     def reload(self, keep_id: int | None = None) -> None:
         # Read the controls on the UI thread: fetch runs on a worker.
-        self._params = (self._key(), self.account_combo.currentData() or "", self.from_edit.text(), self.to_edit.text())
+        self._params = (self._key(), self.account_combo.currentData() or "", self.from_edit.text(), self.to_edit.text(),
+                        self.compare_box.isChecked() and self._key() == "income")
         super().reload(keep_id)
 
     def distribute(self) -> None:
@@ -147,10 +152,10 @@ class ReportsPage(ListPage):
         rows = _Rows()
         if offset or not self.can_view(con):
             return rows
-        key, account, from_text, to_text = self._params
+        key, account, from_text, to_text, compare = self._params
         try:
             start, end = self._range(filter_key, from_text, to_text)
-            table = reports.build(con, key, start, end, account)
+            table = reports.build(con, key, start, end, account, compare)
         except ReportError as e:
             rows.error = str(e)
             return rows

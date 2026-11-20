@@ -81,6 +81,15 @@ class ReportsPageTest(unittest.TestCase):
         self.assertIn("font-size:16pt", html)
         self.assertIn("<span dir='ltr'>", html.split("</p>")[1])      # the subtitle line
 
+    def test_compare_checkbox_adds_the_previous_period_columns_for_income_only(self):
+        page = self.page()
+        self.assertFalse(page.compare_box.isHidden())
+        page.compare_box.setChecked(True)
+        self.assertEqual(page.model.columnCount(), 6)
+        page.report_combo.setCurrentIndex(page.report_combo.findData("trial"))
+        self.assertTrue(page.compare_box.isHidden())
+        self.assertEqual(page.model.columnCount(), 4)
+
     def test_custom_period_shows_dates_and_reports_bad_input_inline(self):
         page = self.page()
         page.set_filter("custom")
