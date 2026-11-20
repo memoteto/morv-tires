@@ -1,12 +1,14 @@
 """Settings tab listing the shop partners with their balances, and adding or stopping partners."""
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtWidgets import QDialog, QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
 
+from morv.core import profit_rules
 from morv.core.money import fmt
 from morv.core.text import ltr
-from morv.infra import treasury
+from morv.infra import profit, treasury
 from morv.ui.modal import Modal
-from morv.ui.widgets import Notice, danger_button, form, muted, primary_button
+from morv.ui.profit_dialogs import ShareSetDialog
+from morv.ui.widgets import Notice, danger_button, form, ltr_edit, muted, primary_button
 
 
 class PartnersTab(QWidget):
@@ -25,6 +27,21 @@ class PartnersTab(QWidget):
         self.active_btn = danger_button("إيقاف الشريك")
         self.active_btn.clicked.connect(self.toggle_active)
         lay.addWidget(self.active_btn)
+        self.shares_btn = None
+        self.reserve_edit = None
+        if session.can("profit.manage"):
+            self.shares_btn = primary_button("حصص الأرباح")
+            self.shares_btn.clicked.connect(self.edit_shares)
+            lay.addWidget(self.shares_btn)
+            row = QHBoxLayout()
+            self.reserve_edit = ltr_edit("0")
+            self.reserve_edit.setText(profit_rules.fmt_percent(profit.reserve_bp(session.con)) or "0")
+            save = primary_button("حفظ نسبة الاحتياطي")
+            save.clicked.connect(self.save_reserve)
+            row.addWidget(muted("نسبة الاحتياطي القانوني من ربح الفترة %"))
+            row.addWidget(self.reserve_edit)
+            row.addWidget(save)
+            lay.addLayout(row)
         lay.addWidget(muted("للمحل الذي له مالك واحد: أضِفه كشريك واحد. الرصيد الموجب مستحق للشريك على المحل."))
         self.notice = Notice()
         lay.addWidget(self.notice)
@@ -43,6 +60,19 @@ class PartnersTab(QWidget):
         if self.partners:
             self.list.setCurrentRow(idx)
         self.active_btn.setEnabled(bool(self.partners))
+
+    def edit_shares(self) -> None:
+        if ShareSetDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
+            self.reload()
+            self.notice.show_message("اعتُمدت الحصص", "success")
+
+    def save_reserve(self) -> None:
+        try:
+            profit.set_reserve_bp(self.session.con, self.session.user, profit_rules.parse_percent(self.reserve_edit.text()))
+        except (profit.ProfitError, profit_rules.ShareError) as e:
+            self.notice.show_message(str(e))
+            return
+        self.notice.show_message("حُفظت نسبة الاحتياطي", "success")
 
     def _current(self):
         row = self.list.currentRow()
