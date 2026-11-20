@@ -91,7 +91,7 @@ class ReportsPage(ListPage):
 
     def _fill_params(self, key: str) -> None:
         """Accounts for the statement, partners for the partner statement; refilled only when the kind changes."""
-        kind = "partner" if key == "partner" else "account"
+        kind = reports.NEEDS_PARAM[key]
         if kind == self._filled_for:
             return
         self._filled_for = kind
@@ -99,14 +99,15 @@ class ReportsPage(ListPage):
         self.account_combo.clear()
         for value, label in reports.param_choices(self.session.con, key):
             self.account_combo.addItem(label, value)
-        self.account_combo.setCurrentIndex(max(0, self.account_combo.findData("1110")))
+        default = {"account": "1110", "days": str(reports.DEFAULT_IDLE_DAYS)}.get(kind)
+        self.account_combo.setCurrentIndex(max(0, self.account_combo.findData(default)))
         self.account_combo.blockSignals(False)
 
     def _sync_controls(self) -> None:
         key = self._key()
-        if key in reports.NEEDS_ACCOUNT:
+        if key in reports.NEEDS_PARAM:
             self._fill_params(key)
-        self.account_combo.setVisible(key in reports.NEEDS_ACCOUNT)
+        self.account_combo.setVisible(key in reports.NEEDS_PARAM)
         self.compare_box.setVisible(key == "income")
         custom = self.filter_key == CUSTOM
         for w in (self.from_edit, self.to_edit, *self.range_labels):
@@ -214,11 +215,19 @@ class ReportsPage(ListPage):
         self.summary_details([(h, _cell_text(v, k)) for h, v, k in zip(self.table.headers, cells, self.table.kinds,
                                                                        strict=True)])
 
+    def _export_table(self):
+        """The shown table, or the full one when the screen stops at a row limit (the journal)."""
+        key, account, from_text, to_text, compare = self._params
+        if self.table.key != "journal":
+            return self.table
+        start, end = self._range(self.filter_key, from_text, to_text)
+        return reports.build(self.session.con, key, start, end, account, compare, full=True)
+
     def export_csv_to(self, path: str) -> None:
-        reports.to_csv(self.table, path)
+        reports.to_csv(self._export_table(), path)
 
     def export_pdf_to(self, path: str) -> None:
-        report_export.export_pdf(self.table, path)
+        report_export.export_pdf(self._export_table(), path)
 
     def export_csv(self) -> None:
         path, _ = QFileDialog.getSaveFileName(self, "تصدير التقرير", f"{self.table.title}.csv", "Excel (*.csv)")
