@@ -25,6 +25,16 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         self.session = Session(self.con, admin)
         self.cashier_session = Session(self.con, cashier)
         self.app = get_app()
+        from unittest import mock
+        patcher = mock.patch("morv.ui.treasury_dialogs.ask", side_effect=AssertionError("unexpected confirmation"))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        # Seed cash so no insufficient-balance warning opens a blocking confirmation dialog in tests
+        from morv.infra import ledger
+        from morv.infra.db.connection import transaction
+        with transaction(self.con):
+            ledger.post_entry(self.con, admin, "2026-11-01", "sale", 1, "فاتورة بيع 1",
+                              [("1110", 100000, 0), ("4110", 0, 100000)])
 
     def page(self, session=None):
         from morv.ui.treasury_page import TreasuryPage
@@ -47,9 +57,9 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         dlg.amount.setText("50")
         dlg.memo.setText("كهرباء")
         dlg.save()
-        self.assertIsNotNone(dlg.saved, dlg.notice.text() if hasattr(dlg.notice, "text") else "")
+        self.assertIsNotNone(dlg.saved)
         page = self.page()
-        self.assertEqual(len(page.model.rows), 1)
+        self.assertEqual(len(page.model.rows), 2)
 
     def test_partner_kind_without_partners_is_refused_with_a_hint(self):
         from morv.ui.treasury_dialogs import MovementDialog
@@ -77,7 +87,7 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         dlg.save()
         self.assertIsNotNone(dlg.saved)
         page = self.page()
-        self.assertEqual(len(page.model.rows), 2)
+        self.assertEqual(len(page.model.rows), 3)
 
     def test_partners_tab_adds_and_stops_a_partner(self):
         from morv.ui.partners_tab import NewPartnerDialog, PartnersTab
