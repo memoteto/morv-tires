@@ -5,6 +5,7 @@ from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import cash_closing, safe_count, treasury, treasury_view
 from morv.ui.listpage import ListPage
+from morv.ui.reconciliation_dialogs import ReconciliationDialog
 from morv.ui.treasury_dialogs import CloseDialog, MovementDialog, ReverseDialog, SafeCountDialog
 from morv.ui.widgets import danger_button, muted, primary_button
 
@@ -42,6 +43,7 @@ class TreasuryPage(ListPage):
         self._balance_values: dict[str, QLabel] = {}
         self.close_btn = None
         self.safe_btn = None
+        self.bank_btn = None
         self.close_note = None
         super().__init__(session)
 
@@ -82,13 +84,19 @@ class TreasuryPage(ListPage):
             self.safe_btn = primary_button("جرد الخزنة")
             self.safe_btn.clicked.connect(self.count_safe)
             grid.addWidget(self.safe_btn, 2, 0)
+            self.bank_btn = primary_button("مطابقة البنك")
+            self.bank_btn.clicked.connect(self.reconcile_banks)
+            grid.addWidget(self.bank_btn, 3, 0)
             self.close_note = muted("")
-            grid.addWidget(self.close_note, 1, 1, 2, len(tiles) - 1)
+            grid.addWidget(self.close_note, 1, 1, 3, len(tiles) - 1)
         return grid_host
 
     def count_safe(self) -> None:
         if SafeCountDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
             self.reload(self.current_id)
+
+    def reconcile_banks(self) -> None:
+        ReconciliationDialog(self.session, self).exec()
 
     def close_day(self) -> None:
         if CloseDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
