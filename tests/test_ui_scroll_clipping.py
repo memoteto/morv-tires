@@ -40,20 +40,26 @@ class ScrollAreaClippingTest(unittest.TestCase):
         return found
 
     def test_main_pages_do_not_clip_content_at_common_sizes(self):
+        from morv.infra import settings
         from morv.ui.shell import NAV, MainWindow
         from morv.ui.widgets import dispose
-        win = MainWindow(self.session, self.app)
-        win.health_timer.stop()
-        self.addCleanup(dispose, win, self.app)
-        win.show()
         problems = []
-        for width, height in ((1366, 768), (1920, 1080)):
-            win.resize(width, height)
-            self.app.processEvents()
-            for key, _title, _icon, _phase in NAV:
-                win.go_key(key)
+        # The sidebar's state changes the page width by 172px, so both states are checked
+        for collapsed in ("1", "0"):
+            settings.put(self.con, "ui.sidebar_collapsed", collapsed)
+            win = MainWindow(self.session, self.app)
+            win.health_timer.stop()
+            self.addCleanup(dispose, win, self.app)
+            win.show()
+            for width, height in ((1366, 768), (1920, 1080)):
+                win.resize(width, height)
                 self.app.processEvents()
-                problems += [f"{key} @{width}x{height}: {c}" for c in self.clipped(win)]
+                for key, _title, _icon, _phase in NAV:
+                    win.go_key(key)
+                    self.app.processEvents()
+                    side = "collapsed" if collapsed == "1" else "open"
+                    problems += [f"{key} @{width}x{height} sidebar {side}: {c}" for c in self.clipped(win)]
+            win.close()
         self.assertEqual(problems, [], "scroll areas clip their content sideways")
 
     def test_key_dialogs_do_not_clip_content(self):
