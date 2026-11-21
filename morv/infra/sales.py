@@ -9,7 +9,7 @@ from morv.core import sales_rules as rules
 from morv.core.sales_rules import Payment, SaleRuleError
 from morv.infra import customer_receipts, inventory, ledger
 from morv.infra.db.connection import transaction
-from morv.infra.users import audit, has_permission
+from morv.infra.users import audit, has_permission, permission_limit
 
 STOCK_KINDS = ("tire", "battery")
 
@@ -59,6 +59,33 @@ def _check_items(con, lines: list) -> dict:
             raise SaleError(f"السطر {i}: الصنف موقوف")
         kinds[ln.item_id] = row[0]
     return kinds
+
+
+def _check_pricing(con, by, lines: list, invoice_discount: int) -> list:
+    """Enforce the price and discount rules; returns notes for the audit trail."""
+    notes = []
+    if not has_permission(con, by, "sales.price_override"):
+        for i, ln in enumerate(lines, start=1):
+            row = con.execute("SELECT price_retail, price_wholesale, price_super FROM items WHERE id=?",
+                              (ln.item_id,)).fetchone()
+            if row and ln.unit_price not in row:
+                raise SaleError(f"السطر {i}: السعر ليس من أسعار الصنف ولا تملك صلاحية تعديل السعر")
+    else:
+        for ln in lines:
+            row = con.execute("SELECT price_retail, price_wholesale, price_super FROM items WHERE id=?",
+                              (ln.item_id,)).fetchone()
+            if row and ln.unit_price not in row:
+                notes.append(f"سعر معدّل للصنف {ln.item_id}: {ln.unit_price}")
+    discount = invoice_discount + sum(ln.line_discount for ln in lines)
+    if discount:
+        gross = sum(ln.qty * ln.unit_price for ln in lines)
+        if not has_permission(con, by, "sales.discount"):
+            raise SaleError("لا تملك صلاحية منح خصم")
+        cap = permission_limit(con, by, "sales.discount")
+        if cap is not None and discount * 100 > cap * gross:
+            raise SaleError(f"الخصم يتجاوز حدك المسموح ({cap}%)")
+        notes.append(f"خصم {discount}")
+    return notes
 
 
 def _check_customer(con, customer_id, payments: list) -> None:
@@ -135,6 +162,7 @@ def post_sale(con: sqlite3.Connection, by, *, request_key: str, customer_id: int
         nets = [b - s for b, s in zip(bases, shares, strict=True)]
         subtotal, line_disc = sum(gross), sum(ln.line_discount for ln in shaped)
         total = sum(nets)
+        notes_audit = _check_pricing(con, by, shaped, invoice_discount)
         _check_customer(con, customer_id, payments)
         sale_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM sales").fetchone()[0]
         number = f"SI-{sale_id:06d}"
@@ -161,13 +189,18 @@ def post_sale(con: sqlite3.Connection, by, *, request_key: str, customer_id: int
                 (sale_id, no, ln.item_id, ln.qty, ln.unit_price, ln.line_discount, share, net))
             if kinds[ln.item_id] in STOCK_KINDS:
                 try:
-                    inventory.issue_in_tx(con, by, ln.item_id, ln.qty, source_type="sale", source_id=sale_id,
+                    issued = inventory.issue_in_tx(con, by, ln.item_id, ln.qty, source_type="sale", source_id=sale_id,
                                           source_line_id=cur.lastrowid, picks=ln.picks,
                                           reason=ln.pick_reason, issue_date=day)
                 except inventory.StockError as e:
                     raise SaleError(f"السطر {no}: {e}") from e
+                if net < issued.cost_total:
+                    if not has_permission(con, by, "sales.below_cost"):
+                        raise SaleError(f"السطر {no}: السعر أقل من التكلفة ولا تملك صلاحية ذلك")
+                    notes_audit.append(f"بأقل من التكلفة: السطر {no}")
         for p in payments:
             con.execute("INSERT INTO sale_payments (sale_id, method, amount, received, reference) VALUES (?,?,?,?,?)",
                         (sale_id, p.method, p.amount, p.received, (p.reference or "").strip() or None))
-        audit(con, by, "sale.post", "sale", sale_id, f"{number} · {total}")
+        audit(con, by, "sale.post", "sale", sale_id,
+              f"{number} · {total}" + ("".join(f" · {n}" for n in notes_audit)))
     return PostedSale(sale_id, number, total, False)
