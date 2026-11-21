@@ -21,6 +21,12 @@ class DateEditTest(unittest.TestCase):
         self.assertEqual(w.text(), date.today().isoformat())
         self.assertTrue(w.calendarPopup())
 
+    def test_value_reads_left_to_right_in_an_rtl_app_while_the_calendar_stays_rtl(self):
+        from PySide6.QtCore import Qt
+        w = self.make()
+        self.assertEqual(w.layoutDirection(), Qt.LayoutDirection.LeftToRight)
+        self.assertEqual(w.calendarWidget().layoutDirection(), Qt.LayoutDirection.RightToLeft)
+
     def test_set_and_read_back_iso(self):
         w = self.make()
         seen = []

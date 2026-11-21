@@ -78,6 +78,8 @@ class DateEdit(QDateEdit):
         self.setCalendarPopup(True)
         self.setDisplayFormat("yyyy-MM-dd")
         self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
+        # In an RTL window Qt mirrors the date's sections (21-11-2026); the Latin value runs LTR on its own
+        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.setMinimumDate(self._BLANK)
         if not allow_future:      # posting engines refuse future dates, so the calendar offers none
             self.setMaximumDate(QDate.currentDate())
@@ -85,6 +87,7 @@ class DateEdit(QDateEdit):
             self.setSpecialValueText(" ")
         cal = self.calendarWidget()
         cal.setObjectName("dateCalendar")
+        cal.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
         cal.setGridVisible(False)
         self.setDate(self._BLANK if optional else QDate.currentDate())
