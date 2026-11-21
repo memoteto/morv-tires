@@ -102,3 +102,44 @@ class PosCompactInvoiceTest(PosFixture):
         p = self.page()
         self.assertTrue(p.number_edit.text().startswith("SI-"))
         self.assertRegex(p.sale_date.text(), r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
+
+
+@require_qt()
+class PosCustomerLookupBeyond300Test(PosFixture):
+    def setUp(self):
+        super().setUp()
+        for i in range(320):
+            self.con.execute("INSERT INTO customers (name, name_norm, mobile, credit_limit) VALUES (?,?,?,0)",
+                             (f"عميل {i:03d}", f"عميل {i:03d}", f"010{i:08d}"))
+        self.con.execute("INSERT INTO customers (name, name_norm, mobile, credit_limit) "
+                         "VALUES ('ياسر الأخير','ياسر الاخير','01099999999',0)")
+
+    def test_preload_stops_at_300_but_a_typed_mobile_still_finds_the_customer(self):
+        p = self.page()
+        self.assertEqual(p.customer.count(), 301)              # cash customer plus the first 300
+        self.assertEqual(p.customer.findText("ياسر الأخير"), -1)
+        p.mobile.setText("01099999999")
+        p._on_mobile_typed()
+        self.assertEqual(p.customer.currentText(), "ياسر الأخير")
+        self.assertEqual(p.notice.text(), "")
+
+    def test_a_typed_name_beyond_the_preload_is_found(self):
+        p = self.page()
+        p.customer.lineEdit().setText("ياسر الأخير")
+        p._on_customer_typed()
+        self.assertEqual(p.customer.currentText(), "ياسر الأخير")
+        self.assertEqual(p.customer.currentData()[2], "01099999999")
+
+    def test_typing_loads_matches_so_the_completer_can_offer_them(self):
+        p = self.page()
+        p.customer.lineEdit().setText("ياسر")
+        p._load_customer_matches("ياسر")
+        self.assertGreaterEqual(p.customer.findText("ياسر الأخير"), 0)
+
+    def test_an_unknown_mobile_still_warns_and_does_not_duplicate_items(self):
+        p = self.page()
+        before = p.customer.count()
+        p.mobile.setText("01011112222")
+        p._on_mobile_typed()
+        self.assertIn("لا يوجد عميل مسجّل", p.notice.text())
+        self.assertEqual(p.customer.count(), before)

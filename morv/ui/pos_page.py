@@ -153,6 +153,12 @@ class PosPage(QWidget):
         self.customer.lineEdit().setPlaceholderText("اكتب اسم العميل للبحث")
         self.customer.lineEdit().addAction(icons.icon("user", ICON_MUTED, 18), QLineEdit.ActionPosition.LeadingPosition)
         self.customer.lineEdit().editingFinished.connect(self._on_customer_typed)
+        # The list preloads only the first 300 customers, so typing also looks the rest up
+        self._customer_lookup = QTimer(self)
+        self._customer_lookup.setSingleShot(True)
+        self._customer_lookup.setInterval(250)
+        self._customer_lookup.timeout.connect(lambda: self._load_customer_matches(self.customer.lineEdit().text()))
+        self.customer.lineEdit().textEdited.connect(lambda _t: self._customer_lookup.start())
         self.customer.currentIndexChanged.connect(self._on_customer_changed)
         self.mobile = ltr_edit("ابحث برقم الموبايل")
         self._trail_icon(self.mobile, "phone")
@@ -586,10 +592,26 @@ class PosPage(QWidget):
         self._refresh_change()
 
     # ---------- Customer and items ----------
+    def _load_customer_matches(self, text: str) -> int:
+        """Adds registered customers beyond the preloaded first 300; returns how many were added."""
+        text = text.strip()
+        if len(text) < 2:
+            return 0
+        known = {self.customer.itemData(i)[0] for i in range(self.customer.count())}
+        added = 0
+        for row in customers.search(self.session.con, text, limit=30):
+            if row[0] not in known:
+                self.customer.addItem(row[1], (row[0], row[3], row[2] or "", (row[5] or "").strip()))
+                added += 1
+        return added
+
     def _on_customer_typed(self) -> None:
         """A typed name picks that customer; anything else falls back to the chosen one."""
         text = self.customer.lineEdit().text().strip()
         idx = self.customer.findText(text, Qt.MatchFlag.MatchFixedString)
+        if idx < 0 and text:
+            self._load_customer_matches(text)
+            idx = self.customer.findText(text, Qt.MatchFlag.MatchFixedString)
         if idx >= 0:
             self.customer.setCurrentIndex(idx)
             return
@@ -603,12 +625,19 @@ class PosPage(QWidget):
         current = (self.customer.currentData() or ("", "", "", ""))[2]
         if not digits or digits == current:
             return
+        if not self._select_by_mobile(digits):
+            self._load_customer_matches(digits)
+            if self._select_by_mobile(digits):
+                return
+            self.notice.show_message(f"لا يوجد عميل مسجّل بالرقم {ltr(digits)}.", "warn")
+
+    def _select_by_mobile(self, digits: str) -> bool:
         for i in range(1, self.customer.count()):
             if self.customer.itemData(i)[2] == digits:
                 self.customer.setCurrentIndex(i)
                 self.notice.show_message("")
-                return
-        self.notice.show_message(f"لا يوجد عميل مسجّل بالرقم {ltr(digits)}.", "warn")
+                return True
+        return False
 
     def _on_customer_changed(self, *_args) -> None:
         cid, level, mobile, vehicle = self.customer.currentData() or ("", "retail", "", "")
