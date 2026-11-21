@@ -159,6 +159,49 @@ class SalesTest(unittest.TestCase):
             self.post([SaleLineIn(self.tire, 1, 20000, picks={newer: 1}, pick_reason=None)],
                       [Payment("cash", 20000, received=20000)])
 
+    def cashier_sale(self, price, discount=0, qty=1, item=None):
+        self.n += 1
+        return sales.post_sale(self.con, self.cashier, request_key=f"cash-key-{self.n:04d}", customer_id=None,
+                               lines=[SaleLineIn(item or self.tire, qty, price, line_discount=discount)],
+                               payments=[Payment("cash", qty * price - discount, received=qty * price - discount)],
+                               sale_date="2026-11-10")
+
+    def cheap_item(self):
+        item = self.item("tire", "TR-2")
+        self.purchase(item, 10, 5000, "2525", "k-buy-0003")
+        return item
+
+    def test_cashier_cannot_sell_off_tier_price(self):
+        item = self.cheap_item()
+        self.cashier_sale(18000, item=item)                       # a wholesale tier price is allowed
+        with self.assertRaisesRegex(SaleError, "السعر"):
+            self.cashier_sale(1, item=item)
+
+    def test_cashier_discount_needs_permission_and_cap(self):
+        item = self.cheap_item()
+        with self.assertRaisesRegex(SaleError, "خصم"):
+            self.cashier_sale(20000, discount=100, item=item)
+        users.set_permission(self.con, self.admin, self.cashier.id, "sales.discount", True, 5)
+        self.cashier_sale(20000, discount=1000, item=item)        # exactly 5%
+        with self.assertRaisesRegex(SaleError, "يتجاوز"):
+            self.cashier_sale(20000, discount=1001, item=item)
+
+    def test_below_cost_needs_permission_and_rolls_back(self):
+        users.set_permission(self.con, self.admin, self.cashier.id, "sales.price_override", True)
+        before = self.counts()
+        with self.assertRaisesRegex(SaleError, "التكلفة"):
+            self.cashier_sale(20000)                   # cost is 1000.00 per tire (100000 piasters)
+        self.assertEqual(self.counts(), before)
+        users.set_permission(self.con, self.admin, self.cashier.id, "sales.below_cost", True)
+        self.cashier_sale(20000)
+        row = self.con.execute("SELECT detail FROM audit_log WHERE action='sale.post' ORDER BY id DESC").fetchone()
+        self.assertIn("بأقل من التكلفة", row[0])
+
+    def test_manager_price_override_is_audited(self):
+        self.post([SaleLineIn(self.tire, 1, 150000)], [Payment("cash", 150000, received=150000)])
+        row = self.con.execute("SELECT detail FROM audit_log WHERE action='sale.post' ORDER BY id DESC").fetchone()
+        self.assertIn("سعر معدّل", row[0])
+
     def test_posted_sale_is_immutable(self):
         r = self.post([SaleLineIn(self.service, 1, 1000)], [Payment("cash", 1000, received=1000)])
         for stmt in ("UPDATE sales SET total=1 WHERE id=?", "DELETE FROM sales WHERE id=?",

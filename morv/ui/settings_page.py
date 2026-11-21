@@ -4,7 +4,7 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPushButton, QScrollArea, QTableView, QTabWidget, QVBoxLayout, QWidget)
+                               QPushButton, QScrollArea, QSpinBox, QTableView, QTabWidget, QVBoxLayout, QWidget)
 
 from morv.core import security
 from morv.core.text import ltr
@@ -222,6 +222,14 @@ class UsersTab(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setWidget(perms_box)
+        cap_row = QHBoxLayout()
+        cap_row.addWidget(muted("الحد الأقصى للخصم (٪ من قيمة الفاتورة):"))
+        self.discount_cap = QSpinBox()
+        self.discount_cap.setRange(0, 100)
+        self.discount_cap.valueChanged.connect(lambda _v: self._perm_changed("sales.discount", self.checks["sales.discount"].isChecked()))
+        cap_row.addWidget(self.discount_cap)
+        cap_row.addStretch(1)
+        inner.addLayout(cap_row)
         inner.addWidget(scroll, 1)       # permissions scroll; the buttons below always stay visible
         btns = QHBoxLayout()
         self.pw_btn = QPushButton("إعادة تعيين كلمة المرور")
@@ -264,6 +272,8 @@ class UsersTab(QWidget):
         for key, cb in self.checks.items():
             cb.setChecked(key in perms)
             cb.setEnabled(not u.is_manager)
+        self.discount_cap.setValue(users.permission_limit(self.session.con, u, "sales.discount") or 0)
+        self.discount_cap.setEnabled(not u.is_manager)
         self.active_btn.setText("إيقاف الحساب" if u.active else "تفعيل الحساب")
         self.active_btn.setEnabled(u.id != self.session.user.id)
         self.notice.show_message("")
@@ -288,7 +298,8 @@ class UsersTab(QWidget):
     def _perm_changed(self, key: str, on: bool) -> None:
         if self._loading or not self.current or self.current.is_manager:
             return
-        users.set_permission(self.session.con, self.session.user, self.current.id, key, on)
+        limit = self.discount_cap.value() if key == "sales.discount" else None
+        users.set_permission(self.session.con, self.session.user, self.current.id, key, on, limit)
 
     def new_user(self) -> None:
         dlg = NewUserDialog(self.session, self)

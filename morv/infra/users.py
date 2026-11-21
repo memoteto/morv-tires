@@ -173,6 +173,15 @@ def has_permission(con, user: User, perm: str) -> bool:
     return perm in permissions(con, user)
 
 
+def permission_limit(con, user: User, perm: str) -> int | None:
+    """Numeric cap for a permission; None means unlimited (managers), a missing cap means 0."""
+    if user.is_manager:
+        return None
+    row = con.execute("SELECT limit_value FROM user_permissions WHERE user_id=? AND perm=? AND allowed=1",
+                      (user.id, perm)).fetchone()
+    return row[0] or 0 if row else 0
+
+
 def set_password(con, by: User, user_id: int, new_password: str, must_change: bool = False) -> None:
     try:
         pw_hash = security.hash_password(new_password)
