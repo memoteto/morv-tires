@@ -7,13 +7,14 @@ import unittest
 from pathlib import Path
 
 from morv.core.sales_rules import Payment
-from morv.infra import customer_receipts, customer_statement, ledger, opening_balances, reports, sales, treasury, users
+from morv.infra import (customer_receipts, customer_statement, inventory, ledger, opening_balances, purchasing, reports,
+                        sales, stock_adjustments, treasury, users)
 from morv.infra.db.bootstrap import open_main_db
 from morv.infra.opening_balances import OpeningError, OpeningLine
 from morv.infra.sales import SaleLineIn
 
 
-class OpeningTest(unittest.TestCase):
+class OpeningBase(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())
         os.environ["MORV_DATA_DIR"] = str(self.dir)
@@ -50,6 +51,13 @@ class OpeningTest(unittest.TestCase):
     def bal(self, code):
         return ledger.account_balance(self.con, code)
 
+    def _service(self):
+        return self.con.execute(
+            "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
+            "VALUES ('service','SV-1','SV-1','sv-1',450000,450000,450000) RETURNING id").fetchone()[0]
+
+
+class OpeningTest(OpeningBase):
     def test_posts_one_entry_per_line_and_clears_the_transitional_account(self):
         r = self.post()
         self.assertEqual(self.con.execute("SELECT count(*) FROM opening_balance_lines WHERE opening_id=?",
@@ -78,11 +86,6 @@ class OpeningTest(unittest.TestCase):
             sales.post_sale(self.con, self.admin, request_key="credit-key-001", customer_id=self.cust,
                             lines=[SaleLineIn(self._service(), 1, 450000)], payments=[Payment("credit", 450000)],
                             sale_date="2026-11-10")
-
-    def _service(self):
-        return self.con.execute(
-            "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
-            "VALUES ('service','SV-1','SV-1','sv-1',450000,450000,450000) RETURNING id").fetchone()[0]
 
     def test_unbalanced_is_refused_with_the_difference_and_preview_writes_nothing(self):
         bad = self.lines()[:-1]                                    # drop the partner current: 50000 short
@@ -155,3 +158,70 @@ class OpeningTest(unittest.TestCase):
         for sql in ("UPDATE opening_balances SET note='x' WHERE id=?", "DELETE FROM opening_balances WHERE id=?"):
             with self.assertRaises(sqlite3.DatabaseError):
                 self.con.execute(sql, (r.id,))
+
+
+class OpeningInventoryTest(OpeningBase):
+    def setUp(self):
+        super().setUp()
+        self.tire = self.con.execute(
+            "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
+            "VALUES ('tire','TR-1','TR-1','tr-1',50000,50000,50000) RETURNING id").fetchone()[0]
+
+    def stock_lines(self):
+        return [OpeningLine("inventory", item_id=self.tire, qty=10, unit_cost=30000, dot="2024"),
+                OpeningLine("inventory", item_id=self.tire, qty=4, unit_cost=32000, dot="2224")]   # 300000 + 128000
+
+    def with_stock(self):
+        # equity grows by the stock value, so the balance equation still holds
+        return self.lines() + [OpeningLine("partner_capital", 428000, partner_id=self.p1.id)] + self.stock_lines()
+
+    def post_stock(self):
+        base = [ln for ln in self.lines() if not (ln.kind == "partner_capital" and ln.partner_id == self.p1.id)]
+        return self.post(base + [OpeningLine("partner_capital", 250000 + 428000, partner_id=self.p1.id)]
+                         + self.stock_lines())
+
+    def test_inventory_creates_lots_layers_and_ties_to_1410(self):
+        self.post_stock()
+        self.assertEqual(inventory.on_hand(self.con, self.tire), 14)
+        self.assertEqual(self.bal("1410"), 428000)
+        self.assertEqual(inventory.book_value(self.con), 428000)
+        self.assertEqual(inventory.reconcile(self.con), [])
+        dots = {r[0] for r in self.con.execute("SELECT dot FROM stock_lots WHERE item_id=?", (self.tire,))}
+        self.assertEqual(dots, {"2024", "2224"})
+
+    def test_opening_cost_feeds_fifo_sales_and_counts_as_a_recorded_cost(self):
+        self.post_stock()
+        sales.post_sale(self.con, self.admin, request_key="sale-key-0001", customer_id=None,
+                        lines=[SaleLineIn(self.tire, 3, 50000)], payments=[Payment("cash", 150000, received=150000)],
+                        sale_date="2026-11-05")
+        self.assertEqual(self.bal("5110"), 90000)                       # three at the oldest layer's 30000
+        self.assertEqual(purchasing.last_cost(self.con, self.tire), 32000)
+        g = stock_adjustments.post_adjustment(
+            self.con, self.admin, request_key="adj-key-0001", adjust_date="2026-11-06", reason="جرد",
+            lines=[stock_adjustments.AdjustLine(self.tire, "gain", 1, dot="2024")])
+        self.assertEqual(g.gain_total, 30000)                           # cost from the opening lot of that DOT
+        self.assertEqual(inventory.reconcile(self.con), [])
+
+    def test_reversal_removes_the_lots(self):
+        r = self.post_stock()
+        opening_balances.reverse_opening(self.con, self.admin, request_key="rev-key-0009", opening_id=r.id,
+                                         reason="خطأ في الإدخال")
+        self.assertEqual((inventory.on_hand(self.con, self.tire), self.bal("1410"), inventory.book_value(self.con)),
+                         (0, 0, 0))
+        self.assertEqual(inventory.reconcile(self.con), [])
+
+    def test_inventory_line_rules(self):
+        bad = [dict(qty=0, unit_cost=1), dict(qty=1, unit_cost=0), dict(qty=1, unit_cost=1, dot="9999"),
+               dict(qty=1, unit_cost=1, item_id=self._service())]
+        for kw in bad:
+            kw.setdefault("item_id", self.tire)
+            with self.assertRaises(OpeningError):
+                self.post([OpeningLine("inventory", **kw)])
+        same = OpeningLine("inventory", item_id=self.tire, qty=1, unit_cost=5, dot="2024")
+        with self.assertRaisesRegex(OpeningError, "مكرر"):
+            self.post([same, same])
+
+    def test_an_item_with_stock_cannot_change_kind_or_be_deleted(self):
+        from morv.infra import items
+        self.post_stock()
+        self.assertTrue(items.has_documents(self.con, self.tire))

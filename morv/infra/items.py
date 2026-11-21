@@ -248,7 +248,9 @@ def set_active(con, by, item_id: int, active: bool) -> None:
 
 
 def has_documents(con, item_id: int) -> bool:
-    return con.execute("SELECT 1 FROM purchase_lines WHERE item_id=? LIMIT 1", (item_id,)).fetchone() is not None
+    return con.execute("SELECT EXISTS(SELECT 1 FROM purchase_lines WHERE item_id=?) "
+                       "OR EXISTS(SELECT 1 FROM stock_lots WHERE item_id=?) "
+                       "OR EXISTS(SELECT 1 FROM sale_lines WHERE item_id=?)", (item_id,) * 3).fetchone()[0] == 1
 
 
 def delete(con, by, item_id: int) -> None:

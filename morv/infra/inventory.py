@@ -161,6 +161,20 @@ def reconcile(con: sqlite3.Connection) -> list:
                "OR coalesce((SELECT sum(cost) FROM cost_allocations WHERE adjustment_line_id = l.id), 0) "
                "<> CASE WHEN l.direction = 'loss' THEN l.value WHEN l.cost_source = 'restore' THEN -l.value ELSE 0 END"):
         bad.append(f"سطر تسوية {r[0]}: الحركات أو التخصيصات لا تطابق الكمية والقيمة")
+    for r in q("SELECT l.id FROM opening_balance_lines l JOIN opening_balances o ON o.id = l.opening_id "
+               "WHERE l.kind = 'inventory' AND o.kind = 'opening' AND "
+               "((SELECT count(*) FROM stock_lots WHERE opening_line_id = l.id) <> 1 "
+               "OR (SELECT count(*) FROM cost_layers WHERE opening_line_id = l.id) <> 1)"):
+        bad.append(f"سطر افتتاحي {r[0]}: ليس له دفعة وطبقة واحدة بالضبط")
+    for r in q("SELECT l.id FROM opening_balance_lines l JOIN opening_balances o ON o.id = l.opening_id "
+               "WHERE l.kind = 'inventory' AND ("
+               "coalesce((SELECT sum(qty) FROM stock_movements WHERE opening_line_id = l.id), 0) "
+               "<> CASE o.kind WHEN 'opening' THEN l.qty ELSE -l.qty END "
+               "OR coalesce((SELECT sum(qty) FROM cost_allocations WHERE opening_line_id = l.id), 0) "
+               "<> CASE o.kind WHEN 'opening' THEN 0 ELSE l.qty END "
+               "OR coalesce((SELECT sum(cost) FROM cost_allocations WHERE opening_line_id = l.id), 0) "
+               "<> CASE o.kind WHEN 'opening' THEN 0 ELSE l.amount END)"):
+        bad.append(f"سطر افتتاحي {r[0]}: الحركات أو التخصيصات لا تطابق الكمية والقيمة")
     for r in q("SELECT m.id FROM stock_movements m LEFT JOIN stock_lots l ON l.id = m.lot_id WHERE l.id IS NULL"):
         bad.append(f"حركة {r[0]}: دفعتها غير موجودة")
     for r in q("SELECT a.id FROM cost_allocations a LEFT JOIN cost_layers c ON c.id = a.layer_id WHERE c.id IS NULL"):
