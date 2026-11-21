@@ -123,7 +123,9 @@ def supplier_owed(con: sqlite3.Connection, supplier_id: int) -> int:
     paid = con.execute(
         "SELECT coalesce(sum(CASE kind WHEN 'supplier_payment' THEN amount ELSE -amount END), 0) "
         "FROM treasury_movements WHERE supplier_id=?", (supplier_id,)).fetchone()[0]
-    return invoiced - paid
+    opening = con.execute("SELECT coalesce(sum(amount), 0) FROM active_opening_lines WHERE supplier_id=?",
+                          (supplier_id,)).fetchone()[0]
+    return opening + invoiced - paid
 
 
 def movement_info(con: sqlite3.Connection, movement_id: int) -> tuple | None:
