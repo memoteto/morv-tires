@@ -1,5 +1,5 @@
 """Treasury screen: cash, bank and wallet balances, their ledger movements, and manual movements."""
-from PySide6.QtWidgets import QDialog, QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QFrame, QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from morv.core.money import fmt
 from morv.core.text import ltr
@@ -7,7 +7,7 @@ from morv.infra import cash_closing, safe_count, treasury, treasury_view
 from morv.ui.listpage import ListPage
 from morv.ui.reconciliation_dialogs import ReconciliationDialog
 from morv.ui.treasury_dialogs import CloseDialog, MovementDialog, ReverseDialog, SafeCountDialog
-from morv.ui.widgets import danger_button, muted, primary_button
+from morv.ui.widgets import danger_button, muted
 
 ACCOUNT_NAMES = {"1110": "الصندوق", "1130": "الخزنة", "1210": "بنك التحويلات", "1220": "بنك البطاقات", "1230": "المحافظ الإلكترونية"}
 SOURCE_LABELS = {"sale": "فاتورة بيع", "sale_return": "مرتجع بيع", "purchase_invoice": "فاتورة شراء",
@@ -78,18 +78,21 @@ class TreasuryPage(ListPage):
             self._balance_values[key] = value
             grid.addWidget(box, 0, i)
         if self.session.can("treasury.close"):
-            self.close_btn = primary_button("إقفال الصندوق")
-            self.close_btn.clicked.connect(self.close_day)
-            grid.addWidget(self.close_btn, 1, 0)
-            self.safe_btn = primary_button("جرد الخزنة")
-            self.safe_btn.clicked.connect(self.count_safe)
-            grid.addWidget(self.safe_btn, 2, 0)
-            self.bank_btn = primary_button("مطابقة البنك")
-            self.bank_btn.clicked.connect(self.reconcile_banks)
-            grid.addWidget(self.bank_btn, 3, 0)
             self.close_note = muted("")
-            grid.addWidget(self.close_note, 1, 1, 3, len(tiles) - 1)
+            grid.addWidget(self.close_note, 1, 0, 1, len(tiles))
         return grid_host
+
+    def extra_actions(self) -> list:
+        """Closing, safe count and bank matching are periodic checks, so they sit beside the main action."""
+        if not self.session.can("treasury.close"):
+            return []
+        self.close_btn = QPushButton("إقفال الصندوق")
+        self.close_btn.clicked.connect(self.close_day)
+        self.safe_btn = QPushButton("جرد الخزنة")
+        self.safe_btn.clicked.connect(self.count_safe)
+        self.bank_btn = QPushButton("مطابقة البنك")
+        self.bank_btn.clicked.connect(self.reconcile_banks)
+        return [self.close_btn, self.safe_btn, self.bank_btn]
 
     def count_safe(self) -> None:
         if SafeCountDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:

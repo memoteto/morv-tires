@@ -31,6 +31,7 @@ class ReportsPage(ListPage):
     title = "التقارير"
     add_label = "قفل الفترة"
     add_icon = "lock"
+    add_primary = False
     search_placeholder = "بحث في البنود (F2)"
     empty_message = "لا توجد قيود في هذه الفترة"
     filters_as_dropdown = True

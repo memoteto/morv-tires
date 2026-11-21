@@ -11,7 +11,7 @@ from morv.core.text import RLM
 from morv.infra.db.connection import ClosedDatabase
 from morv.ui import icons
 from morv.ui.tokens import LAYOUT
-from morv.ui.widgets import muted, primary_button
+from morv.ui.widgets import icon_button, muted, primary_button
 from morv.ui.workers import run_async
 
 PAGE = 300
@@ -163,6 +163,7 @@ class ListPage(QWidget):
     title = ""
     add_label = "جديد"
     add_icon = "plus"
+    add_primary = True
     row_icon = None            # row -> icon name, for the name column
     filters: list = []          # [(key, title)]; empty means no filters
     filters_as_dropdown = False  # a combo box instead of a row of buttons, for long filter lists
@@ -183,7 +184,9 @@ class ListPage(QWidget):
         head.addWidget(self.count_label, 1)
         for extra_btn in self.extra_actions():
             head.addWidget(extra_btn)
-        self.add_btn = primary_button(self.add_label, self.add_icon)
+        # One primary action per page: a page whose header action is administrative shows it as secondary
+        self.add_btn = (primary_button(self.add_label, self.add_icon) if self.add_primary
+                        else icon_button(self.add_label, self.add_icon) if self.add_icon else QPushButton(self.add_label))
         self.add_btn.clicked.connect(lambda: self.open_dialog(None))
         self.add_btn.setEnabled(self.can_edit())
         head.addWidget(self.add_btn)
