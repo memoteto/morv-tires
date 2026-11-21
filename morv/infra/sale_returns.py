@@ -8,7 +8,7 @@ from datetime import date
 from morv.core import costing
 from morv.core import return_rules as rules
 from morv.core.sales_rules import PAYMENT_ACCOUNT
-from morv.infra import installments, ledger
+from morv.infra import customer_receipts, installments, ledger
 from morv.infra.db.connection import transaction
 from morv.infra.inventory import COGS_ACCOUNTS
 from morv.infra.users import audit, has_permission
@@ -249,6 +249,10 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         cost_total = sum(x[5] for x in shaped)
         if total <= 0 and cost_total <= 0:
             raise ReturnError("المرتجع بلا قيمة ولا تكلفة")
+        if method == "credit":
+            owner = con.execute("SELECT customer_id FROM sales WHERE id=?", (sale_id,)).fetchone()[0]
+            if total > customer_receipts.customer_balance(con, owner):
+                raise ReturnError("الرد على الحساب أكبر من دين العميل الآجل المتبقي؛ لا يُترك رصيد دائن للعميل")
         return_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM sale_returns").fetchone()[0]
         number = f"SR-{return_id:06d}"
 
