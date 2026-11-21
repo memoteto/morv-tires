@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from morv.core import validate
 from morv.core.text import norm_ar
 from morv.infra.db.connection import transaction
-from morv.infra.users import audit
+from morv.infra.users import audit, require
 
 
 SUPPLIES = {"tires": "إطارات", "batteries": "بطاريات", "both": "إطارات وبطاريات", "other": "أخرى"}
@@ -57,6 +57,7 @@ def _duplicate(con, mobile: str, excluding: int | None) -> str | None:
 
 
 def create(con, by, s: Supplier) -> Supplier:
+    require(con, by, "suppliers.manage", SupplierError)
     _clean(s)
     dup = _duplicate(con, s.mobile, None)
     if dup:
@@ -74,6 +75,7 @@ def create(con, by, s: Supplier) -> Supplier:
 
 
 def update(con, by, s: Supplier) -> Supplier:
+    require(con, by, "suppliers.manage", SupplierError)
     _clean(s)
     dup = _duplicate(con, s.mobile, s.id)
     if dup:
@@ -91,6 +93,7 @@ def update(con, by, s: Supplier) -> Supplier:
 
 
 def set_active(con, by, supplier_id: int, active: bool) -> None:
+    require(con, by, "suppliers.manage", SupplierError)
     with transaction(con):
         con.execute("UPDATE suppliers SET active=? WHERE id=?", (int(active), supplier_id))
         audit(con, by, "supplier.activate" if active else "supplier.deactivate", "supplier", supplier_id)
@@ -103,6 +106,7 @@ def has_documents(con, supplier_id: int) -> bool:
 
 
 def delete(con, by, supplier_id: int) -> None:
+    require(con, by, "suppliers.manage", SupplierError)
     if has_documents(con, supplier_id):
         raise SupplierError("للمورد مستندات مسجّلة؛ أوقفه بدل حذفه")
     s = get(con, supplier_id)

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from morv.core import validate
 from morv.core.text import norm_ar, scanner_fix
 from morv.infra.db.connection import transaction
-from morv.infra.users import audit
+from morv.infra.users import audit, require
 
 KINDS = {"tire": "إطار", "battery": "بطارية", "service": "خدمة"}
 FIXED_KEYS = {"name", "code", "barcode", "brand", "model", "price_retail", "price_wholesale", "price_super",
@@ -84,6 +84,7 @@ def all_fields(con) -> list[Field]:
 
 
 def set_field(con, by, kind: str, key: str, *, show=None, required=None, print_=None, filter_=None) -> None:
+    require(con, by, "items.manage", ItemError)
     r = con.execute("SELECT builtin, show FROM item_fields WHERE kind=? AND key=?", (kind, key)).fetchone()
     if not r:
         raise ItemError("حقل غير معروف")
@@ -105,6 +106,7 @@ def set_field(con, by, kind: str, key: str, *, show=None, required=None, print_=
 
 
 def add_custom_field(con, by, kind: str, label: str, ftype: str, options: list | None = None) -> str:
+    require(con, by, "items.manage", ItemError)
     if kind not in ("common", *KINDS) or ftype not in ("text", "num", "sel", "bool"):
         raise ItemError("نوع الحقل غير معروف")
     label = (label or "").strip()
@@ -198,6 +200,7 @@ def _unique_errors(con, it: Item) -> None:
 
 
 def create(con, by, it: Item) -> Item:
+    require(con, by, "items.manage", ItemError)
     _clean(con, it)
     _unique_errors(con, it)
     with transaction(con):
@@ -213,6 +216,7 @@ def create(con, by, it: Item) -> Item:
 
 
 def update(con, by, it: Item) -> Item:
+    require(con, by, "items.manage", ItemError)
     _clean(con, it)
     _unique_errors(con, it)
     with transaction(con):
@@ -220,6 +224,8 @@ def update(con, by, it: Item) -> Item:
         old = get(con, it.id)
         if old.kind != it.kind and has_documents(con, it.id):
             raise ItemError("لا يمكن تغيير نوع صنف له حركات؛ أنشئ صنفًا جديدًا")
+        if ((old.price_retail, old.price_wholesale, old.price_super) != (it.price_retail, it.price_wholesale, it.price_super)):
+            require(con, by, "items.prices", ItemError)
         con.execute(
             "UPDATE items SET kind=?, code=?, barcode=?, name=?, name_norm=?, brand=?, model=?, price_retail=?, price_wholesale=?, "
             "price_super=?, min_qty=?, notes=?, updated_at=strftime('%Y-%m-%d %H:%M:%S','now','localtime') WHERE id=?",
@@ -235,6 +241,7 @@ def update(con, by, it: Item) -> Item:
 
 
 def set_active(con, by, item_id: int, active: bool) -> None:
+    require(con, by, "items.manage", ItemError)
     with transaction(con):
         con.execute("UPDATE items SET active=? WHERE id=?", (int(active), item_id))
         audit(con, by, "item.activate" if active else "item.deactivate", "item", item_id)
@@ -245,6 +252,7 @@ def has_documents(con, item_id: int) -> bool:
 
 
 def delete(con, by, item_id: int) -> None:
+    require(con, by, "items.manage", ItemError)
     if has_documents(con, item_id):
         raise ItemError("للصنف حركات مسجّلة؛ أوقفه بدل حذفه")
     it = get(con, item_id)
