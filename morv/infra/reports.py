@@ -448,13 +448,18 @@ def slow_moving(con, end: str, days: str) -> Table:
 
 
 def supplier_balances(con, end: str) -> Table:
-    """Per supplier: invoices less payments up to the end date, tied back to ledger account 2110."""
+    """Per supplier: invoices net of returns less payments up to the end date, tied to account 2110."""
     _s, end = _range("0001-01-01", end)
     per: dict[int, list] = {}
     for sid, name, total in con.execute(
             "SELECT s.id, s.name, sum(p.total) FROM purchase_invoices p JOIN suppliers s ON s.id = p.supplier_id "
             "JOIN journal_entries e ON e.id = p.journal_entry_id WHERE e.entry_date <= ? GROUP BY s.id", (end,)):
         per[sid] = [name, total, 0]
+    for sid, name, back in con.execute(
+            "SELECT s.id, s.name, sum(CASE r.kind WHEN 'return' THEN r.total ELSE -r.total END) "
+            "FROM purchase_returns r JOIN suppliers s ON s.id = r.supplier_id "
+            "JOIN journal_entries e ON e.id = r.journal_entry_id WHERE e.entry_date <= ? GROUP BY s.id", (end,)):
+        per.setdefault(sid, [name, 0, 0])[1] -= back
     for sid, name, paid in con.execute(
             "SELECT s.id, s.name, sum(CASE m.kind WHEN 'supplier_payment' THEN m.amount ELSE -m.amount END) "
             "FROM treasury_movements m JOIN suppliers s ON s.id = m.supplier_id "

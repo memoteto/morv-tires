@@ -118,6 +118,8 @@ def partner_balance(con: sqlite3.Connection, partner_id: int) -> int:
 def supplier_owed(con: sqlite3.Connection, supplier_id: int) -> int:
     invoiced = con.execute("SELECT coalesce(sum(total), 0) FROM purchase_invoices WHERE supplier_id=?",
                            (supplier_id,)).fetchone()[0]
+    invoiced -= con.execute("SELECT coalesce(sum(CASE kind WHEN 'return' THEN total ELSE -total END), 0) "
+                            "FROM purchase_returns WHERE supplier_id=?", (supplier_id,)).fetchone()[0]
     paid = con.execute(
         "SELECT coalesce(sum(CASE kind WHEN 'supplier_payment' THEN amount ELSE -amount END), 0) "
         "FROM treasury_movements WHERE supplier_id=?", (supplier_id,)).fetchone()[0]
