@@ -84,6 +84,13 @@ def _replay(con, key: str, digest: str) -> PostedDeposit | None:
     return PostedDeposit(old[0], old[1], old[2], True)
 
 
+def _check_backing(con, customer_id: int, held_after: int) -> None:
+    """A deposit that backs credit cannot leave while the debt exceeds the limit plus what stays held."""
+    limit = con.execute("SELECT credit_limit FROM customers WHERE id=?", (customer_id,)).fetchone()[0]
+    if customer_receipts.customer_balance(con, customer_id) > limit + max(0, held_after):
+        raise DepositError("العربون يغطي دينًا آجلًا يتجاوز حد العميل؛ سوِّ الدين أولًا")
+
+
 def post_document(con: sqlite3.Connection, by, *, request_key: str, customer_id: int, kind: str, amount: int,
                   method: str | None = None, doc_date: str | None = None, notes: str | None = None) -> PostedDeposit:
     """Takes, refunds or applies a deposit; refunds and applications never exceed the balance."""
@@ -114,6 +121,8 @@ def post_document(con: sqlite3.Connection, by, *, request_key: str, customer_id:
             raise DepositError("المبلغ أكبر من عربون العميل المتاح")
         if kind == "apply" and amount > customer_receipts.customer_balance(con, customer_id):
             raise DepositError("المبلغ أكبر من دين العميل الآجل المتبقي")
+        if kind == "refund":
+            _check_backing(con, customer_id, held - amount)
         return _post(con, by, key=key, digest=digest, customer_id=customer_id, kind=kind, amount=amount,
                      method=method, doc_date=day, notes=notes)
 
@@ -137,8 +146,10 @@ def reverse_document(con: sqlite3.Connection, by, *, request_key: str, document_
         if con.execute("SELECT 1 FROM customer_deposits WHERE reverses_id=?", (document_id,)).fetchone():
             raise DepositError("المستند معكوس سابقًا")
         cid, kind, amount = src[1], src[2], src[4]
-        if kind == "deposit" and customer_receipts.deposit_balance(con, cid) < amount:
-            raise DepositError("لا يُعكس الإيداع: صُرف جزء من العربون")
+        if kind == "deposit":
+            if customer_receipts.deposit_balance(con, cid) < amount:
+                raise DepositError("لا يُعكس الإيداع: صُرف جزء من العربون")
+            _check_backing(con, cid, customer_receipts.deposit_balance(con, cid) - amount)
         if kind == "apply":
             collected = (customer_receipts.received(con, cid) + customer_receipts.applied_deposits(con, cid) - amount)
             if collected < customer_receipts.cash_refunded(con, cid):

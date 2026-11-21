@@ -87,6 +87,19 @@ class CustomerDepositsTest(unittest.TestCase):
         self.doc("apply", 40000)
         self.assertEqual(customer_receipts.customer_balance(self.con, self.cust), 0)
 
+    def test_deposit_backing_credit_cannot_be_withdrawn_or_reversed_while_the_debt_stands(self):
+        dep = self.doc("deposit", 50000)
+        self.credit_sale(50000)
+        with self.assertRaises(DepositError):
+            self.doc("refund", 10000)
+        with self.assertRaises(DepositError):
+            cd.reverse_document(self.con, self.admin, request_key=self.key(), document_id=dep.id, reason="خطأ")
+        self.doc("apply", 50000)
+        self.assertEqual(self.held(), 0)
+        self.assertEqual(ledger.account_balance(self.con, "2340"), 0)
+        self.doc("deposit", 20000)
+        self.doc("refund", 20000)                                    # no debt left: free to leave
+
     def test_statement_shows_the_application_and_ties_to_1310(self):
         self.doc("deposit", 50000)
         self.credit_sale(40000)
@@ -105,9 +118,9 @@ class CustomerDepositsTest(unittest.TestCase):
         self.assertEqual((self.held(), customer_receipts.customer_balance(self.con, self.cust)), (50000, 30000))
         with self.assertRaises(DepositError):
             cd.reverse_document(self.con, self.admin, request_key=self.key(), document_id=applied.id, reason="مرة ثانية")
-        cd.reverse_document(self.con, self.admin, request_key=self.key(), document_id=dep.id, reason="خطأ")
-        self.assertEqual(self.held(), 0)
-        self.assertEqual(ledger.account_balance(self.con, "2340"), 0)
+        with self.assertRaises(DepositError):                       # the restored debt is backed by this deposit
+            cd.reverse_document(self.con, self.admin, request_key=self.key(), document_id=dep.id, reason="خطأ")
+        self.assertEqual(ledger.account_balance(self.con, "2340"), -50000)
 
     def test_reversing_a_refund_puts_the_deposit_back(self):
         self.doc("deposit", 50000)
