@@ -225,3 +225,23 @@ class OpeningInventoryTest(OpeningBase):
         from morv.infra import items
         self.post_stock()
         self.assertTrue(items.has_documents(self.con, self.tire))
+
+
+class OpeningScreenHelpersTest(OpeningBase):
+    def test_choices_cover_every_line_kind(self):
+        for kind in ("account", "customer", "supplier", "partner_capital", "partner_current", "inventory"):
+            with self.subTest(kind=kind):
+                got = opening_balances.choices(self.con, kind)
+                if kind != "inventory":
+                    self.assertTrue(got)
+        self.assertEqual(opening_balances.choices(self.con, "retained"), [])
+        self.assertIn("1110", [k for k, _ in opening_balances.choices(self.con, "account")])
+
+    def test_current_follows_post_and_reversal(self):
+        self.assertIsNone(opening_balances.current(self.con))
+        posted = self.post()
+        live = opening_balances.current(self.con)
+        self.assertEqual((live[0], live[3]), (posted.id, 6))
+        opening_balances.reverse_opening(self.con, self.admin, request_key="rev-key-0001",
+                                         opening_id=posted.id, reason="خطأ إدخال")
+        self.assertIsNone(opening_balances.current(self.con))
