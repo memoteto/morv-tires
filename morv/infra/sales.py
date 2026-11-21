@@ -76,10 +76,11 @@ def _check_customer(con, customer_id, payments: list) -> None:
     if not row[0]:
         raise SaleError("العميل موقوف")
     if credit:
-        if row[1] <= 0:
-            raise SaleError("لهذا العميل حد ائتمان صفر؛ لا يُقبل آجل")
+        room = row[1] + max(0, customer_receipts.deposit_balance(con, customer_id))   # a held deposit backs credit
+        if room <= 0:
+            raise SaleError("لهذا العميل حد ائتمان صفر ولا عربون؛ لا يُقبل آجل")
         outstanding = customer_receipts.customer_balance(con, customer_id)
-        if outstanding + credit > row[1]:
+        if outstanding + credit > room:
             raise SaleError("يتجاوز الآجل حد ائتمان العميل")
 
 

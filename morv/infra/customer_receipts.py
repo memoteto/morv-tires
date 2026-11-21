@@ -53,7 +53,25 @@ def customer_balance(con: sqlite3.Connection, customer_id: int) -> int:
                        "WHERE s.customer_id=? AND p.method='credit'", (customer_id,)).fetchone()[0]
     refunded = con.execute(f"SELECT coalesce(sum({CREDIT_PART}), 0) FROM sale_returns r JOIN sales s "
                            "ON s.id = r.sale_id WHERE s.customer_id=?", (customer_id,)).fetchone()[0]
-    return sold - refunded - received(con, customer_id)
+    return sold - refunded - received(con, customer_id) - applied_deposits(con, customer_id)
+
+
+_DEPOSIT_JOIN = "FROM customer_deposits d LEFT JOIN customer_deposits o ON o.id = d.reverses_id WHERE d.customer_id=?"
+
+
+def deposit_balance(con: sqlite3.Connection, customer_id: int) -> int:
+    """Customer deposit still held: deposits minus refunds and applications, reversals undone."""
+    return con.execute(
+        "SELECT coalesce(sum(CASE d.kind WHEN 'deposit' THEN d.amount ELSE CASE WHEN d.kind = 'reversal' "
+        "THEN CASE o.kind WHEN 'deposit' THEN -d.amount ELSE d.amount END ELSE -d.amount END END), 0) "
+        + _DEPOSIT_JOIN, (customer_id,)).fetchone()[0]
+
+
+def applied_deposits(con: sqlite3.Connection, customer_id: int) -> int:
+    """Deposit money applied against credit debt, net of reversals."""
+    return con.execute(
+        "SELECT coalesce(sum(CASE WHEN d.kind = 'apply' THEN d.amount WHEN d.kind = 'reversal' AND o.kind = 'apply' "
+        "THEN -d.amount ELSE 0 END), 0) " + _DEPOSIT_JOIN, (customer_id,)).fetchone()[0]
 
 
 def received(con: sqlite3.Connection, customer_id: int) -> int:
@@ -90,7 +108,10 @@ def collected_unrefunded(con: sqlite3.Connection, customer_id: int, day: str) ->
     net = con.execute("SELECT coalesce(sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END), 0) "
                       "FROM customer_receipts WHERE customer_id=? AND receipt_date <= ?",
                       (customer_id, day)).fetchone()[0]
-    return net - cash_refunded(con, customer_id)
+    applied = con.execute(
+        "SELECT coalesce(sum(CASE WHEN d.kind = 'apply' THEN d.amount WHEN d.kind = 'reversal' AND o.kind = 'apply' "
+        "THEN -d.amount ELSE 0 END), 0) " + _DEPOSIT_JOIN + " AND d.doc_date <= ?", (customer_id, day)).fetchone()[0]
+    return net + applied - cash_refunded(con, customer_id)
 
 
 def post_receipt(con: sqlite3.Connection, by, *, request_key: str, customer_id: int, amount: int, method: str,
@@ -162,7 +183,7 @@ def reverse_receipt(con: sqlite3.Connection, by, *, request_key: str, receipt_id
             raise ReceiptError("سند القبض غير موجود")
         if con.execute("SELECT 1 FROM customer_receipts WHERE reverses_id=?", (receipt_id,)).fetchone():
             raise ReceiptError("سند القبض معكوس سابقًا")
-        if received(con, src[1]) - src[3] < cash_refunded(con, src[1]):
+        if received(con, src[1]) + applied_deposits(con, src[1]) - src[3] < cash_refunded(con, src[1]):
             raise ReceiptError("لا يُعكس السند: رُدّ للعميل نقدًا مبلغ يستند إلى هذا التحصيل")
         today = date.today().isoformat()
         new_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM customer_receipts").fetchone()[0]
@@ -183,6 +204,7 @@ def reverse_receipt(con: sqlite3.Connection, by, *, request_key: str, receipt_id
 
 
 def history(con: sqlite3.Connection, customer_id: int) -> list[tuple]:
-    """Receipts and reversals of one customer, newest first."""
-    return con.execute("SELECT id, number, kind, receipt_date, method, amount, notes FROM customer_receipts "
-                       "WHERE customer_id=? ORDER BY id DESC", (customer_id,)).fetchall()
+    """Receipts and reversals of one customer, newest first, with a flag for receipts already reversed."""
+    return con.execute("SELECT r.id, r.number, r.kind, r.receipt_date, r.method, r.amount, r.notes, "
+                       "EXISTS (SELECT 1 FROM customer_receipts x WHERE x.reverses_id = r.id) "
+                       "FROM customer_receipts r WHERE r.customer_id=? ORDER BY r.id DESC", (customer_id,)).fetchall()

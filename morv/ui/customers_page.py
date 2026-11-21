@@ -10,6 +10,7 @@ from morv.infra.customers import Customer, Vehicle
 from morv.ui.customer_statement_dialog import CustomerStatementDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
+from morv.ui.deposit_dialogs import CustomerDocumentsDialog, DepositDialog
 from morv.ui.receipt_dialogs import ReceiptDialog
 from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
 
@@ -78,14 +79,19 @@ class CustomersPage(ListPage):
         receipt = QPushButton("سند قبض")
         receipt.clicked.connect(lambda: self.open_receipt(c))
         receipt.setEnabled(self.session.can("receipts.post"))
+        deposit = QPushButton("عربون")
+        deposit.clicked.connect(lambda: self.open_deposit(c))
+        deposit.setEnabled(self.session.can("receipts.post"))
+        documents = QPushButton("مستندات القبض والعربون")
+        documents.clicked.connect(lambda: self.open_documents(c))
         if self.can_edit():
             edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(c.id))
             toggle = danger_button("إيقاف" if c.active else "تفعيل", "pause" if c.active else "play")
             toggle.clicked.connect(lambda: self.toggle_active(c))
-            self.actions(edit, toggle, receipt, statement)
+            self.actions(edit, toggle, receipt, deposit, documents, statement)
         else:
-            self.actions(receipt, statement)
+            self.actions(receipt, deposit, documents, statement)
 
     def open_statement(self, c: Customer) -> None:
         con = self.session.con
@@ -96,6 +102,16 @@ class CustomersPage(ListPage):
     def open_receipt(self, c: Customer) -> None:
         dlg = ReceiptDialog(self.session, c.id, c.name, self)
         if dlg.exec() == QDialog.Accepted:
+            self.reload(keep_id=c.id)
+
+    def open_deposit(self, c: Customer) -> None:
+        if DepositDialog(self.session, c.id, c.name, self).exec() == QDialog.Accepted:
+            self.reload(keep_id=c.id)
+
+    def open_documents(self, c: Customer) -> None:
+        dlg = CustomerDocumentsDialog(self.session, c.id, c.name, self)
+        dlg.exec()
+        if dlg.changed:
             self.reload(keep_id=c.id)
 
     def toggle_active(self, c: Customer) -> None:
