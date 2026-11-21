@@ -180,8 +180,8 @@ QTabBar::tab {{ padding:8px 16px; margin:0 2px; border:1px solid transparent; bo
                 border-top-left-radius:8px; border-top-right-radius:8px; color:{t['muted']}; }}
 QTabBar::tab:selected {{ background:{t['surface']}; border-color:{t['border']}; color:{t['text']}; font-weight:600; }}
 QComboBox {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px;
-             padding-left:32px; padding-right:10px; }}
-QComboBox::drop-down {{ subcontrol-origin:border; subcontrol-position:top left; width:30px; border:0;
+             padding-left:24px; padding-right:8px; }}
+QComboBox::drop-down {{ subcontrol-origin:padding; subcontrol-position:center left; width:20px; border:0;
                        background:transparent; }}
 QComboBox::down-arrow {{ image:url({t.get('arrow', '')}); width:12px; height:12px; }}
 QComboBox::down-arrow:disabled {{ image:url({t.get('arrow_off', '')}); }}
@@ -251,7 +251,7 @@ QFrame#payBox {{ background:{t['surface2']}; border:1px solid {t['border']}; bor
 QFrame#changeBox {{ background:{t['success_soft']}; border:0; border-radius:8px; }}
 QLabel#changeLabel {{ color:{t['success']}; font-size:{t['fs']+1}px; font-weight:700; }}
 QLabel#changeValue {{ color:{t['success']}; font-size:{t['fs']+4}px; font-weight:700; }}
-QComboBox#payMethod {{ min-height:56px; padding-left:32px; padding-right:12px; font-weight:600; }}
+QComboBox#payMethod {{ min-height:56px; padding-left:24px; padding-right:10px; font-weight:600; }}
 QPushButton#primaryLarge {{ background:{t['primary']}; color:{t['on_primary']}; border:0; border-radius:10px;
                            min-height:54px; font-size:{t['fs']+4}px; font-weight:700; }}
 QPushButton#primaryLarge:disabled {{ background:{t['border']}; color:{t['muted']}; }}

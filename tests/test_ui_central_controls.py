@@ -30,7 +30,8 @@ class CentralControlsTest(unittest.TestCase):
         for _ in range(40):
             dlg.body.addWidget(QLineEdit())
         dlg.show()
-        self.app.processEvents()
+        for _ in range(3):
+            self.app.processEvents()
         screen_h = QGuiApplication.primaryScreen().availableGeometry().height()
         self.assertGreater(dlg.height(), screen_h * 2 // 3 + 10)
         self.assertLessEqual(dlg.height(), dlg.maximumHeight())

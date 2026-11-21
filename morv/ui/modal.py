@@ -109,12 +109,12 @@ class Modal(QDialog):
 
     def _fit_height(self) -> None:
         """Grow to the content up to the screen limit; Qt alone caps a scroll area at 2/3 of the screen."""
+        # Size hints, not geometry: a shown window's geometry may not be updated yet
         self.scroll.setMinimumHeight(0)
-        self.adjustSize()
-        chrome = self.height() - self.scroll.height()
+        chrome = self.sizeHint().height() - self.scroll.sizeHint().height()
         wanted = self.scroll.widget().sizeHint().height()
         self.scroll.setMinimumHeight(max(0, min(wanted, self.maximumHeight() - chrome)))
-        self.adjustSize()
+        self.resize(self.width(), min(self.sizeHint().height(), self.maximumHeight()))
 
     # ---------- Dragging by the header ----------
     def mousePressEvent(self, e) -> None:
