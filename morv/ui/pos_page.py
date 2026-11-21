@@ -28,6 +28,8 @@ PAYMENT_HINTS = {"cash": "استلام نقدية وحساب الباقي", "car
                  "wallet": "يلزم رقم المرجع", "installment": "يُفتح العقد بعد الاعتماد"}
 KIND_TABS = (("الكل", None), ("إطارات", "tire"), ("بطاريات", "battery"), ("خدمات", "service"))
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
+SIDE_MIN_WIDTH = 360      # the summary and payment column never gets narrower than its cards
+SIDE_SCROLL_GAP = 16      # room for the vertical scrollbar beside the cards
 ICON_MUTED = "#8792A3"
 ICON_PRIMARY = "#1F5FD6"
 
@@ -307,8 +309,11 @@ class PosPage(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # A scroll area reports no minimum width of its own, so the 3:1 split would squeeze the
+        # cards narrower than their content and clip them. The panel keeps the width they need.
         scroll.setWidget(inner)
+        self.side_scroll, self.side_content = scroll, inner
+        panel.setMinimumWidth(max(SIDE_MIN_WIDTH, inner.minimumSizeHint().width() + SIDE_SCROLL_GAP))
         outer.addWidget(scroll, 1)
         outer.addWidget(footer)
         return panel
