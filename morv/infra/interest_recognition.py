@@ -108,7 +108,7 @@ def evaluate(con: sqlite3.Connection, contract_id: int, period: str, closed_on: 
         raise RecognitionError("توزيع الفوائد يتضمن مبلغًا سالبًا غير مدعوم")
     fingerprint = _schedule_hash(contract, rows, schedule)
     historic = con.execute(
-        "SELECT id, period, amount, schedule_hash, policy FROM interest_recognitions "
+        "SELECT id, period, amount, schedule_hash, policy FROM active_interest_recognitions "
         "WHERE contract_id=? ORDER BY period", (contract_id,),
     ).fetchall()
     posted = {}
@@ -135,6 +135,10 @@ def evaluate(con: sqlite3.Connection, contract_id: int, period: str, closed_on: 
     return ("ready", amount, fingerprint, number, str(schedule.annual_rate))
 
 
+def _has_generation(con: sqlite3.Connection) -> bool:
+    return any(r[1] == "generation" for r in con.execute("PRAGMA table_info(interest_recognitions)"))
+
+
 def recognise_in_tx(con: sqlite3.Connection, by, contract_id: int, period: str, day: str,
                     closed_on: date) -> PostedRecognition | None:
     """Body of recognise_month without permission check or transaction; the caller owns both."""
@@ -153,13 +157,15 @@ def recognise_in_tx(con: sqlite3.Connection, by, contract_id: int, period: str, 
         )
     except ledger.LedgerError as exc:
         raise RecognitionError(str(exc)) from exc
-    con.execute(
-        "INSERT INTO interest_recognitions "
-        "(id, contract_id, period, entry_date, amount, annual_rate, schedule_hash, policy, "
-        "journal_entry_id, user_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
-        (rec_id, contract_id, period, day, amount, annual_rate,
-         fingerprint, POLICY, journal_id, by.id),
-    )
+    generation = con.execute("SELECT coalesce(max(generation), 0) + 1 FROM interest_recognitions "
+                             "WHERE contract_id=? AND period=?", (contract_id, period)).fetchone()[0] \
+        if _has_generation(con) else 1
+    columns = "id, contract_id, period, entry_date, amount, annual_rate, schedule_hash, policy, journal_entry_id, user_id"
+    values = [rec_id, contract_id, period, day, amount, annual_rate, fingerprint, POLICY, journal_id, by.id]
+    if generation > 1:       # the column default covers the first generation, so older test schemas still post
+        columns += ", generation"
+        values.append(generation)
+    con.execute(f"INSERT INTO interest_recognitions ({columns}) VALUES ({','.join('?' * len(values))})", values)
     audit(con, by, "installment.interest_recognise", "interest_recognition", rec_id,
           f"{number} · {period} · {amount}")
     return PostedRecognition(rec_id, contract_id, period, amount, False)

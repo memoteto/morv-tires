@@ -77,7 +77,7 @@ def review(con: sqlite3.Connection, through: str) -> list[Item]:
                 simulated[period] = state[1]
                 items.append(Item(cid, number, period, state[1], READY))
     for rcid, rnumber, period, amount, entry_date in con.execute(
-            "SELECT r.contract_id, c.number, r.period, r.amount, r.entry_date FROM interest_recognitions r "
+            "SELECT r.contract_id, c.number, r.period, r.amount, r.entry_date FROM active_interest_recognitions r "
             "JOIN installment_contracts c ON c.id = r.contract_id ORDER BY r.contract_id, r.period"):
         if month_end(period).isoformat() <= through < entry_date:
             items.append(Item(rcid, rnumber, period, amount, MISDATED, f"مرحّل بتاريخ {entry_date}"))

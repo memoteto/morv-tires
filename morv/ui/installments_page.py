@@ -12,7 +12,7 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
 from morv.infra import installment_view, installments
 from morv.infra.installments import ContractError, Guarantor
-from morv.ui.interest_dialogs import InterestRecognitionDialog
+from morv.ui.interest_dialogs import InterestRecognitionDialog, ReverseInterestDialog
 from morv.ui.listpage import ListPage, TupleModel
 from morv.ui.widgets import Notice, card, field, ltr_edit, muted, primary_button, ro_field
 
@@ -122,7 +122,18 @@ class ContractsPage(ListPage):
         self.interest_btn = QPushButton("اعتراف بفوائد الأشهر المنتهية")
         self.interest_btn.clicked.connect(self.recognise_interest)
         self.interest_btn.setVisible(self.session.can("installments.manage"))
-        return [self.interest_btn]
+        self.reverse_interest_btn = QPushButton("عكس اعتراف بفائدة")
+        self.reverse_interest_btn.clicked.connect(self.reverse_interest)
+        self.reverse_interest_btn.setVisible(self.session.can("installments.manage"))
+        return [self.interest_btn, self.reverse_interest_btn]
+
+    def reverse_interest(self) -> None:
+        if not self.session.can("installments.manage", self.session.con):
+            self.notice.show_message("لا تملك صلاحية الاعتراف بفوائد التقسيط")
+            return
+        dlg = ReverseInterestDialog(self.session, self)
+        if dlg.exec() and dlg.saved:
+            self.notice.show_message("عُكس الاعتراف؛ الشهر جاهز للاعتراف من جديد", "success")
 
     def recognise_interest(self) -> None:
         if not self.session.can("installments.manage", self.session.con):
