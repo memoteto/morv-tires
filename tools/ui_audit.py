@@ -168,9 +168,10 @@ def _screen_config(w: int, h: int) -> str:
     """Offscreen Qt defaults to an 800x600 screen; a config file gives it the size being audited."""
     cfg = {"screens": [{"name": "audit", "x": 0, "y": 0, "width": w, "height": h,
                         "logicalDpi": 96, "logicalBaseDpi": 96, "dpr": 1}]}
-    path = Path(tempfile.mkdtemp()) / "screen.json"
-    path.write_text(json.dumps(cfg), encoding="utf-8")
-    return str(path)
+    # Qt splits platform arguments on ':', so a Windows drive path (C:\...) would be cut; keep it relative
+    name = f"ui_audit_screen_{w}x{h}.json"
+    Path(name).write_text(json.dumps(cfg), encoding="utf-8")
+    return name
 
 
 def main() -> int:
