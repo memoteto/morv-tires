@@ -43,6 +43,27 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         self.addCleanup(dispose, page, self.app)
         return page
 
+    def test_bank_reconciliation_dialog_shows_difference_and_saves(self):
+        from morv.infra import bank_reconciliation, ledger
+        from morv.infra.db.connection import transaction
+        from morv.ui.reconciliation_dialogs import ReconciliationDialog
+        from morv.ui.widgets import dispose
+        with transaction(self.con):
+            ledger.post_entry(self.con, self.session.user, "2026-11-02", "sale", 2, "فاتورة بيع 2",
+                              [("1210", 30000, 0), ("4110", 0, 30000)])
+        dlg = ReconciliationDialog(self.session)
+        self.addCleanup(dispose, dlg, self.app)
+        dlg.date.setText("2026-11-30")
+        dlg.statement.setText("290")
+        self.assertIn("أقل", dlg.diff_label.text())
+        dlg.save()
+        self.assertIsNone(dlg.saved)
+        dlg.memo.setText("رسوم بنكية")
+        dlg.save()
+        self.assertEqual(dlg.saved.difference, -1000)
+        self.assertEqual(len(bank_reconciliation.history(self.con, "1210")), 1)
+        self.assertIsNone(self.page(self.cashier_session).bank_btn)
+
     def test_cashier_cannot_add_movements(self):
         self.assertFalse(self.page(self.cashier_session).can_edit())
         self.assertTrue(self.page().can_edit())
