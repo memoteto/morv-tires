@@ -124,5 +124,5 @@ jobs:
           git config user.name "ui-audit"
           git config user.email "ui-audit@users.noreply.github.com"
           git add -A
-          git commit -q -m "ui audit images"
+          git commit -q -m "ui audit images from ${{ github.head_ref || github.ref_name }} @ ${{ github.event.pull_request.head.sha || github.sha }}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ui-audit-images

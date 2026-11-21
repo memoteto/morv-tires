@@ -2,6 +2,7 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -75,10 +76,17 @@ def _measure(root) -> dict:
             "window": [root.width(), root.height()]}
 
 
-def run(out: Path) -> dict:
+def _settle(app) -> None:
+    """Lists load on worker threads; wait for them so screenshots show rows, not empty tables."""
+    from morv.ui.workers import wait_all
+    for _ in range(3):
+        app.processEvents()
+        wait_all()
+        app.processEvents()
+
+
+def run(out: Path, size: tuple) -> dict:
     os.environ["MORV_DATA_DIR"] = tempfile.mkdtemp()
-    if "--native" not in sys.argv:       # --native uses the real display, as on the owner's machine
-        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
     from morv.infra import users
     from morv.infra.db.bootstrap import open_main_db
@@ -93,7 +101,8 @@ def run(out: Path) -> dict:
     seed(con, admin, n_customers=60, n_items=80, n_suppliers=10)
     item_id = con.execute("SELECT id FROM items ORDER BY id LIMIT 1").fetchone()[0]
     session = Session(con, admin)
-    report: dict = {"platform": app.platformName(), "pages": {}, "dialogs": {}}
+    geo = app.primaryScreen().availableGeometry()
+    report: dict = {"platform": app.platformName(), "screen": [geo.width(), geo.height()], "pages": {}, "dialogs": {}}
     out.mkdir(parents=True, exist_ok=True)
     for dark in (False, True):
         mode = "dark" if dark else "light"
@@ -102,12 +111,12 @@ def run(out: Path) -> dict:
         if win.dark != dark:
             win.toggle_theme()
         win.show()
-        for w, h in SIZES:
+        for w, h in [size]:
             win.resize(w, h)
-            app.processEvents()
+            _settle(app)
             for key, _title, _icon, _phase in NAV:
                 win.go_key(key)
-                app.processEvents()
+                _settle(app)
                 name = f"page_{key}_{w}x{h}_{mode}"
                 win.grab().save(str(out / f"{name}.png"))
                 report["pages"][name] = _measure(win)
@@ -116,7 +125,7 @@ def run(out: Path) -> dict:
                 try:
                     dlg = make()
                     dlg.show()
-                    app.processEvents()
+                    _settle(app)
                     dlg.grab().save(str(out / f"{name}.png"))
                     info = _measure(dlg)
                     info["size"] = [dlg.width(), dlg.height()]
@@ -131,7 +140,6 @@ def run(out: Path) -> dict:
         app.processEvents()
     con.close()
     shutil.rmtree(os.environ["MORV_DATA_DIR"], ignore_errors=True)
-    (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
     return report
 
 
@@ -154,11 +162,41 @@ def summary(report: dict) -> str:
     return "\n".join(lines) or "no layout findings"
 
 
+def _screen_config(w: int, h: int) -> str:
+    """Offscreen Qt defaults to an 800x600 screen; a config file gives it the size being audited."""
+    cfg = {"screens": [{"name": "audit", "x": 0, "y": 0, "width": w, "height": h,
+                        "logicalDpi": 96, "logicalBaseDpi": 96, "dpr": 1}]}
+    path = Path(tempfile.mkdtemp()) / "screen.json"
+    path.write_text(json.dumps(cfg), encoding="utf-8")
+    return str(path)
+
+
 def main() -> int:
-    args = [a for a in sys.argv[1:] if a != "--native"]
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
     out = Path(args[0] if args else "ui_audit_out")
-    report = run(out)
-    text = summary(report)
+    native = "--native" in sys.argv
+    one = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--size=")), None)
+    if one:      # child process: one screen size per process, since the screen is fixed at start-up
+        w, h = (int(v) for v in one.split("x"))
+        part = run(out, (w, h))
+        (out / f"report_{one}.json").write_text(json.dumps(part, ensure_ascii=False, indent=1), encoding="utf-8")
+        return 0
+    out.mkdir(parents=True, exist_ok=True)
+    report: dict = {"pages": {}, "dialogs": {}, "screens": {}}
+    for w, h in SIZES:
+        env = dict(os.environ)
+        if not native:
+            env["QT_QPA_PLATFORM"] = f"offscreen:configfile={_screen_config(w, h)}"
+        tag = f"{w}x{h}"
+        subprocess.run([sys.executable, __file__, str(out), f"--size={tag}"] + (["--native"] if native else []),
+                       env=env, check=True)
+        part = json.loads((out / f"report_{tag}.json").read_text(encoding="utf-8"))
+        report["screens"][tag] = part["screen"]
+        report["pages"].update(part["pages"])
+        report["dialogs"].update(part["dialogs"])
+    (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+    text = "\n".join(f"SCREEN {k}: available {v[0]}x{v[1]}" for k, v in report["screens"].items())
+    text += "\n" + summary(report)
     (out / "summary.txt").write_text(text, encoding="utf-8")
     print(text)
     return 0
