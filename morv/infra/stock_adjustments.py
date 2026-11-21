@@ -313,6 +313,14 @@ def _remove_gain(con, by, new_id: int, no: int, orig_line: int, item_id: int, qt
                 (line_id, layer[0], qty, value))
 
 
+def stocked_items(con: sqlite3.Connection) -> list[tuple]:
+    """Active stocked items for the adjustment screen: (id, code, name, on hand)."""
+    return con.execute(
+        "SELECT i.id, i.code, i.name, coalesce(sum(l.qty_on_hand), 0) FROM items i "
+        "LEFT JOIN stock_lots l ON l.item_id = i.id WHERE i.kind IN ('tire', 'battery') AND i.active = 1 "
+        "GROUP BY i.id ORDER BY i.name_norm").fetchall()
+
+
 def history(con: sqlite3.Connection) -> list[tuple]:
     """Adjustments and reversals, newest first: (id, number, kind, date, gain, loss, reason, reversed)."""
     return con.execute(

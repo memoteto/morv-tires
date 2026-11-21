@@ -1,13 +1,17 @@
 """Stock tabs: lots with their movements, and stocktake. Read-only."""
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QDialog, QPushButton
 
 from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import inventory, stock_view
 from morv.ui.listpage import ListPage
+from morv.ui.stock_adjustment_dialogs import AdjustmentsHistoryDialog, StockAdjustmentDialog
 from morv.ui.widgets import info
 
-MOVE_LABELS = {"receipt": "استلام", "issue": "صرف", "return": "مرتجع", "restock": "إرجاع من مرتجع مورد"}
+MOVE_LABELS = {"receipt": "استلام", "issue": "صرف", "return": "مرتجع", "restock": "إرجاع من مرتجع مورد",
+               "adjust_in": "زيادة جرد", "adjust_out": "عجز جرد", "opening_in": "رصيد افتتاحي",
+               "opening_out": "عكس رصيد افتتاحي"}
 
 
 def _cost_ok(session, con=None) -> bool:
@@ -135,7 +139,20 @@ class StockPage(ListPage):
                     multiline_rows=True)
         else:
             self.summary_note("لا رصيد لهذا الصنف.")
-        self.summary_note("تسويات الجرد (زيادة أو نقص أو تلف) غير مفعّلة بعد؛ تُضاف مع دفتر التسويات.")
+        if self.session.can("stock.adjust"):
+            adjust = QPushButton("تسوية جرد")
+            adjust.clicked.connect(lambda: self.open_adjustment(row_id))
+            history = QPushButton("سجل التسويات")
+            history.clicked.connect(self.open_history)
+            self.actions(adjust, history)
+
+    def open_adjustment(self, item_id: int) -> None:
+        if StockAdjustmentDialog(self.session, item_id, self).exec() == QDialog.DialogCode.Accepted:
+            self.reload(keep_id=item_id)
+
+    def open_history(self) -> None:
+        AdjustmentsHistoryDialog(self.session, self).exec()
+        self.reload()
 
     def open_dialog(self, row_id):
         if row_id is not None or not self.can_edit():
