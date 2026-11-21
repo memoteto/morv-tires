@@ -36,6 +36,15 @@ def main(argv: list[str] | None = None) -> int:
 
     setup_logging()
     log.info("بدء التشغيل %s", argv[1:])
+    from morv.infra import instance_lock
+    if not instance_lock.acquire(paths.data_dir(), wait=4.0):      # a relaunch may overlap a closing copy
+        from PySide6.QtWidgets import QApplication
+        from morv.ui.widgets import info
+        app = QApplication(argv)
+        info(None, "البرنامج يعمل بالفعل",
+             "نسخة أخرى من البرنامج تعمل على بيانات المحل نفسها. أغلقها أولًا، فتشغيل نسختين قد يُتلف البيانات.", error=True)
+        del app
+        return 1
     _mark(log, "logging_ready")
     con = open_main_db()
     _mark(log, "db_opened")

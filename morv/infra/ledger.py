@@ -2,6 +2,7 @@
 import sqlite3
 from datetime import date
 
+from morv.core.money import MAX_MINOR
 from morv.infra.users import audit
 
 
@@ -35,6 +36,8 @@ def post_entry(con: sqlite3.Connection, by, entry_date: str, source_type: str, s
     for _, d, c in lines:
         if type(d) is not int or type(c) is not int:
             raise LedgerError("المبالغ أعداد صحيحة بالقرش فقط")
+        if abs(d) > MAX_MINOR or abs(c) > MAX_MINOR:
+            raise LedgerError("المبلغ أكبر من الحد المسموح")
     if sum(d for _, d, _ in lines) != sum(c for _, _, c in lines):
         raise LedgerError("القيد غير متوازن")
     total = sum(d for _, d, _ in lines)

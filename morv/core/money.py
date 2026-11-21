@@ -2,6 +2,9 @@
 import re
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+MAX_POUNDS = 10_000_000_000      # ten billion: far above any shop, well below the 64-bit storage limit
+MAX_MINOR = MAX_POUNDS * 100
+
 # Arabic and Persian digits and separators mapped to Latin
 _DIGITS = str.maketrans(
     "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹٫٬",
@@ -38,6 +41,8 @@ def parse_money(text) -> int:
     if len(frac) > 2:
         raise MoneyError(f"أكثر من خانتين عشريتين: {text!r}")
     pounds = int((m.group("int") or "0").replace(",", ""))
+    if pounds > MAX_POUNDS:
+        raise MoneyError("المبلغ أكبر من الحد المسموح")
     minor = pounds * 100 + int(frac.ljust(2, "0") or "0")
     return -minor if m.group("sign") else minor
 

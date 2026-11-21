@@ -767,13 +767,21 @@ def _cell(value, kind: str) -> str:
     return fmt(value) if kind == MONEY and type(value) is int else ("" if value is None else str(value))
 
 
+_FORMULA_LEAD = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe(text: str) -> str:
+    """Neutralise spreadsheet formulas: a text cell starting with =+-@ would run when opened in Excel."""
+    return "'" + text if text.startswith(_FORMULA_LEAD) else text
+
+
 def to_csv(table: Table, path: str) -> None:
     """UTF-8 with BOM so Excel opens Arabic correctly; money as plain pounds with two decimals."""
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
-        w.writerow([table.title])
-        w.writerow([table.subtitle])
-        w.writerow(table.headers)
+        w.writerow([_safe(table.title)])
+        w.writerow([_safe(table.subtitle)])
+        w.writerow([_safe(h) for h in table.headers])
         for _kind, cells in table.rows:
-            w.writerow([_cell(v, k).replace(",", "") if k == MONEY else _cell(v, k)
+            w.writerow([_cell(v, k).replace(",", "") if k == MONEY else _safe(_cell(v, k))
                         for v, k in zip(cells, table.kinds, strict=True)])
