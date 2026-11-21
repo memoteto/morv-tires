@@ -58,6 +58,10 @@ class SettingsPage(QWidget):
             from morv.ui.partners_tab import PartnersTab
             self.partners_tab = PartnersTab(session)
             self.tabs.addTab(self.partners_tab, "الشركاء")
+        if session.can("opening.post"):
+            from morv.ui.opening_dialogs import OpeningTab
+            self.opening_tab = OpeningTab(session)
+            self.tabs.addTab(self.opening_tab, "الأرصدة الافتتاحية")
         self.appearance_tab = AppearanceTab(session)
         self.tabs.addTab(self.appearance_tab, "المظهر")
         self.tabs.addTab(ShortcutsTab(), "الاختصارات")

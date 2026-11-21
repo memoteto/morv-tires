@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 from datetime import date
 
 from morv.core import dot as dotmod
-from morv.infra import ledger
+from morv.infra import ledger, stock_adjustments
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, require
 
@@ -298,6 +298,31 @@ def reverse_opening(con: sqlite3.Connection, by, *, request_key: str, opening_id
         _clearing_zero(con)
         audit(con, by, "opening.reverse", "opening_balance", new_id, f"{number} عكس {src[0]}")
     return PostedOpening(new_id, number, False)
+
+
+def choices(con: sqlite3.Connection, kind: str) -> list[tuple]:
+    """Targets the opening screen offers for a line kind: (key, label)."""
+    if kind == "account":
+        marks = ",".join("?" * len(ASSET_ACCOUNTS + LIABILITY_ACCOUNTS))
+        return [(code, f"{name} ({code})") for code, name in con.execute(
+            f"SELECT code, name FROM accounts WHERE code IN ({marks}) ORDER BY code", ASSET_ACCOUNTS + LIABILITY_ACCOUNTS)]
+    if kind == "customer":
+        return con.execute("SELECT id, name FROM customers ORDER BY name_norm").fetchall()
+    if kind == "supplier":
+        return con.execute("SELECT id, name FROM suppliers WHERE active=1 ORDER BY name_norm").fetchall()
+    if kind in ("partner_capital", "partner_current"):
+        return con.execute("SELECT id, name FROM partners WHERE active=1 ORDER BY id").fetchall()
+    if kind == "inventory":
+        return [(iid, f"{name} · {code}") for iid, code, name, _on_hand in stock_adjustments.stocked_items(con)]
+    return []
+
+
+def current(con: sqlite3.Connection) -> tuple | None:
+    """The live opening document: (id, number, date, line count), or None when none is live."""
+    return con.execute(
+        "SELECT o.id, o.number, o.opening_date, (SELECT count(*) FROM opening_balance_lines WHERE opening_id = o.id) "
+        "FROM opening_balances o WHERE o.kind = 'opening' "
+        "AND NOT EXISTS (SELECT 1 FROM opening_balances r WHERE r.reverses_id = o.id)").fetchone()
 
 
 def opening_of(con: sqlite3.Connection, kind: str, party_id: int) -> int:
