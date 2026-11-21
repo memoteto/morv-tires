@@ -33,9 +33,16 @@ def _dialogs(session, item_id):
             ("period_lock", lambda: PeriodLockDialog(session))]
 
 
+def _ancestors(w):
+    p = w.parentWidget()
+    while p is not None:
+        yield p
+        p = p.parentWidget()
+
+
 def _clipped_buttons(root) -> list:
     from PySide6.QtCore import QPoint
-    from PySide6.QtWidgets import QAbstractButton
+    from PySide6.QtWidgets import QAbstractButton, QScrollArea
     out = []
     bounds = root.rect()
     for b in root.findChildren(QAbstractButton):
@@ -44,7 +51,9 @@ def _clipped_buttons(root) -> list:
         top_left = b.mapTo(root, QPoint(0, 0))
         right, bottom = top_left.x() + b.width(), top_left.y() + b.height()
         if top_left.x() < 0 or top_left.y() < 0 or right > bounds.width() or bottom > bounds.height():
-            out.append({"text": b.text(), "x": top_left.x(), "y": top_left.y(), "w": b.width(), "h": b.height()})
+            in_scroll = any(isinstance(a, QScrollArea) for a in _ancestors(b))
+            out.append({"text": b.text(), "x": top_left.x(), "y": top_left.y(), "w": b.width(), "h": b.height(),
+                        "in_scroll": in_scroll})
     return out
 
 
@@ -62,7 +71,8 @@ def _table_report(root) -> list:
 
 
 def _measure(root) -> dict:
-    return {"clipped_buttons": _clipped_buttons(root), "tables": _table_report(root)}
+    return {"clipped_buttons": _clipped_buttons(root), "tables": _table_report(root),
+            "window": [root.width(), root.height()]}
 
 
 def run(out: Path) -> dict:
@@ -133,7 +143,9 @@ def summary(report: dict) -> str:
                 lines.append(f"ERROR {name}: {r['error']}")
                 continue
             for b in r["clipped_buttons"]:
-                lines.append(f"CLIPPED {name}: button '{b['text']}' at ({b['x']},{b['y']}) {b['w']}x{b['h']}")
+                where = "inside a scroll area (reachable by scrolling)" if b["in_scroll"] else "NOT in a scroll area (unreachable)"
+                lines.append(f"CLIPPED {name}: window {r['window']}: button '{b['text']}' at ({b['x']},{b['y']}) "
+                             f"{b['w']}x{b['h']} - {where}")
             for t in r["tables"]:
                 if t["h_scroll"] or t["columns_w"] > t["viewport_w"]:
                     lines.append(f"TABLE-SCROLL {name}: {t['name']} needs {t['columns_w']}px in {t['viewport_w']}px")
