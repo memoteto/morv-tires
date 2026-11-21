@@ -10,7 +10,7 @@ from morv.infra import bank_reconciliation as br
 from morv.infra import ledger, treasury_view
 from morv.infra.bank_reconciliation import ReconciliationError
 from morv.ui.modal import Modal
-from morv.ui.widgets import danger_button, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, danger_button, form, ltr_edit, muted
 
 
 class ReconciliationDialog(Modal):
@@ -25,7 +25,7 @@ class ReconciliationDialog(Modal):
         self.account = QComboBox()
         for code in br.ACCOUNTS:
             self.account.addItem(self._names[code], code)
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         self.program = QLabel("—")
         self.statement = ltr_edit("0.00")

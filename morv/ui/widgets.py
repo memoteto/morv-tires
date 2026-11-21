@@ -1,7 +1,7 @@
 """Small shared UI pieces, so screens stay consistent."""
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtCore import QDate, Qt, Signal
+from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+                               QPushButton, QToolButton, QVBoxLayout, QWidget)
 
 from morv.ui import icons
 
@@ -62,6 +62,63 @@ def ltr_edit(placeholder: str = "") -> QLineEdit:
     # The value is Latin so the field alone runs LTR: field content, not layout
     e.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
     return e
+
+
+class DateEdit(QDateEdit):
+    """Calendar date field speaking ISO text like the line edit it replaced; engines still validate it."""
+
+    textChanged = Signal(str)
+    _BLANK = QDate(2000, 1, 1)      # the 'no date' value of an optional field, shown as an empty box
+
+    def __init__(self, optional: bool = False, allow_future: bool = False):
+        super().__init__()
+        self.setObjectName("dateEdit")
+        self.optional = optional
+        self._raw: str | None = None
+        self.setCalendarPopup(True)
+        self.setDisplayFormat("yyyy-MM-dd")
+        self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
+        self.setMinimumDate(self._BLANK)
+        if not allow_future:      # posting engines refuse future dates, so the calendar offers none
+            self.setMaximumDate(QDate.currentDate())
+        if optional:
+            self.setSpecialValueText(" ")
+        cal = self.calendarWidget()
+        cal.setObjectName("dateCalendar")
+        cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        cal.setGridVisible(False)
+        self.setDate(self._BLANK if optional else QDate.currentDate())
+        self.dateChanged.connect(self._changed)
+
+    def _changed(self, _day) -> None:
+        self._raw = None
+        self.textChanged.emit(self.text())
+
+    def text(self) -> str:
+        if self._raw is not None:
+            return self._raw
+        if self.optional and self.date() == self._BLANK:
+            return ""
+        return self.date().toString(Qt.DateFormat.ISODate)
+
+    def setText(self, value: str) -> None:
+        """An invalid or out-of-range value is kept as typed, so the engine reports it as before."""
+        value = (value or "").strip()
+        day = QDate.fromString(value, Qt.DateFormat.ISODate)
+        had_raw, self._raw = self._raw is not None, None
+        if not value and self.optional:
+            self.setDate(self._BLANK)
+        elif day.isValid() and self.minimumDate() <= day <= self.maximumDate():
+            self.setDate(day)
+        else:
+            self._raw = value
+            self.textChanged.emit(value)
+            return
+        if had_raw:      # leaving a kept raw value changes the text even when the date did not move
+            self.textChanged.emit(self.text())
+
+    def clear(self) -> None:
+        self.setText("")
 
 
 class PasswordEdit(QWidget):

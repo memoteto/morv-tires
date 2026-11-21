@@ -9,7 +9,7 @@ from morv.infra import customer_deposits, customer_receipts, ledger
 from morv.infra.customer_deposits import DepositError
 from morv.ui.modal import Modal
 from morv.ui.receipt_dialogs import METHOD_LABELS, ReverseReceiptDialog
-from morv.ui.widgets import danger_button, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, danger_button, form, ltr_edit, muted
 
 KIND_LABELS = {"deposit": "إيداع عربون", "refund": "رد عربون", "apply": "تسوية العربون على الدين"}
 
@@ -30,7 +30,7 @@ class DepositDialog(Modal):
         self.method = QComboBox()
         for key in customer_receipts.METHODS:
             self.method.addItem(METHOD_LABELS[key], key)
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         self.amount = ltr_edit("0.00")
         self.notes = QLineEdit()

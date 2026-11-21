@@ -14,7 +14,7 @@ from morv.infra import installment_view, installments
 from morv.infra.installments import ContractError, Guarantor
 from morv.ui.interest_dialogs import InterestRecognitionDialog, ReverseInterestDialog
 from morv.ui.listpage import ListPage, TupleModel
-from morv.ui.widgets import Notice, card, field, ltr_edit, muted, primary_button, ro_field
+from morv.ui.widgets import DateEdit, Notice, card, field, ltr_edit, muted, primary_button, ro_field
 
 DOWN_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"))
 COLLECT_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"),
@@ -332,7 +332,7 @@ class ContractForm(QWidget):
         terms_box, terms_lay = card("بنود العقد")
         t = QGridLayout()
         t.setSpacing(10)
-        self.contract_date = ltr_edit("YYYY-MM-DD")
+        self.contract_date = DateEdit()
         self.contract_date.setText(max(date.today().isoformat(), self.sale[3]))
         self.rate = ltr_edit("مثال: 15")
         self.rate.setText("15")
@@ -344,7 +344,7 @@ class ContractForm(QWidget):
         self.months.setRange(calc.MIN_MONTHS, calc.MAX_MONTHS)
         self.months.setValue(10)
         self.months.valueChanged.connect(self.recompute)
-        self.first_due = ltr_edit("YYYY-MM-DD")
+        self.first_due = DateEdit(allow_future=True)
         self.first_due.setText(calc.add_months(self.contract_date.text(), 1))
         self.first_due.textChanged.connect(self.recompute)
         self.down_method = QComboBox()

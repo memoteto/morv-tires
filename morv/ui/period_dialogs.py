@@ -8,7 +8,7 @@ from morv.core.text import ltr
 from morv.infra import ledger, period_lock
 from morv.infra.period_lock import LockError
 from morv.ui.modal import Modal
-from morv.ui.widgets import danger_button, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, danger_button, form, muted
 
 
 class PeriodLockDialog(Modal):
@@ -21,7 +21,7 @@ class PeriodLockDialog(Modal):
         self.body.addWidget(muted("الفترة مقفلة حتى: " + (ltr(latest[2]) if latest else "لا يوجد قفل")))
         first_of_month = date.today().replace(day=1)
         f = form()
-        self.through = ltr_edit("YYYY-MM-DD")
+        self.through = DateEdit()
         self.through.setText((first_of_month - timedelta(days=1)).isoformat())
         self.memo = QLineEdit()
         self.memo.setPlaceholderText("ملاحظة (اختياري)")

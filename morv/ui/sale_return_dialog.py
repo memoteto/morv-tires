@@ -12,7 +12,7 @@ from morv.core.text import ltr
 from morv.infra.sale_returns import ReturnError, ReturnLineIn, post_return, preview_installment_refund
 from morv.ui.listpage import TupleModel
 from morv.ui.modal import Modal
-from morv.ui.widgets import form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, form, ltr_edit, muted
 
 CONDITIONS = (("sound", "سليم — يعود للمخزون"), ("defective", "معيب — مخزن التالف"))
 REFUND_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
@@ -32,7 +32,7 @@ class SaleReturnDialog(Modal):
         self._request_key = uuid.uuid4().hex
 
         head = form()
-        self.return_date = ltr_edit("YYYY-MM-DD")
+        self.return_date = DateEdit()
         self.return_date.setText(max(date.today().isoformat(), sale.sale_date))
         self.reason = QComboBox()
         self.reason.setEditable(True)

@@ -68,7 +68,8 @@ def qss(t: dict) -> str:
     from morv.ui import icons
     # QSS takes arrow images only as files, so the theme colour is drawn into one per mode
     t = {"arrow": icons.svg_file("chevron_down", t["muted"]),
-         "arrow_off": icons.svg_file("chevron_down", t["border_strong"]), **t}
+         "arrow_off": icons.svg_file("chevron_down", t["border_strong"]),
+         "calendar": icons.svg_file("calendar", t["muted"]), **t}
     return f"""
 QWidget#side {{ background:{t['side']}; }}
 QLabel#brand {{ color:#FFFFFF; font-size:{t['fs']+3}px; font-weight:700; }}
@@ -194,19 +195,20 @@ QCheckBox::indicator {{ width:18px; height:18px; }}
 QListWidget#userList {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:10px; }}
 QListWidget#userList::item {{ padding:10px; border-radius:8px; }}
 QListWidget#userList::item:selected {{ background:{t['primary_soft']}; color:{t['text']}; }}
-QDateEdit#statementDate {{ background:{t['surface']}; color:{t['text']};
+QDateEdit#statementDate, QDateEdit#dateEdit {{ background:{t['surface']}; color:{t['text']};
                               border:1px solid {t['border_strong']}; border-radius:8px;
                               min-height:38px; padding:0 8px 0 28px; }}
-QDateEdit#statementDate:focus {{ border:2px solid {t['primary']}; }}
-QDateEdit#statementDate::drop-down {{ subcontrol-origin:border; subcontrol-position:top left;
+QDateEdit#statementDate:focus, QDateEdit#dateEdit:focus {{ border:2px solid {t['primary']}; }}
+QDateEdit#statementDate::drop-down, QDateEdit#dateEdit::drop-down {{ subcontrol-origin:border; subcontrol-position:top left;
                                      width:26px; border:0; background:transparent; }}
 QDateEdit#statementDate::down-arrow {{ image:none; width:10px; height:10px; }}
-QCalendarWidget#statementCalendar {{ background:{t['surface']}; }}
-QCalendarWidget#statementCalendar QWidget#qt_calendar_navigationbar {{ background:{t['surface2']}; }}
-QCalendarWidget#statementCalendar QToolButton {{ color:{t['text']}; background:{t['surface2']};
+QDateEdit#dateEdit::down-arrow {{ image:url({t.get('calendar', '')}); width:14px; height:14px; }}
+QCalendarWidget#statementCalendar, QCalendarWidget#dateCalendar {{ background:{t['surface']}; }}
+QCalendarWidget#statementCalendar QWidget#qt_calendar_navigationbar, QCalendarWidget#dateCalendar QWidget#qt_calendar_navigationbar {{ background:{t['surface2']}; }}
+QCalendarWidget#statementCalendar QToolButton, QCalendarWidget#dateCalendar QToolButton {{ color:{t['text']}; background:{t['surface2']};
                                                    border:0; min-height:0; max-height:30px;
                                                    padding:0 4px; }}
-QCalendarWidget#statementCalendar QAbstractItemView {{ background:{t['surface']}; color:{t['text']};
+QCalendarWidget#statementCalendar QAbstractItemView, QCalendarWidget#dateCalendar QAbstractItemView {{ background:{t['surface']}; color:{t['text']};
                                                         selection-background-color:{t['primary']};
                                                         selection-color:{t['on_primary']}; }}
 QLabel#statementCustomerName {{ font-size:{t['fs']+2}px; font-weight:700; }}

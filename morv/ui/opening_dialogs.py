@@ -8,7 +8,7 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.infra import ledger, opening_balances
 from morv.infra.opening_balances import OpeningError, OpeningLine
 from morv.ui.modal import Modal
-from morv.ui.widgets import Notice, danger_button, form, ltr_edit, muted, primary_button
+from morv.ui.widgets import DateEdit, Notice, danger_button, form, ltr_edit, muted, primary_button
 
 TYPES = [("account", "نقدية أو بنك أو أصل أو التزام"), ("customer", "رصيد عميل"), ("supplier", "رصيد مورد"),
          ("partner_capital", "رأس مال شريك"), ("partner_current", "جاري شريك (الموجب له، والسالب عليه)"),
@@ -33,7 +33,7 @@ class OpeningBalancesDialog(Modal):
         self.qty = ltr_edit("الكمية للمخزون")
         self.unit_cost = ltr_edit("تكلفة الوحدة للمخزون")
         self.dot = ltr_edit("DOT مثل 2024")
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         self.note = QLineEdit()
         self.note.setPlaceholderText("ملاحظة (اختياري)")

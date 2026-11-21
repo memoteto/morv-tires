@@ -8,7 +8,7 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.infra import customer_receipts, ledger
 from morv.infra.customer_receipts import ReceiptError
 from morv.ui.modal import Modal
-from morv.ui.widgets import form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, form, ltr_edit, muted
 
 METHOD_LABELS = {"cash": "نقدًا", "card": "بطاقة", "transfer": "تحويل", "wallet": "محفظة إلكترونية"}
 
@@ -24,7 +24,7 @@ class ReceiptDialog(Modal):
         self.method = QComboBox()
         for key in customer_receipts.METHODS:
             self.method.addItem(METHOD_LABELS[key], key)
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         self.amount = ltr_edit("0.00")
         if owed > 0:

@@ -19,7 +19,7 @@ from morv.ui import icons
 from morv.ui.inventory_page import ItemDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
-from morv.ui.widgets import Notice, field, ltr_edit, muted, primary_button
+from morv.ui.widgets import DateEdit, Notice, field, ltr_edit, muted, primary_button
 
 ITEM_CHOICES = 50
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
@@ -365,7 +365,7 @@ class PurchaseForm(QWidget):
         self.recv_date.setReadOnly(True)
 
         self.inv_no = ltr_edit("كما في فاتورته")
-        self.inv_date = ltr_edit("YYYY-MM-DD")
+        self.inv_date = DateEdit()
         self.inv_date.setText(date.today().isoformat())
         self.notes = QLineEdit()
         self.notes.setPlaceholderText("اختياري")

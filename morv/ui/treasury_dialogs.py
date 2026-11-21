@@ -10,7 +10,7 @@ from morv.infra import cash_closing, ledger, safe_count, suppliers, treasury, tr
 from morv.infra.cash_closing import ClosingError
 from morv.infra.treasury import NeedsConfirmation, TreasuryError
 from morv.ui.modal import Modal
-from morv.ui.widgets import ask, danger_button, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, ask, danger_button, form, ltr_edit, muted
 
 # kind -> (label of the money account row, label of the counterpart row or None)
 _ROWS = {
@@ -38,7 +38,7 @@ class MovementDialog(Modal):
         self.kind = QComboBox()
         for k in treasury.KINDS:
             self.kind.addItem(treasury.LABELS[k], k)
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         self.money = QComboBox()
         for code in treasury_view.ACCOUNTS:
@@ -178,7 +178,7 @@ class CloseDialog(Modal):
         self.body.addWidget(muted("عُدّ النقد في الدُّرج وأدخل المجموع. الفرق يحتاج سببًا، والبيع بعد الإقفال يدخل الدورة التالية."))
         self.body.addWidget(muted("آخر إقفال: " + (f"{ltr(last[1])} · {ltr(last[2])} · {ltr(last[3])}" if last else "لا يوجد")))
         f = form()
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         self.book_label = QLabel(ltr(fmt(self._book)))
         self.counted = ltr_edit("0.00")
@@ -315,7 +315,7 @@ class SafeCountDialog(Modal):
         self.body.addWidget(muted("عُدّ النقد في الخزنة وأدخل المجموع. الفرق يحتاج سببًا ويُرحَّل على حساب عجز الخزنة أو زيادتها."))
         self.body.addWidget(muted("آخر جرد: " + (f"{ltr(last[1])} · {ltr(last[2])} · {ltr(last[3])}" if last else "لا يوجد")))
         f = form()
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         self.counted = ltr_edit("0.00")
         self.diff_label = QLabel("—")
