@@ -93,6 +93,8 @@ jobs:
           retention-days: 14
 
   ui-audit:
+    permissions:
+      contents: write
     # لقطات الصفحات والنوافذ على Windows بدقتين وبالوضعين، وتقرير قياس (معلوماتي، لا يفشل على الملاحظات)
     runs-on: windows-latest
     env:
@@ -113,3 +115,14 @@ jobs:
         with:
           name: ui-audit
           path: ui_audit_out
+      - name: رفع الصور إلى فرع معزول للمراجعة (مؤقت)
+        if: always()
+        shell: bash
+        run: |
+          cd ui_audit_out
+          git init -q -b ui-audit-images
+          git config user.name "ui-audit"
+          git config user.email "ui-audit@users.noreply.github.com"
+          git add -A
+          git commit -q -m "ui audit images"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ui-audit-images
