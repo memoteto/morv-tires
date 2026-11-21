@@ -8,7 +8,7 @@ from datetime import date
 from morv.core import costing
 from morv.core import return_rules as rules
 from morv.core.sales_rules import PAYMENT_ACCOUNT
-from morv.infra import customer_receipts, installments, ledger
+from morv.infra import customer_receipts, customer_statement, installments, ledger
 from morv.infra.db.connection import transaction
 from morv.infra.inventory import COGS_ACCOUNTS
 from morv.infra.users import audit, has_permission
@@ -250,14 +250,19 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         if total <= 0 and cost_total <= 0:
             raise ReturnError("المرتجع بلا قيمة ولا تكلفة")
         owner = con.execute("SELECT customer_id FROM sales WHERE id=?", (sale_id,)).fetchone()[0]
-        credit_only = {r[0] for r in con.execute("SELECT method FROM sale_payments WHERE sale_id=?",
-                                                  (sale_id,))} == {"credit"}
+        kinds = {r[0] for r in con.execute("SELECT method FROM sale_payments WHERE sale_id=?", (sale_id,))}
+        credit_part = 0
         if method == "credit":
-            if total > customer_receipts.customer_balance(con, owner):
-                raise ReturnError("الرد على الحساب أكبر من دين العميل الآجل المتبقي؛ "
-                                  "إن حُصِّل الدين فاختر ردًا نقديًا")
-        elif credit_only and total > customer_receipts.collected_unrefunded(con, owner, day):
-            raise ReturnError("الرد النقدي لفاتورة آجلة لا يتجاوز ما حُصِّل من العميل ولم يُرَدّ")
+            credit_part = total
+        elif "credit" in kinds and "installment" not in kinds:
+            # Money goes back only up to what was paid in money or collected; the rest settles on the account
+            room = customer_receipts.sale_money_room(con, sale_id) + max(
+                0, customer_receipts.collected_unrefunded(con, owner, day))
+            if min(total, room) <= 0:
+                raise ReturnError("لا يوجد مبلغ مدفوع أو محصَّل يُرَدّ نقدًا؛ اختر الرد على حساب العميل")
+            credit_part = total - min(total, room)
+        if credit_part and credit_part > customer_receipts.customer_balance(con, owner):
+            raise ReturnError("الرد على الحساب أكبر من دين العميل الآجل المتبقي؛ لا يُترك رصيد دائن للعميل")
         return_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM sale_returns").fetchone()[0]
         number = f"SR-{return_id:06d}"
 
@@ -274,7 +279,10 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
                 entry.append((installments.RECEIVABLE_ACCOUNT, 0, settlement.receivable_reduced))
             entry.extend((PAYMENT_ACCOUNT[m], 0, amount) for m, amount in settlement.refunds)
         elif total:
-            entry.append((PAYMENT_ACCOUNT[method], 0, total))
+            if total - credit_part:
+                entry.append((PAYMENT_ACCOUNT[method], 0, total - credit_part))
+            if credit_part:
+                entry.append((customer_statement.CUSTOMER_ACCOUNT, 0, credit_part))
         stock_side: dict[str, int] = {}
         cogs_side: dict[str, int] = {}
         for ln, _item, kind, _qty, _value, cost, _layers, _lots in shaped:
@@ -291,11 +299,14 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         except ledger.LedgerError as e:
             raise ReturnError(str(e)) from e
 
-        con.execute(
-            "INSERT INTO sale_returns (id, number, request_key, payload_hash, sale_id, return_date, total, "
-            "cost_total, reason, refund_method, notes, journal_entry_id, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (return_id, number, key, h, sale_id, day, total, cost_total, why, method,
-             (notes or "").strip() or None, entry_id, by.id))
+        columns = ["id", "number", "request_key", "payload_hash", "sale_id", "return_date", "total", "cost_total",
+                   "reason", "refund_method", "notes", "journal_entry_id", "user_id"]
+        values = [return_id, number, key, h, sale_id, day, total, cost_total, why, method,
+                  (notes or "").strip() or None, entry_id, by.id]
+        if credit_part:                                  # the column defaults to 0; schemas before 0025 lack it
+            columns.append("credit_part")
+            values.append(credit_part)
+        con.execute(f"INSERT INTO sale_returns ({', '.join(columns)}) VALUES ({', '.join('?' * len(values))})", values)
         if settlement:
             con.execute(
                 "INSERT INTO installment_return_adjustments "

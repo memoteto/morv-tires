@@ -13,6 +13,10 @@ from morv.infra.users import audit, has_permission
 
 METHODS = ("cash", "card", "transfer", "wallet")
 PERMISSION = "receipts.post"
+# Old returns have credit_part 0 and refund_method 'credit' meaning the whole total
+CREDIT_PART = "CASE WHEN r.refund_method = 'credit' THEN r.total ELSE r.credit_part END"
+_MIXED = ("EXISTS (SELECT 1 FROM sale_payments p WHERE p.sale_id = s.id AND p.method = 'credit') AND NOT EXISTS "
+          "(SELECT 1 FROM sale_payments p WHERE p.sale_id = s.id AND p.method = 'installment')")
 
 
 class ReceiptError(Exception):
@@ -47,8 +51,8 @@ def customer_balance(con: sqlite3.Connection, customer_id: int) -> int:
     """Credit-sale debt still owed by the customer: credit sales minus credit refunds minus live receipts."""
     sold = con.execute("SELECT coalesce(sum(p.amount), 0) FROM sale_payments p JOIN sales s ON s.id = p.sale_id "
                        "WHERE s.customer_id=? AND p.method='credit'", (customer_id,)).fetchone()[0]
-    refunded = con.execute("SELECT coalesce(sum(r.total), 0) FROM sale_returns r JOIN sales s ON s.id = r.sale_id "
-                           "WHERE s.customer_id=? AND r.refund_method='credit'", (customer_id,)).fetchone()[0]
+    refunded = con.execute(f"SELECT coalesce(sum({CREDIT_PART}), 0) FROM sale_returns r JOIN sales s "
+                           "ON s.id = r.sale_id WHERE s.customer_id=?", (customer_id,)).fetchone()[0]
     return sold - refunded - received(con, customer_id)
 
 
@@ -58,13 +62,27 @@ def received(con: sqlite3.Connection, customer_id: int) -> int:
                        "FROM customer_receipts WHERE customer_id=?", (customer_id,)).fetchone()[0]
 
 
+def _money_paid_and_refunded(con: sqlite3.Connection, sale_id: int) -> tuple[int, int]:
+    paid = con.execute("SELECT coalesce(sum(amount), 0) FROM sale_payments WHERE sale_id=? AND method <> 'credit'",
+                       (sale_id,)).fetchone()[0]
+    refunded = con.execute(f"SELECT coalesce(sum(r.total - ({CREDIT_PART})), 0) FROM sale_returns r "
+                           "WHERE r.sale_id=?", (sale_id,)).fetchone()[0]
+    return paid, refunded
+
+
+def sale_money_room(con: sqlite3.Connection, sale_id: int) -> int:
+    """Money paid on the invoice that no earlier return has refunded yet."""
+    paid, refunded = _money_paid_and_refunded(con, sale_id)
+    return max(0, paid - refunded)
+
+
 def cash_refunded(con: sqlite3.Connection, customer_id: int) -> int:
-    """Returns of credit-only invoices refunded in money (not on account): they consume collected receipts."""
-    return con.execute(
-        "SELECT coalesce(sum(r.total), 0) FROM sale_returns r JOIN sales s ON s.id = r.sale_id "
-        "WHERE s.customer_id=? AND r.refund_method <> 'credit' AND NOT EXISTS "
-        "(SELECT 1 FROM sale_payments p WHERE p.sale_id = s.id AND p.method <> 'credit')",
-        (customer_id,)).fetchone()[0]
+    """Money refunded beyond what the invoices were paid in money: it consumed collected receipts."""
+    used = 0
+    for (sale_id,) in con.execute(f"SELECT s.id FROM sales s WHERE s.customer_id=? AND {_MIXED}", (customer_id,)).fetchall():
+        paid, refunded = _money_paid_and_refunded(con, sale_id)
+        used += max(0, refunded - paid)
+    return used
 
 
 def collected_unrefunded(con: sqlite3.Connection, customer_id: int, day: str) -> int:

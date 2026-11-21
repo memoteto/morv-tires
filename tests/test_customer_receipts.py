@@ -180,13 +180,37 @@ class CustomerReceiptsTest(unittest.TestCase):
         self.assertEqual(cr.customer_balance(self.con, self.cust), 0)
         self.assertEqual(reports.credit_aging(self.con, "2026-02-28").subtitle.count("يطابق الدفتر"), 1)
 
-    def test_money_refund_is_capped_by_collected_amount_and_cannot_reuse_it(self):
+    def test_money_refund_uses_collected_cash_once_and_the_rest_goes_on_account(self):
         sale = self.two_unit_sale()
         self.receipt(60000)
+        self.money_return(sale, "ret-key-0001")                 # 50000 of the 60000 collected
+        self.money_return(sale, "ret-key-0002")                 # 10000 money, 40000 on account
+        parts = self.con.execute("SELECT total, credit_part FROM sale_returns ORDER BY id").fetchall()
+        self.assertEqual(parts, [(50000, 0), (50000, 40000)])
+        self.assertEqual((ledger.account_balance(self.con, "1310"), ledger.account_balance(self.con, "1110")), (0, 0))
+        self.assertEqual(cr.customer_balance(self.con, self.cust), 0)
+        self.assertIn("يطابق الدفتر", reports.credit_aging(self.con, "2026-02-28").subtitle)
+
+    def mixed_sale(self, cash=40000, credit=60000):
+        self.n += 1
+        return sales.post_sale(self.con, self.admin, request_key=f"sale-key-{self.n:04d}", customer_id=self.cust,
+                               lines=[SaleLineIn(self.service, 1, cash + credit)],
+                               payments=[Payment("cash", cash, received=cash), Payment("credit", credit)],
+                               sale_date="2026-02-01")
+
+    def test_mixed_invoice_return_in_cash_pays_only_what_was_paid_and_settles_the_rest_on_account(self):
+        sale = self.mixed_sale()
         self.money_return(sale, "ret-key-0001")
-        with self.assertRaises(sale_returns.ReturnError):
-            self.money_return(sale, "ret-key-0002")
-        self.assertEqual(cr.customer_balance(self.con, self.cust), 40000)
+        self.assertEqual(self.con.execute("SELECT total, credit_part FROM sale_returns").fetchone(), (100000, 60000))
+        self.assertEqual((ledger.account_balance(self.con, "1110"), ledger.account_balance(self.con, "1310")), (0, 0))
+        self.assertEqual(cr.customer_balance(self.con, self.cust), 0)
+
+    def test_mixed_invoice_return_never_leaves_the_customer_a_credit_balance(self):
+        sale = self.mixed_sale()
+        self.receipt(60000)
+        self.money_return(sale, "ret-key-0001")
+        self.assertEqual(self.con.execute("SELECT total, credit_part FROM sale_returns").fetchone(), (100000, 0))
+        self.assertEqual((ledger.account_balance(self.con, "1110"), ledger.account_balance(self.con, "1310")), (0, 0))
 
     def test_money_refund_before_any_receipt_is_refused_and_cash_sales_keep_the_old_rule(self):
         sale = self.credit_sale(100000)
