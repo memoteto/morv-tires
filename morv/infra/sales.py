@@ -7,7 +7,7 @@ from datetime import date
 
 from morv.core import sales_rules as rules
 from morv.core.sales_rules import Payment, SaleRuleError
-from morv.infra import inventory, ledger
+from morv.infra import customer_receipts, inventory, ledger
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, has_permission
 
@@ -78,17 +78,7 @@ def _check_customer(con, customer_id, payments: list) -> None:
     if credit:
         if row[1] <= 0:
             raise SaleError("لهذا العميل حد ائتمان صفر؛ لا يُقبل آجل")
-        sold = con.execute(
-            "SELECT coalesce(sum(p.amount), 0) FROM sale_payments p JOIN sales s ON s.id = p.sale_id "
-            "WHERE s.customer_id=? AND p.method='credit'", (customer_id,)).fetchone()[0]
-        # Credit refunds and receipts free the customer's used credit limit
-        refunded = con.execute(
-            "SELECT coalesce(sum(r.total), 0) FROM sale_returns r JOIN sales s ON s.id = r.sale_id "
-            "WHERE s.customer_id=? AND r.refund_method='credit'", (customer_id,)).fetchone()[0]
-        received = con.execute(
-            "SELECT coalesce(sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END), 0) "
-            "FROM customer_receipts WHERE customer_id=?", (customer_id,)).fetchone()[0]
-        outstanding = sold - refunded - received
+        outstanding = customer_receipts.customer_balance(con, customer_id)
         if outstanding + credit > row[1]:
             raise SaleError("يتجاوز الآجل حد ائتمان العميل")
 

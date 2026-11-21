@@ -13,6 +13,10 @@ from morv.infra.users import audit, has_permission
 
 METHODS = ("cash", "card", "transfer", "wallet")
 PERMISSION = "receipts.post"
+# Old returns have credit_part 0 and refund_method 'credit' meaning the whole total
+CREDIT_PART = "CASE WHEN r.refund_method = 'credit' THEN r.total ELSE r.credit_part END"
+_MIXED = ("EXISTS (SELECT 1 FROM sale_payments p WHERE p.sale_id = s.id AND p.method = 'credit') AND NOT EXISTS "
+          "(SELECT 1 FROM sale_payments p WHERE p.sale_id = s.id AND p.method = 'installment')")
 
 
 class ReceiptError(Exception):
@@ -47,8 +51,8 @@ def customer_balance(con: sqlite3.Connection, customer_id: int) -> int:
     """Credit-sale debt still owed by the customer: credit sales minus credit refunds minus live receipts."""
     sold = con.execute("SELECT coalesce(sum(p.amount), 0) FROM sale_payments p JOIN sales s ON s.id = p.sale_id "
                        "WHERE s.customer_id=? AND p.method='credit'", (customer_id,)).fetchone()[0]
-    refunded = con.execute("SELECT coalesce(sum(r.total), 0) FROM sale_returns r JOIN sales s ON s.id = r.sale_id "
-                           "WHERE s.customer_id=? AND r.refund_method='credit'", (customer_id,)).fetchone()[0]
+    refunded = con.execute(f"SELECT coalesce(sum({CREDIT_PART}), 0) FROM sale_returns r JOIN sales s "
+                           "ON s.id = r.sale_id WHERE s.customer_id=?", (customer_id,)).fetchone()[0]
     return sold - refunded - received(con, customer_id)
 
 
@@ -56,6 +60,37 @@ def received(con: sqlite3.Connection, customer_id: int) -> int:
     """Net receipts: receipts minus their reversals."""
     return con.execute("SELECT coalesce(sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END), 0) "
                        "FROM customer_receipts WHERE customer_id=?", (customer_id,)).fetchone()[0]
+
+
+def _money_paid_and_refunded(con: sqlite3.Connection, sale_id: int) -> tuple[int, int]:
+    paid = con.execute("SELECT coalesce(sum(amount), 0) FROM sale_payments WHERE sale_id=? AND method <> 'credit'",
+                       (sale_id,)).fetchone()[0]
+    refunded = con.execute(f"SELECT coalesce(sum(r.total - ({CREDIT_PART})), 0) FROM sale_returns r "
+                           "WHERE r.sale_id=?", (sale_id,)).fetchone()[0]
+    return paid, refunded
+
+
+def sale_money_room(con: sqlite3.Connection, sale_id: int) -> int:
+    """Money paid on the invoice that no earlier return has refunded yet."""
+    paid, refunded = _money_paid_and_refunded(con, sale_id)
+    return max(0, paid - refunded)
+
+
+def cash_refunded(con: sqlite3.Connection, customer_id: int) -> int:
+    """Money refunded beyond what the invoices were paid in money: it consumed collected receipts."""
+    used = 0
+    for (sale_id,) in con.execute(f"SELECT s.id FROM sales s WHERE s.customer_id=? AND {_MIXED}", (customer_id,)).fetchall():
+        paid, refunded = _money_paid_and_refunded(con, sale_id)
+        used += max(0, refunded - paid)
+    return used
+
+
+def collected_unrefunded(con: sqlite3.Connection, customer_id: int, day: str) -> int:
+    """Receipts up to the day, net of reversals, that no money refund has used yet."""
+    net = con.execute("SELECT coalesce(sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END), 0) "
+                      "FROM customer_receipts WHERE customer_id=? AND receipt_date <= ?",
+                      (customer_id, day)).fetchone()[0]
+    return net - cash_refunded(con, customer_id)
 
 
 def post_receipt(con: sqlite3.Connection, by, *, request_key: str, customer_id: int, amount: int, method: str,
@@ -127,6 +162,8 @@ def reverse_receipt(con: sqlite3.Connection, by, *, request_key: str, receipt_id
             raise ReceiptError("سند القبض غير موجود")
         if con.execute("SELECT 1 FROM customer_receipts WHERE reverses_id=?", (receipt_id,)).fetchone():
             raise ReceiptError("سند القبض معكوس سابقًا")
+        if received(con, src[1]) - src[3] < cash_refunded(con, src[1]):
+            raise ReceiptError("لا يُعكس السند: رُدّ للعميل نقدًا مبلغ يستند إلى هذا التحصيل")
         today = date.today().isoformat()
         new_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM customer_receipts").fetchone()[0]
         number = f"CR-{today[:4]}-{new_id:06d}"

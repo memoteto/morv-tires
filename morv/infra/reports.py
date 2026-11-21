@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 from datetime import date, timedelta
 
 from morv.core.money import fmt
-from morv.infra import income_statement, ledger, suspended_balances
+from morv.infra import customer_receipts, income_statement, ledger, suspended_balances
 
 TEXT, CODE, MONEY, DATE = "text", "code", "money", "date"
 KEYS = ("income", "daily_sales", "top_items", "sales_profit", "slow_moving", "journal", "trial", "ledger",
@@ -272,8 +272,8 @@ def credit_aging(con, end: str) -> Table:
         invoices.setdefault(cid, [name, []])[1].append(entry)
         by_sale[sid] = entry
     for sid, refunded in con.execute(
-            "SELECT sale_id, sum(total) FROM sale_returns WHERE refund_method = 'credit' AND return_date <= ? "
-            "GROUP BY sale_id", (end,)):
+            f"SELECT r.sale_id, sum({customer_receipts.CREDIT_PART}) FROM sale_returns r WHERE r.return_date <= ? "
+            "GROUP BY r.sale_id", (end,)):
         if sid in by_sale:
             by_sale[sid][2] -= min(refunded, by_sale[sid][2])
     for cid, net in con.execute(

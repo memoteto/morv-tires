@@ -1,6 +1,7 @@
 """Read-only views of posted sales for the list and the preview."""
 import sqlite3
 from dataclasses import dataclass
+from morv.infra import customer_receipts
 
 
 
@@ -99,7 +100,9 @@ def returnable_lines(con: sqlite3.Connection, sale_id: int) -> list[ReturnableLi
 
 
 def refund_methods(con: sqlite3.Connection, sale_id: int) -> list[str]:
-    return [r[0] for r in con.execute(
+    """Original payment methods; a credit-only invoice may also be refunded in money once collected."""
+    found = [r[0] for r in con.execute(
         "SELECT DISTINCT method FROM sale_payments WHERE sale_id=? ORDER BY method", (sale_id,))]
+    return found + list(customer_receipts.METHODS) if found == ["credit"] else found
 
 
