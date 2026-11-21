@@ -84,8 +84,9 @@ class PosCompactInvoiceTest(PosFixture):
         p.note.setText("ملاحظة وهمية")
         self.assertFalse(p.extra_box.isVisibleTo(p))
         p._add_row(item, "service", "خدمة")
+        p.pay1_received.setText("500.00")       # cash needs a received amount covering the total
         p.post()
-        self.assertIsNotNone(p.posted)
+        self.assertIsNotNone(p.posted, p.notice.text())
         row = self.con.execute("SELECT odometer, vehicle_plate, notes FROM sales ORDER BY id DESC").fetchone()
         self.assertEqual(row, (84500, "ABC 123", "ملاحظة وهمية"))
 
