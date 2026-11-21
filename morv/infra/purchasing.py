@@ -41,7 +41,8 @@ def next_number_preview(con: sqlite3.Connection) -> str:
 
 def last_cost(con: sqlite3.Connection, item_id: int) -> int | None:
     """The most recent purchase unit cost recorded for an item, if any."""
-    row = con.execute("SELECT purchase_unit_cost FROM stock_lots WHERE item_id=? ORDER BY id DESC LIMIT 1",
+    row = con.execute("SELECT purchase_unit_cost FROM stock_lots WHERE item_id=? AND purchase_line_id IS NOT NULL "
+                      "ORDER BY id DESC LIMIT 1",
                       (item_id,)).fetchone()
     return row[0] if row else None
 

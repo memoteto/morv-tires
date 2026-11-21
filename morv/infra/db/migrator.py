@@ -9,6 +9,8 @@ from pathlib import Path
 MIGRATIONS_DIR = Path(__file__).with_name("migrations")
 _NAME = re.compile(r"^(\d{4})_([a-z0-9_]+)\.sql$")
 
+_FK_OFF = {(13, "installment_returns"), (29, "stock_adjustments")}   # rebuild parent tables with live children
+
 _BOOTSTRAP = """CREATE TABLE IF NOT EXISTS schema_migrations (
   version    INTEGER PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -80,9 +82,9 @@ def migrate(con: sqlite3.Connection, migrations=None, before_apply=None) -> list
     done = []
     for mig in todo:
         # SQLite cannot rebuild a parent table with live child FKs while FK enforcement is on.
-        # Only migration 0013 needs this atomic, pre-backup rebuild. Foreign-key integrity is
+        # Only the migrations in _FK_OFF need this atomic, pre-backup rebuild. Foreign-key integrity is
         # checked before commit and normal enforcement is restored even if migration fails.
-        rebuild_returns = mig.version == 13 and mig.name == "installment_returns"
+        rebuild_returns = (mig.version, mig.name) in _FK_OFF
         if rebuild_returns:
             if con.in_transaction or con.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
                 raise MigrationError("إعادة بناء المرتجعات تتطلب اتصالًا بلا معاملة مع تفعيل العلاقات")
