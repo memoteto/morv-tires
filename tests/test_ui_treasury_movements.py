@@ -53,7 +53,6 @@ class TreasuryMovementsUiTest(unittest.TestCase):
                               [("1210", 30000, 0), ("4110", 0, 30000)])
         dlg = ReconciliationDialog(self.session)
         self.addCleanup(dispose, dlg, self.app)
-        dlg.date.setText("2026-11-30")
         dlg.statement.setText("290")
         self.assertIn("أقل", dlg.diff_label.text())
         dlg.save()
