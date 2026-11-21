@@ -8,7 +8,7 @@ from pathlib import Path
 
 from morv.core.sales_rules import Payment
 from morv.infra import customer_receipts as cr
-from morv.infra import customer_statement, ledger, period_lock, sale_returns, sales, users
+from morv.infra import customer_statement, ledger, period_lock, reports, sale_returns, sale_view, sales, users
 from morv.infra.customer_receipts import ReceiptError
 from morv.infra.db.bootstrap import open_main_db
 from morv.infra.sale_returns import ReturnLineIn
@@ -158,6 +158,55 @@ class CustomerReceiptsTest(unittest.TestCase):
                            receipt_id=cr.history(self.con, self.cust)[0][0], reason="خطأ")
         self.credit_return(sale, "ret-key-0002")
         self.assertEqual(ledger.account_balance(self.con, "1310"), 0)
+
+    def money_return(self, sale, key, qty=1, method="cash"):
+        line = self.con.execute("SELECT id FROM sale_lines WHERE sale_id=?", (sale.id,)).fetchone()[0]
+        return sale_returns.post_return(self.con, self.admin, request_key=key, sale_id=sale.id,
+                                        lines=[ReturnLineIn(line, qty)], reason="إلغاء الخدمة",
+                                        refund_method=method, return_date="2026-02-20")
+
+    def two_unit_sale(self):
+        self.n += 1
+        return sales.post_sale(self.con, self.admin, request_key=f"sale-key-{self.n:04d}", customer_id=self.cust,
+                               lines=[SaleLineIn(self.service, 2, 50000)], payments=[Payment("credit", 100000)],
+                               sale_date="2026-02-01")
+
+    def test_collected_credit_invoice_is_refunded_in_money_and_ledger_stays_tied(self):
+        sale = self.credit_sale(100000)
+        self.receipt(100000)
+        self.assertIn("cash", sale_view.refund_methods(self.con, sale.id))
+        self.money_return(sale, "ret-key-0001", method="cash")
+        self.assertEqual((ledger.account_balance(self.con, "1310"), ledger.account_balance(self.con, "1110")), (0, 0))
+        self.assertEqual(cr.customer_balance(self.con, self.cust), 0)
+        self.assertEqual(reports.credit_aging(self.con, "2026-02-28").subtitle.count("يطابق الدفتر"), 1)
+
+    def test_money_refund_is_capped_by_collected_amount_and_cannot_reuse_it(self):
+        sale = self.two_unit_sale()
+        self.receipt(60000)
+        self.money_return(sale, "ret-key-0001")
+        with self.assertRaises(sale_returns.ReturnError):
+            self.money_return(sale, "ret-key-0002")
+        self.assertEqual(cr.customer_balance(self.con, self.cust), 40000)
+
+    def test_money_refund_before_any_receipt_is_refused_and_cash_sales_keep_the_old_rule(self):
+        sale = self.credit_sale(100000)
+        with self.assertRaises(sale_returns.ReturnError):
+            self.money_return(sale, "ret-key-0001")
+        self.n += 1
+        paid = sales.post_sale(self.con, self.admin, request_key=f"sale-key-{self.n:04d}", customer_id=self.cust,
+                               lines=[SaleLineIn(self.service, 1, 50000)],
+                               payments=[Payment("cash", 50000, received=50000)], sale_date="2026-02-01")
+        with self.assertRaises(sale_returns.ReturnError):
+            self.money_return(paid, "ret-key-0002", method="card")
+        self.assertNotIn("card", sale_view.refund_methods(self.con, paid.id))
+
+    def test_receipt_behind_a_money_refund_cannot_be_reversed(self):
+        sale = self.credit_sale(100000)
+        doc = self.receipt(100000)
+        self.money_return(sale, "ret-key-0001")
+        with self.assertRaises(ReceiptError):
+            cr.reverse_receipt(self.con, self.admin, request_key="rev-key-0001", receipt_id=doc.id, reason="خطأ")
+        self.assertEqual(cr.customer_balance(self.con, self.cust), 0)
 
     def test_documents_are_immutable(self):
         self.credit_sale(100000)

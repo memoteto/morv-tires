@@ -43,7 +43,7 @@ def _refund_method(con, sale_id: int, asked) -> str:
     methods = [r[0] for r in con.execute(
         "SELECT method FROM sale_payments WHERE sale_id=? ORDER BY id", (sale_id,))]
     if asked:
-        if asked not in methods:
+        if asked not in methods and not (set(methods) == {"credit"} and asked in customer_receipts.METHODS):
             raise ReturnError("طريقة الرد يجب أن تكون من وسائل دفع الفاتورة الأصلية")
         return asked
     if len(set(methods)) != 1:
@@ -249,10 +249,15 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         cost_total = sum(x[5] for x in shaped)
         if total <= 0 and cost_total <= 0:
             raise ReturnError("المرتجع بلا قيمة ولا تكلفة")
+        owner = con.execute("SELECT customer_id FROM sales WHERE id=?", (sale_id,)).fetchone()[0]
+        credit_only = {r[0] for r in con.execute("SELECT method FROM sale_payments WHERE sale_id=?",
+                                                  (sale_id,))} == {"credit"}
         if method == "credit":
-            owner = con.execute("SELECT customer_id FROM sales WHERE id=?", (sale_id,)).fetchone()[0]
             if total > customer_receipts.customer_balance(con, owner):
-                raise ReturnError("الرد على الحساب أكبر من دين العميل الآجل المتبقي؛ لا يُترك رصيد دائن للعميل")
+                raise ReturnError("الرد على الحساب أكبر من دين العميل الآجل المتبقي؛ "
+                                  "إن حُصِّل الدين فاختر ردًا نقديًا")
+        elif credit_only and total > customer_receipts.collected_unrefunded(con, owner, day):
+            raise ReturnError("الرد النقدي لفاتورة آجلة لا يتجاوز ما حُصِّل من العميل ولم يُرَدّ")
         return_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM sale_returns").fetchone()[0]
         number = f"SR-{return_id:06d}"
 
