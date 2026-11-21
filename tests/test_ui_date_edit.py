@@ -27,6 +27,18 @@ class DateEditTest(unittest.TestCase):
         self.assertEqual(w.layoutDirection(), Qt.LayoutDirection.LeftToRight)
         self.assertEqual(w.calendarWidget().layoutDirection(), Qt.LayoutDirection.RightToLeft)
 
+    def test_shown_text_starts_with_the_year_inside_an_rtl_parent(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QDateEdit, QWidget
+        from morv.ui.widgets import DateEdit, dispose
+        parent = QWidget()
+        parent.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.addCleanup(dispose, parent, self.app)
+        w = DateEdit()
+        w.setParent(parent)
+        w.setText("2026-11-05")
+        self.assertEqual(QDateEdit.text(w), "2026-11-05")      # what the box shows, not the ISO value
+
     def test_set_and_read_back_iso(self):
         w = self.make()
         seen = []

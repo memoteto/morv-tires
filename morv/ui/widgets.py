@@ -75,11 +75,12 @@ class DateEdit(QDateEdit):
         self.setObjectName("dateEdit")
         self.optional = optional
         self._raw: str | None = None
+        # Before the format: Qt orders the date's sections by direction when the format is set, so in an
+        # RTL window it showed 21-11-2026. The Latin value runs LTR on its own, like ltr_edit.
+        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.setCalendarPopup(True)
         self.setDisplayFormat("yyyy-MM-dd")
         self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
-        # In an RTL window Qt mirrors the date's sections (21-11-2026); the Latin value runs LTR on its own
-        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.setMinimumDate(self._BLANK)
         if not allow_future:      # posting engines refuse future dates, so the calendar offers none
             self.setMaximumDate(QDate.currentDate())
