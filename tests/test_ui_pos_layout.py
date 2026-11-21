@@ -8,8 +8,7 @@ from pathlib import Path
 from tests.qt_app import get_app, require_qt
 
 
-@require_qt()
-class PosPinnedActionsTest(unittest.TestCase):
+class PosFixture(unittest.TestCase):
     def setUp(self):
         from morv.infra import users
         from morv.infra.db.bootstrap import open_main_db
@@ -40,6 +39,10 @@ class PosPinnedActionsTest(unittest.TestCase):
         return (top_left.x() >= 0 and top_left.y() >= 0
                 and top_left.x() + button.width() <= p.width() and top_left.y() + button.height() <= p.height())
 
+
+
+@require_qt()
+class PosPinnedActionsTest(PosFixture):
     def test_post_button_is_outside_every_scroll_area(self):
         from PySide6.QtWidgets import QScrollArea
         p = self.page()
@@ -59,3 +62,43 @@ class PosPinnedActionsTest(unittest.TestCase):
         p = self.page()
         self.assertEqual(p.post_btn.text(), "اعتماد وتحصيل")
         self.assertEqual(p.post_btn.objectName(), "primaryLarge")
+
+
+@require_qt()
+class PosCompactInvoiceTest(PosFixture):
+    def test_optional_details_start_folded_and_open_on_demand(self):
+        p = self.page()
+        self.assertFalse(p.extra_box.isVisibleTo(p))
+        p.extra_toggle.setChecked(True)
+        self.assertTrue(p.extra_box.isVisibleTo(p))
+        self.assertTrue(p.odometer.isVisibleTo(p) and p.plate.isVisibleTo(p) and p.note.isVisibleTo(p))
+
+    def test_hidden_details_are_still_saved_with_the_invoice(self):
+        p = self.page()
+        self.con.execute(
+            "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
+            "VALUES ('service','SV-1','خدمة','خدمه',50000,50000,50000)")
+        item = self.con.execute("SELECT id FROM items").fetchone()[0]
+        p.odometer.setText("84500")
+        p.plate.setText("ABC 123")
+        p.note.setText("ملاحظة وهمية")
+        self.assertFalse(p.extra_box.isVisibleTo(p))
+        p._add_row(item, "service", "خدمة")
+        p.post()
+        self.assertIsNotNone(p.posted)
+        row = self.con.execute("SELECT odometer, vehicle_plate, notes FROM sales ORDER BY id DESC").fetchone()
+        self.assertEqual(row, (84500, "ABC 123", "ملاحظة وهمية"))
+
+    def test_summary_shows_hidden_values_and_reset_folds_again(self):
+        p = self.page()
+        p.odometer.setText("84500")
+        self.assertIn("84500", p.extra_summary.text())
+        p.extra_toggle.setChecked(True)
+        p._reset_after_post()
+        self.assertFalse(p.extra_box.isVisibleTo(p))
+        self.assertEqual(p.extra_summary.text(), "")
+
+    def test_invoice_number_and_date_are_header_chips(self):
+        p = self.page()
+        self.assertTrue(p.number_edit.text().startswith("SI-"))
+        self.assertRegex(p.sale_date.text(), r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")

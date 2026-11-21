@@ -121,29 +121,26 @@ class PosPage(QWidget):
         return col
 
     def _invoice_card(self) -> QFrame:
-        box, body, _head = self._card("بيانات الفاتورة والعميل", "sales")
+        box, body, head = self._card("بيانات الفاتورة والعميل", "sales")
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(12)
-        for c in range(4):
-            grid.setColumnStretch(c, 1)
+        for c, stretch in enumerate((3, 2, 2)):
+            grid.setColumnStretch(c, stretch)
 
-        self.number_edit = ltr_edit("")
-        self.number_edit.setText(sales.next_number_preview(self.session.con))
-        self.number_edit.setReadOnly(True)
-        self.sale_date = ltr_edit()
-        self.sale_date.setReadOnly(True)
-        self._trail_icon(self.sale_date, "lock")
+        # Read-only facts live in the card header, so they take no field row
+        self.number_edit = self._chip(sales.next_number_preview(self.session.con))
+        self.sale_date = self._chip("")
+        self.number_edit.setToolTip("رقم الفاتورة")
+        self.sale_date.setToolTip("التاريخ والوقت")
+        head.addWidget(self.number_edit)
+        head.addWidget(self.sale_date)
         self.tier_combo = QComboBox()
         for key, label in TIER_LABELS.items():
             self.tier_combo.addItem(label, key)
         self.tier_combo.currentIndexChanged.connect(lambda _i: self._set_tier(self.tier_combo.currentData()))
         self.tier_combo.setEnabled(bool(getattr(self.session.user, "is_manager", False)))
         self.odometer = ltr_edit("مثال: 84500")
-        grid.addWidget(self._field("رقم الفاتورة", self.number_edit), 0, 0)
-        grid.addWidget(self._field("التاريخ والوقت", self.sale_date), 0, 1)
-        grid.addWidget(self._field("فئة السعر", self.tier_combo, locked=True), 0, 2)
-        grid.addWidget(self._field("عداد الكيلومترات", self.odometer), 0, 3)
 
         self.customer = QComboBox()
         self.customer.addItem("عميل نقدي", ("", "retail", "", ""))
@@ -162,14 +159,26 @@ class PosPage(QWidget):
         self.mobile.editingFinished.connect(self._on_mobile_typed)
         self.plate = ltr_edit("رقم اللوحة")
         self._trail_icon(self.plate, "car")
-        grid.addWidget(self._field("العميل *", self.customer), 1, 0, 1, 2)
-        grid.addWidget(self._field("رقم الموبايل", self.mobile), 1, 2)
-        grid.addWidget(self._field("المركبة / اللوحة", self.plate), 1, 3)
+        grid.addWidget(self._field("العميل *", self.customer), 0, 0)
+        grid.addWidget(self._field("رقم الموبايل", self.mobile), 0, 1)
+        grid.addWidget(self._field("فئة السعر", self.tier_combo, locked=True), 0, 2)
+        body.addLayout(grid)
 
+        # Optional details stay folded until needed, which leaves the room to the item rows
         self.note = QLineEdit()
         self.note.setPlaceholderText("اختياري — تظهر في الطباعة")
-        grid.addWidget(self._field("ملاحظة على الفاتورة", self.note), 2, 0, 1, 4)
-        body.addLayout(grid)
+        self.extra_box = QWidget()
+        extra = QGridLayout(self.extra_box)
+        extra.setContentsMargins(0, 0, 0, 0)
+        extra.setHorizontalSpacing(12)
+        extra.setVerticalSpacing(12)
+        for c, stretch in enumerate((3, 2, 2)):
+            extra.setColumnStretch(c, stretch)
+        extra.addWidget(self._field("ملاحظة على الفاتورة", self.note), 0, 0)
+        extra.addWidget(self._field("عداد الكيلومترات", self.odometer), 0, 1)
+        extra.addWidget(self._field("المركبة / اللوحة", self.plate), 0, 2)
+        self.extra_box.setVisible(False)
+        body.addWidget(self.extra_box)
 
         strip = QFrame()
         strip.setObjectName("infoStrip")
@@ -183,10 +192,20 @@ class PosPage(QWidget):
         change = QPushButton("تغيير العميل")
         change.setObjectName("link")
         change.clicked.connect(self._focus_customer)
+        self.extra_summary = muted("")
+        self.extra_summary.setWordWrap(False)
+        self.extra_toggle = QPushButton("تفاصيل المركبة والملاحظة")
+        self.extra_toggle.setObjectName("link")
+        self.extra_toggle.setCheckable(True)
+        self.extra_toggle.toggled.connect(self.extra_box.setVisible)
+        for field in (self.odometer, self.plate, self.note):
+            field.textChanged.connect(self._refresh_extra_summary)
         s.addWidget(self.cust_kind)
         s.addWidget(self.cust_tier_chip)
         s.addWidget(self.cust_stats)
         s.addStretch(1)
+        s.addWidget(self.extra_summary)
+        s.addWidget(self.extra_toggle)
         s.addWidget(change)
         body.addWidget(strip)
         return box
@@ -543,8 +562,17 @@ class PosPage(QWidget):
     def _stamp(self) -> str:
         now = datetime.now()
         self.sale_date.setText(now.strftime("%Y-%m-%d %H:%M"))
-        self.sale_date.setCursorPosition(0)      # show from the start of the text so the date is not clipped
         return date.today().isoformat()
+
+    def _refresh_extra_summary(self, *_args) -> None:
+        parts = []
+        if self.odometer.text().strip():
+            parts.append(f"العداد {ltr(self.odometer.text().strip())}")
+        if self.plate.text().strip():
+            parts.append(f"اللوحة {ltr(self.plate.text().strip())}")
+        if self.note.text().strip():
+            parts.append("ملاحظة")
+        self.extra_summary.setText(" · ".join(parts))
 
     def _on_method_changed(self, *_args) -> None:
         on_instalments = self.pay1_method.currentData() == "installment"
@@ -898,6 +926,7 @@ class PosPage(QWidget):
         self.odometer.clear()
         self.plate.clear()
         self.note.clear()
+        self.extra_toggle.setChecked(False)
         self.invoice_disc.clear()
         self.pay1_amount.clear()
         self.pay1_received.clear()
