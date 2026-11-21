@@ -59,3 +59,10 @@ class PosPinnedActionsTest(unittest.TestCase):
         p = self.page()
         self.assertEqual(p.post_btn.text(), "اعتماد وتحصيل")
         self.assertEqual(p.post_btn.objectName(), "primaryLarge")
+
+    def test_summary_and_payment_cards_are_never_clipped(self):
+        for width in (1280, 1366, 1920):
+            with self.subTest(width=width):
+                p = self.page(width, 700)
+                self.assertGreaterEqual(p.side_scroll.viewport().width(), p.side_content.minimumSizeHint().width())
+                self.assertFalse(p.side_scroll.horizontalScrollBar().isVisible())
