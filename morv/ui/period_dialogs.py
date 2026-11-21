@@ -47,7 +47,7 @@ class PeriodLockDialog(Modal):
         found = period_lock.blockers(self.session.con, day)
         notes = period_lock.warnings(self.session.con, day)
         if notes:
-            found += ["تنبيه لا يمنع القفل: مطابقة البنك والمحافظ ناقصة:"] + [f"   • {n}" for n in notes]
+            found += ["تنبيه لا يمنع القفل: جرد الخزنة أو مطابقة البنك والمحافظ ناقصة:"] + [f"   • {n}" for n in notes]
         self.blockers.setText("\n".join(found))
 
     def save(self) -> None:

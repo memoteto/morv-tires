@@ -63,6 +63,24 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         self.assertEqual(len(bank_reconciliation.history(self.con, "1210")), 1)
         self.assertIsNone(self.page(self.cashier_session).bank_btn)
 
+    def test_bank_fee_checkbox_books_the_shortfall_and_saves_a_matching_record(self):
+        from morv.infra import ledger
+        from morv.infra.db.connection import transaction
+        from morv.ui.reconciliation_dialogs import ReconciliationDialog
+        from morv.ui.widgets import dispose
+        with transaction(self.con):
+            ledger.post_entry(self.con, self.session.user, "2026-11-02", "sale", 3, "فاتورة بيع 3",
+                              [("1210", 30000, 0), ("4110", 0, 30000)])
+        dlg = ReconciliationDialog(self.session)
+        self.addCleanup(dispose, dlg, self.app)
+        self.assertTrue(dlg.fee_box.isHidden())
+        dlg.statement.setText("290")
+        self.assertFalse(dlg.fee_box.isHidden())
+        dlg.fee_box.setChecked(True)
+        dlg.save()
+        self.assertEqual(dlg.saved.difference, 0)
+        self.assertEqual(ledger.account_balance(self.con, "5260"), 1000)
+
     def test_cashier_cannot_add_movements(self):
         self.assertFalse(self.page(self.cashier_session).can_edit())
         self.assertTrue(self.page().can_edit())

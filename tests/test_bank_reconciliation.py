@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from morv.infra import bank_reconciliation as br
-from morv.infra import ledger, period_lock, users
+from morv.infra import cash_closing, ledger, period_lock, safe_count, users
 from morv.infra.bank_reconciliation import ReconciliationError
 from morv.infra.db.bootstrap import open_main_db
 from morv.infra.db.connection import transaction
@@ -127,6 +127,40 @@ class BankReconciliationTest(unittest.TestCase):
         self.assertEqual(period_lock.warnings(self.con, "2026-10-31"), br.gaps(self.con, "2026-10-31"))
         self.assertEqual(period_lock.blockers(self.con, "2026-10-31"), [])
         period_lock.lock_period(self.con, self.admin, request_key=self.key(), through_date="2026-10-31")
+
+    def test_statement_shortfall_can_be_booked_as_a_bank_fee_and_reconciled_in_one_call(self):
+        doc = br.reconcile_fee(self.con, self.admin, request_key="fee-key-0001", account="1210",
+                               statement_date="2026-10-31", statement_balance=695000, reference="كشف أكتوبر")
+        self.assertEqual(doc.difference, 0)
+        self.assertEqual(ledger.account_balance(self.con, "5260"), 5000)
+        self.assertEqual(br.program_balance(self.con, "1210", "2026-10-31"), 695000)
+        again = br.reconcile_fee(self.con, self.admin, request_key="fee-key-0001", account="1210",
+                                 statement_date="2026-10-31", statement_balance=695000)
+        self.assertTrue(again.replayed)
+        self.assertEqual(ledger.account_balance(self.con, "5260"), 5000)
+        self.assertFalse(br.drifted(self.con, "1210"))
+
+    def test_fee_booking_refuses_a_statement_that_is_not_lower(self):
+        with self.assertRaises(ReconciliationError):
+            br.reconcile_fee(self.con, self.admin, request_key="fee-key-0002", account="1210",
+                             statement_date="2026-10-31", statement_balance=700000)
+        with self.assertRaises(ReconciliationError):
+            br.reconcile_fee(self.con, self.clerk, request_key="fee-key-0003", account="1210",
+                             statement_date="2026-10-31", statement_balance=690000)
+        self.assertEqual(ledger.account_balance(self.con, "5260"), 0)
+
+    def test_safe_gap_warns_until_a_count_covers_the_last_movement(self):
+        self.assertIsNone(safe_count.gap(self.con, "2026-10-31"))
+        self.post("2026-10-10", "1130", 50000)
+        self.assertIn("لم تُجرد قط", safe_count.gap(self.con, "2026-10-31"))
+        self.assertIn("الخزنة", period_lock.warnings(self.con, "2026-10-31")[0])
+        _, book = cash_closing.book_snapshot(self.con, "1130")
+        safe_count.count_safe(self.con, self.admin, request_key=self.key(), count_date="2026-10-15", counted=book,
+                              expected_book=book)
+        self.assertIsNone(safe_count.gap(self.con, "2026-10-31"))
+        self.post("2026-10-20", "1130", 1000)
+        self.assertIn("يسبق آخر حركة", safe_count.gap(self.con, "2026-10-31"))
+        self.assertIsNone(safe_count.gap(self.con, "2026-10-12"))
 
     def test_records_are_immutable(self):
         doc = self.rec(700000)
