@@ -10,13 +10,15 @@ from morv.infra import customer_receipts, income_statement, ledger, suspended_ba
 
 TEXT, CODE, MONEY, DATE = "text", "code", "money", "date"
 KEYS = ("income", "daily_sales", "top_items", "sales_profit", "slow_moving", "journal", "trial", "ledger",
-        "aging", "credit_aging", "suppliers", "partner", "suspended")
+        "aging", "credit_aging", "suppliers", "partner", "suspended", "stock_valuation", "expenses", "collections",
+        "purchases", "returns")
 TITLES = {"income": "قائمة الدخل", "daily_sales": "ملخص المبيعات اليومي", "top_items": "الأصناف الأكثر مبيعًا",
           "sales_profit": "المبيعات وربحية الأصناف", "slow_moving": "الأصناف بطيئة الحركة",
           "journal": "دفتر اليومية", "trial": "ميزان المراجعة", "ledger": "كشف حساب",
           "aging": "أعمار ديون التقسيط", "credit_aging": "أعمار البيع الآجل",
           "suppliers": "أرصدة الموردين", "partner": "كشف حساب الشريك",
-          "suspended": "الأرصدة المعلّقة"}
+          "suspended": "الأرصدة المعلّقة", "stock_valuation": "تقييم المخزون", "expenses": "المصروفات حسب البند",
+          "collections": "المقبوضات", "purchases": "المشتريات حسب المورد والصنف", "returns": "مرتجعات البيع"}
 NEEDS_PARAM = {"ledger": "account", "partner": "partner", "slow_moving": "days"}   # one choice from param_choices
 IDLE_DAYS = (30, 60, 90, 180, 365)
 DEFAULT_IDLE_DAYS = 90
@@ -462,6 +464,138 @@ def supplier_balances(con, end: str) -> Table:
                  ("المورد", "الفواتير", "المسدَّد", "المتبقي"), (TEXT, MONEY, MONEY, MONEY), tuple(rows), 0)
 
 
+def _tie(ledger_value: int, report_value: int, label: str) -> str:
+    return "يطابق الدفتر" if ledger_value == report_value else f"تحذير: الدفتر {label} = {fmt(ledger_value)}"
+
+
+def _ledger_net(con, account: str, start: str, end: str, source: str | None = None, credit: bool = False) -> int:
+    """Net posted movement of one account in the range, optionally of one source type only."""
+    sign = "l.credit - l.debit" if credit else "l.debit - l.credit"
+    sql = (f"SELECT coalesce(sum({sign}), 0) FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id "
+           "WHERE e.status = 'posted' AND l.account_code = ? AND e.entry_date BETWEEN ? AND ?")
+    args = [account, start, end]
+    if source:
+        sql += " AND e.source_type = ?"
+        args.append(source)
+    return con.execute(sql, args).fetchone()[0]
+
+
+def stock_valuation(con, end: str) -> Table:
+    """Current stock per item at book cost from the FIFO layers, with the oldest DOT, tied to account 1410."""
+    _s, end = _range("0001-01-01", end)
+    year = date.fromisoformat(end).year
+    rows, qty_total, value_total = [], 0, 0
+    for item_id, code, name, qty, value in con.execute(
+            "SELECT i.id, i.code, i.name, sum(c.qty_remaining), sum(c.cost_remaining) FROM items i "
+            "JOIN cost_layers c ON c.item_id = i.id WHERE c.qty_remaining > 0 GROUP BY i.id ORDER BY i.code"):
+        dot = con.execute("SELECT dot FROM stock_lots WHERE item_id = ? AND qty_on_hand > 0 AND mfg_key IS NOT NULL "
+                          "ORDER BY mfg_key, id LIMIT 1", (item_id,)).fetchone()
+        age = str(year - 2000 - int(dot[0][2:])) if dot else ""
+        rows.append(("line", (code, name, str(qty), value, (value + qty // 2) // qty, dot[0] if dot else "", age)))
+        qty_total, value_total = qty_total + qty, value_total + value
+    rows.append(("grand", ("", "الإجمالي", str(qty_total), value_total, "", "", "")))
+    ledger_1410 = con.execute("SELECT coalesce(sum(l.debit) - sum(l.credit), 0) FROM journal_lines l JOIN "
+                              "journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' "
+                              "AND l.account_code = '1410'").fetchone()[0]
+    other = {code: ledger.account_balance(con, code) for code in ("1420", "1430")}
+    note = f" · معيب بانتظار المورد 1430: {fmt(other['1430'])}" if other["1430"] else ""
+    note += f" · بطاريات قديمة 1420: {fmt(other['1420'])}" if other["1420"] else ""
+    return Table("stock_valuation", TITLES["stock_valuation"],
+                 f"الرصيد الحالي بتكلفة طبقات FIFO · {_tie(ledger_1410, value_total, '1410')}{note}",
+                 ("الكود", "الصنف", "الكمية", "القيمة الدفترية", "متوسط التكلفة", "أقدم DOT", "عمره بالسنوات"),
+                 (CODE, TEXT, CODE, MONEY, MONEY, CODE, CODE), tuple(rows), 1)
+
+
+def expenses(con, start: str, end: str) -> Table:
+    """Operating expense accounts (52xx) in the range with each one's share of the total."""
+    start, end = _range(start, end)
+    data = con.execute(
+        "SELECT a.code, a.name, sum(l.debit) - sum(l.credit) FROM accounts a JOIN journal_lines l "
+        "ON l.account_code = a.code JOIN journal_entries e ON e.id = l.entry_id WHERE a.parent_code = '52' "
+        "AND e.status = 'posted' AND e.entry_date BETWEEN ? AND ? GROUP BY a.code ORDER BY a.code",
+        (start, end)).fetchall()
+    data = [d for d in data if d[2]]
+    total = sum(d[2] for d in data)
+    rows = [("line", (code, name, amount, _bp_text(amount, total))) for code, name, amount in data]
+    rows.append(("grand", ("", "الإجمالي", total, _bp_text(total, total))))
+    return Table("expenses", TITLES["expenses"], f"من {start} إلى {end} · حسابات 52 (دون تكلفة المبيعات)",
+                 ("الحساب", "البند", "المبلغ", "النسبة"), (CODE, TEXT, MONEY, CODE), tuple(rows), 1)
+
+
+def collections(con, start: str, end: str) -> Table:
+    """Customer receipts and instalment payments per day, split cash and non-cash, tied to the ledger."""
+    start, end = _range(start, end)
+    days: dict[str, list] = {}
+
+    def add(day, slot, method, amount):
+        row = days.setdefault(day, [0, 0, 0, 0])      # receipts, instalments, cash, non-cash
+        row[slot] += amount
+        row[2 if method == "cash" else 3] += amount
+
+    for day, method, amount in con.execute(
+            "SELECT receipt_date, method, sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END) "
+            "FROM customer_receipts WHERE receipt_date BETWEEN ? AND ? GROUP BY receipt_date, method", (start, end)):
+        add(day, 0, method, amount)
+    for day, method, amount in con.execute(
+            "SELECT payment_date, method, sum(amount) FROM installment_payments WHERE payment_date BETWEEN ? AND ? "
+            "GROUP BY payment_date, method", (start, end)):
+        add(day, 1, method, amount)
+    rows = [("line", (day, v[0], v[1], v[0] + v[1], v[2], v[3])) for day, v in sorted(days.items())]
+    totals = [sum(r[1][i] for r in rows) for i in range(1, 6)]
+    rows.append(("grand", ("الإجمالي", *totals)))
+    ok_receipts = _ledger_net(con, "1310", start, end, "customer_receipt", credit=True) == totals[0]
+    ok_instal = _ledger_net(con, "1320", start, end, "installment_payment", credit=True) == totals[1]
+    tie = "يطابق الدفتر" if ok_receipts and ok_instal else "تحذير: لا يطابق الدفتر"
+    return Table("collections", TITLES["collections"], f"من {start} إلى {end} · {tie}",
+                 ("التاريخ", "سندات القبض", "أقساط التقسيط", "الإجمالي", "نقدًا", "غير نقدي"),
+                 (DATE, MONEY, MONEY, MONEY, MONEY, MONEY), tuple(rows), 0)
+
+
+def purchases(con, start: str, end: str) -> Table:
+    """Purchase invoices per supplier with their items, tied to the credits posted on account 2110."""
+    start, end = _range(start, end)
+    suppliers_rows: dict[int, list] = {}
+    for sid, sname, code, name, qty, amount in con.execute(
+            "SELECT s.id, s.name, i.code, i.name, sum(pl.qty), sum(pl.line_total) FROM purchase_invoices p "
+            "JOIN journal_entries e ON e.id = p.journal_entry_id JOIN suppliers s ON s.id = p.supplier_id "
+            "JOIN purchase_lines pl ON pl.invoice_id = p.id JOIN items i ON i.id = pl.item_id "
+            "WHERE e.entry_date BETWEEN ? AND ? GROUP BY s.id, i.id ORDER BY s.name, i.code", (start, end)):
+        suppliers_rows.setdefault(sid, [sname, []])[1].append((code, name, qty, amount))
+    rows, grand = [], 0
+    for sname, items in sorted(suppliers_rows.values(), key=lambda v: v[0]):
+        total = sum(i[3] for i in items)
+        grand += total
+        rows.append(("head", (sname, "", "", total, "")))
+        rows += [("line", (name, code, str(qty), amount, (amount + qty // 2) // qty)) for code, name, qty, amount in items]
+    rows.append(("grand", ("الإجمالي", "", "", grand, "")))
+    tie = _tie(_ledger_net(con, "2110", start, end, "purchase_invoice", credit=True), grand, "2110")
+    return Table("purchases", TITLES["purchases"], f"من {start} إلى {end} · {tie}",
+                 ("المورد / الصنف", "الكود", "الكمية", "الإجمالي", "متوسط التكلفة"),
+                 (TEXT, CODE, CODE, MONEY, MONEY), tuple(rows), 0)
+
+
+def returns(con, start: str, end: str) -> Table:
+    """Sale returns by reason and by item, sound against defective, tied to account 4190."""
+    start, end = _range(start, end)
+    base = ("FROM sale_return_lines rl JOIN sale_returns r ON r.id = rl.return_id JOIN sale_lines sl "
+            "ON sl.id = rl.sale_line_id JOIN items i ON i.id = sl.item_id WHERE r.return_date BETWEEN ? AND ? ")
+    sums = ("count(DISTINCT r.id), coalesce(sum(CASE rl.condition WHEN 'sound' THEN rl.qty END), 0), "
+            "coalesce(sum(CASE rl.condition WHEN 'defective' THEN rl.qty END), 0), sum(rl.value) ")
+    rows, total = [], 0
+    for title, label, group in (("حسب السبب", "r.reason", "r.reason"), ("حسب الصنف", "i.code || ' · ' || i.name", "i.id")):
+        data = con.execute(f"SELECT {label}, {sums}{base}GROUP BY {group} ORDER BY sum(rl.value) DESC, 1",
+                           (start, end)).fetchall()
+        section = sum(d[4] for d in data)
+        rows.append(("head", (title, "", "", "", "")))
+        rows += [("line", (name, str(n), str(sound), str(bad), value)) for name, n, sound, bad, value in data]
+        rows.append(("total", ("المجموع", "", str(sum(d[2] for d in data)), str(sum(d[3] for d in data)), section)))
+        total = section
+    tie = _tie(_ledger_net(con, "4190", start, end), total, "4190")
+    return Table("returns", TITLES["returns"], f"من {start} إلى {end} · {tie}",
+                 ("البيان", "المرتجعات", "سليم", "معيب", "القيمة"),
+                 (TEXT, CODE, CODE, CODE, MONEY), tuple(rows), 0)
+
+
 def build(con, key: str, start: str, end: str, account: str = "", compare: bool = False,
           full: bool = False) -> Table:
     if key == "income":
@@ -490,6 +624,16 @@ def build(con, key: str, start: str, end: str, account: str = "", compare: bool 
         return supplier_balances(con, end)
     if key == "suspended":
         return suspended(con)
+    if key == "stock_valuation":
+        return stock_valuation(con, end)
+    if key == "expenses":
+        return expenses(con, start, end)
+    if key == "collections":
+        return collections(con, start, end)
+    if key == "purchases":
+        return purchases(con, start, end)
+    if key == "returns":
+        return returns(con, start, end)
     raise ReportError("تقرير غير معروف")
 
 
