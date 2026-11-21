@@ -56,12 +56,15 @@ class ReportsPageTest(unittest.TestCase):
     def test_report_picker_switches_tables_and_exports(self):
         import os
         from morv.infra.reports import KEYS as reports_keys
+        self.con.execute(          # the item card needs one stocked item to open on
+            "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
+            "VALUES ('tire','TR-1','إطار','اطار',100,100,100)")
         page = self.page()
         self.assertEqual([page.report_combo.itemData(i) for i in range(page.report_combo.count())],
                          list(reports_keys))
         for key in ("trial", "ledger", "sales_profit", "aging", "suspended", "daily_sales", "top_items",
                     "slow_moving", "journal", "suppliers", "income", "credit_aging", "stock_valuation",
-                    "expenses", "collections", "purchases", "returns"):
+                    "expenses", "collections", "purchases", "returns", "item_card", "supplier_aging"):
             page.report_combo.setCurrentIndex(page.report_combo.findData(key))
             self.assertEqual(page.table.key, key)
             self.assertEqual(page.model.columnCount(), len(page.table.headers))

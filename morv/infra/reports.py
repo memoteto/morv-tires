@@ -11,15 +11,16 @@ from morv.infra import customer_receipts, income_statement, ledger, suspended_ba
 TEXT, CODE, MONEY, DATE = "text", "code", "money", "date"
 KEYS = ("income", "daily_sales", "top_items", "sales_profit", "slow_moving", "journal", "trial", "ledger",
         "aging", "credit_aging", "suppliers", "partner", "suspended", "stock_valuation", "expenses", "collections",
-        "purchases", "returns")
+        "purchases", "returns", "supplier_aging", "item_card")
 TITLES = {"income": "قائمة الدخل", "daily_sales": "ملخص المبيعات اليومي", "top_items": "الأصناف الأكثر مبيعًا",
           "sales_profit": "المبيعات وربحية الأصناف", "slow_moving": "الأصناف بطيئة الحركة",
           "journal": "دفتر اليومية", "trial": "ميزان المراجعة", "ledger": "كشف حساب",
           "aging": "أعمار ديون التقسيط", "credit_aging": "أعمار البيع الآجل",
           "suppliers": "أرصدة الموردين", "partner": "كشف حساب الشريك",
           "suspended": "الأرصدة المعلّقة", "stock_valuation": "تقييم المخزون", "expenses": "المصروفات حسب البند",
-          "collections": "المقبوضات", "purchases": "المشتريات حسب المورد والصنف", "returns": "مرتجعات البيع"}
-NEEDS_PARAM = {"ledger": "account", "partner": "partner", "slow_moving": "days"}   # one choice from param_choices
+          "collections": "المقبوضات", "purchases": "المشتريات حسب المورد والصنف", "returns": "مرتجعات البيع",
+          "supplier_aging": "أعمار مستحقات الموردين", "item_card": "كارت الصنف"}
+NEEDS_PARAM = {"ledger": "account", "partner": "partner", "slow_moving": "days", "item_card": "item"}   # one choice from param_choices
 IDLE_DAYS = (30, 60, 90, 180, 365)
 DEFAULT_IDLE_DAYS = 90
 JOURNAL_LIMIT = 3000
@@ -49,6 +50,9 @@ def param_choices(con: sqlite3.Connection, key: str) -> list[tuple[str, str]]:
         return list(con.execute("SELECT current_account, name FROM partners ORDER BY name"))
     if key == "slow_moving":
         return [(str(d), f"{d} يومًا") for d in IDLE_DAYS]
+    if key == "item_card":
+        return [(str(i), f"{c} · {n}") for i, c, n in con.execute(
+            "SELECT id, code, name FROM items WHERE kind IN ('tire', 'battery') ORDER BY code")]
     return account_choices(con)
 
 
@@ -332,7 +336,8 @@ SOURCE_TEXT = {"sale": "بيع", "sale_return": "مرتجع بيع", "purchase_i
                "treasury_movement": "حركة خزينة", "cash_closing": "إقفال صندوق", "safe_count": "جرد خزنة",
                "installment_contract": "عقد تقسيط", "installment_payment": "تحصيل قسط",
                "customer_receipt": "سند قبض",
-               "interest_recognition": "فوائد تقسيط", "profit_distribution": "توزيع أرباح",
+               "interest_recognition": "فوائد تقسيط", "interest_recognition_reversal": "عكس فوائد تقسيط",
+               "customer_deposit": "عربون عميل", "purchase_return": "مرتجع مورد", "profit_distribution": "توزيع أرباح",
                "stock_issue": "صرف مخزون"}
 
 
@@ -621,6 +626,98 @@ def returns(con, start: str, end: str) -> Table:
                  (TEXT, CODE, CODE, CODE, MONEY), tuple(rows), 0)
 
 
+def supplier_aging(con, end: str) -> Table:
+    """Open supplier balances by days past due; returns and payments settle the oldest invoice first."""
+    _s, end = _range("0001-01-01", end)
+    today = date.fromisoformat(end)
+    invoices: dict[int, list] = {}      # supplier -> [name, [[due, open]]]
+    for sid, name, days, day, total in con.execute(
+            "SELECT s.id, s.name, s.payment_days, p.invoice_date, p.total FROM purchase_invoices p "
+            "JOIN suppliers s ON s.id = p.supplier_id JOIN journal_entries e ON e.id = p.journal_entry_id "
+            "WHERE e.entry_date <= ? ORDER BY p.invoice_date, p.id", (end,)):
+        due = (date.fromisoformat(day) + timedelta(days=days)).isoformat()
+        invoices.setdefault(sid, [name, []])[1].append([due, total])
+    settled: dict[int, int] = {}
+    for sid, net in con.execute(
+            "SELECT r.supplier_id, sum(CASE r.kind WHEN 'return' THEN r.total ELSE -r.total END) "
+            "FROM purchase_returns r JOIN journal_entries e ON e.id = r.journal_entry_id "
+            "WHERE e.entry_date <= ? GROUP BY r.supplier_id", (end,)):
+        settled[sid] = net
+    for sid, net in con.execute(
+            "SELECT m.supplier_id, sum(CASE m.kind WHEN 'supplier_payment' THEN m.amount ELSE -m.amount END) "
+            "FROM treasury_movements m JOIN journal_entries e ON e.id = m.journal_entry_id "
+            "WHERE m.supplier_id IS NOT NULL AND e.entry_date <= ? GROUP BY m.supplier_id", (end,)):
+        settled[sid] = settled.get(sid, 0) + net
+    names = dict(con.execute("SELECT id, name FROM suppliers"))
+    rows = []
+    for sid in sorted(set(invoices) | set(settled), key=lambda i: names[i]):
+        left = settled.get(sid, 0)
+        buckets = [0] * len(BUCKETS)
+        for due, amount in invoices.get(sid, (None, []))[1]:
+            take = min(max(left, 0), amount)
+            left -= take
+            if amount - take > 0:
+                late = (today - date.fromisoformat(due)).days
+                buckets[next(i for i, (limit, _t) in enumerate(BUCKETS) if limit is None or late <= limit)] += amount - take
+        credit = -max(left, 0)           # paid or returned beyond the invoices: the supplier owes the shop
+        if sum(buckets) or credit:
+            rows.append(("line", (names[sid], *buckets, credit, sum(buckets) + credit)))
+    totals = [sum(r[1][1 + i] for r in rows) for i in range(len(BUCKETS) + 2)]
+    rows.append(("grand", ("الإجمالي", *totals)))
+    ledger_2110 = con.execute(
+        "SELECT coalesce(sum(l.credit) - sum(l.debit), 0) FROM journal_lines l JOIN journal_entries e "
+        "ON e.id = l.entry_id WHERE e.status = 'posted' AND l.account_code = '2110' AND e.entry_date <= ?",
+        (end,)).fetchone()[0]
+    return Table("supplier_aging", TITLES["supplier_aging"],
+                 f"حتى {end} · حسب تاريخ استحقاق الفاتورة · {_tie(ledger_2110, totals[-1], '2110')}",
+                 ("المورد", *(t for _l, t in BUCKETS), "رصيد لنا", "الإجمالي"),
+                 (TEXT, *([MONEY] * (len(BUCKETS) + 2))), tuple(rows), 0)
+
+
+ITEM_CARD_LABELS = {"receipt": "استلام شراء", "issue": "صرف", "return": "مرتجع بيع", "restock": "عكس مرتجع مورد"}
+
+
+def item_card(con, item_id: str, start: str, end: str) -> Table:
+    """Every stock movement of one item with its lot and running quantity, opening balance first."""
+    start, end = _range(start, end)
+    try:
+        item = con.execute("SELECT id, code, name FROM items WHERE id = ? AND kind IN ('tire', 'battery')",
+                           (int(item_id),)).fetchone()
+    except ValueError:
+        item = None
+    if item is None:
+        raise ReportError("اختر صنفًا مخزّنًا")
+    opening = con.execute("SELECT coalesce(sum(qty), 0) FROM stock_movements WHERE item_id = ? AND date(at) < ?",
+                          (item[0], start)).fetchone()[0]
+    rows = [("head", ("", "رصيد أول الفترة", "", "", str(opening), ""))]
+    running = opening
+    for at, kind, qty, ref, dot, src_type, src_no, pr_no in con.execute(
+            "SELECT m.at, m.kind, m.qty, l.ref_no, coalesce(l.dot, ''), si.source_type, "
+            "coalesce(s.number, ''), coalesce(prt.number, '') FROM stock_movements m "
+            "JOIN stock_lots l ON l.id = m.lot_id LEFT JOIN stock_issues si ON si.id = m.issue_id "
+            "LEFT JOIN sales s ON si.source_type = 'sale' AND s.id = si.source_id "
+            "LEFT JOIN purchase_return_lines prl ON prl.id = m.purchase_return_line_id "
+            "LEFT JOIN purchase_returns prt ON prt.id = prl.return_id "
+            "WHERE m.item_id = ? AND date(m.at) BETWEEN ? AND ? ORDER BY m.at, m.id", (item[0], start, end)):
+        running += qty
+        if kind == "issue" and src_type == "purchase_return":
+            label = "مرتجع للمورد"
+        else:
+            label = ITEM_CARD_LABELS[kind]
+        rows.append(("line", (at[:10], label, f"{ref}" + (f" · DOT {dot}" if dot else ""), src_no or pr_no,
+                              str(qty), str(running))))
+    closing = running
+    rows.append(("grand", ("", "رصيد آخر الفترة", "", "", str(closing), "")))
+    on_hand = con.execute("SELECT coalesce(sum(qty_on_hand), 0) FROM stock_lots WHERE item_id = ?",
+                          (item[0],)).fetchone()[0]
+    after = con.execute("SELECT coalesce(sum(qty), 0) FROM stock_movements WHERE item_id = ? AND date(at) > ?",
+                        (item[0], end)).fetchone()[0]
+    tie = "يطابق رصيد الدفعات" if closing + after == on_hand else f"تحذير: رصيد الدفعات الحالي = {on_hand}"
+    return Table("item_card", TITLES["item_card"], f"{item[1]} · {item[2]} · من {start} إلى {end} · {tie}",
+                 ("التاريخ", "الحركة", "الدفعة", "المرجع", "الكمية", "الرصيد"),
+                 (DATE, TEXT, CODE, CODE, CODE, CODE), tuple(rows), 1)
+
+
 def build(con, key: str, start: str, end: str, account: str = "", compare: bool = False,
           full: bool = False) -> Table:
     if key == "income":
@@ -659,6 +756,10 @@ def build(con, key: str, start: str, end: str, account: str = "", compare: bool 
         return purchases(con, start, end)
     if key == "returns":
         return returns(con, start, end)
+    if key == "supplier_aging":
+        return supplier_aging(con, end)
+    if key == "item_card":
+        return item_card(con, account, start, end)
     raise ReportError("تقرير غير معروف")
 
 
