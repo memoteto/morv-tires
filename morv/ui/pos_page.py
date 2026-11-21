@@ -52,10 +52,8 @@ class PosPage(QWidget):
         root.addWidget(self.notice)
         main = QHBoxLayout()
         main.setSpacing(16)
-        main.addLayout(self._build_right_column(), 3)
-        main.addLayout(self._build_left_column(), 1)
         content = QWidget()
-        content.setLayout(main)
+        content.setLayout(self._build_right_column())
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -65,7 +63,9 @@ class PosPage(QWidget):
         # widgets now, so they compress to fit; this policy is a hard backstop.
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(content)
-        root.addWidget(scroll, 1)
+        main.addWidget(scroll, 3)
+        main.addWidget(self._build_left_panel(), 1)
+        root.addLayout(main, 1)
         root.addLayout(self._build_hints())
         self._shortcuts()
 
@@ -265,13 +265,48 @@ class PosPage(QWidget):
         self._rows_container.addStretch(1)
         return box
 
-    def _build_left_column(self) -> QVBoxLayout:
-        col = QVBoxLayout()
+    def _build_left_panel(self) -> QWidget:
+        """Summary and payment scroll on their own; the action buttons stay pinned underneath."""
+        panel = QWidget()
+        outer = QVBoxLayout(panel)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(10)
+        footer = self._actions_footer()      # built first: the payment card reacts to post_btn
+        inner = QWidget()
+        col = QVBoxLayout(inner)
+        col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(16)
         col.addWidget(self._summary_card())
         col.addWidget(self._payment_card())
         col.addStretch(1)
-        return col
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(inner)
+        outer.addWidget(scroll, 1)
+        outer.addWidget(footer)
+        return panel
+
+    def _actions_footer(self) -> QWidget:
+        footer = QWidget()
+        col = QVBoxLayout(footer)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(8)
+        self.post_btn = QPushButton("اعتماد وتحصيل")
+        self.post_btn.setObjectName("primaryLarge")
+        self.post_btn.setIcon(icons.icon("check", "#FFFFFF", 20))
+        inner = QHBoxLayout(self.post_btn)
+        inner.setContentsMargins(16, 0, 16, 0)
+        inner.addStretch(1)
+        inner.addWidget(self._kbd("F9", on_primary=True))
+        self.post_btn.clicked.connect(self.post)
+        col.addWidget(self.post_btn)
+        row = QHBoxLayout()
+        row.addWidget(self._deferred_button("حفظ كمسودة"), 1)
+        row.addWidget(self._deferred_button("اعتماد وطباعة", "printer"), 1)
+        col.addLayout(row)
+        return footer
 
     def _summary_card(self) -> QFrame:
         box, body, _head = self._card("ملخص الفاتورة", "sales")
@@ -373,19 +408,6 @@ class PosPage(QWidget):
         body.addWidget(self.split_btn, 0, Qt.AlignmentFlag.AlignLeading)
         body.addWidget(self.split)
 
-        self.post_btn = QPushButton("اعتماد وتحصيل")
-        self.post_btn.setObjectName("primaryLarge")
-        self.post_btn.setIcon(icons.icon("check", "#FFFFFF", 20))
-        inner = QHBoxLayout(self.post_btn)
-        inner.setContentsMargins(16, 0, 16, 0)
-        inner.addStretch(1)
-        inner.addWidget(self._kbd("F9", on_primary=True))
-        self.post_btn.clicked.connect(self.post)
-        body.addWidget(self.post_btn)
-        row = QHBoxLayout()
-        row.addWidget(self._deferred_button("حفظ كمسودة"), 1)
-        row.addWidget(self._deferred_button("اعتماد وطباعة", "printer"), 1)
-        body.addLayout(row)
         self._on_method_changed()
         return box
 
