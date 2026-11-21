@@ -48,12 +48,14 @@ def _key(request_key: str) -> str:
 
 
 def customer_balance(con: sqlite3.Connection, customer_id: int) -> int:
-    """Credit-sale debt still owed by the customer: credit sales minus credit refunds minus live receipts."""
+    """Debt owed by the customer: opening balance plus credit sales, less refunds and live receipts."""
     sold = con.execute("SELECT coalesce(sum(p.amount), 0) FROM sale_payments p JOIN sales s ON s.id = p.sale_id "
                        "WHERE s.customer_id=? AND p.method='credit'", (customer_id,)).fetchone()[0]
     refunded = con.execute(f"SELECT coalesce(sum({CREDIT_PART}), 0) FROM sale_returns r JOIN sales s "
                            "ON s.id = r.sale_id WHERE s.customer_id=?", (customer_id,)).fetchone()[0]
-    return sold - refunded - received(con, customer_id) - applied_deposits(con, customer_id)
+    opening = con.execute("SELECT coalesce(sum(amount), 0) FROM active_opening_lines WHERE customer_id=?",
+                          (customer_id,)).fetchone()[0]
+    return opening + sold - refunded - received(con, customer_id) - applied_deposits(con, customer_id)
 
 
 _DEPOSIT_JOIN = "FROM customer_deposits d LEFT JOIN customer_deposits o ON o.id = d.reverses_id WHERE d.customer_id=?"

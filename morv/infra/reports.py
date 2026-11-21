@@ -277,6 +277,11 @@ def credit_aging(con, end: str) -> Table:
         entry = [sid, due, amount]
         invoices.setdefault(cid, [name, []])[1].append(entry)
         by_sale[sid] = entry
+    for cid, name, day, days, amount in con.execute(
+            "SELECT cu.id, cu.name, o.opening_date, cu.credit_days, o.amount FROM active_opening_lines o "
+            "JOIN customers cu ON cu.id = o.customer_id WHERE o.opening_date <= ?", (end,)):
+        due = (date.fromisoformat(day) + timedelta(days=days)).isoformat()
+        invoices.setdefault(cid, [name, []])[1].insert(0, [None, due, amount])   # the opening is the oldest debt
     for sid, refunded in con.execute(
             f"SELECT r.sale_id, sum({customer_receipts.CREDIT_PART}) FROM sale_returns r WHERE r.return_date <= ? "
             "GROUP BY r.sale_id", (end,)):
@@ -336,7 +341,7 @@ SOURCE_TEXT = {"sale": "بيع", "sale_return": "مرتجع بيع", "purchase_i
                "treasury_movement": "حركة خزينة", "cash_closing": "إقفال صندوق", "safe_count": "جرد خزنة",
                "installment_contract": "عقد تقسيط", "installment_payment": "تحصيل قسط",
                "customer_receipt": "سند قبض",
-               "interest_recognition": "فوائد تقسيط", "interest_recognition_reversal": "عكس فوائد تقسيط", "stock_adjustment": "تسوية جرد",
+               "interest_recognition": "فوائد تقسيط", "interest_recognition_reversal": "عكس فوائد تقسيط", "opening_balance": "رصيد افتتاحي", "stock_adjustment": "تسوية جرد",
                "customer_deposit": "عربون عميل", "purchase_return": "مرتجع مورد", "profit_distribution": "توزيع أرباح",
                "stock_issue": "صرف مخزون"}
 
@@ -465,6 +470,10 @@ def supplier_balances(con, end: str) -> Table:
             "FROM purchase_returns r JOIN suppliers s ON s.id = r.supplier_id "
             "JOIN journal_entries e ON e.id = r.journal_entry_id WHERE e.entry_date <= ? GROUP BY s.id", (end,)):
         per.setdefault(sid, [name, 0, 0])[1] -= back
+    for sid, name, opening in con.execute(
+            "SELECT s.id, s.name, sum(o.amount) FROM active_opening_lines o JOIN suppliers s ON s.id = o.supplier_id "
+            "WHERE o.opening_date <= ? GROUP BY s.id", (end,)):
+        per.setdefault(sid, [name, 0, 0])[1] += opening
     for sid, name, paid in con.execute(
             "SELECT s.id, s.name, sum(CASE m.kind WHEN 'supplier_payment' THEN m.amount ELSE -m.amount END) "
             "FROM treasury_movements m JOIN suppliers s ON s.id = m.supplier_id "
@@ -637,6 +646,11 @@ def supplier_aging(con, end: str) -> Table:
             "WHERE e.entry_date <= ? ORDER BY p.invoice_date, p.id", (end,)):
         due = (date.fromisoformat(day) + timedelta(days=days)).isoformat()
         invoices.setdefault(sid, [name, []])[1].append([due, total])
+    for sid, name, days, day, amount in con.execute(
+            "SELECT s.id, s.name, s.payment_days, o.opening_date, o.amount FROM active_opening_lines o "
+            "JOIN suppliers s ON s.id = o.supplier_id WHERE o.opening_date <= ?", (end,)):
+        due = (date.fromisoformat(day) + timedelta(days=days)).isoformat()
+        invoices.setdefault(sid, [name, []])[1].insert(0, [due, amount])        # the opening is the oldest debt
     settled: dict[int, int] = {}
     for sid, net in con.execute(
             "SELECT r.supplier_id, sum(CASE r.kind WHEN 'return' THEN r.total ELSE -r.total END) "

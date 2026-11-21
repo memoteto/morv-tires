@@ -5,18 +5,21 @@ from dataclasses import dataclass
 from morv.infra import ledger
 
 CUSTOMER_ACCOUNT = "1310"
-TEXTS = {"sale": "فاتورة بيع آجلة", "sale_return": "مرتجع بيع", "customer_receipt": "سند قبض", "customer_deposit": "تسوية عربون على الدين"}
+TEXTS = {"sale": "فاتورة بيع آجلة", "sale_return": "مرتجع بيع", "customer_receipt": "سند قبض", "customer_deposit": "تسوية عربون على الدين",
+         "opening_balance": "رصيد افتتاحي"}
 
 _MOVES = (
     "SELECT e.entry_date, l.debit, l.credit, e.source_type, e.source_id, "
-    "coalesce(s.number, r.number, cr.number, cd.number, e.source_type || '#' || e.source_id), "
-    "coalesce(s.customer_id, rs.customer_id, cr.customer_id, cd.customer_id) "
+    "coalesce(s.number, r.number, cr.number, cd.number, ob.number, e.source_type || '#' || e.source_id), "
+    "coalesce(s.customer_id, rs.customer_id, cr.customer_id, cd.customer_id, ol.customer_id) "
     "FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id "
     "LEFT JOIN sales s ON e.source_type = 'sale' AND s.id = e.source_id "
     "LEFT JOIN sale_returns r ON e.source_type = 'sale_return' AND r.id = e.source_id "
     "LEFT JOIN sales rs ON rs.id = r.sale_id "
     "LEFT JOIN customer_receipts cr ON e.source_type = 'customer_receipt' AND cr.id = e.source_id "
     "LEFT JOIN customer_deposits cd ON e.source_type = 'customer_deposit' AND cd.id = e.source_id "
+    "LEFT JOIN opening_balance_lines ol ON e.source_type = 'opening_balance' AND ol.id = e.source_id "
+    "LEFT JOIN opening_balances ob ON ob.id = ol.opening_id "
     f"WHERE l.account_code = '{CUSTOMER_ACCOUNT}' "
     "ORDER BY e.entry_date, e.id, l.line_no")
 
