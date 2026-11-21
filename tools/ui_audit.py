@@ -102,6 +102,7 @@ def run(out: Path, size: tuple) -> dict:
     item_id = con.execute("SELECT id FROM items ORDER BY id LIMIT 1").fetchone()[0]
     session = Session(con, admin)
     geo = app.primaryScreen().availableGeometry()
+    print(f"audit: app ready on {app.platformName()} screen {geo.width()}x{geo.height()}", flush=True)
     report: dict = {"platform": app.platformName(), "screen": [geo.width(), geo.height()], "pages": {}, "dialogs": {}}
     out.mkdir(parents=True, exist_ok=True)
     for dark in (False, True):
@@ -117,6 +118,7 @@ def run(out: Path, size: tuple) -> dict:
             for key, _title, _icon, _phase in NAV:
                 win.go_key(key)
                 _settle(app)
+                print(f"audit: page {key} {mode}", flush=True)
                 name = f"page_{key}_{w}x{h}_{mode}"
                 win.grab().save(str(out / f"{name}.png"))
                 report["pages"][name] = _measure(win)
@@ -176,10 +178,15 @@ def main() -> int:
     out = Path(args[0] if args else "ui_audit_out")
     native = "--native" in sys.argv
     one = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--size=")), None)
+    if one:
+        import faulthandler
+        faulthandler.enable()
     if one:      # child process: one screen size per process, since the screen is fixed at start-up
         w, h = (int(v) for v in one.split("x"))
         part = run(out, (w, h))
+        print(f"audit: {one} captured {len(part['pages'])} pages, {len(part['dialogs'])} dialogs", flush=True)
         (out / f"report_{one}.json").write_text(json.dumps(part, ensure_ascii=False, indent=1), encoding="utf-8")
+        print("audit: report written", flush=True)
         return 0
     out.mkdir(parents=True, exist_ok=True)
     report: dict = {"pages": {}, "dialogs": {}, "screens": {}}
