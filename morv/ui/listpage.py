@@ -241,6 +241,10 @@ class ListPage(QWidget):
         self.view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.view.setAlternatingRowColors(True)
         self.view.verticalHeader().setVisible(False)
+        # Rows are told apart by alternating colours; vertical grid lines only added noise
+        self.view.setShowGrid(False)
+        # Titles start where their cell text starts, instead of floating centred over wide columns
+        self.view.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignLeading | Qt.AlignmentFlag.AlignVCenter)
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)   # the name column stretches
         self.view.horizontalHeader().setMinimumSectionSize(90)

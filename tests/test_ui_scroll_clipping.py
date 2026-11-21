@@ -36,8 +36,21 @@ class ScrollAreaClippingTest(unittest.TestCase):
             has = area.viewport().width()
             off = area.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
             if (off and needs > has) or area.horizontalScrollBar().isVisible():
-                found.append(f"{area.objectName() or type(content).__name__}: content needs {needs}px, viewport {has}px")
+                found.append(f"{area.objectName() or type(content).__name__}: content needs {needs}px, viewport {has}px"
+                             f" [{self.widest(content)}]")
         return found
+
+    @staticmethod
+    def widest(content) -> str:
+        """Names the widgets that force the width, so a failure points at its cause."""
+        from PySide6.QtWidgets import QWidget
+        rows = []
+        for w in content.findChildren(QWidget):
+            mw = w.minimumSizeHint().width()
+            if mw >= 240 and w.isVisibleTo(content):
+                label = getattr(w, "text", lambda: "")() if hasattr(w, "text") else ""
+                rows.append((mw, f"{type(w).__name__}#{w.objectName()} '{str(label)[:20]}' {mw}px"))
+        return "; ".join(t for _, t in sorted(rows, reverse=True)[:8])
 
     def test_main_pages_do_not_clip_content_at_common_sizes(self):
         from morv.infra import settings
