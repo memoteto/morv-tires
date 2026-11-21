@@ -8,9 +8,10 @@ from pathlib import Path
 
 from morv.core.sales_rules import Payment
 from morv.infra import customer_receipts as cr
-from morv.infra import customer_statement, ledger, period_lock, sales, users
+from morv.infra import customer_statement, ledger, period_lock, sale_returns, sales, users
 from morv.infra.customer_receipts import ReceiptError
 from morv.infra.db.bootstrap import open_main_db
+from morv.infra.sale_returns import ReturnLineIn
 from morv.infra.sales import SaleError, SaleLineIn
 
 
@@ -134,6 +135,29 @@ class CustomerReceiptsTest(unittest.TestCase):
         with self.assertRaises(ReceiptError):
             self.receipt(1000)
         self.assertEqual(cr.history(self.con, self.cust), [])
+
+    def credit_return(self, sale, key):
+        line = self.con.execute("SELECT id FROM sale_lines WHERE sale_id=?", (sale.id,)).fetchone()[0]
+        return sale_returns.post_return(self.con, self.admin, request_key=key, sale_id=sale.id,
+                                        lines=[ReturnLineIn(line, 1)], reason="إلغاء الخدمة", return_date="2026-02-20")
+
+    def test_credit_return_cannot_exceed_the_remaining_debt(self):
+        sale = self.credit_sale(100000)
+        self.receipt(100000)
+        with self.assertRaises(sale_returns.ReturnError):
+            self.credit_return(sale, "ret-key-0001")
+        self.assertEqual(ledger.account_balance(self.con, "1310"), 0)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM sale_returns").fetchone()[0], 0)
+
+    def test_credit_return_within_the_debt_still_posts_and_partial_debt_refuses(self):
+        sale = self.credit_sale(100000)
+        self.receipt(40000)
+        with self.assertRaises(sale_returns.ReturnError):
+            self.credit_return(sale, "ret-key-0001")
+        cr.reverse_receipt(self.con, self.admin, request_key="rev-key-0001",
+                           receipt_id=cr.history(self.con, self.cust)[0][0], reason="خطأ")
+        self.credit_return(sale, "ret-key-0002")
+        self.assertEqual(ledger.account_balance(self.con, "1310"), 0)
 
     def test_documents_are_immutable(self):
         self.credit_sale(100000)
