@@ -5,7 +5,7 @@ import sqlite3
 from dataclasses import dataclass
 
 from morv.core.money import fmt
-from morv.infra import ledger
+from morv.infra import ledger, treasury
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, has_permission
 
@@ -107,6 +107,34 @@ def reconcile(con: sqlite3.Connection, by, *, request_key: str, account: str, st
             raise ReconciliationError("هذا الحساب مطابَق في هذا التاريخ بالفعل") from e
         audit(con, by, "bank.reconcile", "bank_reconciliation", new_id, f"{number} · فرق {difference}")
     return Reconciled(new_id, number, difference, False)
+
+
+def reconcile_fee(con: sqlite3.Connection, by, *, request_key: str, account: str, statement_date: str,
+                  statement_balance: int, reference: str | None = None) -> Reconciled:
+    """Books a statement shortfall as a bank-fee expense, then saves a matching record."""
+    _require(con, by)
+    key = _key(request_key)
+    old = con.execute("SELECT id, number, difference FROM bank_reconciliations WHERE request_key=?", (key,)).fetchone()
+    if old:
+        return Reconciled(old[0], old[1], old[2], True)
+    try:
+        day = ledger.valid_date(statement_date, "تاريخ الرصيد")
+    except ledger.LedgerError as e:
+        raise ReconciliationError(str(e)) from e
+    if account not in ACCOUNTS or type(statement_balance) is not int:
+        raise ReconciliationError("بيانات المطابقة غير صالحة")
+    shortfall = program_balance(con, account, day) - statement_balance
+    if shortfall <= 0:
+        raise ReconciliationError("الكشف ليس أقل من البرنامج؛ لا يوجد مصروف يُسجَّل")
+    try:
+        treasury.post_movement(con, by, request_key=f"{key}-fee", kind="expense", amount=shortfall,
+                               memo="رسوم بنكية حسب كشف الحساب", money_account=account, other_account="5260",
+                               movement_date=day, reference=reference, confirmed=True)
+    except (treasury.TreasuryError, ledger.LedgerError) as e:
+        raise ReconciliationError(str(e)) from e
+    return reconcile(con, by, request_key=key, account=account, statement_date=day,
+                     statement_balance=statement_balance, expected_program=program_balance(con, account, day),
+                     reference=reference)
 
 
 def cancel(con: sqlite3.Connection, by, *, request_key: str, reconciliation_id: int, memo: str) -> Reconciled:

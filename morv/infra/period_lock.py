@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from morv.core.money import fmt
-from morv.infra import bank_reconciliation, cash_closing, interest_review, ledger
+from morv.infra import bank_reconciliation, cash_closing, interest_review, ledger, safe_count
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, has_permission
 
@@ -90,8 +90,9 @@ def blockers(con: sqlite3.Connection, through: str) -> list[str]:
 
 
 def warnings(con: sqlite3.Connection, through: str) -> list[str]:
-    """Findings that never stop a lock: bank and wallet accounts not reconciled up to the last movement."""
-    return bank_reconciliation.gaps(con, through)
+    """Findings that never stop a lock: safe not counted and bank or wallet accounts not reconciled."""
+    safe = safe_count.gap(con, through)
+    return ([safe] if safe else []) + bank_reconciliation.gaps(con, through)
 
 
 def lock_period(con: sqlite3.Connection, by, *, request_key: str, through_date: str,

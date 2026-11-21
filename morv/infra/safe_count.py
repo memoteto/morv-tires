@@ -49,6 +49,21 @@ def days_since_count(con: sqlite3.Connection, today: str | None = None) -> int |
     return (date.fromisoformat(today or date.today().isoformat()) - date.fromisoformat(last[2])).days
 
 
+def gap(con: sqlite3.Connection, through: str) -> str | None:
+    """A finding when the safe moved up to the date but no live count covers its last movement."""
+    last_move = con.execute(
+        "SELECT max(e.entry_date) FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id "
+        "WHERE e.status = 'posted' AND l.account_code = ? AND e.entry_date <= ?", (SAFE, through)).fetchone()[0]
+    if last_move is None:
+        return None
+    last = latest_count(con)
+    if last is None:
+        return f"الخزنة: لم تُجرد قط وآخر حركة {last_move}"
+    if last[2] < last_move:
+        return f"الخزنة: آخر جرد {last[2]} يسبق آخر حركة {last_move}"
+    return None
+
+
 def _lines(difference: int, reverse: bool = False) -> list:
     amount = abs(difference)
     other = SHORTAGE if difference < 0 else OVERAGE

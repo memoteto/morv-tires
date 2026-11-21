@@ -2,7 +2,7 @@
 import uuid
 from datetime import date
 
-from PySide6.QtWidgets import QComboBox, QDialog, QLabel, QLineEdit
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLabel, QLineEdit
 
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
@@ -42,6 +42,9 @@ class ReconciliationDialog(Modal):
         f.addRow("سبب الفرق", self.memo)
         f.addRow("مرجع الكشف", self.reference)
         self.body.addLayout(f)
+        self.fee_box = QCheckBox("سجّل الفرق كمصروف بنكي (رسوم) بتاريخ الرصيد ثم احفظ محضرًا مطابقًا")
+        self.fee_box.setVisible(False)
+        self.body.addWidget(self.fee_box)
         self.last_note = muted("")
         self.body.addWidget(self.last_note)
         self.cancel_btn = danger_button("إلغاء آخر محضر لهذا الحساب")
@@ -84,6 +87,9 @@ class ReconciliationDialog(Modal):
             self.diff_label.setText("—")
             return
         side = "الكشف أعلى من البرنامج" if diff > 0 else "الكشف أقل من البرنامج" if diff < 0 else "متطابق"
+        self.fee_box.setVisible(diff < 0)
+        if diff >= 0:
+            self.fee_box.setChecked(False)
         self.diff_label.setText(f"{ltr(fmt(diff))} ({side})")
 
     def save(self) -> None:
@@ -97,10 +103,16 @@ class ReconciliationDialog(Modal):
             self.notice.show_message("تاريخ الرصيد غير صالح")
             return
         try:
-            self.saved = br.reconcile(
-                self.session.con, self.session.user, request_key=self._key, account=self.account.currentData(),
-                statement_date=self.date.text().strip(), statement_balance=statement, expected_program=book,
-                reference=self.reference.text(), memo=self.memo.text())
+            if self.fee_box.isChecked():
+                self.saved = br.reconcile_fee(
+                    self.session.con, self.session.user, request_key=self._key, account=self.account.currentData(),
+                    statement_date=self.date.text().strip(), statement_balance=statement,
+                    reference=self.reference.text())
+            else:
+                self.saved = br.reconcile(
+                    self.session.con, self.session.user, request_key=self._key, account=self.account.currentData(),
+                    statement_date=self.date.text().strip(), statement_balance=statement, expected_program=book,
+                    reference=self.reference.text(), memo=self.memo.text())
         except (ReconciliationError, ledger.LedgerError) as e:
             self.notice.show_message(str(e))
             return
