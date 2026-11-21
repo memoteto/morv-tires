@@ -99,5 +99,11 @@ class ItemCardTest(Base):
         self.assertNotIn(str(self.service), ids)
 
 
+class JournalLabelsTest(unittest.TestCase):
+    def test_new_document_sources_have_arabic_labels(self):
+        for source in ("customer_deposit", "purchase_return", "interest_recognition_reversal"):
+            self.assertIn(source, reports.SOURCE_TEXT)
+
+
 if __name__ == "__main__":
     unittest.main()

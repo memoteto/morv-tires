@@ -54,6 +54,33 @@ class InstallmentsUiTest(unittest.TestCase):
         btn = self.page().list_page.interest_btn
         self.assertTrue(btn.isEnabled() and not btn.isHidden())
 
+    def test_reverse_dialog_reverses_the_latest_month_and_the_button_is_shown(self):
+        from morv.core.sales_rules import Payment
+        from morv.infra import installments, interest_recognition, sales
+        from morv.infra.sales import SaleLineIn
+        from morv.ui.interest_dialogs import ReverseInterestDialog
+        empty = ReverseInterestDialog(self.session)
+        self.addCleanup(empty.deleteLater)
+        self.assertEqual(empty.choice.count(), 0)
+        item = self.con.execute("SELECT id FROM items").fetchone()[0]
+        old = sales.post_sale(self.con, self.admin, request_key="ui-ic-sale-2", customer_id=self.cust,
+                              lines=[SaleLineIn(item, 1, 1200000)], payments=[Payment("installment", 1200000)],
+                              sale_date="2025-07-10")
+        contract = installments.post_contract(
+            self.con, self.admin, request_key="ui-ic-contract-2", sale_id=old.id, down=200000, rate_bp=1500, months=10,
+            first_due="2025-08-13", national_id="29001011201234", down_method="cash", contract_date="2025-07-13")
+        interest_recognition.recognise_month(self.con, self.admin, contract_id=contract.id, period="2025-07",
+                                             entry_date="2025-09-15")
+        dlg = ReverseInterestDialog(self.session)
+        self.addCleanup(dlg.deleteLater)
+        self.assertEqual(dlg.choice.count(), 1)
+        dlg.reason.setText("تاريخ خاطئ")
+        dlg.save()
+        self.assertIsNotNone(dlg.saved)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM active_interest_recognitions").fetchone()[0], 0)
+        btn = self.page().list_page.reverse_interest_btn
+        self.assertTrue(btn.isEnabled() and not btn.isHidden())
+
     def opened_form(self):
         p = self.page()
         p.list_page.open_dialog(None)

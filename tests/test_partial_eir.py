@@ -163,6 +163,8 @@ class PartialModificationMigrationTest(unittest.TestCase):
                 first_due="2025-08-13", national_id="29001011201234",
                 down_method="cash", contract_date="2025-07-13",
             )
+            # v14 predates reversals; current code reads the view, so an old schema gets the equivalent one
+            con.execute("CREATE VIEW active_interest_recognitions AS SELECT * FROM interest_recognitions")
             interest_recognition.recognise_month(
                 con, manager, contract_id=contract.id, period="2025-07",
                 entry_date="2025-08-01",
@@ -179,6 +181,7 @@ class PartialModificationMigrationTest(unittest.TestCase):
                 lines=[ReturnLineIn(line_id, 1)],
                 reason="مرتجع اختبار", return_date="2025-09-02",
             )
+            con.execute("DROP VIEW active_interest_recognitions")
             tables = (
                 "schema_migrations", "installment_contracts", "installment_rows",
                 "installment_payments", "installment_payment_lines",

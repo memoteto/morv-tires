@@ -101,13 +101,13 @@ def _installment_settlement(con, sale_id: int, amount: int, day: str) -> Install
         "SELECT max(payment_date) FROM installment_payments WHERE contract_id=?", (cid,),
     ).fetchone()[0]
     last_interest = con.execute(
-        "SELECT max(entry_date) FROM interest_recognitions WHERE contract_id=?", (cid,),
+        "SELECT max(entry_date) FROM active_interest_recognitions WHERE contract_id=?", (cid,),
     ).fetchone()[0]
     if day < max(d for d in (contract_date, last_payment, last_interest) if d):
         raise ReturnError("تاريخ إلغاء التقسيط يسبق عقدًا أو تحصيلًا أو قيد فائدة مرحّلًا")
 
     recognized = con.execute(
-        "SELECT coalesce(sum(amount),0) FROM interest_recognitions WHERE contract_id=?",
+        "SELECT coalesce(sum(amount),0) FROM active_interest_recognitions WHERE contract_id=?",
         (cid,),
     ).fetchone()[0]
     if not 0 <= recognized <= markup:
