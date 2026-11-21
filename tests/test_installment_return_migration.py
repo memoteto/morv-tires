@@ -52,13 +52,15 @@ class MigrationOfExistingData(unittest.TestCase):
             self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
             self.assertEqual(con.execute("SELECT id,total,refund_method FROM sale_returns").fetchall(), before)
             self.assertEqual(con.execute("SELECT return_id FROM sale_return_lines").fetchone()[0], old_return.id)
-            self.assertEqual(inventory.reconcile(con), [])
             self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual({table: tuple(con.execute(f"SELECT * FROM {table} ORDER BY rowid"))
                               for table in original}, original)
             self.assertEqual({code: ledger.account_balance(con, code)
                               for code in balance_before}, balance_before)
             self.assertEqual(current_version(con), 13)
+            migrate(con)      # reconcile reads tables of the latest schema, so it runs after the full upgrade
+            self.assertEqual(inventory.reconcile(con), [])
+            self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
         finally:
             if con is not None:
                 con.close()
