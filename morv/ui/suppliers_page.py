@@ -1,5 +1,7 @@
 """Suppliers screen: list, preview and add or edit dialog."""
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLineEdit, QPlainTextEdit, QSpinBox, QWidget
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QDialog, QLineEdit, QPlainTextEdit, QPushButton, QSpinBox, QWidget,
+)
 
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
@@ -7,6 +9,7 @@ from morv.infra import purchase_view, suppliers
 from morv.infra.suppliers import Supplier
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
+from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
 from morv.ui.widgets import ask, danger_button, form, ltr_edit, muted, primary_button
 
 
@@ -72,6 +75,21 @@ class SuppliersPage(ListPage):
             toggle = danger_button("إيقاف" if s.active else "تفعيل", "pause" if s.active else "play")
             toggle.clicked.connect(lambda: self.toggle_active(s))
             self.actions(edit, toggle)
+        if self.session.can("purchases.post"):
+            send_back = QPushButton("مرتجع للمورد")
+            send_back.clicked.connect(lambda: self.open_return(s))
+            returns = QPushButton("مرتجعات المورد")
+            returns.clicked.connect(lambda: self.open_returns(s))
+            self.actions(send_back, returns)
+
+    def open_return(self, s: Supplier) -> None:
+        dlg = PurchaseReturnDialog(self.session, s.id, s.name, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.reload(keep_id=s.id)
+
+    def open_returns(self, s: Supplier) -> None:
+        SupplierReturnsDialog(self.session, s.id, s.name, self).exec()
+        self.reload(keep_id=s.id)
 
     def toggle_active(self, s: Supplier) -> None:
         verb = "إيقاف" if s.active else "تفعيل"
