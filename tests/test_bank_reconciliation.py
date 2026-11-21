@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from morv.infra import bank_reconciliation as br
-from morv.infra import ledger, users
+from morv.infra import ledger, period_lock, users
 from morv.infra.bank_reconciliation import ReconciliationError
 from morv.infra.db.bootstrap import open_main_db
 from morv.infra.db.connection import transaction
@@ -106,6 +106,27 @@ class BankReconciliationTest(unittest.TestCase):
         br.cancel(self.con, self.admin, request_key=self.key(), reconciliation_id=new.id, memo="خطأ إدخال")
         self.assertEqual(br.latest(self.con, "1210")[0], old.id)
         self.assertEqual(self.rec(700000, day="2026-10-31").difference, 0)
+
+    def test_gaps_name_each_account_with_a_reason_and_clear_when_reconciled(self):
+        gaps = br.gaps(self.con, "2026-10-31")
+        self.assertEqual(len(gaps), 2)
+        self.assertTrue(all("لم تُطابَق قط" in g for g in gaps))
+        self.assertEqual(br.gaps(self.con, "2026-10-01"), [])
+        self.rec(700000, day="2026-10-20")
+        self.rec(90000, day="2026-10-10", account="1230")
+        self.assertEqual(br.gaps(self.con, "2026-10-31"), [])
+        self.post("2026-10-28", "1210", 1000)
+        self.assertIn("تسبق آخر حركة", br.gaps(self.con, "2026-10-31")[0])
+        self.post("2026-10-05", "1230", 1000)
+        self.assertIn("تغيّر رصيد البرنامج", br.gaps(self.con, "2026-10-31")[1])
+
+    def test_unsettled_difference_is_reported_and_warnings_never_block_a_lock(self):
+        self.rec(695000, day="2026-10-20", memo="رسوم")
+        self.rec(90000, day="2026-10-10", account="1230")
+        self.assertIn("فرق غير مسوّى", br.gaps(self.con, "2026-10-20")[0])
+        self.assertEqual(period_lock.warnings(self.con, "2026-10-31"), br.gaps(self.con, "2026-10-31"))
+        self.assertEqual(period_lock.blockers(self.con, "2026-10-31"), [])
+        period_lock.lock_period(self.con, self.admin, request_key=self.key(), through_date="2026-10-31")
 
     def test_records_are_immutable(self):
         doc = self.rec(700000)

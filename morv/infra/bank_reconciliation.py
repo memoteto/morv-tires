@@ -4,6 +4,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 
+from morv.core.money import fmt
 from morv.infra import ledger
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, has_permission
@@ -147,3 +148,25 @@ def history(con: sqlite3.Connection, account: str) -> list[tuple]:
         "FROM bank_reconciliations WHERE account_code = ? ORDER BY id DESC", (account,)).fetchall()
 
 
+
+
+def gaps(con: sqlite3.Connection, through: str) -> list[str]:
+    """Accounts with activity up to the date that are unreconciled, stale, drifted or off."""
+    names = dict(con.execute("SELECT code, name FROM accounts WHERE code IN (?,?,?)", ACCOUNTS).fetchall())
+    out = []
+    for code in ACCOUNTS:
+        last_move = con.execute(
+            "SELECT max(e.entry_date) FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id "
+            "WHERE e.status = 'posted' AND l.account_code = ? AND e.entry_date <= ?", (code, through)).fetchone()[0]
+        if last_move is None:
+            continue
+        last = latest(con, code)
+        if last is None:
+            out.append(f"{names[code]}: لم تُطابَق قط وآخر حركة {last_move}")
+        elif last[2] < last_move:
+            out.append(f"{names[code]}: آخر مطابقة {last[2]} تسبق آخر حركة {last_move}")
+        elif drifted(con, code):
+            out.append(f"{names[code]}: تغيّر رصيد البرنامج بعد مطابقة {last[2]}")
+        elif last[5]:
+            out.append(f"{names[code]}: مطابقة {last[2]} بها فرق غير مسوّى {fmt(last[5])}")
+    return out
