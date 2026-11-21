@@ -60,7 +60,8 @@ class ReportsPageTest(unittest.TestCase):
         self.assertEqual([page.report_combo.itemData(i) for i in range(page.report_combo.count())],
                          list(reports_keys))
         for key in ("trial", "ledger", "sales_profit", "aging", "suspended", "daily_sales", "top_items",
-                    "slow_moving", "journal", "suppliers", "income"):
+                    "slow_moving", "journal", "suppliers", "income", "credit_aging", "stock_valuation",
+                    "expenses", "collections", "purchases", "returns"):
             page.report_combo.setCurrentIndex(page.report_combo.findData(key))
             self.assertEqual(page.table.key, key)
             self.assertEqual(page.model.columnCount(), len(page.table.headers))
