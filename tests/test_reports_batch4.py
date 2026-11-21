@@ -66,12 +66,12 @@ class CollectionsTest(_Shop):
         customer_receipts.post_receipt(self.con, self.admin, request_key=self.key("rc"), customer_id=self.cust,
                                        amount=20000, method="transfer", receipt_date="2026-11-12")
         t = reports.collections(self.con, "2026-11-01", "2026-11-30")
-        self.assertEqual(lines(t), [("2026-11-12", 60000, 0, 60000, 40000, 20000)])
+        self.assertEqual(lines(t), [("2026-11-12", 60000, 0, 0, 60000, 40000, 20000)])
         self.assertIn("يطابق الدفتر", t.subtitle)
         customer_receipts.reverse_receipt(self.con, self.admin, request_key=self.key("rv"), receipt_id=first.id,
                                           reason="خطأ")
         net = reports.collections(self.con, "2026-11-01", "2026-12-31")
-        self.assertEqual(net.rows[-1][1][3], 20000)
+        self.assertEqual(net.rows[-1][1][4], 20000)
         self.assertIn("يطابق الدفتر", net.subtitle)
 
 

@@ -278,9 +278,18 @@ def credit_aging(con, end: str) -> Table:
             "GROUP BY r.sale_id", (end,)):
         if sid in by_sale:
             by_sale[sid][2] -= min(refunded, by_sale[sid][2])
+    settled: dict[int, int] = {}
     for cid, net in con.execute(
             "SELECT customer_id, sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END) "
             "FROM customer_receipts WHERE receipt_date <= ? GROUP BY customer_id", (end,)):
+        settled[cid] = net
+    for cid, net in con.execute(
+            "SELECT d.customer_id, sum(CASE WHEN d.kind = 'apply' THEN d.amount WHEN d.kind = 'reversal' "
+            "AND o.kind = 'apply' THEN -d.amount ELSE 0 END) FROM customer_deposits d "
+            "LEFT JOIN customer_deposits o ON o.id = d.reverses_id WHERE d.doc_date <= ? GROUP BY d.customer_id",
+            (end,)):
+        settled[cid] = settled.get(cid, 0) + net
+    for cid, net in settled.items():
         left = net
         for entry in invoices.get(cid, (None, []))[1]:
             take = min(left, entry[2])
@@ -523,14 +532,14 @@ def expenses(con, start: str, end: str) -> Table:
 
 
 def collections(con, start: str, end: str) -> Table:
-    """Customer receipts and instalment payments per day, split cash and non-cash, tied to the ledger."""
+    """Receipts, instalment payments and net deposits per day, split cash and non-cash, tied to the ledger."""
     start, end = _range(start, end)
     days: dict[str, list] = {}
 
     def add(day, slot, method, amount):
-        row = days.setdefault(day, [0, 0, 0, 0])      # receipts, instalments, cash, non-cash
+        row = days.setdefault(day, [0, 0, 0, 0, 0])   # receipts, instalments, deposits, cash, non-cash
         row[slot] += amount
-        row[2 if method == "cash" else 3] += amount
+        row[3 if method == "cash" else 4] += amount
 
     for day, method, amount in con.execute(
             "SELECT receipt_date, method, sum(CASE kind WHEN 'receipt' THEN amount ELSE -amount END) "
@@ -540,15 +549,26 @@ def collections(con, start: str, end: str) -> Table:
             "SELECT payment_date, method, sum(amount) FROM installment_payments WHERE payment_date BETWEEN ? AND ? "
             "GROUP BY payment_date, method", (start, end)):
         add(day, 1, method, amount)
-    rows = [("line", (day, v[0], v[1], v[0] + v[1], v[2], v[3])) for day, v in sorted(days.items())]
-    totals = [sum(r[1][i] for r in rows) for i in range(1, 6)]
+    deposit_money = applied = 0
+    for day, method, kind, original, amount in con.execute(
+            "SELECT d.doc_date, d.method, d.kind, o.kind, d.amount FROM customer_deposits d "
+            "LEFT JOIN customer_deposits o ON o.id = d.reverses_id WHERE d.doc_date BETWEEN ? AND ?", (start, end)):
+        if kind == "apply" or original == "apply":
+            applied += amount if kind == "apply" else -amount
+            continue
+        signed = amount if (kind == "deposit" or original == "refund") else -amount
+        deposit_money += signed
+        add(day, 2, method, signed)
+    rows = [("line", (day, v[0], v[1], v[2], v[0] + v[1] + v[2], v[3], v[4])) for day, v in sorted(days.items())]
+    totals = [sum(r[1][i] for r in rows) for i in range(1, 7)]
     rows.append(("grand", ("الإجمالي", *totals)))
     ok_receipts = _ledger_net(con, "1310", start, end, "customer_receipt", credit=True) == totals[0]
     ok_instal = _ledger_net(con, "1320", start, end, "installment_payment", credit=True) == totals[1]
-    tie = "يطابق الدفتر" if ok_receipts and ok_instal else "تحذير: لا يطابق الدفتر"
+    ok_deposits = _ledger_net(con, "2340", start, end, "customer_deposit", credit=True) + applied == deposit_money
+    tie = "يطابق الدفتر" if ok_receipts and ok_instal and ok_deposits else "تحذير: لا يطابق الدفتر"
     return Table("collections", TITLES["collections"], f"من {start} إلى {end} · {tie}",
-                 ("التاريخ", "سندات القبض", "أقساط التقسيط", "الإجمالي", "نقدًا", "غير نقدي"),
-                 (DATE, MONEY, MONEY, MONEY, MONEY, MONEY), tuple(rows), 0)
+                 ("التاريخ", "سندات القبض", "أقساط التقسيط", "عربون (صافٍ)", "الإجمالي", "نقدًا", "غير نقدي"),
+                 (DATE, MONEY, MONEY, MONEY, MONEY, MONEY, MONEY), tuple(rows), 0)
 
 
 def purchases(con, start: str, end: str) -> Table:
