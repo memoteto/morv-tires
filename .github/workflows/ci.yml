@@ -91,3 +91,38 @@ jobs:
           name: ${{ steps.art.outputs.name }}
           path: dist/MorvTires
           retention-days: 14
+
+  ui-audit:
+    permissions:
+      contents: write
+    # لقطات الصفحات والنوافذ على Windows بدقتين وبالوضعين، وتقرير قياس (معلوماتي، لا يفشل على الملاحظات)
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: تثبيت المتطلبات
+        run: python -m pip install -r requirements.txt
+      - name: لقطات وقياسات الواجهة
+        run: python tools/ui_audit.py ui_audit_out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-audit
+          path: ui_audit_out
+      - name: رفع الصور إلى فرع معزول للمراجعة (مؤقت)
+        if: always()
+        shell: bash
+        run: |
+          cd ui_audit_out
+          git init -q -b ui-audit-images
+          git config user.name "ui-audit"
+          git config user.email "ui-audit@users.noreply.github.com"
+          git add -A
+          git commit -q -m "ui audit images"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ui-audit-images
