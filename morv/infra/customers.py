@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from morv.core import validate
 from morv.core.text import norm_ar
 from morv.infra.db.connection import transaction
-from morv.infra.users import audit
+from morv.infra.users import audit, require
 
 TYPES = {"individual": "فرد", "workshop": "ورشة / مركز صيانة", "company": "شركة / أسطول", "trader": "تاجر"}
 LEVELS = {"retail": "قطاعي", "wholesale": "جملة", "super": "جملة الجملة"}
@@ -104,6 +104,7 @@ def _save_vehicles(con, customer_id: int, vehicles: list) -> None:
 
 
 def create(con, by, c: Customer) -> Customer:
+    require(con, by, "customers.manage", CustomerError)
     _clean(c)
     dup = _duplicate(con, c.mobile, None)
     if dup:
@@ -122,6 +123,7 @@ def create(con, by, c: Customer) -> Customer:
 
 
 def update(con, by, c: Customer) -> Customer:
+    require(con, by, "customers.manage", CustomerError)
     _clean(c)
     old = get(con, c.id)
     dup = _duplicate(con, c.mobile, c.id)
@@ -146,6 +148,7 @@ def update(con, by, c: Customer) -> Customer:
 
 
 def set_active(con, by, customer_id: int, active: bool) -> None:
+    require(con, by, "customers.manage", CustomerError)
     with transaction(con):
         con.execute("UPDATE customers SET active=? WHERE id=?", (int(active), customer_id))
         audit(con, by, "customer.activate" if active else "customer.deactivate", "customer", customer_id)
@@ -156,6 +159,7 @@ def has_documents(con, customer_id: int) -> bool:
 
 
 def delete(con, by, customer_id: int) -> None:
+    require(con, by, "customers.manage", CustomerError)
     if has_documents(con, customer_id):
         raise CustomerError("للعميل مستندات مسجّلة؛ أوقفه بدل حذفه")
     c = get(con, customer_id)

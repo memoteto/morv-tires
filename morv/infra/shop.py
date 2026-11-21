@@ -7,6 +7,7 @@ from pathlib import Path
 from morv.core.money import to_latin
 from morv.infra import paths, settings
 from morv.infra.db.connection import transaction
+from morv.infra.users import require
 
 LOGO_FILE = "shop_logo.png"
 _PHONE = re.compile(r"^01[0-9]{9}$")
@@ -56,7 +57,8 @@ def put(con, name: str, phone: str, address: str) -> None:
     settings.put(con, "shop.address", address)
 
 
-def save(con, name: str, phone: str, address: str) -> Shop:
+def save(con, by, name: str, phone: str, address: str) -> Shop:
+    require(con, by, "settings.edit", ShopError)
     values = check(name, phone, address)
     with transaction(con):
         put(con, *values)

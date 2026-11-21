@@ -84,6 +84,8 @@ def check_new_user(username: str, display_name: str, password: str, role: str) -
 def create_user(con, by: User | None, username: str, display_name: str, password: str, role: str,
                 must_change_pw: bool = False) -> User:
     u, pw_hash = check_new_user(username, display_name, password, role)
+    if not (by is None and con.execute("SELECT 1 FROM users").fetchone() is None):   # only the very first manager is unauthenticated
+        require(con, by, "users.manage")
     with transaction(con):
         uid = insert_user(con, by, u, display_name.strip(), role, pw_hash, must_change_pw)
     return get_user(con, uid)
@@ -129,6 +131,7 @@ def _active_managers(con, excluding: int | None = None) -> int:
 
 
 def set_active(con, by: User, user_id: int, active: bool) -> None:
+    require(con, by, "users.manage", AuthError)
     target = get_user(con, user_id)
     if not active:
         if by.id == user_id:
@@ -141,6 +144,7 @@ def set_active(con, by: User, user_id: int, active: bool) -> None:
 
 
 def set_role(con, by: User, user_id: int, role: str) -> None:
+    require(con, by, "users.manage", AuthError)
     if role not in security.ROLES:
         raise AuthError("دور غير معروف")
     target = get_user(con, user_id)
@@ -153,6 +157,7 @@ def set_role(con, by: User, user_id: int, role: str) -> None:
 
 
 def set_permission(con, by: User, user_id: int, perm: str, allowed: bool, limit_value: int | None = None) -> None:
+    require(con, by, "users.manage", AuthError)
     if perm not in security.PERMISSIONS:
         raise AuthError("صلاحية غير معروفة")
     with transaction(con):
@@ -173,6 +178,12 @@ def has_permission(con, user: User, perm: str) -> bool:
     return perm in permissions(con, user)
 
 
+def require(con, by, perm: str, error=AuthError) -> None:
+    """Refuse the write unless the acting user holds the permission (the UI is not the only gate)."""
+    if by is None or not has_permission(con, by, perm):
+        raise error(f"لا تملك صلاحية: {security.PERMISSIONS[perm]}")
+
+
 def permission_limit(con, user: User, perm: str) -> int | None:
     """Numeric cap for a permission; None means unlimited (managers), a missing cap means 0."""
     if user.is_manager:
@@ -187,6 +198,8 @@ def set_password(con, by: User, user_id: int, new_password: str, must_change: bo
         pw_hash = security.hash_password(new_password)
     except ValueError as e:
         raise AuthError(str(e)) from e
+    if by.id != user_id:
+        require(con, by, "users.manage")
     with transaction(con):
         con.execute("UPDATE users SET pw_hash=?, must_change_pw=?, failed_count=0, locked_until=NULL WHERE id=?",
                     (pw_hash, int(must_change), user_id))

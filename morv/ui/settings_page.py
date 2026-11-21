@@ -167,7 +167,7 @@ class ShopTab(QWidget):
 
     def save(self) -> None:
         try:
-            shop.save(self.session.con, self.name.text(), self.phone.text(), self.address.text())
+            shop.save(self.session.con, self.session.user, self.name.text(), self.phone.text(), self.address.text())
         except shop.ShopError as e:
             self.notice.show_message(str(e))
             return

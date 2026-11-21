@@ -23,7 +23,7 @@ class _Device(unittest.TestCase):
         os.environ["MORV_DATA_DIR"] = str(self.dir)
         self.db = self.dir / "morv_tires.db"
         self.con = open_main_db(self.db)
-        users.create_user(self.con, None, "admin", "المدير", "Admin12345", "manager")
+        self.admin = users.create_user(self.con, None, "admin", "المدير", "Admin12345", "manager")
         self.rk = security.new_recovery_key()
         backup.setup_encryption(self.con, PW, self.rk)
 
@@ -69,7 +69,7 @@ class Defect1AtomicRestore(_Device):
 
     def test_failed_replace_leaves_db_byte_identical(self):
         f = self._backup_file()
-        users.create_user(self.con, None, "later", "لاحق", "Later12345", "cashier")
+        users.create_user(self.con, self.admin, "later", "لاحق", "Later12345", "cashier")
         self.con.close()
         before = self.db.read_bytes()
         with mock.patch("morv.infra.backup.os.replace", side_effect=OSError("قرص ممتلئ")):
@@ -91,7 +91,7 @@ class Defect1AtomicRestore(_Device):
 
     def test_successful_restore_replaces_and_keeps_safety_copy(self):
         f = self._backup_file()
-        users.create_user(self.con, None, "later", "لاحق", "Later12345", "cashier")
+        users.create_user(self.con, self.admin, "later", "لاحق", "Later12345", "cashier")
         self.con.close()
         safety = backup.restore_file(self.db, f, secret=PW)
         self.assertTrue(safety and safety.exists())
@@ -189,14 +189,14 @@ class Defect3ResumableSetup(_Device):
 
 class Defect4Transactions(_Device):
     def test_failed_role_change_rolls_back_and_connection_recovers(self):
-        cashier = users.create_user(self.con, None, "karim", "كريم", "Karim12345", "cashier")
+        cashier = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
         admin = users.get_user(self.con, 1)
         with mock.patch("morv.infra.users.audit", side_effect=RuntimeError("فشل مُحاكى")):
             with self.assertRaises(RuntimeError):
                 users.set_role(self.con, admin, cashier.id, "manager")
         self.assertFalse(self.con.in_transaction)
         self.assertEqual(users.get_user(self.con, cashier.id).role, "cashier")
-        users.create_user(self.con, None, "next", "التالي", "Next12345", "cashier")   # must work
+        users.create_user(self.con, self.admin, "next", "التالي", "Next12345", "cashier")   # must work
 
     def test_nested_transaction_is_refused(self):
         with self.assertRaises(NestedTransaction):
