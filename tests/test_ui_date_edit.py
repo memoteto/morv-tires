@@ -21,23 +21,17 @@ class DateEditTest(unittest.TestCase):
         self.assertEqual(w.text(), date.today().isoformat())
         self.assertTrue(w.calendarPopup())
 
-    def test_value_reads_left_to_right_in_an_rtl_app_while_the_calendar_stays_rtl(self):
+    def test_shown_text_starts_with_the_year_in_both_directions(self):
         from PySide6.QtCore import Qt
-        w = self.make()
-        self.assertEqual(w.layoutDirection(), Qt.LayoutDirection.LeftToRight)
-        self.assertEqual(w.calendarWidget().layoutDirection(), Qt.LayoutDirection.RightToLeft)
-
-    def test_shown_text_starts_with_the_year_inside_an_rtl_parent(self):
-        from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QDateEdit, QWidget
-        from morv.ui.widgets import DateEdit, dispose
-        parent = QWidget()
-        parent.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.addCleanup(dispose, parent, self.app)
-        w = DateEdit()
-        w.setParent(parent)
-        w.setText("2026-11-05")
-        self.assertEqual(QDateEdit.text(w), "2026-11-05")      # what the box shows, not the ISO value
+        from PySide6.QtWidgets import QDateEdit
+        self.addCleanup(self.app.setLayoutDirection, self.app.layoutDirection())
+        for direction in (Qt.LayoutDirection.RightToLeft, Qt.LayoutDirection.LeftToRight):
+            with self.subTest(direction=direction):
+                self.app.setLayoutDirection(direction)
+                w = self.make()
+                w.setText("2026-11-05")
+                self.assertEqual(QDateEdit.text(w), "2026-11-05")      # what the box shows
+                self.assertEqual(w.text(), "2026-11-05")               # the ISO value
 
     def test_set_and_read_back_iso(self):
         w = self.make()

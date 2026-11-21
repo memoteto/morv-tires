@@ -1,5 +1,5 @@
 """Small shared UI pieces, so screens stay consistent."""
-from PySide6.QtCore import QDate, Qt, Signal
+from PySide6.QtCore import QDate, QEvent, Qt, Signal
 from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QPushButton, QToolButton, QVBoxLayout, QWidget)
 
@@ -75,11 +75,8 @@ class DateEdit(QDateEdit):
         self.setObjectName("dateEdit")
         self.optional = optional
         self._raw: str | None = None
-        # Before the format: Qt orders the date's sections by direction when the format is set, so in an
-        # RTL window it showed 21-11-2026. The Latin value runs LTR on its own, like ltr_edit.
-        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.setCalendarPopup(True)
-        self.setDisplayFormat("yyyy-MM-dd")
+        self._apply_format()
         self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
         self.setMinimumDate(self._BLANK)
         if not allow_future:      # posting engines refuse future dates, so the calendar offers none
@@ -88,11 +85,19 @@ class DateEdit(QDateEdit):
             self.setSpecialValueText(" ")
         cal = self.calendarWidget()
         cal.setObjectName("dateCalendar")
-        cal.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
         cal.setGridVisible(False)
         self.setDate(self._BLANK if optional else QDate.currentDate())
         self.dateChanged.connect(self._changed)
+
+    def _apply_format(self) -> None:
+        """Qt lays a date's sections out by direction, so RTL needs the mirrored format to show 2026-11-21."""
+        self.setDisplayFormat("dd-MM-yyyy" if self.isRightToLeft() else "yyyy-MM-dd")
+
+    def changeEvent(self, e) -> None:
+        super().changeEvent(e)
+        if e.type() == QEvent.Type.LayoutDirectionChange:
+            self._apply_format()
 
     def _changed(self, _day) -> None:
         self._raw = None
