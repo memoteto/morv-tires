@@ -78,7 +78,7 @@ def _gain_cost(con, i: int, ln: AdjustLine) -> tuple:
         source = ("source_lot", ln.source_lot_id)
     elif ln.dot:
         ref = con.execute("SELECT purchase_unit_cost, id FROM stock_lots WHERE item_id=? AND dot=? "
-                          "AND purchase_line_id IS NOT NULL ORDER BY id DESC LIMIT 1", (ln.item_id, ln.dot)).fetchone()
+                          "AND adjustment_line_id IS NULL ORDER BY id DESC LIMIT 1", (ln.item_id, ln.dot)).fetchone()
         source = ("source_lot", ref[1] if ref else None)
     if ref:
         if ln.manual_unit_cost is not None:

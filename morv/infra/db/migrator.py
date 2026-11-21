@@ -9,7 +9,8 @@ from pathlib import Path
 MIGRATIONS_DIR = Path(__file__).with_name("migrations")
 _NAME = re.compile(r"^(\d{4})_([a-z0-9_]+)\.sql$")
 
-_FK_OFF = {(13, "installment_returns"), (29, "stock_adjustments")}   # rebuild parent tables with live children
+_FK_OFF = {(13, "installment_returns"), (29, "stock_adjustments"),
+           (31, "opening_inventory")}   # rebuild parent tables with live children
 
 _BOOTSTRAP = """CREATE TABLE IF NOT EXISTS schema_migrations (
   version    INTEGER PRIMARY KEY,
