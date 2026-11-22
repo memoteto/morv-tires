@@ -8,7 +8,7 @@ from morv.core.text import ltr
 from morv.infra import profit, treasury
 from morv.ui.modal import Modal
 from morv.ui.profit_dialogs import ShareSetDialog
-from morv.ui.widgets import action_row, danger_button, field, form, ltr_edit, muted, Notice, primary_button
+from morv.ui.widgets import Notice, action_row, danger_button, form, ltr_edit, muted, primary_button
 
 
 class PartnersTab(QWidget):
@@ -105,7 +105,7 @@ class NewPartnerDialog(Modal):
         self.created = None
         f = form()
         self.name = QLineEdit()
-        f.addRow(field("اسم الشريك *", self.name))
+        f.addRow("اسم الشريك *", self.name)
         self.body.addLayout(f)
         self.add_footer("حفظ", self.save)
 

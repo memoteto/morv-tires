@@ -8,7 +8,7 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.infra import ledger, opening_balances
 from morv.infra.opening_balances import OpeningError, OpeningLine
 from morv.ui.modal import Modal
-from morv.ui.widgets import danger_button, DateEdit, field, form, ltr_edit, muted, Notice, primary_button
+from morv.ui.widgets import DateEdit, Notice, danger_button, form, ltr_edit, muted, primary_button
 
 TYPES = [("account", "نقدية أو بنك أو أصل أو التزام"), ("customer", "رصيد عميل"), ("supplier", "رصيد مورد"),
          ("partner_capital", "رأس مال شريك"), ("partner_current", "جاري شريك (الموجب له، والسالب عليه)"),
@@ -37,14 +37,14 @@ class OpeningBalancesDialog(Modal):
         self.date.setText(date.today().isoformat())
         self.note = QLineEdit()
         self.note.setPlaceholderText("ملاحظة (اختياري)")
-        f.addRow(field("النوع *", self.kind))
-        f.addRow(field("الحساب أو الطرف", self.target))
-        f.addRow(field("المبلغ", self.amount))
-        f.addRow(field("الكمية (مخزون)", self.qty))
-        f.addRow(field("تكلفة الوحدة (مخزون)", self.unit_cost))
-        f.addRow(field("DOT (مخزون)", self.dot))
-        f.addRow(field("تاريخ بدء التشغيل *", self.date))
-        f.addRow(field("ملاحظة", self.note))
+        f.addRow("النوع *", self.kind)
+        f.addRow("الحساب أو الطرف", self.target)
+        f.addRow("المبلغ", self.amount)
+        f.addRow("الكمية (مخزون)", self.qty)
+        f.addRow("تكلفة الوحدة (مخزون)", self.unit_cost)
+        f.addRow("DOT (مخزون)", self.dot)
+        f.addRow("تاريخ بدء التشغيل *", self.date)
+        f.addRow("ملاحظة", self.note)
         self.body.addLayout(f)
         self.summary = muted("لم تُضف أسطر بعد.")
         self.body.addWidget(self.summary)
@@ -141,7 +141,7 @@ class ReverseOpeningDialog(Modal):
         f = form()
         self.reason = QLineEdit()
         self.reason.setPlaceholderText("سبب العكس (إلزامي)")
-        f.addRow(field("سبب العكس *", self.reason))
+        f.addRow("سبب العكس *", self.reason)
         self.body.addLayout(f)
         self.add_footer("عكس الأرصدة", self.save)
 

@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel, QLineE
 from morv import APP_NAME
 from morv.core import security
 from morv.infra import backup, setup, shop, users, vault
-from morv.ui.widgets import field, form, ltr_edit, muted, Notice, PasswordEdit, primary_button
+from morv.ui.widgets import Notice, PasswordEdit, form, ltr_edit, muted, primary_button
 
 STEPS_NEW = ["البداية", "بيانات المحل", "حساب المدير", "كلمة مرور النسخ", "مفتاح الاسترداد", "مراجعة وإنهاء"]
 STEPS_RESTORE = ["البداية", "ملف النسخة"]
@@ -168,9 +168,9 @@ class SetupWizard(QDialog):
         self.shop_phone = ltr_edit("01xxxxxxxxx")
         self.shop_addr = QLineEdit()
         self.shop_addr.setPlaceholderText("المدينة — الشارع")
-        f.addRow(field("اسم المحل *", self.shop_name))
-        f.addRow(field("رقم الهاتف *", self.shop_phone))
-        f.addRow(field("العنوان", self.shop_addr))
+        f.addRow("اسم المحل *", self.shop_name)
+        f.addRow("رقم الهاتف *", self.shop_phone)
+        f.addRow("العنوان", self.shop_addr)
         lay.addLayout(f)
         lay.addStretch(1)
         return w
@@ -198,11 +198,11 @@ class SetupWizard(QDialog):
         self.admin_pw2 = PasswordEdit()
         self.admin_strength = muted("8 أحرف على الأقل، ويُفضّل خلط حروف وأرقام")
         self.admin_pw.edit.textChanged.connect(self._strength)
-        f.addRow(field("اسمك *", self.admin_name))
-        f.addRow(field("اسم الدخول *", self.admin_user))
-        f.addRow(field("كلمة المرور *", self.admin_pw))
-        f.addRow(self.admin_strength)
-        f.addRow(field("تأكيد كلمة المرور *", self.admin_pw2))
+        f.addRow("اسمك *", self.admin_name)
+        f.addRow("اسم الدخول *", self.admin_user)
+        f.addRow("كلمة المرور *", self.admin_pw)
+        f.addRow("", self.admin_strength)
+        f.addRow("تأكيد كلمة المرور *", self.admin_pw2)
         lay.addLayout(f)
         lay.addStretch(1)
         return w
@@ -242,11 +242,9 @@ class SetupWizard(QDialog):
         pick.clicked.connect(self._pick_usb)
         usb_row.addWidget(self.usb_dir, 1)
         usb_row.addWidget(pick)
-        usb_box = QWidget()
-        usb_box.setLayout(usb_row)
-        f.addRow(field("كلمة مرور النسخ *", self.bk_pw))
-        f.addRow(field("تأكيدها *", self.bk_pw2))
-        f.addRow(field("مجلد الفلاشة", usb_box))
+        f.addRow("كلمة مرور النسخ *", self.bk_pw)
+        f.addRow("تأكيدها *", self.bk_pw2)
+        f.addRow("مجلد الفلاشة", usb_row)
         lay.addLayout(f)
         lay.addWidget(muted("النسخ اليومي تلقائي على الجهاز. الفلاشة تُنسخ إليها عند الطلب وعند إغلاق البرنامج إن كانت موصولة، "
                             "ويذكّرك البرنامج إن مرّ أسبوع بلا نسخة عليها."))
@@ -287,7 +285,7 @@ class SetupWizard(QDialog):
         lay.addWidget(warn)
         f = form()
         self.key_confirm = ltr_edit("أعد كتابة المفتاح كاملًا للتأكيد")
-        f.addRow(field("للتأكيد، اكتب المفتاح *", self.key_confirm))
+        f.addRow("للتأكيد، اكتب المفتاح *", self.key_confirm)
         lay.addLayout(f)
         lay.addStretch(1)
         return w
@@ -341,13 +339,11 @@ class SetupWizard(QDialog):
         pick.clicked.connect(self._pick_restore)
         row.addWidget(self.restore_file, 1)
         row.addWidget(pick)
-        row_box = QWidget()
-        row_box.setLayout(row)
         self.restore_info = muted("")
         self.restore_pw = PasswordEdit("كلمة مرور النسخ أو مفتاح الاسترداد")
-        f.addRow(field("ملف النسخة *", row_box))
-        f.addRow(self.restore_info)
-        f.addRow(field("كلمة المرور أو المفتاح *", self.restore_pw))
+        f.addRow("ملف النسخة *", row)
+        f.addRow("", self.restore_info)
+        f.addRow("كلمة المرور أو المفتاح *", self.restore_pw)
         lay.addLayout(f)
         lay.addStretch(1)
         return w

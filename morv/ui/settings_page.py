@@ -11,7 +11,8 @@ from morv.core.text import ltr
 from morv.infra import backup, settings, shop, users, vault
 from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
-from morv.ui.widgets import (ask, card, danger_button, field, form, info, ltr_edit, muted, Notice, PasswordEdit, primary_button)
+from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, form, info, ltr_edit, muted,
+                             primary_button)
 
 SHORTCUTS = [("F2", "التركيز على مربع البحث في شاشات القوائم"), ("Ctrl+N", "إضافة جديد في شاشة القوائم المفتوحة"),
              ("Ctrl+B", "طي الشريط الجانبي أو فتحه"), ("Ctrl+D", "التبديل بين الوضع الفاتح والداكن"),
@@ -87,8 +88,8 @@ class AppearanceTab(QWidget):
             self.size.addItem(ltr(str(s)), s)
         self.size.setCurrentIndex(list(theme.FONT_SIZES).index(
             int(settings.get(session.con, "ui.font_size", str(theme.DEFAULT_SIZE)))))
-        f.addRow(field("الخط", self.family))
-        f.addRow(field("حجم الخط", self.size))
+        f.addRow("الخط", self.family)
+        f.addRow("حجم الخط", self.size)
         inner.addLayout(f)
         self.sample = QLabel("نموذج: إطار ميشلان Primacy 4 مقاس " + ltr("205/55R16") + " بسعر " + ltr("6,450.00"))
         self.sample.setWordWrap(True)
@@ -119,9 +120,9 @@ class ShopTab(QWidget):
         self.phone = ltr_edit("01xxxxxxxxx")
         self.phone.setText(data.phone)
         self.address = QLineEdit(data.address)
-        f.addRow(field("اسم المحل *", self.name))
-        f.addRow(field("رقم الهاتف *", self.phone))
-        f.addRow(field("العنوان", self.address))
+        f.addRow("اسم المحل *", self.name)
+        f.addRow("رقم الهاتف *", self.phone)
+        f.addRow("العنوان", self.address)
         logo_row = QHBoxLayout()
         self.logo = QLabel()
         self.logo.setFixedSize(96, 96)
@@ -134,9 +135,7 @@ class ShopTab(QWidget):
         logo_row.addWidget(pick)
         logo_row.addWidget(remove)
         logo_row.addStretch(1)
-        logo_box = QWidget()
-        logo_box.setLayout(logo_row)
-        f.addRow(field("الشعار", logo_box))
+        f.addRow("الشعار", logo_row)
         inner.addLayout(f)
         self.notice = Notice()
         inner.addWidget(self.notice)
@@ -210,7 +209,7 @@ class UsersTab(QWidget):
         for key, label in security.ROLES.items():
             self.role.addItem(label, key)
         self.role.currentIndexChanged.connect(self._role_changed)
-        f.addRow(field("الدور", self.role))
+        f.addRow("الدور", self.role)
         inner.addLayout(f)
         inner.addWidget(muted("الصلاحيات (المدير يملكها كلها دائمًا):"))
         self.checks: dict[str, QCheckBox] = {}
@@ -343,10 +342,10 @@ class NewUserDialog(Modal):
         for key, label in security.ROLES.items():
             self.role.addItem(label, key)
         self.role.setCurrentIndex(list(security.ROLES).index("cashier"))
-        f.addRow(field("الاسم *", self.name))
-        f.addRow(field("اسم الدخول *", self.username))
-        f.addRow(field("كلمة مرور مؤقتة *", self.password))
-        f.addRow(field("الدور", self.role))
+        f.addRow("الاسم *", self.name)
+        f.addRow("اسم الدخول *", self.username)
+        f.addRow("كلمة مرور مؤقتة *", self.password)
+        f.addRow("الدور", self.role)
         lay.addLayout(f)
         lay.addWidget(muted("يُطلب من المستخدم تغيير كلمة المرور عند أول دخول."))
         self.add_footer("حفظ", self.save)
@@ -368,7 +367,7 @@ class TempPasswordDialog(Modal):
         self.session, self.target = session, target
         f = form()
         self.password = PasswordEdit()
-        f.addRow(field("كلمة المرور المؤقتة", self.password))
+        f.addRow("كلمة المرور المؤقتة", self.password)
         self.body.addLayout(f)
         self.add_footer("حفظ", self.save)
 
@@ -631,12 +630,12 @@ class SecretDialog(Modal):
         lay = self.body
         f = form()
         self.cur = PasswordEdit()
-        f.addRow(field(label, self.cur))
+        f.addRow(label, self.cur)
         if new_password:
             self.new = PasswordEdit()
             self.new2 = PasswordEdit()
-            f.addRow(field("كلمة المرور الجديدة", self.new))
-            f.addRow(field("تأكيدها", self.new2))
+            f.addRow("كلمة المرور الجديدة", self.new)
+            f.addRow("تأكيدها", self.new2)
         lay.addLayout(f)
         self.add_footer("متابعة", self.go)
 
@@ -701,8 +700,8 @@ class RestoreConfirmDialog(Modal):
         self.login_pw = PasswordEdit()
         self.word = QLineEdit()
         self.word.setPlaceholderText("استعادة")
-        f.addRow(field("كلمة مرور دخولك", self.login_pw))
-        f.addRow(field("للتأكيد اكتب: استعادة", self.word))
+        f.addRow("كلمة مرور دخولك", self.login_pw)
+        f.addRow("للتأكيد اكتب: استعادة", self.word)
         lay.addLayout(f)
         self.add_footer("حفظ نسخة أمان ثم الاستعادة", self.go).setObjectName("danger")
 

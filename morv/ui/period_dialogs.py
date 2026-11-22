@@ -8,7 +8,7 @@ from morv.core.text import ltr
 from morv.infra import ledger, period_lock
 from morv.infra.period_lock import LockError
 from morv.ui.modal import Modal
-from morv.ui.widgets import danger_button, DateEdit, field, form, muted
+from morv.ui.widgets import DateEdit, danger_button, form, muted
 
 
 class PeriodLockDialog(Modal):
@@ -25,8 +25,8 @@ class PeriodLockDialog(Modal):
         self.through.setText((first_of_month - timedelta(days=1)).isoformat())
         self.memo = QLineEdit()
         self.memo.setPlaceholderText("ملاحظة (اختياري)")
-        f.addRow(field("قفل حتى تاريخ *", self.through))
-        f.addRow(field("ملاحظة", self.memo))
+        f.addRow("قفل حتى تاريخ *", self.through)
+        f.addRow("ملاحظة", self.memo)
         self.body.addLayout(f)
         self.blockers = muted("")
         self.body.addWidget(self.blockers)
@@ -74,7 +74,7 @@ class UnlockDialog(Modal):
         self.body.addWidget(muted("يُسجَّل مستند فتح بسببه، ويُفتح آخر قفل فقط؛ وما قبله يبقى مقفلًا."))
         f = form()
         self.memo = QLineEdit()
-        f.addRow(field("سبب الفتح *", self.memo))
+        f.addRow("سبب الفتح *", self.memo)
         self.body.addLayout(f)
         self.add_footer("فتح الفترة", self.save)
 
