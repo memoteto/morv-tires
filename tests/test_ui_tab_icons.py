@@ -51,6 +51,22 @@ class TabAndHeaderIconsTest(unittest.TestCase):
             self.assertEqual("", head.text(), f"column {col} still spends width on a title")
             self.assertEqual(ItemFieldsTab.COLS[col], head.toolTip(), f"column {col} lost its tooltip")
 
+    def test_the_settings_tabs_still_fit_on_one_row_at_1366(self):
+        from morv.ui.shell import MainWindow
+        from morv.ui.widgets import dispose
+        win = MainWindow(self.session, self.app)
+        win.health_timer.stop()
+        self.addCleanup(dispose, win, self.app)
+        win.resize(1366, 768)
+        win.show()
+        win.go_key("settings")
+        self.app.processEvents()
+        tabs = win.stack.currentWidget().tabs
+        needed = tabs.tabBar().sizeHint().width()
+        room = tabs.width()
+        self.assertLessEqual(needed, room,
+                             f"the tab bar needs {needed}px but has {room}px, so tabs hide behind scroll arrows")
+
     def test_the_icon_columns_are_narrower_than_the_titles_they_replaced(self):
         from PySide6.QtWidgets import QHeaderView
         from morv.ui.inventory_page import ItemFieldsTab

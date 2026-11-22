@@ -45,7 +45,7 @@ class SettingsPage(QWidget):
             self.tabs.addTab(self.shop_tab, muted_icon("home"), "المحل")
         if session.can("users.manage"):
             self.users_tab = UsersTab(session)
-            self.tabs.addTab(self.users_tab, muted_icon("user"), "المستخدمون والصلاحيات")
+            self.tabs.addTab(self.users_tab, muted_icon("user"), "المستخدمون")
             self.audit_tab = AuditTab(session)
             # "sales" is the document glyph; it gets its own name once the icon set is replaced.
             self.tabs.addTab(self.audit_tab, muted_icon("sales"), "سجل العمليات")
