@@ -41,7 +41,7 @@ class InventoryPage(QWidget):
             self.tabs.currentChanged.disconnect(self._refresh_tab)
             self.lots_tab = LotsPage(self._session)
             self.tabs.removeTab(1)
-            self.tabs.insertTab(1, self.lots_tab, "الدفعات (DOT)")
+            self.tabs.insertTab(1, self.lots_tab, muted_icon("calendar"), "الدفعات (DOT)")
             self.tabs.setCurrentIndex(1)
             self.tabs.currentChanged.connect(self._refresh_tab)
             return
@@ -49,7 +49,7 @@ class InventoryPage(QWidget):
             self.tabs.currentChanged.disconnect(self._refresh_tab)
             self.stock_tab = StockPage(self._session)
             self.tabs.removeTab(2)
-            self.tabs.insertTab(2, self.stock_tab, "الجرد والتسويات")
+            self.tabs.insertTab(2, self.stock_tab, muted_icon("check"), "الجرد والتسويات")
             self.tabs.setCurrentIndex(2)
             self.tabs.currentChanged.connect(self._refresh_tab)
             return
