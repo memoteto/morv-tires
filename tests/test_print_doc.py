@@ -55,8 +55,9 @@ class PrintedSheetTest(unittest.TestCase):
         from morv.ui.print_doc import _COLS
         self.assertEqual(("الإجمالي", "السعر", "الكمية", "الصنف", "م"), tuple(t for t, _w in _COLS),
                          "columns are emitted left to right, so the serial comes last")
-        html = self.html()
-        places = [html.index(f">{title}<") for title, _w in _COLS]
+        # Inside the items table only: the serial header and the shop initial are the same letter
+        table = self.html()[self.html().index("border='1'"):]
+        places = [table.index(f">{title}<") for title, _w in _COLS]
         self.assertEqual(sorted(places), places, "the emitted order must match the approved order")
 
     def test_the_sheet_holds_no_column_the_design_does_not_have(self):
@@ -103,8 +104,11 @@ class PrintedSheetTest(unittest.TestCase):
         self.assertNotIn("شكرًا", self.reads(_shop(thanks="")))
 
     def test_the_logo_square_carries_the_first_letter_and_the_switch_removes_it(self):
-        self.assertIn(">م<", self.html(), "no logo file, so the design's blue square stands in")
-        self.assertNotIn(">م<", self.html(_shop(show_logo=False)))
+        from morv.ui.print_doc import BLUE
+        square = f"bgcolor='{BLUE}'><tr><td align='center'"
+        self.assertIn(square, self.html(), "no logo file, so the design's blue square stands in")
+        self.assertIn(">م</td>", self.html().split(square)[1][:120], "the square carries the initial")
+        self.assertNotIn(square, self.html(_shop(show_logo=False)))
 
     def test_every_picture_is_a_resource_the_renderer_holds(self):
         from PySide6.QtCore import QUrl
@@ -147,7 +151,8 @@ class PrintedRollTest(unittest.TestCase):
         html = self.html()
         self.assertNotIn("border='1'", html, "a roll is too narrow for a bordered column table")
         self.assertNotIn(">م<", html, "a roll carries no serial column")
-        self.assertIn("dashed", html, "the design separates a roll's blocks with dashed rules")
+        from morv.ui.print_doc import DASH
+        self.assertIn(f"bgcolor='{DASH}'", html, "the design separates a roll's blocks with rules")
         for text in ("مورف للإطارات", "فاتورة بيع", "إطار ميشلان Primacy 4", "الصافي"):
             self.assertIn(text, html, text)
 

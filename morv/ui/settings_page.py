@@ -264,7 +264,7 @@ class ShopTab(QWidget):
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview.setObjectName("printPreview")
         inner.addWidget(self.preview, 1)
-        trial = primary_button("طباعة صفحة تجريبية")
+        trial = QPushButton("طباعة صفحة تجريبية")
         trial.clicked.connect(self.trial_print)
         trial.setEnabled(self.editable)
         inner.addWidget(trial, 0, Qt.AlignmentFlag.AlignLeading)
