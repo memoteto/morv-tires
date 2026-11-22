@@ -16,7 +16,7 @@ class SalesPage(ListPage):
     add_label = "فاتورة جديدة من نقطة البيع"
     search_placeholder = "رقم الفاتورة، اسم العميل، أو الموبايل (F2)"
     columns = [
-        ("الرقم", lambda r: ltr(r[1])),
+        ("الفاتورة", lambda r: ltr(r[1])),
         ("التاريخ", lambda r: ltr(r[3])),
         ("العميل", lambda r: r[2]),
         ("الدفع", lambda r: r[5] or "—"),
