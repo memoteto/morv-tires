@@ -150,14 +150,13 @@ class ShopTab(QWidget):
                 w.setEnabled(False)
         self._show_logo()
         self._tax_toggled()
+        self._draw_preview()
 
     def _identity_card(self, data) -> QFrame:
         box, inner = card("بيانات المحل")
-        inner.addWidget(muted("تظهر في ترويسة كل مستند مطبوع."))
-        f = form()
         self.name = QLineEdit(data.name)
         self.activity = QLineEdit(data.activity)
-        self.activity.setPlaceholderText("سطر تحت اسم المحل: إطارات · بطاريات · خدمات سريعة")
+        self.activity.setPlaceholderText("إطارات · بطاريات · خدمات سريعة")
         self.phone = ltr_edit("01xxxxxxxxx")
         self.phone.setText(data.phone)
         self.phone2 = ltr_edit("اختياري")
@@ -169,58 +168,56 @@ class ShopTab(QWidget):
         self.hours.setPlaceholderText("السبت - الخميس · 9 ص إلى 10 م")
         self.website = QLineEdit(data.website)
         self.website.setPlaceholderText("صفحة فيسبوك أو موقع")
-        for label, w in (("اسم المحل *", self.name), ("النشاط", self.activity), ("هاتف 1 *", self.phone),
-                         ("هاتف 2", self.phone2), ("واتساب المحل", self.whatsapp), ("العنوان", self.address),
-                         ("مواعيد العمل", self.hours), ("فيسبوك أو موقع", self.website)):
-            f.addRow(label, w)
-        logo_row = QWidget()
-        logo_lay = QHBoxLayout(logo_row)
-        logo_lay.setContentsMargins(0, 0, 0, 0)
+        self.tax_id = ltr_edit("رقم التسجيل الضريبي")
+        self.tax_id.setText(data.tax_id)
+        self.register_no = ltr_edit("رقم السجل التجاري")
+        self.register_no.setText(data.commercial_register)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(8)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
+        pairs = (("اسم المحل *", self.name), ("النشاط", self.activity), ("هاتف 1 *", self.phone),
+                 ("هاتف 2", self.phone2), ("واتساب المحل", self.whatsapp), ("العنوان", self.address),
+                 ("مواعيد العمل", self.hours), ("فيسبوك أو موقع", self.website),
+                 ("الرقم الضريبي", self.tax_id), ("السجل التجاري", self.register_no))
+        for i, (label, widget) in enumerate(pairs):
+            row, col = divmod(i, 2)
+            grid.addWidget(QLabel(label), row, col * 2)
+            grid.addWidget(widget, row, col * 2 + 1)
+        self.tax_registered = QCheckBox("المحل مسجل ضريبيًا — بدونه لا يُطبع رقم ضريبي ولا سجل تجاري")
+        self.tax_registered.setChecked(data.tax_registered)
+        grid.addWidget(self.tax_registered, len(pairs) // 2, 0, 1, 4)
         self.logo = QLabel()
-        self.logo.setFixedSize(64, 64)
+        self.logo.setFixedSize(52, 52)
         self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.pick = QPushButton("اختيار شعار")
         self.pick.clicked.connect(self.pick_logo)
         self.drop = QPushButton("إزالة")
         self.drop.clicked.connect(self.remove_logo)
-        logo_lay.addWidget(self.logo)
-        logo_lay.addWidget(self.pick)
-        logo_lay.addWidget(self.drop)
-        logo_lay.addStretch(1)
-        f.addRow("الشعار", logo_row)
-        self.tax_registered = QCheckBox("المحل مسجل ضريبيًا")
-        self.tax_registered.setChecked(data.tax_registered)
+        logo_row = QHBoxLayout()
+        logo_row.setContentsMargins(0, 0, 0, 0)
+        logo_row.addWidget(QLabel("الشعار"))
+        logo_row.addWidget(self.logo)
+        logo_row.addWidget(self.pick)
+        logo_row.addWidget(self.drop)
+        logo_row.addStretch(1)
+        grid.addLayout(logo_row, len(pairs) // 2 + 1, 0, 1, 4)
         self.tax_registered.toggled.connect(self._tax_toggled)
-        self.tax_id = ltr_edit("رقم التسجيل الضريبي")
-        self.tax_id.setText(data.tax_id)
-        self.register_no = ltr_edit("رقم السجل التجاري")
-        self.register_no.setText(data.commercial_register)
-        f.addRow("", self.tax_registered)
-        f.addRow("الرقم الضريبي", self.tax_id)
-        f.addRow("السجل التجاري", self.register_no)
-        inner.addLayout(f)
+        inner.addLayout(grid)
         return box
 
     def _words_card(self, data) -> QFrame:
-        box, inner = card("نصوص المستندات وما يظهر فيها")
+        box, inner = card("نصوص المستندات")
         f = form()
         self.thanks = QLineEdit(data.thanks)
         self.thanks.setPlaceholderText("شكرًا لتعاملكم معنا")
         self.policy = QPlainTextEdit(data.policy)
         self.policy.setPlaceholderText("الاستبدال خلال 14 يومًا بالفاتورة · الضمان لا يغطي سوء الاستخدام")
-        self.policy.setFixedHeight(56)
+        self.policy.setFixedHeight(52)
         f.addRow("عبارة الشكر", self.thanks)
         f.addRow("سياسة الاستبدال والضمان", self.policy)
         inner.addLayout(f)
-        self.switches = {}
-        for key, label in (("show_logo", "إظهار الشعار في المستندات"),
-                           ("show_whatsapp", "إظهار رقم واتساب في التذييل"),
-                           ("show_hours", "إظهار مواعيد العمل في التذييل"),
-                           ("show_policy", "إظهار السياسة في الفاتورة")):
-            cb = QCheckBox(label)
-            cb.setChecked(getattr(data, key))
-            self.switches[key] = cb
-            inner.addWidget(cb)
         return box
 
     def _print_card(self, data) -> QFrame:
@@ -241,6 +238,17 @@ class ShopTab(QWidget):
         f.addRow("الطابعة", self.printer)
         f.addRow("مقاس الورق", self.paper)
         inner.addLayout(f)
+        self.switches = {}
+        switch_grid = QGridLayout()
+        switch_grid.setHorizontalSpacing(10)
+        for i, (key, label) in enumerate((("show_logo", "الشعار"), ("show_whatsapp", "واتساب"),
+                                          ("show_hours", "المواعيد"), ("show_policy", "السياسة"))):
+            cb = QCheckBox(label)
+            cb.setChecked(getattr(data, key))
+            self.switches[key] = cb
+            switch_grid.addWidget(cb, *divmod(i, 2))
+        inner.addWidget(muted("يظهر في المستند:"))
+        inner.addLayout(switch_grid)
         self.sizes = QTabBar()
         for key, label in PAPER_TABS:
             self.sizes.addTab(label)
@@ -250,17 +258,17 @@ class ShopTab(QWidget):
         self.sizes.currentChanged.connect(self._draw_preview)
         inner.addWidget(self.sizes)
         self.preview = QLabel()
-        self.preview.setMinimumWidth(200)
-        self.preview.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+        self.preview.setMinimumSize(190, 200)
+        self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview.setObjectName("printPreview")
         inner.addWidget(self.preview, 1)
         trial = primary_button("طباعة صفحة تجريبية")
         trial.clicked.connect(self.trial_print)
         trial.setEnabled(self.editable)
         inner.addWidget(trial, 0, Qt.AlignmentFlag.AlignLeading)
-        inner.addWidget(muted("التصميم مناسب للطابعات الأبيض والأسود: خلفيات بيضاء وخطوط فاصلة فقط."))
-        box.setMinimumWidth(260)
-        box.setMaximumWidth(400)
+        inner.addWidget(muted("التصميم مناسب للطابعات الأبيض والأسود: خلفيات بيضاء وخطوط فاصلة."))
+        box.setMinimumWidth(250)
+        box.setMaximumWidth(360)
         return box
 
     def collect(self):
@@ -288,9 +296,10 @@ class ShopTab(QWidget):
         self.redraw.start()
 
     def _draw_preview(self) -> None:
-        width = max(200, self.preview.width())
-        image = print_doc.preview_image(self.collect(), print_doc.sample_document(), self.shape(), width)
-        self.preview.setPixmap(QPixmap.fromImage(image))
+        box = self.preview.size() - QSize(20, 20)
+        image = print_doc.preview_image(self.collect(), print_doc.sample_document(), self.shape())
+        self.preview.setPixmap(QPixmap.fromImage(image).scaled(
+            box, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
     def _paper_chosen(self) -> None:
         keys = [key for key, _label in PAPER_TABS]

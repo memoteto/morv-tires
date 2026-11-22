@@ -302,7 +302,11 @@ def preview_image(shop, doc: Document, shape: Shape, width_px: int = 0) -> QImag
     real_px = max(1, round((shape.width_mm - 2 * shape.margin_mm) / 25.4 * 96))
     text = render(shop, doc, shape)
     text.setTextWidth(real_px)
-    image = QImage(real_px, max(1, round(text.size().height())), QImage.Format.Format_RGB32)
+    height = max(1, round(text.size().height()))
+    if not shape.roll:
+        # A sheet is shown whole, so the reader sees how much of the page the document fills
+        height = max(height, round((shape.height_mm - 2 * shape.margin_mm) / 25.4 * 96))
+    image = QImage(real_px, height, QImage.Format.Format_RGB32)
     image.fill(0xFFFFFFFF)
     painter = QPainter(image)
     text.drawContents(painter)
