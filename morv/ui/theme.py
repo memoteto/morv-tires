@@ -209,9 +209,12 @@ QCalendarWidget#statementCalendar QToolButton, QCalendarWidget#dateCalendar QToo
                                                    border:0; min-height:0; max-height:30px;
                                                    padding:0 4px; }}
 QCalendarWidget QTableView::item {{ padding:0; }}
-QCalendarWidget QMenu {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; }}
-QCalendarWidget QMenu::item {{ padding:4px 18px; }}
-QCalendarWidget QMenu::item:selected {{ background:{t['primary']}; color:{t['on_primary']}; }}
+QMenu {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']};
+         border-radius:8px; padding:4px; }}
+QMenu::item {{ padding:7px 18px; border-radius:6px; }}
+QMenu::item:selected {{ background:{t['primary']}; color:{t['on_primary']}; }}
+QMenu::item:disabled {{ color:{t['muted']}; }}
+QPushButton::menu-indicator {{ subcontrol-position:left center; subcontrol-origin:padding; left:10px; }}
 QCalendarWidget QSpinBox#qt_calendar_yearedit {{ background:{t['surface']}; color:{t['text']}; min-width:64px;
                                               border:1px solid {t['border_strong']}; border-radius:6px;
                                               selection-background-color:{t['primary']}; }}

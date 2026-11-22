@@ -39,6 +39,20 @@ EXTRA_TABS = {"settings": (("item_fields", "حقول بطاقة الصنف"), ("
               "inventory": (("lots", "الدفعات (DOT)"), ("stock", "الجرد والتسويات"))}
 
 
+def _open_first_preview(page, app) -> bool:
+    """Preview panels only exist after a row is clicked, so no plain page shot ever shows one."""
+    rows = getattr(getattr(page, "model", None), "rows", None)
+    if not rows or not hasattr(page, "show_preview"):
+        return False
+    try:
+        page.show_preview(rows[0])
+    except Exception as e:                      # a preview that cannot open is worth seeing in the log
+        print(f"audit: preview failed: {type(e).__name__}: {e}", flush=True)
+        return False
+    _settle(app)
+    return True
+
+
 def _tabs_worth_capturing(tabs, key) -> list:
     if tabs is None:
         return []
@@ -134,6 +148,13 @@ def run(out: Path, size: tuple) -> dict:
                 name = f"page_{key}_{w}x{h}_{mode}"
                 win.grab().save(str(out / f"{name}.png"))
                 report["pages"][name] = _measure(win)
+                if _open_first_preview(win.stack.currentWidget(), app):
+                    shot = f"page_{key}_preview_{w}x{h}_{mode}"
+                    print(f"audit: preview {key} {mode}", flush=True)
+                    win.grab().save(str(out / f"{shot}.png"))
+                    report["pages"][shot] = _measure(win)
+                    win.go_key(key)          # rebuild the page so the next shot starts without a preview
+                    _settle(app)
                 tabs = getattr(win.stack.currentWidget(), "tabs", None)
                 for tab_name, tab_index in _tabs_worth_capturing(tabs, key):
                     tabs.setCurrentIndex(tab_index)

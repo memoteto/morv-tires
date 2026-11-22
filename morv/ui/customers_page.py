@@ -12,7 +12,8 @@ from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.deposit_dialogs import CustomerDocumentsDialog, DepositDialog
 from morv.ui.receipt_dialogs import ReceiptDialog
-from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
+from morv.ui.widgets import (Notice, ask, danger_button, form, ltr_edit, menu_button, muted,
+                             primary_button)
 
 
 class CustomersPage(ListPage):
@@ -74,24 +75,22 @@ class CustomersPage(ListPage):
         self.summary_section("موافقة واتساب", "phone")
         self.summary_details([("تذكيرات واتساب", "موافق" if c.whatsapp_ok else "لم يوافق")])
         self.summary_note("آخر زيارة ومواعيد الصيانة تظهر هنا في إصدار لاحق.")
-        statement = QPushButton("كشف الحساب")
-        statement.clicked.connect(lambda: self.open_statement(c))
-        receipt = QPushButton("سند قبض")
-        receipt.clicked.connect(lambda: self.open_receipt(c))
-        receipt.setEnabled(self.session.can("receipts.post"))
-        deposit = QPushButton("عربون")
-        deposit.clicked.connect(lambda: self.open_deposit(c))
-        deposit.setEnabled(self.session.can("receipts.post"))
-        documents = QPushButton("مستندات القبض والعربون")
-        documents.clicked.connect(lambda: self.open_documents(c))
+        # Four account actions behind one button: stacked full-width they took more of the preview
+        # than the customer's own data, and pushed the credit section out of sight
+        posts = self.session.can("receipts.post")
+        self.account_btn = menu_button("الحساب", [
+            ("سند قبض", lambda: self.open_receipt(c), posts),
+            ("عربون", lambda: self.open_deposit(c), posts),
+            ("سجل السندات", lambda: self.open_documents(c), True),
+            ("كشف الحساب", lambda: self.open_statement(c), True)])
         if self.can_edit():
             edit = primary_button("تعديل", "edit")
             edit.clicked.connect(lambda: self.open_dialog(c.id))
             toggle = danger_button("إيقاف" if c.active else "تفعيل", "pause" if c.active else "play")
             toggle.clicked.connect(lambda: self.toggle_active(c))
-            self.actions(edit, toggle, receipt, deposit, documents, statement)
+            self.actions(edit, toggle, self.account_btn)
         else:
-            self.actions(receipt, deposit, documents, statement)
+            self.actions(self.account_btn)
 
     def open_statement(self, c: Customer) -> None:
         con = self.session.con
