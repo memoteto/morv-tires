@@ -67,6 +67,7 @@ class PurchaseReturnsOnPurchasesScreenTest(unittest.TestCase):
         from morv.infra.purchasing import PurchaseLine
         tire = items.create(self.con, self.admin, Item(
             id=None, kind="tire", code="TR-1", name="إطار اختبار", price_retail=645000,
+            brand="Michelin", model="Primacy 4",
             attrs={"size": "205/55r16", "li": "91", "si": "V", "cat": "ملاكي", "cons": "Radial"}))
         posted = purchasing.post_invoice(
             self.con, self.admin, request_key="pr-key-0001", supplier_id=self.supplier.id,
