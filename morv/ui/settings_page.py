@@ -316,7 +316,7 @@ class ShopTab(QWidget):
                                                        Qt.TransformationMode.SmoothTransformation))
         else:
             self.logo.setPixmap(QPixmap())
-            self.logo.setText("لا شعار")
+            self.logo.setText("—")
 
     def pick_logo(self) -> None:
         p, _ = QFileDialog.getOpenFileName(self, "صورة الشعار", "", "صور (*.png *.jpg *.jpeg)")
