@@ -94,6 +94,21 @@ class DateEditTest(unittest.TestCase):
         self.assertNotEqual(cal.weekdayTextFormat(Qt.DayOfWeek.Sunday).foreground().color(), red)
         self.assertEqual((cal.width(), cal.height()), (316, 272))
 
+    def test_all_seven_days_fit_inside_the_calendar(self):
+        from PySide6.QtWidgets import QTableView
+        from morv.ui import theme
+        self.app.setStyleSheet(theme.qss(dict(theme.colors(False), fs=14)))
+        self.addCleanup(self.app.setStyleSheet, "")
+        w = self.make()
+        popup = w.calendarWidget().window()
+        popup.show()
+        self.app.processEvents()
+        self.addCleanup(popup.hide)
+        view = w.calendarWidget().findChild(QTableView)
+        used = sum(view.horizontalHeader().sectionSize(c) for c in range(7))
+        self.assertLessEqual(used, view.viewport().width(), "day columns are cut off")
+        self.assertFalse(view.horizontalScrollBar().isVisible())
+
     def test_arrows_on_an_empty_field_start_from_today(self):
         w = self.make(optional=True, allow_future=True)
         w.stepBy(1)

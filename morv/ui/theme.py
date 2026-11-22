@@ -208,6 +208,7 @@ QCalendarWidget#statementCalendar QWidget#qt_calendar_navigationbar, QCalendarWi
 QCalendarWidget#statementCalendar QToolButton, QCalendarWidget#dateCalendar QToolButton {{ color:{t['text']}; background:{t['surface2']};
                                                    border:0; min-height:0; max-height:30px;
                                                    padding:0 4px; }}
+QCalendarWidget QTableView::item {{ padding:0; }}
 QCalendarWidget QMenu {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; }}
 QCalendarWidget QMenu::item {{ padding:4px 18px; }}
 QCalendarWidget QMenu::item:selected {{ background:{t['primary']}; color:{t['on_primary']}; }}
