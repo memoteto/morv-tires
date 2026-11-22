@@ -92,7 +92,7 @@ class DateEditTest(unittest.TestCase):
         red = cal.weekdayTextFormat(Qt.DayOfWeek.Friday).foreground().color()
         self.assertEqual(cal.weekdayTextFormat(Qt.DayOfWeek.Saturday).foreground().color(), red)
         self.assertNotEqual(cal.weekdayTextFormat(Qt.DayOfWeek.Sunday).foreground().color(), red)
-        self.assertEqual((cal.width(), cal.height()), (364, 280))
+        self.assertEqual((cal.width(), cal.height()), (316, 272))
 
     def test_arrows_on_an_empty_field_start_from_today(self):
         w = self.make(optional=True, allow_future=True)

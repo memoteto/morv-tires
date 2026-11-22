@@ -71,6 +71,7 @@ def arabic_latin_locale() -> QLocale:
     for name in ("ar_LY", "ar_TN", "ar_DZ", "ar_MA"):
         loc = QLocale(name)
         if loc.language() == QLocale.Language.Arabic and loc.zeroDigit() == "0" and loc.monthName(5) == "مايو":
+            loc.setNumberOptions(QLocale.NumberOption.OmitGroupSeparator)      # a year reads 2026, not 2.026
             return loc
     return QLocale(QLocale.Language.Arabic, QLocale.Territory.Egypt)
 
@@ -79,7 +80,7 @@ def style_calendar(cal: QCalendarWidget) -> None:
     """One calendar look for every date field: Arabic names, Latin digits, Friday and Saturday weekend."""
     cal.setLocale(arabic_latin_locale())
     cal.setFirstDayOfWeek(Qt.DayOfWeek.Saturday)
-    cal.setFixedSize(364, 280)
+    cal.setFixedSize(316, 272)
     cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
     cal.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
     cal.setGridVisible(False)
