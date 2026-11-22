@@ -1,9 +1,11 @@
 """Small shared UI pieces, so screens stay consistent."""
-from PySide6.QtCore import QDate, QEvent, Qt, Signal
+from PySide6.QtCore import QDate, QEvent, QLocale, Qt, Signal
+from PySide6.QtGui import QColor, QPalette, QTextCharFormat
 from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QPushButton, QToolButton, QVBoxLayout, QWidget)
 
 from morv.ui import icons
+from morv.ui.tokens import DARK, LIGHT
 
 
 def card(title: str | None = None) -> tuple[QFrame, QVBoxLayout]:
@@ -64,6 +66,31 @@ def ltr_edit(placeholder: str = "") -> QLineEdit:
     return e
 
 
+def arabic_latin_locale() -> QLocale:
+    """Arabic day and month names with Latin digits, which Egypt's own Arabic locale does not give."""
+    for name in ("ar_LY", "ar_TN", "ar_DZ", "ar_MA"):
+        loc = QLocale(name)
+        if loc.language() == QLocale.Language.Arabic and loc.zeroDigit() == "0" and loc.monthName(5) == "مايو":
+            return loc
+    return QLocale(QLocale.Language.Arabic, QLocale.Territory.Egypt)
+
+
+def style_calendar(cal: QCalendarWidget) -> None:
+    """One calendar look for every date field: Arabic names, Latin digits, Friday and Saturday weekend."""
+    cal.setLocale(arabic_latin_locale())
+    cal.setFirstDayOfWeek(Qt.DayOfWeek.Saturday)
+    cal.setFixedSize(364, 280)
+    cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+    cal.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
+    cal.setGridVisible(False)
+    dark = cal.palette().color(QPalette.ColorRole.Window).lightness() < 128
+    weekend, plain = QTextCharFormat(), QTextCharFormat()
+    weekend.setForeground(QColor((DARK if dark else LIGHT)["danger"]))
+    plain.setForeground(cal.palette().color(QPalette.ColorRole.Text))
+    for day in Qt.DayOfWeek:
+        cal.setWeekdayTextFormat(day, weekend if day in (Qt.DayOfWeek.Friday, Qt.DayOfWeek.Saturday) else plain)
+
+
 class DateEdit(QDateEdit):
     """Calendar date field speaking ISO text like the line edit it replaced; engines still validate it."""
 
@@ -83,10 +110,11 @@ class DateEdit(QDateEdit):
             self.setMaximumDate(QDate.currentDate())
         if optional:
             self.setSpecialValueText(" ")
+        # No step buttons: invisible ones still caught clicks and moved the year (an empty field became 2001)
+        self.setButtonSymbols(QDateEdit.ButtonSymbols.NoButtons)
         cal = self.calendarWidget()
         cal.setObjectName("dateCalendar")
-        cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
-        cal.setGridVisible(False)
+        style_calendar(cal)
         cal.installEventFilter(self)
         self.setDate(self._BLANK if optional else QDate.currentDate())
         self.dateChanged.connect(self._changed)
@@ -106,6 +134,12 @@ class DateEdit(QDateEdit):
             today = QDate.currentDate()
             obj.setCurrentPage(today.year(), today.month())
         return super().eventFilter(obj, e)
+
+    def stepBy(self, steps: int) -> None:
+        if self.text() == "":      # arrows or the wheel on an empty field start from today, not year 2000
+            self.setDate(QDate.currentDate())
+            return
+        super().stepBy(steps)
 
     def _changed(self, _day) -> None:
         self._raw = None

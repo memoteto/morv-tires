@@ -208,6 +208,15 @@ QCalendarWidget#statementCalendar QWidget#qt_calendar_navigationbar, QCalendarWi
 QCalendarWidget#statementCalendar QToolButton, QCalendarWidget#dateCalendar QToolButton {{ color:{t['text']}; background:{t['surface2']};
                                                    border:0; min-height:0; max-height:30px;
                                                    padding:0 4px; }}
+QCalendarWidget QMenu {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']}; }}
+QCalendarWidget QMenu::item {{ padding:4px 18px; }}
+QCalendarWidget QMenu::item:selected {{ background:{t['primary']}; color:{t['on_primary']}; }}
+QCalendarWidget QSpinBox#qt_calendar_yearedit {{ background:{t['surface']}; color:{t['text']}; min-width:64px;
+                                              border:1px solid {t['border_strong']}; border-radius:6px;
+                                              selection-background-color:{t['primary']}; }}
+QCalendarWidget QSpinBox#qt_calendar_yearedit::up-button, QCalendarWidget QSpinBox#qt_calendar_yearedit::down-button {{
+    width:0; border:0; }}
+QDateEdit#dateEdit::up-button, QDateEdit#dateEdit::down-button {{ width:0; border:0; }}
 QCalendarWidget#statementCalendar QAbstractItemView, QCalendarWidget#dateCalendar QAbstractItemView {{ background:{t['surface']}; color:{t['text']};
                                                         selection-background-color:{t['primary']};
                                                         selection-color:{t['on_primary']}; }}

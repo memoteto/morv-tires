@@ -80,6 +80,25 @@ class DateEditTest(unittest.TestCase):
         self.assertEqual((cal.yearShown(), cal.monthShown()), (today.year, today.month))
         self.assertEqual(w.text(), "")                       # opening the calendar picks no date
 
+    def test_calendar_speaks_arabic_with_latin_digits_and_a_friday_saturday_weekend(self):
+        from PySide6.QtCore import Qt
+        w = self.make()
+        loc = w.calendarWidget().locale()
+        self.assertEqual(loc.monthName(5), "مايو")
+        self.assertEqual(loc.dayName(5), "الجمعة")
+        self.assertEqual(loc.toString(2026), "2026")
+        cal = w.calendarWidget()
+        self.assertEqual(cal.firstDayOfWeek(), Qt.DayOfWeek.Saturday)
+        red = cal.weekdayTextFormat(Qt.DayOfWeek.Friday).foreground().color()
+        self.assertEqual(cal.weekdayTextFormat(Qt.DayOfWeek.Saturday).foreground().color(), red)
+        self.assertNotEqual(cal.weekdayTextFormat(Qt.DayOfWeek.Sunday).foreground().color(), red)
+        self.assertEqual((cal.width(), cal.height()), (364, 280))
+
+    def test_arrows_on_an_empty_field_start_from_today(self):
+        w = self.make(optional=True, allow_future=True)
+        w.stepBy(1)
+        self.assertEqual(w.text(), date.today().isoformat())
+
     def test_no_text_date_fields_left_in_the_ui(self):
         from pathlib import Path
         root = Path(__file__).resolve().parent.parent / "morv" / "ui"
