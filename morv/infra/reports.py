@@ -9,9 +9,14 @@ from morv.core.money import fmt
 from morv.infra import customer_receipts, income_statement, ledger, suspended_balances
 
 TEXT, CODE, MONEY, DATE = "text", "code", "money", "date"
-KEYS = ("income", "daily_sales", "top_items", "sales_profit", "slow_moving", "journal", "trial", "ledger",
-        "aging", "credit_aging", "suppliers", "partner", "suspended", "stock_valuation", "expenses", "collections",
-        "purchases", "returns", "supplier_aging", "item_card")
+# The catalogue in reading order, grouped: a flat list of twenty mixed reports is not scannable,
+# and a new report has to join a group instead of landing at the end.
+GROUPS = (("المالية", ("income", "trial", "journal", "ledger", "partner", "suspended")),
+          ("المبيعات", ("daily_sales", "sales_profit", "top_items", "returns")),
+          ("المشتريات والمخزون", ("purchases", "stock_valuation", "slow_moving", "item_card")),
+          ("ذمم العملاء والموردين", ("credit_aging", "aging", "suppliers", "supplier_aging")),
+          ("الخزينة", ("collections", "expenses")))
+KEYS = tuple(key for _group, keys in GROUPS for key in keys)
 TITLES = {"income": "قائمة الدخل", "daily_sales": "ملخص المبيعات اليومي", "top_items": "الأصناف الأكثر مبيعًا",
           "sales_profit": "المبيعات وربحية الأصناف", "slow_moving": "الأصناف بطيئة الحركة",
           "journal": "دفتر اليومية", "trial": "ميزان المراجعة", "ledger": "كشف حساب",
