@@ -3,10 +3,11 @@ from dataclasses import dataclass, field
 from html import escape
 
 from PySide6.QtCore import QMarginsF, QSizeF
-from PySide6.QtGui import QPageLayout, QPageSize, QPdfWriter, QTextDocument
+from PySide6.QtGui import QFont, QPageLayout, QPageSize, QPdfWriter, QTextDocument
 
 from morv.core.money import fmt
 from morv.core.text import ltr
+from morv.ui import theme
 from morv.ui.report_export import _rich
 
 # Space the shop fills with its own words; it prints empty until they write something, so the
@@ -157,9 +158,17 @@ def _page_size(shape: Shape) -> QPageSize:
     return QPageSize(QSizeF(shape.width_mm, shape.height_mm), QPageSize.Unit.Millimeter, shape.label)
 
 
+def print_font(shape: Shape) -> QFont:
+    """Paper must name its own Arabic family: unlike a window, it never inherits the application font."""
+    font = QFont(theme.pick_font().family())       # pick_font loads the bundled fonts and picks what exists
+    font.setPointSizeF(8.5 if shape.narrow else 10.5)
+    return font
+
+
 def render(shop, doc: Document, shape: Shape) -> QTextDocument:
     """The one drawing both the PDF and the printer use, so paper and file can never drift apart."""
     text = QTextDocument()
+    text.setDefaultFont(print_font(shape))
     text.setHtml(document_html(shop, doc, shape))
     return text
 

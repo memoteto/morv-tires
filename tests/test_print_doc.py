@@ -86,6 +86,15 @@ class PrintDocumentTest(unittest.TestCase):
             self.assertEqual(b"%PDF-", head, f"{key} did not write a PDF")
             self.assertGreater(path.stat().st_size, 1000, f"{key} wrote an empty-looking PDF")
 
+    def test_the_page_names_a_font_that_exists_or_it_prints_empty_boxes(self):
+        from PySide6.QtGui import QFontDatabase
+        from morv.ui.print_doc import SHAPES, render
+        for key in SHAPES:
+            family = render(_shop(), _doc(), SHAPES[key]).defaultFont().family()
+            self.assertTrue(family, f"{key} left the family to chance")
+            self.assertIn(family, QFontDatabase.families(),
+                          f"{key} asks for {family}, which this machine does not have")
+
     def test_the_two_rolls_are_narrower_than_the_sheets(self):
         from morv.ui.print_doc import SHAPES
         self.assertTrue(SHAPES["80mm"].narrow and SHAPES["58mm"].narrow)
