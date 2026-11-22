@@ -4,7 +4,7 @@ from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPlainTextEdit, QPushButton, QScrollArea, QSpinBox, QTableView, QTabBar, QTabWidget,
+                               QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTableView, QTabBar, QTabWidget,
                                QVBoxLayout, QWidget)
 
 from morv.core import security
@@ -117,6 +117,7 @@ class ShopTab(QWidget):
         super().__init__()
         self.session = session
         self.editable = session.can("settings.edit")
+        self.page = None
         self.notice = Notice()
         data = shop.load(session.con)
         row = QHBoxLayout(self)
@@ -259,6 +260,7 @@ class ShopTab(QWidget):
         inner.addWidget(self.sizes)
         self.preview = QLabel()
         self.preview.setMinimumSize(190, 200)
+        self.preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview.setObjectName("printPreview")
         inner.addWidget(self.preview, 1)
@@ -289,17 +291,23 @@ class ShopTab(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.redraw.start()
+        self._fit()
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.redraw.start()
+        self._fit()
+
+    def _fit(self) -> None:
+        """Scales the drawn page into whatever room the column has, keeping the paper's proportions."""
+        box = self.preview.size() - QSize(18, 18)
+        if self.page is None or box.width() < 40 or box.height() < 40:
+            return
+        self.preview.setPixmap(QPixmap.fromImage(self.page).scaled(
+            box, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
     def _draw_preview(self) -> None:
-        box = self.preview.size() - QSize(20, 20)
-        image = print_doc.preview_image(self.collect(), print_doc.sample_document(), self.shape())
-        self.preview.setPixmap(QPixmap.fromImage(image).scaled(
-            box, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.page = print_doc.preview_image(self.collect(), print_doc.sample_document(), self.shape())
+        self._fit()
 
     def _paper_chosen(self) -> None:
         keys = [key for key, _label in PAPER_TABS]
