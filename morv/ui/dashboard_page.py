@@ -8,14 +8,13 @@ from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QPushBu
 from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import dashboard_view
-from morv.ui import icons
+from morv.ui import icons, tokens
 from morv.ui.pos_page import PAYMENT_LABELS
-from morv.ui.widgets import Notice, card, kpi_tile, muted
+from morv.ui.widgets import (card, ICON_PRIMARY, kpi_tile, muted, Notice)
 from morv.ui.workers import run_async
 
 PERIODS = dashboard_view.PERIODS
 ALERT_LEVEL = {"bad": "error", "warn": "warn", "ok": "success"}
-ICON_PRIMARY = "#1F5FD6"
 BALANCE_LABELS = (("1110", "الصندوق"), ("1130", "الخزنة"), ("1210", "بنك التحويلات"),
                   ("1220", "البطاقات"), ("1230", "المحافظ الإلكترونية"))
 # Collect.dc.html/Purchase.dc.html/Statement.dc.html have no standalone search-first entry point yet,
@@ -107,7 +106,7 @@ class DashboardPage(QWidget):
             ic.setObjectName("qaIcon")
             ic.setFixedSize(38, 38)
             ic.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            ic.setPixmap(icons.icon(icon_name, "#FFFFFF" if main else ICON_PRIMARY, 20).pixmap(20, 20))
+            ic.setPixmap(icons.icon(icon_name, tokens.ICON_ON_PRIMARY if main else ICON_PRIMARY, 20).pixmap(20, 20))
             outer.addWidget(ic)
             col = QVBoxLayout()
             col.setSpacing(2)

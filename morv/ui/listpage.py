@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFrame, QGridLayout
 
 from morv.core.text import RLM
 from morv.infra.db.connection import ClosedDatabase
-from morv.ui import icons
+from morv.ui import icons, tokens
 from morv.ui.tokens import LAYOUT
 from morv.ui.widgets import icon_button, muted, primary_button
 from morv.ui.workers import run_async
@@ -25,7 +25,7 @@ class TupleModel(QAbstractTableModel):
             raise ValueError("Column alignments do not match table columns")
         self.column_alignments = tuple(column_alignments) if column_alignments is not None else None
         self.icon_for = icon_for
-        self.icon_color = "#8792A3"
+        self.icon_color = tokens.ICON_MUTED
         self._icon_cache: dict = {}
         self.rows: list = []
 
@@ -209,7 +209,7 @@ class ListPage(QWidget):
         self.search = QLineEdit()
         self.search.setPlaceholderText(self.search_placeholder)
         self.search.setClearButtonEnabled(True)
-        self.search.addAction(icons.icon("search", "#8792A3", 16), QLineEdit.ActionPosition.LeadingPosition)
+        self.search.addAction(icons.icon("search", tokens.ICON_MUTED, 16), QLineEdit.ActionPosition.LeadingPosition)
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
         self._debounce.setInterval(200)
@@ -539,7 +539,7 @@ class ListPage(QWidget):
         row.setSpacing(8)
         if icon_name:
             image = QLabel()
-            image.setPixmap(icons.icon(icon_name, "#8792A3", 18).pixmap(18, 18))
+            image.setPixmap(icons.icon(icon_name, tokens.ICON_MUTED, 18).pixmap(18, 18))
             row.addWidget(image)
         label = QLabel(title)
         label.setObjectName("summarySectionTitle")
@@ -707,7 +707,7 @@ class ListPage(QWidget):
         row.setContentsMargins(10, 10, 10, 10)
         row.setSpacing(8)
         image = QLabel()
-        image.setPixmap(icons.icon(icon_name, "#8792A3", 18).pixmap(18, 18))
+        image.setPixmap(icons.icon(icon_name, tokens.ICON_MUTED, 18).pixmap(18, 18))
         text = muted(message)
         row.addWidget(image, 0, Qt.AlignmentFlag.AlignTop)
         row.addWidget(text, 1)

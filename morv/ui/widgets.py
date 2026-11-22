@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, 
                                QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
 from morv.core.text import ltr
-from morv.ui import icons
+from morv.ui import icons, tokens
 from morv.ui.tokens import DARK, LIGHT
 
 
@@ -22,8 +22,8 @@ def card(title: str | None = None) -> tuple[QFrame, QVBoxLayout]:
     return box, lay
 
 
-ICON_MUTED = "#8792A3"
-ICON_PRIMARY = "#1F5FD6"
+ICON_MUTED = tokens.ICON_MUTED
+ICON_PRIMARY = tokens.ICON_PRIMARY
 
 
 def section_card(title: str, icon_name: str) -> tuple:
@@ -359,7 +359,7 @@ def primary_button(text: str, icon_name: str | None = None) -> QPushButton:
     b = QPushButton(text)
     b.setObjectName("primary")
     if icon_name:
-        b.setIcon(icons.icon(icon_name, "#FFFFFF", 18))
+        b.setIcon(icons.icon(icon_name, tokens.ICON_ON_PRIMARY, 18))
     return b
 
 
@@ -367,11 +367,11 @@ def danger_button(text: str, icon_name: str | None = None) -> QPushButton:
     b = QPushButton(text)
     b.setObjectName("danger")
     if icon_name:
-        b.setIcon(icons.icon(icon_name, "#B42323", 18))
+        b.setIcon(icons.icon(icon_name, tokens.ICON_DANGER, 18))
     return b
 
 
-def icon_button(text: str, icon_name: str, color: str = "#8792A3") -> QPushButton:
+def icon_button(text: str, icon_name: str, color: str = ICON_MUTED) -> QPushButton:
     b = QPushButton(text)
     b.setIcon(icons.icon(icon_name, color, 18))
     return b

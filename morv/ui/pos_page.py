@@ -13,11 +13,10 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
 from morv.infra import customers, items, sale_view, sales
 from morv.infra.sales import SaleError, SaleLineIn
-from morv.ui import icons
+from morv.ui import icons, tokens
 from morv.ui.inventory_page import ItemDialog
 from morv.ui.purchases_page import _ItemPopup
-from morv.ui.widgets import (Notice, chip, deferred_button, field, field_label, kbd, kv_row, ltr_edit, muted,
-                             section_card, trail_icon)
+from morv.ui.widgets import (chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
 
 ITEM_CHOICES = 50
 TIER_ATTR = {"retail": "price_retail", "wholesale": "price_wholesale", "super": "price_super"}
@@ -29,8 +28,6 @@ PAYMENT_HINTS = {"cash": "استلام نقدية وحساب الباقي", "car
                  "wallet": "يلزم رقم المرجع", "installment": "يُفتح العقد بعد الاعتماد"}
 KIND_TABS = (("الكل", None), ("إطارات", "tire"), ("بطاريات", "battery"), ("خدمات", "service"))
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
-ICON_MUTED = "#8792A3"
-ICON_PRIMARY = "#1F5FD6"
 
 
 class PosPage(QWidget):
@@ -98,7 +95,7 @@ class PosPage(QWidget):
         h.addWidget(deferred_button("معاينة الطباعة", "printer"))
         self.cancel_btn = QPushButton("إلغاء")
         self.cancel_btn.setObjectName("dangerLink")
-        self.cancel_btn.setIcon(icons.icon("close", "#B42323", 16))
+        self.cancel_btn.setIcon(icons.icon("close", tokens.ICON_DANGER, 16))
         self.cancel_btn.clicked.connect(self.cancel_invoice)
         h.addWidget(self.cancel_btn)
         return w
@@ -407,7 +404,7 @@ class PosPage(QWidget):
 
         self.post_btn = QPushButton("اعتماد وتحصيل")
         self.post_btn.setObjectName("primary")
-        self.post_btn.setIcon(icons.icon("check", "#FFFFFF", 18))
+        self.post_btn.setIcon(icons.icon("check", tokens.ICON_ON_PRIMARY, 18))
         inner = QHBoxLayout(self.post_btn)
         inner.setContentsMargins(16, 0, 16, 0)
         inner.addStretch(1)
