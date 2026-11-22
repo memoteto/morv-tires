@@ -4,6 +4,7 @@ from PySide6.QtGui import QColor, QPalette, QTextCharFormat
 from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
+from morv.core.text import ltr
 from morv.ui import icons
 from morv.ui.tokens import DARK, LIGHT
 
@@ -19,6 +20,80 @@ def card(title: str | None = None) -> tuple[QFrame, QVBoxLayout]:
         head.setObjectName("cardTitle")
         lay.addWidget(head)
     return box, lay
+
+
+ICON_MUTED = "#8792A3"
+ICON_PRIMARY = "#1F5FD6"
+
+
+def section_card(title: str, icon_name: str) -> tuple:
+    """Card with an icon header row; returns (card, body layout, header layout) for invoice screens."""
+    box = QFrame()
+    box.setObjectName("card")
+    outer = QVBoxLayout(box)
+    outer.setContentsMargins(0, 0, 0, 0)
+    outer.setSpacing(0)
+    head_w = QWidget()
+    head_w.setObjectName("cardHead")
+    head = QHBoxLayout(head_w)
+    head.setContentsMargins(18, 12, 18, 12)
+    head.setSpacing(8)
+    ic = QLabel()
+    ic.setPixmap(icons.icon(icon_name, ICON_PRIMARY, 18).pixmap(18, 18))
+    t = QLabel(title)
+    t.setObjectName("cardTitle")
+    head.addWidget(ic)
+    head.addWidget(t)
+    head.addStretch(1)
+    outer.addWidget(head_w)
+    body = QVBoxLayout()
+    body.setContentsMargins(18, 14, 18, 16)
+    body.setSpacing(12)
+    outer.addLayout(body)
+    return box, body, head
+
+
+def field_label(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setObjectName("fieldLabel")
+    return lbl
+
+
+def kv_row(label: str, value_widget: QWidget) -> QWidget:
+    w = QWidget()
+    h = QHBoxLayout(w)
+    h.setContentsMargins(0, 4, 0, 4)
+    h.addWidget(field_label(label))
+    h.addStretch(1)
+    h.addWidget(value_widget)
+    return w
+
+
+def chip(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setObjectName("chip")
+    return lbl
+
+
+def kbd(key: str, on_primary: bool = False) -> QLabel:
+    lbl = QLabel(ltr(key))
+    lbl.setObjectName("kbdOnPrimary" if on_primary else "kbd")
+    return lbl
+
+
+def deferred_button(label: str, icon_name: str | None = None) -> QPushButton:
+    """A planned action not built yet: hidden until it works (owner decision), disabled as a safeguard."""
+    b = QPushButton(label)
+    if icon_name:
+        b.setIcon(icons.icon(icon_name, ICON_MUTED, 16))
+    b.setEnabled(False)
+    b.setToolTip("قريبًا — غير مبني بعد")
+    b.setVisible(False)
+    return b
+
+
+def trail_icon(edit: QLineEdit, name: str) -> None:
+    edit.addAction(icons.icon(name, ICON_MUTED, 16), QLineEdit.ActionPosition.TrailingPosition)
 
 
 def muted(text: str) -> QLabel:
@@ -37,15 +112,24 @@ def form() -> QFormLayout:
     return f
 
 
-def field(title: str, widget: QWidget) -> QWidget:
-    """A label above its input, matching the approved design's field layout (not label-beside-input)."""
+def field(title: str, widget: QWidget, locked: bool = False) -> QWidget:
+    """A label above its input (the approved layout); locked marks a value changed only with permission."""
     w = QWidget()
     v = QVBoxLayout(w)
     v.setContentsMargins(0, 0, 0, 0)
     v.setSpacing(6)
-    lbl = QLabel(title)
-    lbl.setObjectName("fieldLabel")
-    v.addWidget(lbl)
+    if locked:
+        h = QHBoxLayout()
+        h.setSpacing(4)
+        h.addWidget(field_label(title))
+        ic = QLabel()
+        ic.setPixmap(icons.icon("lock", ICON_MUTED, 13).pixmap(13, 13))
+        h.addWidget(ic)
+        h.addWidget(field_label("بصلاحية"))
+        h.addStretch(1)
+        v.addLayout(h)
+    else:
+        v.addWidget(field_label(title))
     v.addWidget(widget)
     return w
 

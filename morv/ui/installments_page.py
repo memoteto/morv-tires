@@ -14,7 +14,7 @@ from morv.infra import installment_view, installments
 from morv.infra.installments import ContractError, Guarantor
 from morv.ui.interest_dialogs import InterestRecognitionDialog, ReverseInterestDialog
 from morv.ui.listpage import ListPage, TupleModel
-from morv.ui.widgets import DateEdit, Notice, card, field, ltr_edit, muted, primary_button, ro_field
+from morv.ui.widgets import deferred_button, DateEdit, Notice, card, field, ltr_edit, muted, primary_button, ro_field
 
 DOWN_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"))
 COLLECT_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"),
@@ -213,8 +213,7 @@ class ContractsPage(ListPage):
             btn = primary_button("تحصيل قسط")
             btn.clicked.connect(lambda: self.stack.open_collect(row_id))
             self.actions(btn)
-            statement_btn = QPushButton("كشف حساب العقد — قريبًا")
-            statement_btn.setEnabled(False)
+            statement_btn = deferred_button("كشف حساب العقد")
             self.actions(statement_btn)
 
     def open_dialog(self, row_id):
@@ -277,8 +276,7 @@ class ContractForm(QWidget):
         draft_chip.setObjectName("chip")
         back = QPushButton("رجوع للقائمة")
         back.clicked.connect(lambda: self.stack.back_to_list())
-        preview = QPushButton("معاينة العقد — قريبًا")
-        preview.setEnabled(False)
+        preview = deferred_button("معاينة العقد")
         h.addWidget(title)
         h.addWidget(draft_chip)
         h.addWidget(muted(f"من فاتورة البيع {ltr(self.sale[1])}"))
@@ -412,8 +410,7 @@ class ContractForm(QWidget):
         self.post_btn.clicked.connect(self.post)
         col.addWidget(self.post_btn)
         for label in ("حفظ كمسودة", "طباعة العقد والجدول"):
-            b = QPushButton(f"{label} — قريبًا")
-            b.setEnabled(False)
+            b = deferred_button(label)
             col.addWidget(b)
         col.addStretch(1)
         return col
@@ -535,8 +532,7 @@ class CollectPage(QWidget):
         back = QPushButton("رجوع للقائمة")
         back.clicked.connect(lambda: self.stack.back_to_list(keep_id=self.contract_id))
         for label in ("كشف حساب العميل", "تسوية مبكرة للعقد"):
-            b = QPushButton(f"{label} — قريبًا")
-            b.setEnabled(False)
+            b = deferred_button(label)
             h.addWidget(b)
         h.addWidget(title)
         h.addStretch(1)
@@ -620,8 +616,7 @@ class CollectPage(QWidget):
         self.collect_btn = primary_button("تحصيل")
         self.collect_btn.clicked.connect(self.collect)
         inner.addWidget(self.collect_btn)
-        print_btn = QPushButton("تحصيل وطباعة الإيصال — قريبًا")
-        print_btn.setEnabled(False)
+        print_btn = deferred_button("تحصيل وطباعة الإيصال")
         inner.addWidget(print_btn)
         col.addWidget(box)
         col.addStretch(1)
