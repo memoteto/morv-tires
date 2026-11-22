@@ -46,10 +46,11 @@ jobs:
         run: echo "MORV_DATA_DIR=${RUNNER_TEMP}/morv_data" >> "$GITHUB_ENV"
       - name: الاختبارات
         run: python run_tests.py
-      - name: pytest (أدوات التطوير)
+      # pytest كان يعيد تشغيل المجموعة نفسها كاملة (نفس المعرّفات بالضبط)؛ صار يتحقق من التطابق فقط
+      - name: تطابق اكتشاف الاختبارات بين unittest و pytest
         run: |
           python -m pip install -r requirements-dev.txt
-          python -m pytest -q
+          python tools/check_test_discovery.py
 
   build-windows:
     needs: test
