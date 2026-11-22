@@ -1,5 +1,5 @@
 """Reports screen: a report picker, period and account controls, and CSV or PDF export."""
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QPushButton, QWidget
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QPushButton, QWidget
 
 from morv.core.money import fmt
 from morv.core.text import ltr
@@ -7,8 +7,6 @@ from morv.infra import income_statement, ledger, reports
 from morv.infra.reports import CODE, DATE, MONEY, ReportError
 from morv.ui import report_export
 from morv.ui.listpage import ListPage
-from morv.ui.period_dialogs import PeriodLockDialog
-from morv.ui.profit_dialogs import DistributionDialog
 from morv.ui.widgets import DateEdit, muted
 
 _INDENT = {"head": "", "line": "    ", "total": "", "grand": ""}
@@ -29,9 +27,7 @@ def _cell_text(value, kind: str) -> str:
 
 class ReportsPage(ListPage):
     title = "التقارير"
-    add_label = "قفل الفترة"
-    add_icon = "lock"
-    add_primary = False
+    add_label = None               # reading and exporting only; the financial actions live in the treasury
     search_placeholder = "بحث في البنود (F2)"
     empty_message = "لا توجد قيود في هذه الفترة"
     filters_as_dropdown = True
@@ -41,14 +37,6 @@ class ReportsPage(ListPage):
     def __init__(self, session):
         super().__init__(session)
         self._sync_controls()
-
-    def extra_actions(self) -> list:
-        self.distribute_btn = None
-        if not self.session.can("profit.manage"):
-            return []
-        self.distribute_btn = QPushButton("توزيع الأرباح")
-        self.distribute_btn.clicked.connect(self.distribute)
-        return [self.distribute_btn]
 
     def extra_header(self) -> QWidget:
         self.table = None
@@ -132,16 +120,9 @@ class ReportsPage(ListPage):
                         self.compare_box.isChecked() and self._key() == "income")
         super().reload(keep_id)
 
-    def distribute(self) -> None:
-        if DistributionDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
-            self.reload(self.current_id)
-
     def can_edit(self) -> bool:
-        return self.session.can("period.lock")
-
-    def open_dialog(self, row_id) -> None:
-        if self.can_edit() and PeriodLockDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:
-            self.reload(self.current_id)
+        """False, so a double click or Ctrl+N on a report line cannot open a financial dialog."""
+        return False
 
     def can_view(self, con=None) -> bool:
         return self.session.can("reports.view", con)
