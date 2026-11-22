@@ -4,7 +4,8 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPushButton, QScrollArea, QSpinBox, QTableView, QTabWidget, QVBoxLayout, QWidget)
+                               QPlainTextEdit, QPushButton, QScrollArea, QSpinBox, QTableView, QTabWidget, QVBoxLayout,
+                               QWidget)
 
 from morv.core import security
 from morv.core.text import ltr
@@ -123,6 +124,12 @@ class ShopTab(QWidget):
         f.addRow("اسم المحل *", self.name)
         f.addRow("رقم الهاتف *", self.phone)
         f.addRow("العنوان", self.address)
+        self.tax_id = ltr_edit("يُطبع على الفواتير بعد التسجيل")
+        self.tax_id.setText(data.tax_id)
+        self.register_no = ltr_edit("رقم السجل التجاري")
+        self.register_no.setText(data.commercial_register)
+        f.addRow("الرقم الضريبي", self.tax_id)
+        f.addRow("السجل التجاري", self.register_no)
         logo_row = QHBoxLayout()
         self.logo = QLabel()
         self.logo.setFixedSize(96, 96)
@@ -136,6 +143,10 @@ class ShopTab(QWidget):
         logo_row.addWidget(remove)
         logo_row.addStretch(1)
         f.addRow("الشعار", logo_row)
+        self.invoice_footer = QPlainTextEdit(data.invoice_footer)
+        self.invoice_footer.setPlaceholderText("يُطبع أسفل كل مستند: الضمان، الاستبدال، أو أي كلمة للعميل")
+        self.invoice_footer.setFixedHeight(64)
+        f.addRow("تذييل المستندات", self.invoice_footer)
         inner.addLayout(f)
         self.notice = Notice()
         inner.addWidget(self.notice)
@@ -171,7 +182,9 @@ class ShopTab(QWidget):
 
     def save(self) -> None:
         try:
-            shop.save(self.session.con, self.session.user, self.name.text(), self.phone.text(), self.address.text())
+            shop.save(self.session.con, self.session.user, self.name.text(), self.phone.text(),
+                      self.address.text(), self.tax_id.text(), self.register_no.text(),
+                      self.invoice_footer.toPlainText())
         except shop.ShopError as e:
             self.notice.show_message(str(e))
             return

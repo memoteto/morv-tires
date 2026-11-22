@@ -1,4 +1,4 @@
-"""Shop data (name, phone, address, logo) in the settings table."""
+"""Shop data (name, phone, address, logo, tax ids and the printed footer) in the settings table."""
 import re
 import shutil
 from dataclasses import dataclass
@@ -18,6 +18,9 @@ class Shop:
     name: str = ""
     phone: str = ""
     address: str = ""
+    tax_id: str = ""                 # printed only once the shop is registered and fills it in
+    commercial_register: str = ""
+    invoice_footer: str = ""         # the shop's own words under every printed document
 
     @property
     def logo_path(self) -> Path | None:
@@ -30,7 +33,9 @@ class ShopError(ValueError):
 
 
 def load(con) -> Shop:
-    return Shop(settings.get(con, "shop.name"), settings.get(con, "shop.phone"), settings.get(con, "shop.address"))
+    return Shop(settings.get(con, "shop.name"), settings.get(con, "shop.phone"), settings.get(con, "shop.address"),
+                settings.get(con, "shop.tax_id"), settings.get(con, "shop.commercial_register"),
+                settings.get(con, "shop.invoice_footer"))
 
 
 def validate(name: str, phone: str) -> tuple[str, str]:
@@ -51,17 +56,23 @@ def check(name: str, phone: str, address: str) -> tuple[str, str, str]:
     return name, phone, address
 
 
-def put(con, name: str, phone: str, address: str) -> None:
+def put(con, name: str, phone: str, address: str, tax_id: str = "", commercial_register: str = "",
+        invoice_footer: str = "") -> None:
     settings.put(con, "shop.name", name)
     settings.put(con, "shop.phone", phone)
     settings.put(con, "shop.address", address)
+    settings.put(con, "shop.tax_id", tax_id)
+    settings.put(con, "shop.commercial_register", commercial_register)
+    settings.put(con, "shop.invoice_footer", invoice_footer)
 
 
-def save(con, by, name: str, phone: str, address: str) -> Shop:
+def save(con, by, name: str, phone: str, address: str, tax_id: str = "", commercial_register: str = "",
+         invoice_footer: str = "") -> Shop:
     require(con, by, "settings.edit", ShopError)
     values = check(name, phone, address)
     with transaction(con):
-        put(con, *values)
+        put(con, *values, to_latin((tax_id or "").strip()), to_latin((commercial_register or "").strip()),
+            (invoice_footer or "").strip())
     return load(con)
 
 
