@@ -61,12 +61,17 @@ class TabAndHeaderIconsTest(unittest.TestCase):
         win.show()
         win.go_key("settings")
         self.app.processEvents()
-        bar = win.stack.currentWidget().tabs.tabBar()
-        # sizeHint() lies once Qt turns on the scroll arrows, so ask where each tab actually landed
-        hidden = [bar.tabText(i) for i in range(bar.count()) if not bar.rect().contains(bar.tabRect(i))]
-        spent = sum(bar.tabRect(i).width() for i in range(bar.count()))
-        self.assertEqual([], hidden,
-                         f"these tabs fall outside the bar: {hidden}; tabs need {spent}px, bar is {bar.width()}px")
+        tabs = win.stack.currentWidget().tabs
+        for _ in range(5):
+            self.app.processEvents()
+        bar = tabs.tabBar()
+        # tabSizeHint is what each tab wants; tabRect is what it got after Qt starts scrolling the bar
+        needed = sum(bar.tabSizeHint(i).width() for i in range(bar.count()))
+        room = tabs.width()
+        print(f"TAB_BAR_FIT tabs={bar.count()} needed={needed} room={room} "
+              f"widths={[bar.tabSizeHint(i).width() for i in range(bar.count())]}", flush=True)
+        self.assertLessEqual(needed, room,
+                             f"the tabs want {needed}px but the bar has {room}px, so some hide behind arrows")
 
     def test_the_icon_columns_are_narrower_than_the_titles_they_replaced(self):
         from PySide6.QtWidgets import QHeaderView
