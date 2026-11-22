@@ -14,7 +14,8 @@ from morv.infra import installment_view, installments
 from morv.infra.installments import ContractError, Guarantor
 from morv.ui.interest_dialogs import InterestRecognitionDialog, ReverseInterestDialog
 from morv.ui.listpage import ListPage, TupleModel
-from morv.ui.widgets import deferred_button, DateEdit, Notice, card, field, ltr_edit, muted, primary_button, ro_field
+from morv.ui.widgets import (DateEdit, Notice, card, deferred_button, field, kpi_tile, ltr_edit, muted,
+                              primary_button, ro_field)
 
 DOWN_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"))
 COLLECT_METHODS = (("cash", "نقدي"), ("card", "بطاقة / ماكينة POS"), ("transfer", "تحويل / محفظة"),
@@ -99,18 +100,7 @@ class ContractsPage(ListPage):
         grid = QGridLayout()
         grid.setSpacing(10)
         for i, (key, title) in enumerate(KPI_TILES):
-            btn = QPushButton()
-            btn.setCheckable(True)
-            btn.setObjectName("kpiTile")
-            inner = QVBoxLayout(btn)
-            inner.setContentsMargins(14, 10, 14, 10)
-            inner.setSpacing(4)
-            inner.addWidget(muted(title))
-            value = QLabel("0")
-            value.setObjectName("cardTitle")
-            inner.addWidget(value)
-            sub = muted("")
-            inner.addWidget(sub)
+            btn, value, sub = kpi_tile(title, clickable=True, initial="0")
             btn.clicked.connect(lambda _c=False, k=key: self._pick_kpi(k))
             self._kpi_values[key] = (value, sub)
             self._kpi_buttons[key] = btn

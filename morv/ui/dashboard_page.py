@@ -10,7 +10,7 @@ from morv.core.text import ltr
 from morv.infra import dashboard_view
 from morv.ui import icons
 from morv.ui.pos_page import PAYMENT_LABELS
-from morv.ui.widgets import Notice, card, muted
+from morv.ui.widgets import Notice, card, kpi_tile, muted
 from morv.ui.workers import run_async
 
 PERIODS = dashboard_view.PERIODS
@@ -129,18 +129,7 @@ class DashboardPage(QWidget):
         specs = (("sales", "المبيعات", False), ("coll", "المحصَّل نقدًا وإلكترونيًا", False),
                  ("due", "أقساط مستحقة ومتأخرة", True), ("cash", "إجمالي الأموال الآن", False))
         for i, (key, title, danger) in enumerate(specs):
-            box = QFrame()
-            box.setObjectName("card")
-            inner = QVBoxLayout(box)
-            inner.setContentsMargins(14, 10, 14, 10)
-            inner.addWidget(muted(title))
-            value = QLabel("—")
-            value.setObjectName("cardTitleDanger" if danger else "cardTitle")
-            value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute
-                               | Qt.AlignmentFlag.AlignVCenter)
-            inner.addWidget(value)
-            sub = muted("")
-            inner.addWidget(sub)
+            box, value, sub = kpi_tile(title, danger=danger)
             self.kpi_values[key] = (value, sub)
             grid.addWidget(box, 0, i)
         return grid
