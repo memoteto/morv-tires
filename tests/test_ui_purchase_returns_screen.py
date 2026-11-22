@@ -75,3 +75,38 @@ class PurchaseReturnsOnPurchasesScreenTest(unittest.TestCase):
             lines=[PurchaseLine(tire.id, 2, 300000, dot="0124")])
         view = purchase_view.get_invoice(self.con, posted.id)
         self.assertEqual(self.supplier.id, view.supplier_id)
+
+    def test_an_invoice_preview_offers_a_return_to_its_own_supplier(self):
+        from PySide6.QtWidgets import QAbstractButton
+        posted = self._an_invoice()
+        page = self._page()
+        page.show_preview((posted.id,))
+        self.app.processEvents()
+        shown = [b.text() for b in page.preview_footer.findChildren(QAbstractButton) if b.text().strip()]
+        self.assertIn("مرتجع للمورد", shown)
+
+    def test_a_cashier_gets_no_return_action_on_an_invoice(self):
+        from PySide6.QtWidgets import QAbstractButton
+        from morv.infra import users
+        from morv.ui.session import Session
+        posted = self._an_invoice()
+        clerk = users.create_user(self.con, self.admin, "clerk2", "موظف٢", "Clerk12345", "cashier")
+        users.set_permission(self.con, self.admin, clerk.id, "items.cost_view", True)   # may read, may not post
+        page = self._page(Session(self.con, clerk))
+        page.show_preview((posted.id,))
+        self.app.processEvents()
+        shown = [b.text() for b in page.preview_footer.findChildren(QAbstractButton) if b.text().strip()]
+        self.assertNotIn("مرتجع للمورد", shown)
+
+    def _an_invoice(self):
+        from morv.infra import items, purchasing
+        from morv.infra.items import Item
+        from morv.infra.purchasing import PurchaseLine
+        tire = items.create(self.con, self.admin, Item(
+            id=None, kind="tire", code=f"TR-{self.con.total_changes}", name="إطار اختبار", price_retail=645000,
+            brand="Michelin", model="Primacy 4",
+            attrs={"size": "205/55r16", "li": "91", "si": "V", "cat": "ملاكي", "cons": "Radial"}))
+        return purchasing.post_invoice(
+            self.con, self.admin, request_key=f"pr-{self.con.total_changes}", supplier_id=self.supplier.id,
+            supplier_invoice_no="SUP-9", invoice_date="2026-01-05",
+            lines=[PurchaseLine(tire.id, 2, 300000, dot="0124")])
