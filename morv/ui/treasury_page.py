@@ -1,5 +1,5 @@
 """Treasury screen: cash, bank and wallet balances, their ledger movements, and manual movements."""
-from PySide6.QtWidgets import QDialog, QFrame, QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QGridLayout, QLabel, QPushButton, QWidget
 
 from morv.core.money import fmt
 from morv.core.text import ltr
@@ -7,7 +7,7 @@ from morv.infra import cash_closing, safe_count, treasury, treasury_view
 from morv.ui.listpage import ListPage
 from morv.ui.reconciliation_dialogs import ReconciliationDialog
 from morv.ui.treasury_dialogs import CloseDialog, MovementDialog, ReverseDialog, SafeCountDialog
-from morv.ui.widgets import danger_button, muted
+from morv.ui.widgets import danger_button, kpi_tile, muted
 
 ACCOUNT_NAMES = {"1110": "الصندوق", "1130": "الخزنة", "1210": "بنك التحويلات", "1220": "بنك البطاقات", "1230": "المحافظ الإلكترونية"}
 SOURCE_LABELS = {"sale": "فاتورة بيع", "sale_return": "مرتجع بيع", "purchase_invoice": "فاتورة شراء",
@@ -66,15 +66,7 @@ class TreasuryPage(ListPage):
         grid.setSpacing(10)
         tiles = [("total", "إجمالي الأموال")] + list(ACCOUNT_NAMES.items())
         for i, (key, title) in enumerate(tiles):
-            box = QFrame()
-            box.setObjectName("card")
-            inner = QVBoxLayout(box)
-            inner.setContentsMargins(14, 10, 14, 10)
-            inner.setSpacing(4)
-            inner.addWidget(muted(title))
-            value = QLabel("0")
-            value.setObjectName("cardTitle")
-            inner.addWidget(value)
+            box, value, _sub = kpi_tile(title, sub=False, initial="0")
             self._balance_values[key] = value
             grid.addWidget(box, 0, i)
         if self.session.can("treasury.close"):

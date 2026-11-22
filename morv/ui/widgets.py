@@ -103,6 +103,29 @@ def muted(text: str) -> QLabel:
     return lbl
 
 
+def kpi_tile(title: str, *, danger: bool = False, clickable: bool = False, sub: bool = True,
+             initial: str = "—"):
+    """One metric card; clickable=True makes it a checkable button (dashboard/treasury/installments)."""
+    box = QPushButton() if clickable else QFrame()
+    if clickable:
+        box.setCheckable(True)
+    box.setObjectName("kpiTile" if clickable else "card")
+    inner = QVBoxLayout(box)
+    inner.setContentsMargins(14, 10, 14, 10)
+    inner.setSpacing(4)
+    inner.addWidget(muted(title))
+    value = QLabel(initial)
+    value.setObjectName("cardTitleDanger" if danger else "cardTitle")
+    if not clickable:
+        value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute
+                           | Qt.AlignmentFlag.AlignVCenter)
+    inner.addWidget(value)
+    sub_lbl = muted("") if sub else None
+    if sub_lbl is not None:
+        inner.addWidget(sub_lbl)
+    return box, value, sub_lbl
+
+
 def form() -> QFormLayout:
     f = QFormLayout()
     f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
