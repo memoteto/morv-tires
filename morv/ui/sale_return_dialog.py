@@ -12,7 +12,7 @@ from morv.core.text import ltr
 from morv.infra.sale_returns import ReturnError, ReturnLineIn, post_return, preview_installment_refund
 from morv.ui.listpage import TupleModel
 from morv.ui.modal import Modal
-from morv.ui.widgets import DateEdit, form, ltr_edit, muted
+from morv.ui.widgets import deferred_button, DateEdit, form, ltr_edit, muted
 
 CONDITIONS = (("sound", "سليم — يعود للمخزون"), ("defective", "معيب — مخزن التالف"))
 REFUND_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
@@ -112,13 +112,11 @@ class SaleReturnDialog(Modal):
         self.refund_breakdown.setWordWrap(True)
         self.body.addWidget(self.refund_breakdown)
         self.body.addWidget(muted("المحل غير مسجّل — بدون ضريبة"))
-        override = QPushButton("موافقة المدير على تجاوز مدة الإرجاع — قريبًا")
-        override.setEnabled(False)
+        override = deferred_button("موافقة المدير على تجاوز مدة الإرجاع")
         self.body.addWidget(override)
 
         self.post_btn = self.add_footer("اعتماد المرتجع", self.post)
-        print_btn = QPushButton("طباعة الإيصال — قريبًا")
-        print_btn.setEnabled(False)
+        print_btn = deferred_button("طباعة الإيصال")
         self.add_footer_widget(print_btn)
         self.return_date.textChanged.connect(lambda _text: self._refresh_total())
         self._refresh_choices()

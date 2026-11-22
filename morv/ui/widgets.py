@@ -82,12 +82,13 @@ def kbd(key: str, on_primary: bool = False) -> QLabel:
 
 
 def deferred_button(label: str, icon_name: str | None = None) -> QPushButton:
-    """A planned action that is not built yet: shown disabled with a 'coming soon' tip."""
+    """A planned action not built yet: hidden until it works (owner decision), disabled as a safeguard."""
     b = QPushButton(label)
     if icon_name:
         b.setIcon(icons.icon(icon_name, ICON_MUTED, 16))
     b.setEnabled(False)
     b.setToolTip("قريبًا — غير مبني بعد")
+    b.setVisible(False)
     return b
 
 

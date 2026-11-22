@@ -55,6 +55,7 @@ class PosDesignV1Test(unittest.TestCase):
         widgets = (ROOT / "morv" / "ui" / "widgets.py").read_text(encoding="utf-8")
         body = widgets[widgets.index("def deferred_button("):widgets.index("def trail_icon(")]
         self.assertIn("setEnabled(False)", body)
+        self.assertIn("setVisible(False)", body)      # owner decision 22 Nov 2026: unbuilt actions are hidden
         self.assertIn("قريبًا", body)
 
     def test_screen_is_a_page_not_a_dialog(self):

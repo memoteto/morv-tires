@@ -67,7 +67,6 @@ class PosPage(QWidget):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(content)
         root.addWidget(scroll, 1)
-        root.addLayout(self._build_hints())
         self._shortcuts()
 
         self._stamp()
@@ -104,16 +103,6 @@ class PosPage(QWidget):
         h.addWidget(self.cancel_btn)
         return w
 
-    def _build_hints(self) -> QHBoxLayout:
-        bar = QHBoxLayout()
-        bar.setSpacing(6)
-        bar.addStretch(1)
-        for key, label in (("F2", "صنف"), ("F4", "عميل"), ("F8", "الدفع"), ("F9", "اعتماد")):
-            bar.addWidget(muted(label))
-            bar.addWidget(kbd(key))
-            bar.addSpacing(8)
-        return bar
-
     def _build_right_column(self) -> QVBoxLayout:
         col = QVBoxLayout()
         col.setSpacing(16)
@@ -122,29 +111,26 @@ class PosPage(QWidget):
         return col
 
     def _invoice_card(self) -> QFrame:
-        box, body, _head = section_card("بيانات الفاتورة والعميل", "sales")
+        box, body, head = section_card("بيانات الفاتورة والعميل", "sales")
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(12)
-        for c in range(4):
-            grid.setColumnStretch(c, 1)
+        for c, stretch in enumerate((3, 2, 2)):
+            grid.setColumnStretch(c, stretch)
 
-        self.number_edit = ltr_edit("")
-        self.number_edit.setText(sales.next_number_preview(self.session.con))
-        self.number_edit.setReadOnly(True)
-        self.sale_date = ltr_edit()
-        self.sale_date.setReadOnly(True)
-        trail_icon(self.sale_date, "lock")
+        # Read-only facts sit in the card header, so they cost no field row
+        self.number_edit = chip(ltr(sales.next_number_preview(self.session.con)))
+        self.number_edit.setToolTip("رقم الفاتورة")
+        self.sale_date = chip("")
+        self.sale_date.setToolTip("التاريخ والوقت")
+        head.addWidget(self.number_edit)
+        head.addWidget(self.sale_date)
         self.tier_combo = QComboBox()
         for key, label in TIER_LABELS.items():
             self.tier_combo.addItem(label, key)
         self.tier_combo.currentIndexChanged.connect(lambda _i: self._set_tier(self.tier_combo.currentData()))
         self.tier_combo.setEnabled(bool(getattr(self.session.user, "is_manager", False)))
         self.odometer = ltr_edit("مثال: 84500")
-        grid.addWidget(field("رقم الفاتورة", self.number_edit), 0, 0)
-        grid.addWidget(field("التاريخ والوقت", self.sale_date), 0, 1)
-        grid.addWidget(field("فئة السعر", self.tier_combo, locked=True), 0, 2)
-        grid.addWidget(field("عداد الكيلومترات", self.odometer), 0, 3)
 
         self.customer = QComboBox()
         self.customer.addItem("عميل نقدي", ("", "retail", "", ""))
@@ -169,14 +155,32 @@ class PosPage(QWidget):
         self.mobile.editingFinished.connect(self._on_mobile_typed)
         self.plate = ltr_edit("رقم اللوحة")
         trail_icon(self.plate, "car")
-        grid.addWidget(field("العميل *", self.customer), 1, 0, 1, 2)
-        grid.addWidget(field("رقم الموبايل", self.mobile), 1, 2)
-        grid.addWidget(field("المركبة / اللوحة", self.plate), 1, 3)
+        cust_row = QHBoxLayout()
+        cust_row.setSpacing(6)
+        cust_row.addWidget(self.customer, 1)
+        cust_row.addWidget(kbd("F4"))
+        cust_box = QWidget()
+        cust_box.setLayout(cust_row)
+        cust_row.setContentsMargins(0, 0, 0, 0)
+        grid.addWidget(field("العميل *", cust_box), 0, 0)
+        grid.addWidget(field("رقم الموبايل", self.mobile), 0, 1)
+        grid.addWidget(field("فئة السعر", self.tier_combo, locked=True), 0, 2)
+        body.addLayout(grid)
 
+        # Vehicle and note are occasional, so they stay folded and leave the room to the item rows
         self.note = QLineEdit()
         self.note.setPlaceholderText("اختياري — تظهر في الطباعة")
-        grid.addWidget(field("ملاحظة على الفاتورة", self.note), 2, 0, 1, 4)
-        body.addLayout(grid)
+        self.extra_box = QWidget()
+        extra = QGridLayout(self.extra_box)
+        extra.setContentsMargins(0, 0, 0, 0)
+        extra.setHorizontalSpacing(12)
+        for c, stretch in enumerate((3, 2, 2)):
+            extra.setColumnStretch(c, stretch)
+        extra.addWidget(field("ملاحظة على الفاتورة", self.note), 0, 0)
+        extra.addWidget(field("عداد الكيلومترات", self.odometer), 0, 1)
+        extra.addWidget(field("المركبة / اللوحة", self.plate), 0, 2)
+        self.extra_box.setVisible(False)
+        body.addWidget(self.extra_box)
 
         strip = QFrame()
         strip.setObjectName("infoStrip")
@@ -190,10 +194,20 @@ class PosPage(QWidget):
         change = QPushButton("تغيير العميل")
         change.setObjectName("link")
         change.clicked.connect(self._focus_customer)
+        self.extra_summary = muted("")
+        self.extra_summary.setWordWrap(False)
+        self.extra_toggle = QPushButton("تفاصيل المركبة والملاحظة")
+        self.extra_toggle.setObjectName("link")
+        self.extra_toggle.setCheckable(True)
+        self.extra_toggle.toggled.connect(self.extra_box.setVisible)
+        for edit in (self.odometer, self.plate, self.note):
+            edit.textChanged.connect(self._refresh_extra_summary)
         s.addWidget(self.cust_kind)
         s.addWidget(self.cust_tier_chip)
         s.addWidget(self.cust_stats)
         s.addStretch(1)
+        s.addWidget(self.extra_summary)
+        s.addWidget(self.extra_toggle)
         s.addWidget(change)
         body.addWidget(strip)
         return box
@@ -241,10 +255,12 @@ class PosPage(QWidget):
 
         quick = QHBoxLayout()
         quick.setSpacing(8)
-        quick.addWidget(muted("إضافة سريعة:"))
+        quick_lbl = muted("إضافة سريعة:")
+        quick.addWidget(quick_lbl)
         quick_btn = deferred_button("الأصناف الأكثر بيعًا", "plus")
         quick_btn.setObjectName("quickChip")
         quick.addWidget(quick_btn)
+        quick_lbl.setVisible(not quick_btn.isHidden())
         quick.addStretch(1)
         body.addLayout(quick)
 
@@ -276,12 +292,12 @@ class PosPage(QWidget):
         col = QVBoxLayout()
         col.setSpacing(16)
         col.addWidget(self._summary_card())
-        col.addWidget(self._payment_card())
         col.addStretch(1)
         return col
 
     def _summary_card(self) -> QFrame:
-        box, body, _head = section_card("ملخص الفاتورة", "sales")
+        """Totals and payment in one card, as in the purchase invoice, so approval is reached unscrolled."""
+        box, body, _head = section_card("ملخص الفاتورة والدفع", "sales")
         self.subtotal_label = QLabel()
         self.invoice_disc = ltr_edit("0.00")
         self.invoice_disc.setFixedWidth(150)
@@ -302,10 +318,10 @@ class PosPage(QWidget):
         t.addStretch(1)
         t.addWidget(self.total_label)
         body.addWidget(total)
+        self._payment_section(body)
         return box
 
-    def _payment_card(self) -> QFrame:
-        box, body, _head = section_card("الدفع", "cash")
+    def _payment_section(self, body: QVBoxLayout) -> None:
         body.addWidget(field_label("طريقة الدفع"))
         method_row = QHBoxLayout()
         self.pay1_method = self._method_combo(first_blank=False)
@@ -384,8 +400,8 @@ class PosPage(QWidget):
         body.addWidget(self.split)
 
         self.post_btn = QPushButton("اعتماد وتحصيل")
-        self.post_btn.setObjectName("primaryLarge")
-        self.post_btn.setIcon(icons.icon("check", "#FFFFFF", 20))
+        self.post_btn.setObjectName("primary")
+        self.post_btn.setIcon(icons.icon("check", "#FFFFFF", 18))
         inner = QHBoxLayout(self.post_btn)
         inner.setContentsMargins(16, 0, 16, 0)
         inner.addStretch(1)
@@ -397,7 +413,6 @@ class PosPage(QWidget):
         row.addWidget(deferred_button("اعتماد وطباعة", "printer"), 1)
         body.addLayout(row)
         self._on_method_changed()
-        return box
 
     # ---------- Builders ----------
     def _set_tier(self, key: str) -> None:
@@ -427,7 +442,9 @@ class PosPage(QWidget):
         return c
 
     def _shortcuts(self) -> None:
-        ctx = Qt.ShortcutContext.WidgetWithChildrenShortcut
+        # Window-wide while the page shows: arriving from the sidebar leaves focus outside the page,
+        # and a children-only context then ignored every key until the user clicked inside
+        ctx = Qt.ShortcutContext.WindowShortcut
         for key, slot in (("F2", self.item_search.setFocus), ("F4", self._focus_customer),
                           ("F8", self.pay1_method.setFocus), ("F9", self.post)):
             sc = QShortcut(QKeySequence(key), self)
@@ -440,9 +457,18 @@ class PosPage(QWidget):
 
     def _stamp(self) -> str:
         now = datetime.now()
-        self.sale_date.setText(now.strftime("%Y-%m-%d %H:%M"))
-        self.sale_date.setCursorPosition(0)      # show from the start of the text so the date is not clipped
+        self.sale_date.setText(ltr(now.strftime("%Y-%m-%d %H:%M")))
         return date.today().isoformat()
+
+    def _refresh_extra_summary(self, *_args) -> None:
+        parts = []
+        if self.odometer.text().strip():
+            parts.append(f"العداد {ltr(self.odometer.text().strip())}")
+        if self.plate.text().strip():
+            parts.append(f"اللوحة {ltr(self.plate.text().strip())}")
+        if self.note.text().strip():
+            parts.append("ملاحظة")
+        self.extra_summary.setText(" · ".join(parts))
 
     def _on_method_changed(self, *_args) -> None:
         on_instalments = self.pay1_method.currentData() == "installment"
@@ -819,6 +845,7 @@ class PosPage(QWidget):
         self.odometer.clear()
         self.plate.clear()
         self.note.clear()
+        self.extra_toggle.setChecked(False)
         self.invoice_disc.clear()
         self.pay1_amount.clear()
         self.pay1_received.clear()
@@ -827,7 +854,7 @@ class PosPage(QWidget):
         self.pay2_amount.clear()
         self.split_btn.setChecked(False)
         self.customer.setCurrentIndex(0)
-        self.number_edit.setText(sales.next_number_preview(self.session.con))
+        self.number_edit.setText(ltr(sales.next_number_preview(self.session.con)))
         self._stamp()
         self._on_row_changed()
 

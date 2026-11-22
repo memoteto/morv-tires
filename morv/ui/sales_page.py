@@ -27,6 +27,10 @@ class SalesPage(ListPage):
     def can_edit(self) -> bool:
         return False
 
+    def __init__(self, session):
+        super().__init__(session)
+        self.add_btn.setVisible(False)      # starting a sale from here is not built; unbuilt actions are hidden
+
     def can_view(self, con=None) -> bool:
         return self.session.can("sales.post", con)
 
