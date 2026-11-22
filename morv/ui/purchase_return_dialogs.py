@@ -103,10 +103,11 @@ class ReversePurchaseReturnDialog(Modal):
 
 
 class SupplierReturnsDialog(Modal):
-    """Returns of one supplier, newest first; the selected return can be reversed."""
+    """Purchase returns newest first, of one supplier or of all of them; the selected one can be reversed."""
 
-    def __init__(self, session, supplier_id: int, supplier_name: str, parent=None):
-        super().__init__(f"مرتجعات المورد {supplier_name}", parent, width=640)
+    def __init__(self, session, supplier_id: int | None = None, supplier_name: str = "", parent=None):
+        title = f"مرتجعات المورد {supplier_name}" if supplier_id else "مرتجعات الشراء"
+        super().__init__(title, parent, width=640)
         self.session, self.supplier_id, self.changed = session, supplier_id, False
         self.docs = QComboBox()
         self.body.addWidget(self.docs)
@@ -123,13 +124,17 @@ class SupplierReturnsDialog(Modal):
         rows = purchase_returns.history(self.session.con, self.supplier_id)
         self.docs.blockSignals(True)
         self.docs.clear()
-        for rid, number, kind, day, _name, total, reason, reversed_ in rows:
+        for rid, number, kind, day, name, total, reason, reversed_ in rows:
             label = "مرتجع" if kind == "return" else "عكس مرتجع"
             reversible = kind == "return" and not reversed_
-            self.docs.addItem(f"{label} {number} · {day} · {fmt(total)} · {reason}" + ("" if reversible else " — لا يُعكس"),
-                              (rid, reversible))
+            # listing every supplier, the supplier's name is what tells two documents apart
+            who = "" if self.supplier_id else f" · {name}"
+            self.docs.addItem(
+                f"{label} {number}{who} · {day} · {fmt(total)} · {reason}" + ("" if reversible else " — لا يُعكس"),
+                (rid, reversible))
         self.docs.blockSignals(False)
-        self.note.setText(f"عدد المستندات: {self.docs.count()}" if self.docs.count() else "لا توجد مرتجعات لهذا المورد.")
+        empty = "لا توجد مرتجعات لهذا المورد." if self.supplier_id else "لا توجد مرتجعات شراء بعد."
+        self.note.setText(f"عدد المستندات: {self.docs.count()}" if self.docs.count() else empty)
         self._selected()
 
     def _selected(self) -> None:

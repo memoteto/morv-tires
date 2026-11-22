@@ -19,6 +19,7 @@ class InvoiceLine:
 class InvoiceView:
     id: int
     number: str
+    supplier_id: int
     supplier_name: str
     supplier_invoice_no: str
     invoice_date: str
@@ -46,7 +47,8 @@ def count(con) -> int:
 
 def get_invoice(con, invoice_id: int) -> InvoiceView:
     h = con.execute(
-        "SELECT p.id, p.number, s.name, p.supplier_invoice_no, p.invoice_date, p.received_date, p.total, p.notes "
+        "SELECT p.id, p.number, p.supplier_id, s.name, p.supplier_invoice_no, p.invoice_date, p.received_date, "
+        "p.total, p.notes "
         "FROM purchase_invoices p JOIN suppliers s ON s.id = p.supplier_id WHERE p.id = ?", (invoice_id,)).fetchone()
     if not h:
         raise KeyError(invoice_id)
@@ -54,7 +56,7 @@ def get_invoice(con, invoice_id: int) -> InvoiceView:
         "SELECT l.line_no, i.name, i.code, l.dot, l.qty, l.unit_cost, l.line_total "
         "FROM purchase_lines l JOIN items i ON i.id = l.item_id WHERE l.invoice_id = ? ORDER BY l.line_no",
         (invoice_id,))]
-    return InvoiceView(h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7] or "", lines)
+    return InvoiceView(h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], h[8] or "", lines)
 
 
 def supplier_totals(con, supplier_id: int) -> tuple[int, int]:
