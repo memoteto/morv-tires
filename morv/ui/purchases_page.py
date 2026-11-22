@@ -19,13 +19,10 @@ from morv.ui import icons
 from morv.ui.inventory_page import ItemDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
-from morv.ui.widgets import (DateEdit, Notice, deferred_button, field, field_label, kv_row, ltr_edit, muted,
-                             primary_button, section_card)
+from morv.ui.widgets import (DateEdit, deferred_button, field, field_label, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
 
 ITEM_CHOICES = 50
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
-ICON_MUTED = "#8792A3"
-ICON_PRIMARY = "#1F5FD6"
 
 
 class PurchasesPage(QStackedWidget):

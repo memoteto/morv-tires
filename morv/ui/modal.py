@@ -4,7 +4,7 @@ from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractScrollArea, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
                                QToolButton, QVBoxLayout, QWidget)
 
-from morv.ui import icons
+from morv.ui import icons, tokens
 from morv.ui.widgets import Notice, primary_button
 
 
@@ -42,7 +42,7 @@ class Modal(QDialog):
         self.title_label.setObjectName("modalTitle")
         self.close_btn = QToolButton()
         self.close_btn.setObjectName("topButton")
-        self.close_btn.setIcon(icons.icon("close", "#8792A3", 16))
+        self.close_btn.setIcon(icons.icon("close", tokens.ICON_MUTED, 16))
         self.close_btn.setToolTip("إغلاق (Esc)")
         self.close_btn.clicked.connect(self.reject)
         h.addWidget(self.title_label, 1)
