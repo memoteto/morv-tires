@@ -8,7 +8,7 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.infra import ledger, stock_adjustments
 from morv.infra.stock_adjustments import AdjustLine, StockAdjustError
 from morv.ui.modal import Modal
-from morv.ui.widgets import DateEdit, danger_button, form, ltr_edit, muted
+from morv.ui.widgets import danger_button, DateEdit, field, form, ltr_edit, muted
 
 SOURCE_TEXT = {"source_lot": "تكلفة الدفعة المصدر", "last_purchase": "آخر تكلفة شراء", "manual": "تكلفة يدوية",
                "fifo": "تكلفة FIFO"}
@@ -42,13 +42,13 @@ class StockAdjustmentDialog(Modal):
         self.reason.setPlaceholderText("سبب التسوية (إلزامي)")
         self.date = DateEdit()
         self.date.setText(date.today().isoformat())
-        f.addRow("الصنف *", self.item)
-        f.addRow("النوع *", self.direction)
-        f.addRow("الكمية *", self.qty)
-        f.addRow("DOT (زيادة)", self.dot)
-        f.addRow("التكلفة اليدوية (زيادة)", self.cost)
-        f.addRow("السبب *", self.reason)
-        f.addRow("التاريخ *", self.date)
+        f.addRow(field("الصنف *", self.item))
+        f.addRow(field("النوع *", self.direction))
+        f.addRow(field("الكمية *", self.qty))
+        f.addRow(field("DOT (زيادة)", self.dot))
+        f.addRow(field("التكلفة اليدوية (زيادة)", self.cost))
+        f.addRow(field("السبب *", self.reason))
+        f.addRow(field("التاريخ *", self.date))
         self.body.addLayout(f)
         self.summary = muted("لم تُضف أسطر بعد.")
         self.body.addWidget(self.summary)
@@ -137,7 +137,7 @@ class ReverseAdjustmentDialog(Modal):
         f = form()
         self.reason = QLineEdit()
         self.reason.setPlaceholderText("سبب العكس (إلزامي)")
-        f.addRow("سبب العكس *", self.reason)
+        f.addRow(field("سبب العكس *", self.reason))
         self.body.addLayout(f)
         self.add_footer("عكس التسوية", self.save)
 

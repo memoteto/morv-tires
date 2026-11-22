@@ -12,7 +12,7 @@ from morv.core.text import ltr
 from morv.infra.sale_returns import ReturnError, ReturnLineIn, post_return, preview_installment_refund
 from morv.ui.listpage import TupleModel
 from morv.ui.modal import Modal
-from morv.ui.widgets import deferred_button, DateEdit, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, deferred_button, field, form, ltr_edit, muted
 
 CONDITIONS = (("sound", "سليم — يعود للمخزون"), ("defective", "معيب — مخزن التالف"))
 REFUND_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
@@ -42,12 +42,12 @@ class SaleReturnDialog(Modal):
         for m in methods:
             self.refund.addItem(REFUND_LABELS.get(m, m), m)
         self.note = ltr_edit("ملاحظة (اختيارية)")
-        head.addRow("العميل", QLabel(sale.customer_name))
-        head.addRow("إجمالي الفاتورة", QLabel(f"{ltr(fmt(sale.total))} جنيه"))
-        head.addRow("تاريخ المرتجع *", self.return_date)
-        head.addRow("سبب المرتجع *", self.reason)
-        head.addRow("طريقة الرد", self.refund)
-        head.addRow("ملاحظة", self.note)
+        head.addRow(field("العميل", QLabel(sale.customer_name)))
+        head.addRow(field("إجمالي الفاتورة", QLabel(f"{ltr(fmt(sale.total))} جنيه")))
+        head.addRow(field("تاريخ المرتجع *", self.return_date))
+        head.addRow(field("سبب المرتجع *", self.reason))
+        head.addRow(field("طريقة الرد", self.refund))
+        head.addRow(field("ملاحظة", self.note))
         self.body.addLayout(head)
 
         entry = QFrame()

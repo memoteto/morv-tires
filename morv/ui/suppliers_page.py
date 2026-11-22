@@ -10,7 +10,7 @@ from morv.infra.suppliers import Supplier
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
-from morv.ui.widgets import ask, danger_button, form, ltr_edit, muted, primary_button
+from morv.ui.widgets import ask, danger_button, field, form, ltr_edit, muted, primary_button
 
 
 class SuppliersPage(ListPage):
@@ -119,10 +119,10 @@ class SupplierDialog(Modal):
         self.notes = QPlainTextEdit(s.notes if s else "")
         self.notes.setPlaceholderText("أي معلومة تفيد عند التعامل مع المورد")
         self.notes.setFixedHeight(64)
-        f.addRow("اسم المورد *", self.name)
-        f.addRow("رقم الموبايل *", self.mobile)
-        f.addRow("العنوان", self.address)
-        f.addRow("ملاحظات", self.notes)
+        f.addRow(field("اسم المورد *", self.name))
+        f.addRow(field("رقم الموبايل *", self.mobile))
+        f.addRow(field("العنوان", self.address))
+        f.addRow(field("ملاحظات", self.notes))
         self.body.addLayout(f)
         self.body.addWidget(muted("الرصيد السابق مع المورد يُدخل مع مرحلة الخزينة."))
 
@@ -155,16 +155,16 @@ class SupplierDialog(Modal):
         self.tax.setText(s.tax_id if s else "")
         self.bank = ltr_edit("اسم البنك ورقم الحساب أو رقم المحفظة")
         self.bank.setText(s.bank_info if s else "")
-        mf.addRow("اسم المسؤول / المندوب", self.contact)
-        mf.addRow("هاتف إضافي", self.phone2)
-        mf.addRow("مدة السداد (أيام)", self.days)
-        mf.addRow("", muted("تحسب تاريخ استحقاق فواتير الشراء الآجلة تلقائيًا"))
-        mf.addRow("حد الائتمان الممنوح لنا", self.limit)
-        mf.addRow("يورّد لنا", self.supplies)
-        mf.addRow("طريقة السداد المفضلة", self.pay)
-        mf.addRow("السجل التجاري", self.creg)
-        mf.addRow("رقم التسجيل الضريبي", self.tax)
-        mf.addRow("بيانات التحويل", self.bank)
+        mf.addRow(field("اسم المسؤول / المندوب", self.contact))
+        mf.addRow(field("هاتف إضافي", self.phone2))
+        mf.addRow(field("مدة السداد (أيام)", self.days))
+        mf.addRow(muted("تحسب تاريخ استحقاق فواتير الشراء الآجلة تلقائيًا"))
+        mf.addRow(field("حد الائتمان الممنوح لنا", self.limit))
+        mf.addRow(field("يورّد لنا", self.supplies))
+        mf.addRow(field("طريقة السداد المفضلة", self.pay))
+        mf.addRow(field("السجل التجاري", self.creg))
+        mf.addRow(field("رقم التسجيل الضريبي", self.tax))
+        mf.addRow(field("بيانات التحويل", self.bank))
         self.more_box.setLayout(mf)
         self.more_box.setVisible(False)
         self.body.addWidget(self.more_box)
