@@ -60,8 +60,13 @@ class ReportsPageTest(unittest.TestCase):
             "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
             "VALUES ('tire','TR-1','إطار','اطار',100,100,100)")
         page = self.page()
-        self.assertEqual([page.report_combo.itemData(i) for i in range(page.report_combo.count())],
+        # the picker is grouped now: headers carry no data, and the reports keep the catalogue's order
+        from morv.infra.reports import GROUPS
+        combo = page.report_combo
+        self.assertEqual([combo.itemData(i) for i in range(combo.count()) if combo.itemData(i)],
                          list(reports_keys))
+        self.assertEqual([combo.itemText(i).strip() for i in range(combo.count()) if not combo.itemData(i)],
+                         [group for group, _keys in GROUPS])
         for key in ("trial", "ledger", "sales_profit", "aging", "suspended", "daily_sales", "top_items",
                     "slow_moving", "journal", "suppliers", "income", "credit_aging", "stock_valuation",
                     "expenses", "collections", "purchases", "returns", "item_card", "supplier_aging"):

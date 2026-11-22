@@ -1,5 +1,8 @@
 """Reports screen: a report picker, period and account controls, and CSV or PDF export."""
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QPushButton, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QPushButton,
+                               QWidget)
 
 from morv.core.money import fmt
 from morv.core.text import ltr
@@ -46,8 +49,7 @@ class ReportsPage(ListPage):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
         self.report_combo = QComboBox()
-        for key in reports.KEYS:
-            self.report_combo.addItem(reports.TITLES[key], key)
+        self._fill_report_combo()
         self.account_combo = QComboBox()
         self._filled_for = None
         self.from_edit, self.to_edit = (DateEdit(optional=True, allow_future=True),
@@ -75,6 +77,18 @@ class ReportsPage(ListPage):
         self.export_csv_btn.clicked.connect(self.export_csv)
         self.export_pdf_btn.clicked.connect(self.export_pdf)
         return host
+
+    def _fill_report_combo(self) -> None:
+        """Group headers carry no data and cannot be picked, so currentData() is always a real report."""
+        for group, keys in reports.GROUPS:
+            self.report_combo.addItem(group)
+            head = self.report_combo.model().item(self.report_combo.count() - 1)
+            head.setEnabled(False)
+            head.setData(QFont(self.report_combo.font().family(), weight=QFont.Weight.Bold),
+                         Qt.ItemDataRole.FontRole)
+            for key in keys:
+                self.report_combo.addItem("   " + reports.TITLES[key], key)
+        self.report_combo.setCurrentIndex(1)          # index 0 is the first group's header
 
     def _key(self) -> str:
         return self.report_combo.currentData()

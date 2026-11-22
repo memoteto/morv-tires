@@ -33,8 +33,8 @@ class ReportsHeaderWidthTest(unittest.TestCase):
         self.addCleanup(dispose, page, self.app)
         page.resize(1366 - 244 - 48, 700)       # page width at 1366 with the sidebar open
         page.show()
-        widest = max(range(page.report_combo.count()),
-                     key=lambda i: len(page.report_combo.itemText(i)))
+        reports = [i for i in range(page.report_combo.count()) if page.report_combo.itemData(i)]
+        widest = max(reports, key=lambda i: len(page.report_combo.itemText(i)))   # skip the group headers
         page.report_combo.setCurrentIndex(widest)
         page.set_filter(CUSTOM)                 # the custom range is what reveals the two date fields
         for _ in range(5):
