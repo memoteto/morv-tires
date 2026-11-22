@@ -1,5 +1,6 @@
 """The printed document carries the shop's head, its own lines and totals, on every paper shape."""
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -36,16 +37,21 @@ class PrintDocumentTest(unittest.TestCase):
         from morv.ui.print_doc import SHAPES, document_html
         return document_html(shop or _shop(), _doc(), SHAPES[shape_key])
 
+    def reads(self, shop=None, shape_key="a4") -> str:
+        """What a reader sees: the markup that keeps numbers left-to-right is not part of the words."""
+        bare = re.sub(r"<[^>]+>", "", self.html(shop, shape_key))
+        return re.sub(r"[\u2066\u2069\xa0]", " ", bare)
+
     def test_the_head_carries_the_shop_and_the_document_its_own_lines(self):
-        html = self.html()
+        reads = self.reads()
         for text in ("مورف للإطارات", "01000000000", "المنصورة", "فاتورة بيع", "SI-000123",
                      "أحمد محمود", "إطار ميشلان", "الإجمالي النهائي"):
-            self.assertIn(text, html, text)
+            self.assertIn(text, reads, text)
 
     def test_tax_and_register_print_only_once_the_shop_has_them(self):
-        self.assertNotIn("رقم ضريبي", self.html())
-        self.assertNotIn("سجل تجاري", self.html())
-        filled = self.html(_shop(tax_id="123-456-789", commercial_register="12345"))
+        self.assertNotIn("رقم ضريبي", self.reads())
+        self.assertNotIn("سجل تجاري", self.reads())
+        filled = self.reads(_shop(tax_id="123-456-789", commercial_register="12345"))
         self.assertIn("رقم ضريبي", filled)
         self.assertIn("123-456-789", filled)
         self.assertIn("سجل تجاري", filled)
@@ -54,20 +60,21 @@ class PrintDocumentTest(unittest.TestCase):
         from morv.ui.print_doc import FOOTER_MIN_HEIGHT_MM
         empty = self.html()
         self.assertIn(f"min-height: {FOOTER_MIN_HEIGHT_MM}mm", empty)
-        written = self.html(_shop(invoice_footer="الضمان سنة على عيوب الصناعة"))
+        written = self.reads(_shop(invoice_footer="الضمان سنة على عيوب الصناعة"))
         self.assertIn("الضمان سنة على عيوب الصناعة", written)
 
     def test_money_prints_as_pounds_and_stays_left_to_right(self):
+        self.assertIn("12,900.00", self.reads(), "money must print formatted, not in piasters")
+        self.assertNotIn("1290000", self.reads())
         html = self.html()
-        self.assertIn("12,900.00", html, "money must print formatted, not in piasters")
-        self.assertNotIn("1290000", html)
         self.assertIn("dir='ltr'", html, "numbers inside an Arabic line must be marked left-to-right")
 
     def test_a_roll_stacks_each_line_instead_of_using_columns(self):
         wide, narrow = self.html(shape_key="a4"), self.html(shape_key="80mm")
         self.assertIn("<th", wide, "the wide shape keeps a real table head")
         self.assertIn("display: none", narrow, "a roll is too narrow for column heads")
-        self.assertIn("الكمية 2", narrow, "the roll labels each value instead of aligning columns")
+        self.assertIn("الكمية 2", self.reads(shape_key="80mm"),
+                      "the roll labels each value instead of aligning columns")
 
     def test_every_shape_writes_a_pdf_with_content(self):
         from morv.ui.print_doc import SHAPES, write_pdf
