@@ -32,7 +32,8 @@ class PosCompactTest(PosFixture):
         from PySide6.QtTest import QTest
         win, pos = self.window_on_pos()
         win.activateWindow()
-        side = next(b for b in win.findChildren(type(pos.post_btn)) if b.isVisible() and not pos.isAncestorOf(b))
+        from PySide6.QtWidgets import QAbstractButton
+        side = next(b for b in win.findChildren(QAbstractButton) if b.isVisible() and not pos.isAncestorOf(b))
         side.setFocus()
         self.app.processEvents()
         QTest.keyClick(side, Qt.Key.Key_F2)
