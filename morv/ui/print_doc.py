@@ -130,7 +130,8 @@ def document_html(shop, doc: Document, shape: Shape) -> str:
         f"<tr class='{'grand' if grand else ''}'><td>{escape(label)}</td>"
         f"<td align='left'>{_rich(ltr(fmt(amount)))}</td></tr>"
         for label, amount, grand in doc.totals)
-    meta = "".join(f"<tr><td>{escape(label)}</td><td>&nbsp;{_rich(str(value))}</td></tr>"
+    # Qt lays a table out from the left even in an RTL page, so the parties are told to hug the margin
+    meta = "".join(f"<tr><td>{escape(label)}:</td><td>&nbsp;{_rich(str(value))}</td></tr>"
                    for label, value in doc.parties)
     note = f"<div class='shop-line'>{_rich(doc.notes)}</div>" if doc.notes else ""
     footer = _rich(shop.invoice_footer) if shop.invoice_footer else "&nbsp;"
@@ -143,7 +144,7 @@ def document_html(shop, doc: Document, shape: Shape) -> str:
                     else f"<table class='totals' align='left'>{totals}</table><div style='clear: both'></div>")
     return (f"<html><head><style>{style}</style></head><body dir='rtl'>"
             f"{_shop_header(shop)}<hr>{head}"
-            f"<table class='meta'>{meta}</table>"
+            f"<table class='meta' align='right'>{meta}</table>"
             f"{_narrow_lines(doc) if shape.narrow else _wide_lines(doc)}"
             f"{totals_table}{note}"
             f"<div class='footer' style='min-height: {FOOTER_MIN_HEIGHT_MM}mm'>{footer}</div>"
