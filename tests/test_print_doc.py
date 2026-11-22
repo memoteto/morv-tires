@@ -69,11 +69,13 @@ class PrintedSheetTest(unittest.TestCase):
         self.assertLess(html.index("الموبايل"), html.index("العميل"),
                         "an LTR wrapper puts the last cell on the right, where العميل belongs")
 
-    def test_the_head_is_divided_by_the_blue_rule_and_the_footer_by_the_dark_one(self):
-        from morv.ui.print_doc import BLUE, INK
+    def test_every_rule_is_a_painted_band_because_a_css_border_never_prints(self):
+        from morv.ui.print_doc import BLUE, DASH, INK
         html = self.html()
-        self.assertIn(f"border-bottom:2px solid {BLUE}", html)
-        self.assertIn(f"border-top:2px solid {INK}", html)
+        for color in (BLUE, INK, DASH):
+            self.assertIn(f"bgcolor='{color}'", html, f"no band in {color}")
+        for ignored in ("border-bottom", "border-top"):
+            self.assertNotIn(ignored, html, "Qt's print engine draws no CSS border on a block")
 
     def test_the_net_total_is_the_only_blue_bold_row(self):
         from morv.ui.print_doc import BLUE
@@ -101,11 +103,8 @@ class PrintedSheetTest(unittest.TestCase):
         self.assertNotIn("شكرًا", self.reads(_shop(thanks="")))
 
     def test_the_logo_square_carries_the_first_letter_and_the_switch_removes_it(self):
-        from morv.ui.print_doc import BLUE
-        with_logo = self.html()
-        self.assertIn(f"bgcolor='{BLUE}'", with_logo, "no logo file, so the design's blue square stands in")
-        self.assertIn(">م<", with_logo)
-        self.assertNotIn(f"bgcolor='{BLUE}'", self.html(_shop(show_logo=False)))
+        self.assertIn(">م<", self.html(), "no logo file, so the design's blue square stands in")
+        self.assertNotIn(">م<", self.html(_shop(show_logo=False)))
 
     def test_money_prints_as_pounds_and_stays_left_to_right(self):
         self.assertIn("12,900.00", self.reads())

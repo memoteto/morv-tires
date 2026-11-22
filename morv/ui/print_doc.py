@@ -64,6 +64,12 @@ def _ltr(text: str) -> str:
     return f"<span dir='ltr'>{text}</span>"
 
 
+def _band(color: str, height_pt: float = 0.8) -> str:
+    """A filled one-cell table: Qt's print engine ignores a CSS border on a block, but paints this."""
+    return (f"<table width='100%' cellspacing='0' cellpadding='0' bgcolor='{color}'>"
+            f"<tr><td style='font-size:{height_pt}pt'>&nbsp;</td></tr></table>")
+
+
 def _icon(name: str, color: str, size: int) -> str:
     return f"<img src='file://{icons.svg_file(name, color)}' width='{size}' height='{size}'>"
 
@@ -85,24 +91,24 @@ def _sheet_head(shop, doc: Document, shape: Shape) -> str:
             parts.append(f"س.ت: {_ltr(shop.commercial_register)}")
         if shop.tax_id:
             parts.append(f"رقم التسجيل الضريبي: {_ltr(shop.tax_id)}")
-        tax = (f"<div style='color:{MUTED};font-size:{_pt(shape, 8)}'>"
+        tax = (f"<div align='right' style='color:{MUTED};font-size:{_pt(shape, 8)}'>"
                f"{'&nbsp;&nbsp;&nbsp;'.join(parts)}</div>")
     logo = ""
     if shop.show_logo:
-        logo = f"<td width='44' valign='middle'>{_logo_cell(shop, 38)}</td>"
-    name = (f"<td valign='middle' dir='rtl'>"
-            f"<div style='font-size:{_pt(shape, 14)};font-weight:bold;color:{INK}'>{shop.name}</div>"
-            f"<div style='color:{MUTED};font-size:{_pt(shape, 8.5)}'>{shop.activity}</div>{tax}</td>")
-    doc_block = (f"<td width='34%' valign='middle' align='left' dir='ltr'>"
+        logo = f"<td width='42' valign='middle' align='left'>{_logo_cell(shop, 38)}</td>"
+    name = (f"<td valign='middle' align='right' dir='rtl' style='padding-right:10px'>"
+            f"<div align='right' style='font-size:{_pt(shape, 14)};font-weight:bold;color:{INK}'>"
+            f"{shop.name}</div>"
+            f"<div align='right' style='color:{MUTED};font-size:{_pt(shape, 8.5)}'>{shop.activity}</div>"
+            f"{tax}</td>")
+    doc_block = (f"<td width='32%' valign='middle' align='left' dir='ltr'>"
                  f"<div align='left' style='color:{BLUE};font-weight:bold;font-size:{_pt(shape, 12)}'>"
                  f"{doc.title}</div>"
                  f"<div align='left' style='color:{INK};font-size:{_pt(shape, 9.5)}'>{doc.number}</div>"
                  f"<div align='left' style='color:{MUTED};font-size:{_pt(shape, 9)}'>{doc.date}</div></td>")
     # The wrapper runs LTR so the cells land where the design puts them whatever Qt does with RTL tables.
-    return (f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr'><tr>{doc_block}"
-            f"<td valign='middle'><table cellspacing='0' cellpadding='0' dir='ltr'><tr>{name}{logo}"
-            f"</tr></table></td></tr></table>"
-            f"<div style='border-bottom:2px solid {BLUE};font-size:2pt'>&nbsp;</div>")
+    return (f"<table width='100%' cellspacing='0' cellpadding='2' dir='ltr'>"
+            f"<tr>{doc_block}{name}{logo}</tr></table>{_band(BLUE, 1.4)}")
 
 
 def _info_box(doc: Document, shape: Shape) -> str:
@@ -153,9 +159,12 @@ def _totals_block(doc: Document, shape: Shape) -> str:
     rows = ""
     for i, (label, value) in enumerate(doc.totals):
         last = i == len(doc.totals) - 1
-        style = (f"color:{BLUE};font-weight:bold;font-size:{_pt(shape, 11.5)};"
-                 f"border-top:1px solid {LINE}") if last else f"color:{INK};font-size:{_pt(shape, 9.5)}"
-        rows += (f"<tr><td align='left' dir='ltr' style='padding:2px 4px;{style}'>{value}</td>"
+        style = (f"color:{BLUE};font-weight:bold;font-size:{_pt(shape, 11.5)}" if last
+                 else f"color:{INK};font-size:{_pt(shape, 9.5)}")
+        if last:
+            rows += f"<tr><td colspan='2' style='padding:0'>{_band(LINE)}</td></tr>"
+        # The value keeps the paragraph's own direction so a currency word stays where the design puts it
+        rows += (f"<tr><td align='left' dir='rtl' style='padding:2px 4px;{style}'>{value}</td>"
                  f"<td align='right' dir='rtl' style='padding:2px 4px;{style}'>{label}</td></tr>")
     inner = f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr'>{rows}</table>"
     return (f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr' style='margin-top:8px'><tr>"
@@ -171,8 +180,8 @@ def _sheet_foot(shop, doc: Document, shape: Shape) -> str:
         out += (f"<div align='center' style='margin-top:10px;color:{BLUE};font-weight:bold;"
                 f"font-size:{_pt(shape, 10)}'>{shop.thanks}</div>")
     if shop.show_policy and shop.policy:
-        out += (f"<div dir='rtl' style='margin-top:6px;border-top:1px dashed {DASH};padding-top:4px;"
-                f"color:{MUTED};font-size:{_pt(shape, 8)}'>{shop.policy.replace(chr(10), '<br>')}</div>")
+        out += _band(DASH) + (f"<div dir='rtl' style='color:{MUTED};font-size:{_pt(shape, 8)}'>"
+                              f"{shop.policy.replace(chr(10), '<br>')}</div>")
     items = []
     if shop.address:
         items.append(("pin", shop.address))
@@ -184,23 +193,23 @@ def _sheet_foot(shop, doc: Document, shape: Shape) -> str:
     if shop.show_hours and shop.hours:
         items.append(("clock", shop.hours))
     if items:
-        size = max(8, round(9 * shape.scale))
+        size = max(10, round(12 * shape.scale))
         cells = "&nbsp;&nbsp;&nbsp;&nbsp;".join(
             f"{_icon(name, MUTED, size)}&nbsp;{text}" for name, text in items)
-        out += (f"<div align='center' dir='rtl' style='margin-top:12px;border-top:2px solid {INK};"
-                f"padding-top:6px;color:{INK};font-size:{_pt(shape, 8.5)}'>{cells}</div>")
+        out += _band(INK, 1.2) + (f"<div align='center' dir='rtl' style='color:{INK};"
+                                  f"font-size:{_pt(shape, 8.5)}'>{cells}</div>")
     return out
 
 
 def _roll(shop, doc: Document, shape: Shape) -> str:
     def rule() -> str:
-        return "<div style='border-bottom:1px dashed #9CA3AF;font-size:2pt;margin:4px 0'>&nbsp;</div>"
+        return _band(DASH)
 
     def row(label: str, value: str, strong: bool = False) -> str:
         weight = "font-weight:bold;" if strong else ""
         size = _pt(shape, 12) if strong else _pt(shape, 9.5)
         return (f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr'><tr>"
-                f"<td align='left' dir='ltr' style='{weight}font-size:{size}'>{value}</td>"
+                f"<td align='left' dir='rtl' style='{weight}font-size:{size}'>{value}</td>"
                 f"<td align='right' dir='rtl' style='{weight}font-size:{size}'>{label}</td></tr></table>")
 
     out = f"<div align='center' style='font-weight:bold;font-size:{_pt(shape, 13)};color:{INK}'>{shop.name}</div>"
