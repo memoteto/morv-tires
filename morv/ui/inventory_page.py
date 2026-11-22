@@ -11,7 +11,7 @@ from morv.infra.items import Item
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.stock_pages import LotsPage, StockPage
-from morv.ui.widgets import ask, danger_button, field, form, ltr_edit, muted, Notice, primary_button
+from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
 
 
 class InventoryPage(QWidget):
@@ -228,9 +228,9 @@ class ItemDialog(Modal):
             if fld.key.startswith("price_") and not price_ok:
                 w.setEnabled(False)
             self.widgets[fld.key] = w
-            f.addRow(field(label, w))
+            f.addRow(label, w)
             if fld.key == "code":
-                f.addRow(muted("الاسم والكود يُقترحان تلقائيًا من الماركة والمقاس؛ اتركهما فارغين لقبول المقترح أو اكتب ما تريد"))
+                f.addRow("", muted("الاسم والكود يُقترحان تلقائيًا من الماركة والمقاس؛ اتركهما فارغين لقبول المقترح أو اكتب ما تريد"))
         self.fields_box.setLayout(f)
         self.body.replaceWidget(old, self.fields_box)
         old.hide()
@@ -376,9 +376,9 @@ class CustomFieldDialog(Modal):
             self.type.addItem(v, k)
         self.opts = QLineEdit()
         self.opts.setPlaceholderText("للقائمة: الاختيارات مفصولة بـ |")
-        f.addRow(field("اسم الحقل", self.name))
-        f.addRow(field("النوع", self.type))
-        f.addRow(field("الاختيارات", self.opts))
+        f.addRow("اسم الحقل", self.name)
+        f.addRow("النوع", self.type)
+        f.addRow("الاختيارات", self.opts)
         lay.addLayout(f)
         self.add_footer("إضافة", self.go)
 

@@ -8,7 +8,7 @@ from morv.core.money import fmt
 from morv.infra import ledger, purchase_returns
 from morv.infra.purchase_returns import PurchaseReturnError, ReturnLine
 from morv.ui.modal import Modal
-from morv.ui.widgets import danger_button, DateEdit, field, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, danger_button, form, ltr_edit, muted
 
 
 class PurchaseReturnDialog(Modal):
@@ -31,10 +31,10 @@ class PurchaseReturnDialog(Modal):
         self.reason.setPlaceholderText("سبب المرتجع (إلزامي)")
         self.date = DateEdit()
         self.date.setText(date.today().isoformat())
-        f.addRow(field("الدفعة *", self.lot))
-        f.addRow(field("الكمية *", self.qty))
-        f.addRow(field("السبب *", self.reason))
-        f.addRow(field("التاريخ *", self.date))
+        f.addRow("الدفعة *", self.lot)
+        f.addRow("الكمية *", self.qty)
+        f.addRow("السبب *", self.reason)
+        f.addRow("التاريخ *", self.date)
         self.body.addLayout(f)
         self.list_label = muted("لم تُضف أسطر بعد.")
         self.body.addWidget(self.list_label)
@@ -87,7 +87,7 @@ class ReversePurchaseReturnDialog(Modal):
         f = form()
         self.reason = QLineEdit()
         self.reason.setPlaceholderText("سبب العكس (إلزامي)")
-        f.addRow(field("سبب العكس *", self.reason))
+        f.addRow("سبب العكس *", self.reason)
         self.body.addLayout(f)
         self.add_footer("عكس المرتجع", self.save)
 

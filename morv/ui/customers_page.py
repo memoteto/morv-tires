@@ -12,7 +12,7 @@ from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.deposit_dialogs import CustomerDocumentsDialog, DepositDialog
 from morv.ui.receipt_dialogs import ReceiptDialog
-from morv.ui.widgets import ask, danger_button, field, form, ltr_edit, muted, Notice, primary_button
+from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
 
 
 class CustomersPage(ListPage):
@@ -155,12 +155,12 @@ class CustomerDialog(Modal):
         self.notes = QPlainTextEdit(c.notes if c else "")
         self.notes.setPlaceholderText("تظهر للكاشير تلقائيًا عند اختيار العميل في الفاتورة")
         self.notes.setFixedHeight(64)
-        f.addRow(field("اسم العميل *", self.name))
-        f.addRow(field("رقم الموبايل *", self.mobile))
-        f.addRow(field("فئة السعر", self.level))
-        f.addRow(field("نوع العميل", self.ctype))
-        f.addRow(field("العنوان", self.address))
-        f.addRow(field("ملاحظات", self.notes))
+        f.addRow("اسم العميل *", self.name)
+        f.addRow("رقم الموبايل *", self.mobile)
+        f.addRow("فئة السعر", self.level)
+        f.addRow("نوع العميل", self.ctype)
+        f.addRow("العنوان", self.address)
+        f.addRow("ملاحظات", self.notes)
         lay.addLayout(f)
 
         vh = QHBoxLayout()
@@ -196,14 +196,14 @@ class CustomerDialog(Modal):
         self.tax.setText(c.tax_id if c else "")
         self.wa = QCheckBox("يوافق العميل على تلقي تذكيرات الأقساط عبر واتساب")
         self.wa.setChecked(bool(c and c.whatsapp_ok))
-        mf.addRow(field("الرقم القومي", self.national_id))
-        mf.addRow(muted("إلزامي عند إنشاء عقد تقسيط، ويُعرض مخفيًا بعد الحفظ"))
-        mf.addRow(field("جهة العمل", self.work))
-        mf.addRow(field("هاتف إضافي", self.mobile2))
-        mf.addRow(field("حد البيع الآجل", self.limit))
-        mf.addRow(field("مدة السداد (أيام)", self.days))
-        mf.addRow(field("الرقم الضريبي / السجل", self.tax))
-        mf.addRow(self.wa)
+        mf.addRow("الرقم القومي", self.national_id)
+        mf.addRow("", muted("إلزامي عند إنشاء عقد تقسيط، ويُعرض مخفيًا بعد الحفظ"))
+        mf.addRow("جهة العمل", self.work)
+        mf.addRow("هاتف إضافي", self.mobile2)
+        mf.addRow("حد البيع الآجل", self.limit)
+        mf.addRow("مدة السداد (أيام)", self.days)
+        mf.addRow("الرقم الضريبي / السجل", self.tax)
+        mf.addRow("", self.wa)
         self.more_box.setLayout(mf)
         self.more_box.setVisible(False)
         lay.addWidget(self.more_box)
@@ -268,7 +268,7 @@ class VehicleDialog(Modal):
         for lbl, w in (("الماركة", self.make), ("الموديل", self.model), ("السنة", self.year), ("رقم اللوحة", self.plate),
                        ("مقاس الإطار الأمامي", self.tire_f), ("مقاس الإطار الخلفي", self.tire_r),
                        ("مقاس البطارية", self.battery), ("آخر عداد كم", self.odo)):
-            f.addRow(field(lbl, w))
+            f.addRow(lbl, w)
         lay.addLayout(f)
         self.add_footer("إضافة", self.go)
 

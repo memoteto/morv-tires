@@ -10,7 +10,7 @@ from morv.infra import bank_reconciliation as br
 from morv.infra import ledger, treasury_view
 from morv.infra.bank_reconciliation import ReconciliationError
 from morv.ui.modal import Modal
-from morv.ui.widgets import danger_button, DateEdit, field, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, danger_button, form, ltr_edit, muted
 
 
 class ReconciliationDialog(Modal):
@@ -34,13 +34,13 @@ class ReconciliationDialog(Modal):
         self.memo.setPlaceholderText("سبب الفرق (إلزامي إن وُجد فرق)")
         self.reference = QLineEdit()
         self.reference.setPlaceholderText("مرجع الكشف (اختياري)")
-        f.addRow(field("الحساب *", self.account))
-        f.addRow(field("تاريخ الرصيد *", self.date))
-        f.addRow(field("رصيد البرنامج في التاريخ", self.program))
-        f.addRow(field("رصيد الكشف *", self.statement))
-        f.addRow(field("الفرق", self.diff_label))
-        f.addRow(field("سبب الفرق", self.memo))
-        f.addRow(field("مرجع الكشف", self.reference))
+        f.addRow("الحساب *", self.account)
+        f.addRow("تاريخ الرصيد *", self.date)
+        f.addRow("رصيد البرنامج في التاريخ", self.program)
+        f.addRow("رصيد الكشف *", self.statement)
+        f.addRow("الفرق", self.diff_label)
+        f.addRow("سبب الفرق", self.memo)
+        f.addRow("مرجع الكشف", self.reference)
         self.body.addLayout(f)
         self.fee_box = QCheckBox("سجّل الفرق كمصروف بنكي (رسوم) بتاريخ الرصيد ثم احفظ محضرًا مطابقًا")
         self.fee_box.setVisible(False)
@@ -133,7 +133,7 @@ class CancelReconciliationDialog(Modal):
         self.body.addWidget(muted("يُسجَّل مستند إلغاء ويبقى المحضر الأصلي في السجل، ثم يمكن المطابقة من جديد."))
         f = form()
         self.memo = QLineEdit()
-        f.addRow(field("سبب الإلغاء *", self.memo))
+        f.addRow("سبب الإلغاء *", self.memo)
         self.body.addLayout(f)
         self.add_footer("إلغاء المحضر", self.save)
 

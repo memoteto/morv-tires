@@ -7,7 +7,7 @@ from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, shop, users
 from morv.ui.modal import Modal
-from morv.ui.widgets import field, form, muted, Notice, PasswordEdit, primary_button
+from morv.ui.widgets import Notice, PasswordEdit, form, muted, primary_button
 
 
 class LoginDialog(QDialog):
@@ -48,8 +48,8 @@ class LoginDialog(QDialog):
             self.combo.addItem(f"{u.display_name} — {security.ROLES[u.role]}", u.id)
         self.password = PasswordEdit()
         self.password.edit.returnPressed.connect(self.try_login)
-        f.addRow(field("المستخدم", self.combo))
-        f.addRow(field("كلمة المرور", self.password))
+        f.addRow("المستخدم", self.combo)
+        f.addRow("كلمة المرور", self.password)
         outer.addLayout(f)
 
         self.notice = Notice()
@@ -104,9 +104,9 @@ class ChangePasswordDialog(Modal):
         self.new = PasswordEdit()
         self.new2 = PasswordEdit()
         if current is None:
-            f.addRow(field("كلمة المرور الحالية", self.old))
-        f.addRow(field("الجديدة", self.new))
-        f.addRow(field("تأكيدها", self.new2))
+            f.addRow("كلمة المرور الحالية", self.old)
+        f.addRow("الجديدة", self.new)
+        f.addRow("تأكيدها", self.new2)
         lay.addLayout(f)
         self.add_footer("حفظ", self.save)
 
