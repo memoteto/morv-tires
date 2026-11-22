@@ -21,7 +21,7 @@ class PosCompactTest(PosFixture):
 
     def test_shortcuts_fire_while_focus_is_outside_the_page(self):
         from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QShortcut
+        from PySide6.QtGui import QShortcut
         _win, pos = self.window_on_pos()
         shortcuts = {s.key().toString(): s for s in pos.findChildren(QShortcut)}
         for key in ("F2", "F4", "F8", "F9"):
@@ -40,9 +40,14 @@ class PosCompactTest(PosFixture):
         self.assertTrue(pos.item_search.hasFocus())
 
     def test_approve_button_is_normal_size_and_visible_at_1366_without_scrolling(self):
+        from PySide6.QtCore import QPoint
         _win, pos = self.window_on_pos()
         self.assertEqual(pos.post_btn.objectName(), "primary")
-        from PySide6.QtCore import QPoint
+        self.con.execute(
+            "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
+            "VALUES ('service','SV-9','خدمة','خدمه',50000,50000,50000)")
+        pos._add_row(self.con.execute("SELECT id FROM items").fetchone()[0], "service", "خدمة")
+        self.app.processEvents()     # with a line the quick-amount row appears, the tallest normal state
         y = pos.post_btn.mapTo(pos, QPoint(0, 0)).y()
         self.assertLessEqual(y + pos.post_btn.height(), pos.height(), "approval needs scrolling at 1366x768")
 

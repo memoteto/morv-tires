@@ -119,7 +119,7 @@ class PosPage(QWidget):
             grid.setColumnStretch(c, stretch)
 
         # Read-only facts sit in the card header, so they cost no field row
-        self.number_edit = chip(ltr(sales.next_number_preview(self.session.con)))
+        self.number_edit = chip(sales.next_number_preview(self.session.con))
         self.number_edit.setToolTip("رقم الفاتورة")
         self.sale_date = chip("")
         self.sale_date.setToolTip("التاريخ والوقت")
@@ -297,14 +297,17 @@ class PosPage(QWidget):
 
     def _summary_card(self) -> QFrame:
         """Totals and payment in one card, as in the purchase invoice, so approval is reached unscrolled."""
-        box, body, _head = section_card("ملخص الفاتورة والدفع", "sales")
+        box, body, head = section_card("ملخص الفاتورة والدفع", "sales")
+        # The shop is not tax-registered, so tax is a fixed fact in the header rather than a row
+        tax = chip("بدون ضريبة")
+        tax.setToolTip("الضريبة: المحل غير مسجّل — بدون ضريبة")
+        head.addWidget(tax)
         self.subtotal_label = QLabel()
         self.invoice_disc = ltr_edit("0.00")
         self.invoice_disc.setFixedWidth(150)
         self.invoice_disc.textChanged.connect(self._refresh_total)
         for label, w in (("الإجمالي قبل الخصم", self.subtotal_label),
-                          ("خصم على الفاتورة", self.invoice_disc),
-                          ("الضريبة", chip("المحل غير مسجّل — بدون ضريبة"))):
+                          ("خصم على الفاتورة", self.invoice_disc)):
             body.addWidget(kv_row(label, w))
         total = QFrame()
         total.setObjectName("totalBox")
@@ -322,7 +325,14 @@ class PosPage(QWidget):
         return box
 
     def _payment_section(self, body: QVBoxLayout) -> None:
-        body.addWidget(field_label("طريقة الدفع"))
+        self.split_btn = QPushButton("تقسيم الدفع على وسيلتين")
+        self.split_btn.setObjectName("link")
+        self.split_btn.setCheckable(True)
+        label_row = QHBoxLayout()
+        label_row.addWidget(field_label("طريقة الدفع"))
+        label_row.addStretch(1)
+        label_row.addWidget(self.split_btn)
+        body.addLayout(label_row)
         method_row = QHBoxLayout()
         self.pay1_method = self._method_combo(first_blank=False)
         self.pay1_method.setObjectName("payMethod")
@@ -381,9 +391,6 @@ class PosPage(QWidget):
         self.instalment_hint.setVisible(False)
         body.addWidget(self.instalment_hint)
 
-        self.split_btn = QPushButton("تقسيم الدفع على وسيلتين")
-        self.split_btn.setObjectName("link")
-        self.split_btn.setCheckable(True)
         self.split = QFrame()
         sp = QGridLayout(self.split)
         sp.setContentsMargins(0, 0, 0, 0)
@@ -396,7 +403,6 @@ class PosPage(QWidget):
         sp.addWidget(field("مبلغها", self.pay2_amount), 1, 1)
         self.split.setVisible(False)
         self.split_btn.toggled.connect(self.split.setVisible)
-        body.addWidget(self.split_btn, 0, Qt.AlignmentFlag.AlignLeading)
         body.addWidget(self.split)
 
         self.post_btn = QPushButton("اعتماد وتحصيل")
@@ -854,7 +860,7 @@ class PosPage(QWidget):
         self.pay2_amount.clear()
         self.split_btn.setChecked(False)
         self.customer.setCurrentIndex(0)
-        self.number_edit.setText(ltr(sales.next_number_preview(self.session.con)))
+        self.number_edit.setText(sales.next_number_preview(self.session.con))
         self._stamp()
         self._on_row_changed()
 
