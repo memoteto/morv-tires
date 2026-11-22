@@ -239,7 +239,7 @@ QPlainTextEdit {{ background:{t['surface']}; color:{t['text']}; border:1px solid
 QToolTip {{ background:{t['surface']}; color:{t['text']}; border:1px solid {t['border_strong']};
             border-radius:6px; padding:4px 8px; }}
 QWidget#cardHead {{ background:transparent; border:0; border-bottom:1px solid {t['border']}; }}
-QLabel#fieldLabel {{ color:{t['muted']}; font-size:{t['fs']-1}px; }}
+QLabel#fieldLabel {{ color:{t['muted']}; font-size:{t['fs']}px; font-weight:600; }}
 QLineEdit:read-only {{ background:{t['surface2']}; border-style:dashed; border-color:{t['border_strong']}; }}
 QFrame#infoStrip {{ background:{t['surface2']}; border:1px solid {t['border']}; border-radius:10px; }}
 QLabel#chip {{ background:{t['surface2']}; color:{t['muted']}; border:1px solid {t['border']}; border-radius:6px;
