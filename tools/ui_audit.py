@@ -34,6 +34,18 @@ def _dialogs(session, item_id):
             ("period_lock", lambda: PeriodLockDialog(session))]
 
 
+# Tabs holding a table or form of their own, which a shot of the page's first tab never shows
+EXTRA_TABS = {"settings": (("item_fields", "حقول بطاقة الصنف"), ("audit", "سجل العمليات")),
+              "inventory": (("lots", "الدفعات (DOT)"), ("stock", "الجرد والتسويات"))}
+
+
+def _tabs_worth_capturing(tabs, key) -> list:
+    if tabs is None:
+        return []
+    wanted = {title: slug for slug, title in EXTRA_TABS.get(key, ())}
+    return [(wanted[tabs.tabText(i)], i) for i in range(tabs.count()) if tabs.tabText(i) in wanted]
+
+
 def _ancestors(w):
     p = w.parentWidget()
     while p is not None:
@@ -122,6 +134,16 @@ def run(out: Path, size: tuple) -> dict:
                 name = f"page_{key}_{w}x{h}_{mode}"
                 win.grab().save(str(out / f"{name}.png"))
                 report["pages"][name] = _measure(win)
+                tabs = getattr(win.stack.currentWidget(), "tabs", None)
+                for tab_name, tab_index in _tabs_worth_capturing(tabs, key):
+                    tabs.setCurrentIndex(tab_index)
+                    _settle(app)
+                    tab_shot = f"page_{key}_tab_{tab_name}_{w}x{h}_{mode}"
+                    print(f"audit: tab {key}/{tab_name} {mode}", flush=True)
+                    win.grab().save(str(out / f"{tab_shot}.png"))
+                    report["pages"][tab_shot] = _measure(win)
+                    tabs.setCurrentIndex(0)
+                    _settle(app)
             for dname, make in _dialogs(session, item_id):
                 name = f"dlg_{dname}_{w}x{h}_{mode}"
                 try:

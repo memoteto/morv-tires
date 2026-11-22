@@ -11,7 +11,7 @@ from morv.infra.items import Item
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.stock_pages import LotsPage, StockPage
-from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, primary_button
+from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, muted_icon, primary_button
 
 
 class InventoryPage(QWidget):
@@ -24,10 +24,10 @@ class InventoryPage(QWidget):
         lay.setContentsMargins(24, 16, 24, 16)
         self.tabs = QTabWidget()
         self.items_tab = ItemsPage(session)
-        self.tabs.addTab(self.items_tab, "الأصناف")
+        self.tabs.addTab(self.items_tab, muted_icon("inventory"), "الأصناف")
         # Lots and stock tabs are built on first selection to avoid blocking startup.
-        self.tabs.addTab(QWidget(), "الدفعات (DOT)")
-        self.tabs.addTab(QWidget(), "الجرد والتسويات")
+        self.tabs.addTab(QWidget(), muted_icon("calendar"), "الدفعات (DOT)")
+        self.tabs.addTab(QWidget(), muted_icon("check"), "الجرد والتسويات")
         self.tabs.currentChanged.connect(self._refresh_tab)
         lay.addWidget(self.tabs)
 
@@ -290,6 +290,9 @@ class ItemDialog(Modal):
 
 class ItemFieldsTab(QWidget):
     COLS = ["الحقل", "مثال", "إظهار", "إلزامي", "في الطباعة", "فلتر بحث"]
+    # The four yes/no columns carry their title as an icon and a tooltip, so each one
+    # costs an icon's width instead of a whole Arabic header.
+    COL_ICONS = {2: "eye", 3: "alert", 4: "printer", 5: "search"}
 
     def __init__(self, session):
         super().__init__()
@@ -309,9 +312,16 @@ class ItemFieldsTab(QWidget):
         lay.addLayout(top)
         self.table = QTableWidget(0, len(self.COLS))
         self.table.setHorizontalHeaderLabels(self.COLS)
+        for col, name in self.COL_ICONS.items():
+            head = QTableWidgetItem()
+            head.setIcon(muted_icon(name))
+            head.setToolTip(self.COLS[col])
+            self.table.setHorizontalHeaderItem(col, head)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for col in self.COL_ICONS:
+            self.table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         self.table.itemChanged.connect(self.on_change)
         lay.addWidget(self.table, 1)
         lay.addWidget(muted("الحقول المقفلة يعتمد عليها البرنامج في البحث والفواتير فتبقى ظاهرة وإلزامية. "

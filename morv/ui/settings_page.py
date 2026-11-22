@@ -12,7 +12,7 @@ from morv.infra import backup, settings, shop, users, vault
 from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
 from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, form, info, ltr_edit, muted,
-                             primary_button)
+                             muted_icon, primary_button)
 
 SHORTCUTS = [("F2", "التركيز على مربع البحث في شاشات القوائم"), ("Ctrl+N", "إضافة جديد في شاشة القوائم المفتوحة"),
              ("Ctrl+B", "طي الشريط الجانبي أو فتحه"), ("Ctrl+D", "التبديل بين الوضع الفاتح والداكن"),
@@ -42,31 +42,33 @@ class SettingsPage(QWidget):
         self.shop_tab = None
         if session.can("settings.edit"):      # A cashier never sees shop data, by the owner's decision
             self.shop_tab = ShopTab(session)
-            self.tabs.addTab(self.shop_tab, "المحل")
+            self.tabs.addTab(self.shop_tab, muted_icon("home"), "المحل")
         if session.can("users.manage"):
             self.users_tab = UsersTab(session)
-            self.tabs.addTab(self.users_tab, "المستخدمون والصلاحيات")
+            self.tabs.addTab(self.users_tab, muted_icon("user"), "المستخدمون والصلاحيات")
             self.audit_tab = AuditTab(session)
-            self.tabs.addTab(self.audit_tab, "سجل العمليات")
+            # "sales" is the document glyph; it gets its own name once the icon set is replaced.
+            self.tabs.addTab(self.audit_tab, muted_icon("sales"), "سجل العمليات")
         self.fields_tab = None
         if session.can("settings.edit"):
             from morv.ui.inventory_page import ItemFieldsTab   # local import to avoid a cycle
             self.fields_tab = ItemFieldsTab(session)
-            self.tabs.addTab(self.fields_tab, "حقول بطاقة الصنف")
+            self.tabs.addTab(self.fields_tab, muted_icon("edit"), "حقول بطاقة الصنف")
         self.partners_tab = None
         if session.can("treasury.manage"):
             from morv.ui.partners_tab import PartnersTab
             self.partners_tab = PartnersTab(session)
-            self.tabs.addTab(self.partners_tab, "الشركاء")
+            self.tabs.addTab(self.partners_tab, muted_icon("customers"), "الشركاء")
         if session.can("opening.post"):
             from morv.ui.opening_dialogs import OpeningTab
             self.opening_tab = OpeningTab(session)
-            self.tabs.addTab(self.opening_tab, "الأرصدة الافتتاحية")
+            self.tabs.addTab(self.opening_tab, muted_icon("cash"), "الأرصدة الافتتاحية")
         self.appearance_tab = AppearanceTab(session)
-        self.tabs.addTab(self.appearance_tab, "المظهر")
-        self.tabs.addTab(ShortcutsTab(), "الاختصارات")
+        self.tabs.addTab(self.appearance_tab, muted_icon("sun"), "المظهر")
+        # "font" stands in for a keyboard until the icon set is replaced.
+        self.tabs.addTab(ShortcutsTab(), muted_icon("font"), "الاختصارات")
         self.backup_tab = BackupTab(session)
-        self.tabs.addTab(self.backup_tab, "النسخ الاحتياطي")
+        self.tabs.addTab(self.backup_tab, muted_icon("save"), "النسخ الاحتياطي")
         lay.addWidget(self.tabs)
 
 

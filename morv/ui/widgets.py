@@ -1,6 +1,6 @@
 """Small shared UI pieces, so screens stay consistent."""
 from PySide6.QtCore import QDate, QEvent, QLocale, Qt, Signal
-from PySide6.QtGui import QColor, QPalette, QTextCharFormat
+from PySide6.QtGui import QColor, QIcon, QPalette, QTextCharFormat
 from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
@@ -90,6 +90,11 @@ def deferred_button(label: str, icon_name: str | None = None) -> QPushButton:
     b.setToolTip("قريبًا — غير مبني بعد")
     b.setVisible(False)
     return b
+
+
+def muted_icon(name: str, size: int = 16) -> QIcon:
+    """Fixed muted tint, which reads on both themes; only the shell retints its icons on a theme change."""
+    return icons.icon(name, ICON_MUTED, size)
 
 
 def trail_icon(edit: QLineEdit, name: str) -> None:
