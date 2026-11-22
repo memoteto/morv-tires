@@ -2,7 +2,7 @@
 from PySide6.QtCore import QDate, QEvent, QLocale, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPalette, QTextCharFormat
 from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
-                               QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
+                               QMenu, QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
 from morv.core.text import ltr
 from morv.ui import icons, tokens
@@ -368,6 +368,20 @@ def danger_button(text: str, icon_name: str | None = None) -> QPushButton:
     b.setObjectName("danger")
     if icon_name:
         b.setIcon(icons.icon(icon_name, tokens.ICON_DANGER, 18))
+    return b
+
+
+def menu_button(text: str, entries: list, icon_name: str | None = None) -> QPushButton:
+    """One button for a group of actions; each entry is (label, callback, enabled) and opens as a menu."""
+    b = QPushButton(text)
+    if icon_name:
+        b.setIcon(icons.icon(icon_name, ICON_MUTED, 18))
+    menu = QMenu(b)
+    for label, on_click, enabled in entries:
+        action = menu.addAction(label)
+        action.setEnabled(enabled)
+        action.triggered.connect(lambda _checked=False, fn=on_click: fn())
+    b.setMenu(menu)                 # the button owns the menu, so it lives as long as the button
     return b
 
 
