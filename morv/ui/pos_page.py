@@ -16,7 +16,8 @@ from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons
 from morv.ui.inventory_page import ItemDialog
 from morv.ui.purchases_page import _ItemPopup
-from morv.ui.widgets import Notice, ltr_edit, muted
+from morv.ui.widgets import (Notice, chip, deferred_button, field, field_label, kbd, kv_row, ltr_edit, muted,
+                             section_card, trail_icon)
 
 ITEM_CHOICES = 50
 TIER_ATTR = {"retail": "price_retail", "wholesale": "price_wholesale", "super": "price_super"}
@@ -94,8 +95,8 @@ class PosPage(QWidget):
         draft.setObjectName("pillWarn")
         h.addWidget(draft)
         h.addStretch(1)
-        h.addWidget(self._deferred_button("تعليق الفاتورة", "pause"))
-        h.addWidget(self._deferred_button("معاينة الطباعة", "printer"))
+        h.addWidget(deferred_button("تعليق الفاتورة", "pause"))
+        h.addWidget(deferred_button("معاينة الطباعة", "printer"))
         self.cancel_btn = QPushButton("إلغاء")
         self.cancel_btn.setObjectName("dangerLink")
         self.cancel_btn.setIcon(icons.icon("close", "#B42323", 16))
@@ -109,7 +110,7 @@ class PosPage(QWidget):
         bar.addStretch(1)
         for key, label in (("F2", "صنف"), ("F4", "عميل"), ("F8", "الدفع"), ("F9", "اعتماد")):
             bar.addWidget(muted(label))
-            bar.addWidget(self._kbd(key))
+            bar.addWidget(kbd(key))
             bar.addSpacing(8)
         return bar
 
@@ -121,7 +122,7 @@ class PosPage(QWidget):
         return col
 
     def _invoice_card(self) -> QFrame:
-        box, body, _head = self._card("بيانات الفاتورة والعميل", "sales")
+        box, body, _head = section_card("بيانات الفاتورة والعميل", "sales")
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(12)
@@ -133,17 +134,17 @@ class PosPage(QWidget):
         self.number_edit.setReadOnly(True)
         self.sale_date = ltr_edit()
         self.sale_date.setReadOnly(True)
-        self._trail_icon(self.sale_date, "lock")
+        trail_icon(self.sale_date, "lock")
         self.tier_combo = QComboBox()
         for key, label in TIER_LABELS.items():
             self.tier_combo.addItem(label, key)
         self.tier_combo.currentIndexChanged.connect(lambda _i: self._set_tier(self.tier_combo.currentData()))
         self.tier_combo.setEnabled(bool(getattr(self.session.user, "is_manager", False)))
         self.odometer = ltr_edit("مثال: 84500")
-        grid.addWidget(self._field("رقم الفاتورة", self.number_edit), 0, 0)
-        grid.addWidget(self._field("التاريخ والوقت", self.sale_date), 0, 1)
-        grid.addWidget(self._field("فئة السعر", self.tier_combo, locked=True), 0, 2)
-        grid.addWidget(self._field("عداد الكيلومترات", self.odometer), 0, 3)
+        grid.addWidget(field("رقم الفاتورة", self.number_edit), 0, 0)
+        grid.addWidget(field("التاريخ والوقت", self.sale_date), 0, 1)
+        grid.addWidget(field("فئة السعر", self.tier_combo, locked=True), 0, 2)
+        grid.addWidget(field("عداد الكيلومترات", self.odometer), 0, 3)
 
         self.customer = QComboBox()
         self.customer.addItem("عميل نقدي", ("", "retail", "", ""))
@@ -164,17 +165,17 @@ class PosPage(QWidget):
         self.customer.lineEdit().textEdited.connect(lambda _t: self._customer_lookup.start())
         self.customer.currentIndexChanged.connect(self._on_customer_changed)
         self.mobile = ltr_edit("ابحث برقم الموبايل")
-        self._trail_icon(self.mobile, "phone")
+        trail_icon(self.mobile, "phone")
         self.mobile.editingFinished.connect(self._on_mobile_typed)
         self.plate = ltr_edit("رقم اللوحة")
-        self._trail_icon(self.plate, "car")
-        grid.addWidget(self._field("العميل *", self.customer), 1, 0, 1, 2)
-        grid.addWidget(self._field("رقم الموبايل", self.mobile), 1, 2)
-        grid.addWidget(self._field("المركبة / اللوحة", self.plate), 1, 3)
+        trail_icon(self.plate, "car")
+        grid.addWidget(field("العميل *", self.customer), 1, 0, 1, 2)
+        grid.addWidget(field("رقم الموبايل", self.mobile), 1, 2)
+        grid.addWidget(field("المركبة / اللوحة", self.plate), 1, 3)
 
         self.note = QLineEdit()
         self.note.setPlaceholderText("اختياري — تظهر في الطباعة")
-        grid.addWidget(self._field("ملاحظة على الفاتورة", self.note), 2, 0, 1, 4)
+        grid.addWidget(field("ملاحظة على الفاتورة", self.note), 2, 0, 1, 4)
         body.addLayout(grid)
 
         strip = QFrame()
@@ -183,7 +184,7 @@ class PosPage(QWidget):
         s.setContentsMargins(12, 8, 12, 8)
         s.setSpacing(8)
         self.cust_kind = QLabel()
-        self.cust_tier_chip = self._chip("")
+        self.cust_tier_chip = chip("")
         self.cust_stats = muted("")
         self.cust_stats.setWordWrap(False)
         change = QPushButton("تغيير العميل")
@@ -198,9 +199,9 @@ class PosPage(QWidget):
         return box
 
     def _items_card(self) -> QFrame:
-        box, body, head = self._card("الأصناف والخدمات", "purchases")
-        self.tier_chip = self._chip("")
-        self.count_chip = self._chip("")
+        box, body, head = section_card("الأصناف والخدمات", "purchases")
+        self.tier_chip = chip("")
+        self.count_chip = chip("")
         head.addWidget(self.tier_chip)
         head.addWidget(self.count_chip)
 
@@ -209,7 +210,7 @@ class PosPage(QWidget):
         self.item_search = QLineEdit()
         self.item_search.setPlaceholderText("اسم الصنف، الكود، المقاس (205/55R16) أو امسح الباركود")
         self.item_search.addAction(icons.icon("search", ICON_MUTED, 18), QLineEdit.ActionPosition.LeadingPosition)
-        self._trail_icon(self.item_search, "barcode")
+        trail_icon(self.item_search, "barcode")
         # Live popup search, same component as the purchase-invoice screen:
         # picking a result adds the line straight away, no dropdown list step.
         self.item_search.textChanged.connect(self._on_item_query)
@@ -220,7 +221,7 @@ class PosPage(QWidget):
         self._item_popup = _ItemPopup(self)
         self._item_popup.hide()
         top.addWidget(self.item_search, 1)
-        top.addWidget(self._kbd("F2"))
+        top.addWidget(kbd("F2"))
         seg = QFrame()
         seg.setObjectName("segBar")
         sl = QHBoxLayout(seg)
@@ -241,9 +242,9 @@ class PosPage(QWidget):
         quick = QHBoxLayout()
         quick.setSpacing(8)
         quick.addWidget(muted("إضافة سريعة:"))
-        chip = self._deferred_button("الأصناف الأكثر بيعًا", "plus")
-        chip.setObjectName("quickChip")
-        quick.addWidget(chip)
+        quick_btn = deferred_button("الأصناف الأكثر بيعًا", "plus")
+        quick_btn.setObjectName("quickChip")
+        quick.addWidget(quick_btn)
         quick.addStretch(1)
         body.addLayout(quick)
 
@@ -280,15 +281,15 @@ class PosPage(QWidget):
         return col
 
     def _summary_card(self) -> QFrame:
-        box, body, _head = self._card("ملخص الفاتورة", "sales")
+        box, body, _head = section_card("ملخص الفاتورة", "sales")
         self.subtotal_label = QLabel()
         self.invoice_disc = ltr_edit("0.00")
         self.invoice_disc.setFixedWidth(150)
         self.invoice_disc.textChanged.connect(self._refresh_total)
         for label, w in (("الإجمالي قبل الخصم", self.subtotal_label),
                           ("خصم على الفاتورة", self.invoice_disc),
-                          ("الضريبة", self._chip("المحل غير مسجّل — بدون ضريبة"))):
-            body.addWidget(self._kv_row(label, w))
+                          ("الضريبة", chip("المحل غير مسجّل — بدون ضريبة"))):
+            body.addWidget(kv_row(label, w))
         total = QFrame()
         total.setObjectName("totalBox")
         t = QHBoxLayout(total)
@@ -304,8 +305,8 @@ class PosPage(QWidget):
         return box
 
     def _payment_card(self) -> QFrame:
-        box, body, _head = self._card("الدفع", "cash")
-        body.addWidget(self._label("طريقة الدفع"))
+        box, body, _head = section_card("الدفع", "cash")
+        body.addWidget(field_label("طريقة الدفع"))
         method_row = QHBoxLayout()
         self.pay1_method = self._method_combo(first_blank=False)
         self.pay1_method.setObjectName("payMethod")
@@ -314,12 +315,12 @@ class PosPage(QWidget):
         self.pay1_method.setMinimumContentsLength(14)
         self.pay1_method.currentIndexChanged.connect(self._on_method_changed)
         method_row.addWidget(self.pay1_method, 1)
-        method_row.addWidget(self._kbd("F8"))
+        method_row.addWidget(kbd("F8"))
         body.addLayout(method_row)
         # The design offers credit beside the cash methods; the engine posts it but the screen
         # does not expose it yet. Instalments are a method of their own above.
         deferred_row = QHBoxLayout()
-        deferred_row.addWidget(self._deferred_button("آجل", "customers"), 1)
+        deferred_row.addWidget(deferred_button("آجل", "customers"), 1)
         body.addLayout(deferred_row)
 
         pbox = QFrame()
@@ -374,9 +375,9 @@ class PosPage(QWidget):
         self.pay2_method = self._method_combo(first_blank=True)
         self.pay2_amount = ltr_edit("فارغ = المتبقي")
         self.pay1_amount.textChanged.connect(self._refresh_change)
-        sp.addWidget(self._field("مبلغ الوسيلة الأولى", self.pay1_amount), 0, 0, 1, 2)
-        sp.addWidget(self._field("الوسيلة الثانية", self.pay2_method), 1, 0)
-        sp.addWidget(self._field("مبلغها", self.pay2_amount), 1, 1)
+        sp.addWidget(field("مبلغ الوسيلة الأولى", self.pay1_amount), 0, 0, 1, 2)
+        sp.addWidget(field("الوسيلة الثانية", self.pay2_method), 1, 0)
+        sp.addWidget(field("مبلغها", self.pay2_amount), 1, 1)
         self.split.setVisible(False)
         self.split_btn.toggled.connect(self.split.setVisible)
         body.addWidget(self.split_btn, 0, Qt.AlignmentFlag.AlignLeading)
@@ -388,105 +389,24 @@ class PosPage(QWidget):
         inner = QHBoxLayout(self.post_btn)
         inner.setContentsMargins(16, 0, 16, 0)
         inner.addStretch(1)
-        inner.addWidget(self._kbd("F9", on_primary=True))
+        inner.addWidget(kbd("F9", on_primary=True))
         self.post_btn.clicked.connect(self.post)
         body.addWidget(self.post_btn)
         row = QHBoxLayout()
-        row.addWidget(self._deferred_button("حفظ كمسودة"), 1)
-        row.addWidget(self._deferred_button("اعتماد وطباعة", "printer"), 1)
+        row.addWidget(deferred_button("حفظ كمسودة"), 1)
+        row.addWidget(deferred_button("اعتماد وطباعة", "printer"), 1)
         body.addLayout(row)
         self._on_method_changed()
         return box
 
     # ---------- Builders ----------
-    @staticmethod
-    def _card(title: str, icon_name: str) -> tuple:
-        """Card with an icon header; returns (card, body, header layout)."""
-        box = QFrame()
-        box.setObjectName("card")
-        outer = QVBoxLayout(box)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
-        head_w = QWidget()
-        head_w.setObjectName("cardHead")
-        head = QHBoxLayout(head_w)
-        head.setContentsMargins(18, 12, 18, 12)
-        head.setSpacing(8)
-        ic = QLabel()
-        ic.setPixmap(icons.icon(icon_name, ICON_PRIMARY, 18).pixmap(18, 18))
-        t = QLabel(title)
-        t.setObjectName("cardTitle")
-        head.addWidget(ic)
-        head.addWidget(t)
-        head.addStretch(1)
-        outer.addWidget(head_w)
-        body = QVBoxLayout()
-        body.setContentsMargins(18, 14, 18, 16)
-        body.setSpacing(12)
-        outer.addLayout(body)
-        return box, body, head
-
-    @staticmethod
-    def _label(text: str) -> QLabel:
-        lbl = QLabel(text)
-        lbl.setObjectName("fieldLabel")
-        return lbl
-
-    def _field(self, title: str, widget: QWidget, locked: bool = False) -> QWidget:
-        """Field with its label; locked adds a lock icon and the permission note."""
-        w = QWidget()
-        v = QVBoxLayout(w)
-        v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(6)
-        if locked:
-            h = QHBoxLayout()
-            h.setSpacing(4)
-            h.addWidget(self._label(title))
-            ic = QLabel()
-            ic.setPixmap(icons.icon("lock", ICON_MUTED, 13).pixmap(13, 13))
-            h.addWidget(ic)
-            h.addWidget(self._label("بصلاحية"))
-            h.addStretch(1)
-            v.addLayout(h)
-        else:
-            v.addWidget(self._label(title))
-        v.addWidget(widget)
-        return w
-
-    @staticmethod
-    def _kv_row(label: str, value_widget: QWidget) -> QWidget:
-        w = QWidget()
-        h = QHBoxLayout(w)
-        h.setContentsMargins(0, 4, 0, 4)
-        lbl = muted(label)
-        h.addWidget(lbl)
-        h.addStretch(1)
-        h.addWidget(value_widget)
-        return w
-
-    @staticmethod
-    def _chip(text: str) -> QLabel:
-        lbl = QLabel(text)
-        lbl.setObjectName("chip")
-        return lbl
-
-    @staticmethod
-    def _kbd(key: str, on_primary: bool = False) -> QLabel:
-        lbl = QLabel(ltr(key))
-        lbl.setObjectName("kbdOnPrimary" if on_primary else "kbd")
-        return lbl
-
-    @staticmethod
-    def _trail_icon(edit: QLineEdit, name: str) -> None:
-        edit.addAction(icons.icon(name, ICON_MUTED, 16), QLineEdit.ActionPosition.TrailingPosition)
-
     def _set_tier(self, key: str) -> None:
         self.tier = key or "retail"
         self.tier_combo.blockSignals(True)
         self.tier_combo.setCurrentIndex(max(self.tier_combo.findData(self.tier), 0))
         self.tier_combo.blockSignals(False)
-        for chip in (self.tier_chip, self.cust_tier_chip):
-            chip.setText(f"فئة السعر: {TIER_SHORT[self.tier]}")
+        for label in (self.tier_chip, self.cust_tier_chip):
+            label.setText(f"فئة السعر: {TIER_SHORT[self.tier]}")
 
     def _set_kind(self, kind) -> None:
         self._kind = kind
@@ -494,15 +414,6 @@ class PosPage(QWidget):
             b.setChecked(k == kind)
         if self.item_search.text().strip():
             self._do_item_search()
-
-    @staticmethod
-    def _deferred_button(label: str, icon_name: str | None = None) -> QPushButton:
-        b = QPushButton(label)
-        if icon_name:
-            b.setIcon(icons.icon(icon_name, ICON_MUTED, 16))
-        b.setEnabled(False)
-        b.setToolTip("قريبًا — غير مبني بعد")
-        return b
 
     @staticmethod
     def _method_combo(first_blank: bool) -> QComboBox:

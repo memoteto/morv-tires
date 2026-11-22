@@ -19,7 +19,8 @@ from morv.ui import icons
 from morv.ui.inventory_page import ItemDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
-from morv.ui.widgets import DateEdit, Notice, field, ltr_edit, muted, primary_button
+from morv.ui.widgets import (DateEdit, Notice, deferred_button, field, field_label, kv_row, ltr_edit, muted,
+                             primary_button, section_card)
 
 ITEM_CHOICES = 50
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
@@ -306,7 +307,7 @@ class PurchaseForm(QWidget):
         main_col.setSpacing(14)
 
         # ---- Card 1: Supplier & invoice header ----
-        box, body, _head = self._card("المورد والفاتورة", "suppliers")
+        box, body, _head = section_card("المورد والفاتورة", "suppliers")
 
         # Supplier search field
         self.sup_search = QLineEdit()
@@ -344,7 +345,7 @@ class PurchaseForm(QWidget):
         sup_field_v = QVBoxLayout(sup_field_w)
         sup_field_v.setContentsMargins(0, 0, 0, 0)
         sup_field_v.setSpacing(6)
-        sup_field_v.addWidget(self._label("المورد *"))
+        sup_field_v.addWidget(field_label("المورد *"))
         sup_field_v.addWidget(self.sup_search)
         sup_field_v.addWidget(self._sup_strip)
 
@@ -380,11 +381,11 @@ class PurchaseForm(QWidget):
         main_col.addWidget(box)
 
         # ---- Card 2: Invoice lines ----
-        ibox, ibody, ihead_w = self._card("الأصناف المستلمة", "purchases")
+        ibox, ibody, ihead_w = section_card("الأصناف المستلمة", "purchases")
 
         # Item count chip in card header (we'll update it)
         self._line_count_lbl = muted("0 سطر")
-        ihead_w.findChild(QHBoxLayout).addWidget(self._line_count_lbl)
+        ihead_w.addWidget(self._line_count_lbl)
 
         # Item search — picking a result adds it straight to the lines below
         item_search_row = QHBoxLayout()
@@ -440,11 +441,11 @@ class PurchaseForm(QWidget):
         sum_col = QVBoxLayout()
         sum_col.setSpacing(14)
 
-        sbox, sbody, _shead = self._card("ملخص فاتورة الشراء", "purchases")
+        sbox, sbody, _shead = section_card("ملخص فاتورة الشراء", "purchases")
 
         self._sub_lbl = QLabel(ltr(fmt(0)))
         self._sub_lbl.setObjectName("cardTitle")
-        sbody.addWidget(self._kv_row("إجمالي الأصناف", self._sub_lbl))
+        sbody.addWidget(kv_row("إجمالي الأصناف", self._sub_lbl))
 
         # Discount/tax/shipping are shown in the approved design's layout but not
         # yet wired to the engine (purchasing.post_invoice has no such parameters),
@@ -493,8 +494,8 @@ class PurchaseForm(QWidget):
         sbody.addWidget(self.post_btn)
 
         # Deferred actions
-        sbody.addWidget(self._deferred_button("حفظ كمسودة"))
-        sbody.addWidget(self._deferred_button("طباعة إذن الاستلام"))
+        sbody.addWidget(deferred_button("حفظ كمسودة"))
+        sbody.addWidget(deferred_button("طباعة إذن الاستلام"))
 
         sbody.addStretch(1)
 
@@ -522,65 +523,13 @@ class PurchaseForm(QWidget):
         draft_badge.setObjectName("pillWarn")
         h.addWidget(draft_badge)
         h.addStretch(1)
-        h.addWidget(self._deferred_button("إرفاق صورة فاتورة المورد"))
+        h.addWidget(deferred_button("إرفاق صورة فاتورة المورد"))
         back = QPushButton("رجوع للقائمة")
         back.clicked.connect(lambda: self.stack.back_to_list())
         h.addWidget(back)
         return w
 
     # ---------- Builder helpers ----------
-    @staticmethod
-    def _card(title: str, icon_name: str) -> tuple:
-        box = QFrame()
-        box.setObjectName("card")
-        outer = QVBoxLayout(box)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
-        head_w = QWidget()
-        head_w.setObjectName("cardHead")
-        head = QHBoxLayout(head_w)
-        head.setContentsMargins(18, 12, 18, 12)
-        head.setSpacing(8)
-        ic = QLabel()
-        ic.setPixmap(icons.icon(icon_name, ICON_PRIMARY, 18).pixmap(18, 18))
-        t = QLabel(title)
-        t.setObjectName("cardTitle")
-        head.addWidget(ic)
-        head.addWidget(t)
-        head.addStretch(1)
-        outer.addWidget(head_w)
-        body = QVBoxLayout()
-        body.setContentsMargins(18, 14, 18, 16)
-        body.setSpacing(12)
-        outer.addLayout(body)
-        return box, body, head_w
-
-    @staticmethod
-    def _label(text: str) -> QLabel:
-        lbl = QLabel(text)
-        lbl.setObjectName("fieldLabel")
-        return lbl
-
-    @staticmethod
-    def _kv_row(label: str, value_widget: QWidget) -> QWidget:
-        w = QWidget()
-        h = QHBoxLayout(w)
-        h.setContentsMargins(0, 4, 0, 4)
-        lbl = QLabel(label)
-        lbl.setObjectName("fieldLabel")
-        h.addWidget(lbl)
-        h.addStretch(1)
-        h.addWidget(value_widget)
-        return w
-
-    @staticmethod
-    def _deferred_button(label: str) -> QPushButton:
-        b = QPushButton(label)
-        b.setEnabled(False)
-        b.setToolTip("قريبًا — غير مبني بعد")
-        return b
-
-    # ---------- Supplier search ----------
     def _on_sup_query(self, text: str) -> None:
         if self._supplier_id is not None:
             return

@@ -50,8 +50,12 @@ class PosDesignV1Test(unittest.TestCase):
         self.assert_present("الدفع", PAYMENT)
 
     def test_deferred_parts_stay_marked_and_disabled(self):
-        self.assertIn("setEnabled(False)", SOURCE)
-        self.assertIn("قريبًا", SOURCE)
+        # The marking moved to the shared widgets.deferred_button; POS must keep using it
+        self.assertIn("deferred_button(", SOURCE)
+        widgets = (ROOT / "morv" / "ui" / "widgets.py").read_text(encoding="utf-8")
+        body = widgets[widgets.index("def deferred_button("):widgets.index("def trail_icon(")]
+        self.assertIn("setEnabled(False)", body)
+        self.assertIn("قريبًا", body)
 
     def test_screen_is_a_page_not_a_dialog(self):
         """The owner's decision: the invoice lives in the POS screen, never in a popup."""
