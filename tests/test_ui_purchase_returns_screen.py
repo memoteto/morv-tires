@@ -99,14 +99,16 @@ class PurchaseReturnsOnPurchasesScreenTest(unittest.TestCase):
         self.assertNotIn("مرتجع للمورد", shown)
 
     def _an_invoice(self):
+        import uuid
+
         from morv.infra import items, purchasing
         from morv.infra.items import Item
         from morv.infra.purchasing import PurchaseLine
         tire = items.create(self.con, self.admin, Item(
-            id=None, kind="tire", code=f"TR-{self.con.total_changes}", name="إطار اختبار", price_retail=645000,
+            id=None, kind="tire", code=f"TR-{uuid.uuid4().hex[:6]}", name="إطار اختبار", price_retail=645000,
             brand="Michelin", model="Primacy 4",
             attrs={"size": "205/55r16", "li": "91", "si": "V", "cat": "ملاكي", "cons": "Radial"}))
         return purchasing.post_invoice(
-            self.con, self.admin, request_key=f"pr-{self.con.total_changes}", supplier_id=self.supplier.id,
+            self.con, self.admin, request_key=uuid.uuid4().hex, supplier_id=self.supplier.id,
             supplier_invoice_no="SUP-9", invoice_date="2026-01-05",
             lines=[PurchaseLine(tire.id, 2, 300000, dot="0124")])
