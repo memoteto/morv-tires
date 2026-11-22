@@ -1,4 +1,4 @@
-"""The printed document carries the shop's head, its own lines and totals, on every paper shape."""
+"""The printed document follows design/Shop.dc.html: column order, gated lines, sheet and roll."""
 import os
 import re
 import shutil
@@ -11,23 +11,25 @@ from tests.qt_app import get_app, require_qt
 
 def _shop(**kw):
     from morv.infra.shop import Shop
-    base = dict(name="مورف للإطارات", phone="01000000000", address="المنصورة")
+    base = dict(name="مورف للإطارات", activity="إطارات وبطاريات", phone="01000000000",
+                phone2="01222222222", whatsapp="01000000000", address="المنصورة",
+                hours="9 ص - 10 م", thanks="شكرًا لتعاملكم معنا", policy="الاستبدال خلال 14 يومًا")
     base.update(kw)
     return Shop(**base)
 
 
 def _doc():
-    from morv.ui.print_doc import Column, Document
+    from morv.ui.print_doc import Document, Line
     return Document(
-        title="فاتورة بيع", number="SI-000123", date="2026-11-22",
-        parties=[("العميل", "أحمد محمود")],
-        columns=[Column("الصنف", "60%"), Column("الكمية", "15%"), Column("الإجمالي", "25%", money=True)],
-        rows=[("إطار ميشلان 205/55R16", "2", 1290000)],
-        totals=[("الإجمالي النهائي", 1290000, True)])
+        title="فاتورة بيع", number="S-2026-000154", date="2026-11-22",
+        info=[("العميل", "أحمد محمود"), ("الموبايل", "01000000021"),
+              ("المركبة", "تويوتا كورولا"), ("الدفع", "نقدي")],
+        lines=[Line("إطار ميشلان Primacy 4", "205/55R16 · 91V", "2", 645000, 1290000)],
+        totals=[("الإجمالي", "12,900.00"), ("الصافي", "12,900.00 ج.م")])
 
 
 @require_qt()
-class PrintDocumentTest(unittest.TestCase):
+class PrintedSheetTest(unittest.TestCase):
     def setUp(self):
         self.app = get_app()
         self.tmp = Path(tempfile.mkdtemp())
@@ -40,51 +42,135 @@ class PrintDocumentTest(unittest.TestCase):
     def reads(self, shop=None, shape_key="a4") -> str:
         """What a reader sees: the markup that keeps numbers left-to-right is not part of the words."""
         bare = re.sub(r"<[^>]+>", "", self.html(shop, shape_key))
-        return re.sub(r"[\u2066\u2069\xa0]", " ", bare)
+        return re.sub(r"[⁦⁩‎‏\xa0]", " ", bare)
 
-    def test_the_head_carries_the_shop_and_the_document_its_own_lines(self):
+    def test_the_sheet_carries_the_shop_the_document_and_its_lines(self):
         reads = self.reads()
-        for text in ("مورف للإطارات", "01000000000", "المنصورة", "فاتورة بيع", "SI-000123",
-                     "أحمد محمود", "إطار ميشلان", "الإجمالي النهائي"):
+        for text in ("مورف للإطارات", "إطارات وبطاريات", "فاتورة بيع", "S-2026-000154",
+                     "العميل", "أحمد محمود", "المركبة", "الدفع", "إطار ميشلان Primacy 4",
+                     "205/55R16", "الصافي", "شكرًا لتعاملكم معنا", "المنصورة"):
             self.assertIn(text, reads, text)
 
-    def test_tax_and_register_print_only_once_the_shop_has_them(self):
-        self.assertNotIn("رقم ضريبي", self.reads())
-        self.assertNotIn("سجل تجاري", self.reads())
-        filled = self.reads(_shop(tax_id="123-456-789", commercial_register="12345"))
-        self.assertIn("رقم ضريبي", filled)
-        self.assertIn("123-456-789", filled)
-        self.assertIn("سجل تجاري", filled)
+    def test_the_item_columns_keep_the_approved_order_from_the_serial_on_the_right(self):
+        from morv.ui.print_doc import _COLS
+        self.assertEqual(("الإجمالي", "السعر", "الكمية", "الصنف", "م"), tuple(t for t, _w in _COLS),
+                         "columns are emitted left to right, so the serial comes last")
+        html = self.html()
+        places = [html.index(f">{title}<") for title, _w in _COLS]
+        self.assertEqual(sorted(places), places, "the emitted order must match the approved order")
 
-    def test_the_footer_keeps_its_room_even_while_the_shop_has_not_written_it(self):
-        from morv.ui.print_doc import FOOTER_MIN_HEIGHT_MM
-        empty = self.html()
-        self.assertIn(f"min-height: {FOOTER_MIN_HEIGHT_MM}mm", empty)
-        written = self.reads(_shop(invoice_footer="الضمان سنة على عيوب الصناعة"))
-        self.assertIn("الضمان سنة على عيوب الصناعة", written)
+    def test_the_sheet_holds_no_column_the_design_does_not_have(self):
+        reads = self.reads()
+        for invented in ("الخصم", "فئة السعر", "المدفوع نقدًا", "الباقي للعميل"):
+            self.assertNotIn(invented, reads, f"{invented} is not in the approved design")
+
+    def test_the_customer_pair_on_the_right_is_the_one_emitted_last(self):
+        html = self.html()
+        self.assertLess(html.index("الموبايل"), html.index("العميل"),
+                        "an LTR wrapper puts the last cell on the right, where العميل belongs")
+
+    def test_the_head_is_divided_by_the_blue_rule_and_the_footer_by_the_dark_one(self):
+        from morv.ui.print_doc import BLUE, INK
+        html = self.html()
+        self.assertIn(f"border-bottom:2px solid {BLUE}", html)
+        self.assertIn(f"border-top:2px solid {INK}", html)
+
+    def test_the_net_total_is_the_only_blue_bold_row(self):
+        from morv.ui.print_doc import BLUE
+        html = self.html()
+        net = html.rindex("الصافي")
+        self.assertIn(BLUE, html[html.rindex("<tr", 0, net):net])
+        first = html.index("الإجمالي", html.index("</table>", html.index("الصنف")))
+        self.assertNotIn(BLUE, html[html.rindex("<tr", 0, first):first])
+
+    def test_tax_ids_print_only_once_the_shop_says_it_is_registered(self):
+        plain = self.reads(_shop(tax_id="123-456-789", commercial_register="12345"))
+        self.assertNotIn("123-456-789", plain, "an unregistered shop prints no tax id")
+        self.assertNotIn("س.ت", plain)
+        registered = self.reads(_shop(tax_registered=True, tax_id="123-456-789",
+                                      commercial_register="12345"))
+        self.assertIn("123-456-789", registered)
+        self.assertIn("رقم التسجيل الضريبي", registered)
+        self.assertIn("س.ت", registered)
+
+    def test_each_display_switch_takes_its_own_block_off_the_sheet(self):
+        self.assertNotIn("01000000000", self.reads(_shop(show_whatsapp=False, phone="01222222222",
+                                                         phone2="")))
+        self.assertNotIn("9 ص - 10 م", self.reads(_shop(show_hours=False)))
+        self.assertNotIn("الاستبدال خلال 14 يومًا", self.reads(_shop(show_policy=False)))
+        self.assertNotIn("شكرًا", self.reads(_shop(thanks="")))
+
+    def test_the_logo_square_carries_the_first_letter_and_the_switch_removes_it(self):
+        from morv.ui.print_doc import BLUE
+        with_logo = self.html()
+        self.assertIn(f"bgcolor='{BLUE}'", with_logo, "no logo file, so the design's blue square stands in")
+        self.assertIn(">م<", with_logo)
+        self.assertNotIn(f"bgcolor='{BLUE}'", self.html(_shop(show_logo=False)))
 
     def test_money_prints_as_pounds_and_stays_left_to_right(self):
-        self.assertIn("12,900.00", self.reads(), "money must print formatted, not in piasters")
+        self.assertIn("12,900.00", self.reads())
         self.assertNotIn("1290000", self.reads())
-        html = self.html()
-        self.assertIn("dir='ltr'", html, "numbers inside an Arabic line must be marked left-to-right")
+        self.assertIn("dir='ltr'", self.html(), "numbers in an Arabic line must be marked left-to-right")
 
-    def test_a_roll_stacks_each_line_instead_of_using_columns(self):
-        wide, narrow = self.html(shape_key="a4"), self.html(shape_key="80mm")
-        self.assertIn("<th", wide, "the wide shape keeps a real table head")
-        self.assertIn("display: none", narrow, "a roll is too narrow for column heads")
-        self.assertIn("الكمية 2", self.reads(shape_key="80mm"),
-                      "the roll labels each value instead of aligning columns")
+    def test_a_document_without_lines_prints_its_words_instead_of_an_empty_table(self):
+        from morv.ui.print_doc import SHAPES, Document, document_html
+        receipt = Document(title="سند قبض", number="RC-000045", date="2026-11-22",
+                           info=[("العميل", "شركة النيل")], totals=[("المبلغ المستلم", "15,000.00")],
+                           note="سدادًا من حساب العميل")
+        html = document_html(_shop(), receipt, SHAPES["a4"])
+        self.assertIn("سدادًا من حساب العميل", html)
+        self.assertNotIn("الصنف", html)
+
+
+@require_qt()
+class PrintedRollTest(unittest.TestCase):
+    def setUp(self):
+        self.app = get_app()
+
+    def html(self, key="r80", shop=None) -> str:
+        from morv.ui.print_doc import SHAPES, document_html
+        return document_html(shop or _shop(), _doc(), SHAPES[key])
+
+    def test_a_roll_stacks_each_line_and_uses_no_column_table(self):
+        html = self.html()
+        self.assertNotIn("border='1'", html, "a roll is too narrow for a bordered column table")
+        self.assertNotIn(">م<", html, "a roll carries no serial column")
+        self.assertIn("dashed", html, "the design separates a roll's blocks with dashed rules")
+        for text in ("مورف للإطارات", "فاتورة بيع", "إطار ميشلان Primacy 4", "الصافي"):
+            self.assertIn(text, html, text)
+
+    def test_the_two_rolls_are_narrower_than_the_sheets_and_set_smaller_type(self):
+        from morv.ui.print_doc import SHAPES
+        self.assertTrue(SHAPES["r80"].roll and SHAPES["r58"].roll)
+        self.assertFalse(SHAPES["a4"].roll or SHAPES["a5"].roll)
+        self.assertLess(SHAPES["r58"].width_mm, SHAPES["r80"].width_mm)
+        self.assertLess(SHAPES["r80"].width_mm, SHAPES["a5"].width_mm)
+        self.assertLess(SHAPES["r58"].scale, SHAPES["r80"].scale)
+        self.assertLess(SHAPES["a5"].scale, SHAPES["a4"].scale)
+
+
+@require_qt()
+class PrintedPaperTest(unittest.TestCase):
+    def setUp(self):
+        self.app = get_app()
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
 
     def test_every_shape_writes_a_pdf_with_content(self):
         from morv.ui.print_doc import SHAPES, write_pdf
         for key in SHAPES:
             path = self.tmp / f"{key}.pdf"
             write_pdf(_shop(), _doc(), str(path), key)
-            self.assertTrue(path.exists(), key)
-            head = path.read_bytes()[:5]
-            self.assertEqual(b"%PDF-", head, f"{key} did not write a PDF")
+            self.assertEqual(b"%PDF-", path.read_bytes()[:5], f"{key} did not write a PDF")
             self.assertGreater(path.stat().st_size, 1000, f"{key} wrote an empty-looking PDF")
+
+    def test_every_shape_keeps_its_own_paper_size(self):
+        from PySide6.QtGui import QPageSize
+        from morv.ui.print_doc import SHAPES, page_layout
+        for key, shape in SHAPES.items():
+            size = page_layout(shape).pageSize().size(QPageSize.Unit.Millimeter)
+            self.assertAlmostEqual(shape.width_mm, size.width(), places=0, msg=key)
+            self.assertAlmostEqual(shape.height_mm, size.height(), places=0, msg=key)
 
     def test_the_page_names_a_font_that_exists_or_it_prints_empty_boxes(self):
         from PySide6.QtGui import QFontDatabase
@@ -94,13 +180,6 @@ class PrintDocumentTest(unittest.TestCase):
             self.assertTrue(family, f"{key} left the family to chance")
             self.assertIn(family, QFontDatabase.families(),
                           f"{key} asks for {family}, which this machine does not have")
-
-    def test_the_two_rolls_are_narrower_than_the_sheets(self):
-        from morv.ui.print_doc import SHAPES
-        self.assertTrue(SHAPES["80mm"].narrow and SHAPES["58mm"].narrow)
-        self.assertFalse(SHAPES["a4"].narrow or SHAPES["a5"].narrow)
-        self.assertLess(SHAPES["58mm"].width_mm, SHAPES["80mm"].width_mm)
-        self.assertLess(SHAPES["80mm"].width_mm, SHAPES["a5"].width_mm)
 
 
 @require_qt()
@@ -119,19 +198,31 @@ class ShopPrintFieldsTest(unittest.TestCase):
         self.session = Session(self.con, self.admin)
         self.app = get_app()
 
-    def test_the_settings_tab_saves_the_three_fields_the_printer_needs(self):
+    def test_an_unregistered_shop_cannot_keep_tax_ids_on_file(self):
         from morv.infra import shop
-        from morv.ui.settings_page import ShopTab
-        from morv.ui.widgets import dispose
-        tab = ShopTab(self.session)
-        self.addCleanup(dispose, tab, self.app)
-        tab.name.setText("مورف للإطارات")
-        tab.phone.setText("01000000000")
-        tab.tax_id.setText("123-456-789")
-        tab.register_no.setText("12345")
-        tab.invoice_footer.setPlainText("الضمان سنة")
-        tab.save()
+        saved = shop.save(self.con, self.admin, shop.Shop(
+            name="مورف", phone="01000000000", tax_id="123", commercial_register="9"))
+        self.assertEqual("", saved.tax_id)
+        self.assertEqual("", saved.commercial_register)
+
+    def test_a_second_number_is_refused_unless_it_is_a_real_mobile(self):
+        from morv.infra import shop
+        with self.assertRaises(shop.ShopError):
+            shop.save(self.con, self.admin, shop.Shop(name="مورف", phone="01000000000", phone2="12"))
+
+    def test_every_printed_field_survives_a_save_and_a_load(self):
+        from morv.infra import shop
+        shop.save(self.con, self.admin, shop.Shop(
+            name="مورف للإطارات", activity="إطارات", phone="01000000000", phone2="01222222222",
+            whatsapp="01000000000", address="المنصورة", hours="9-10", website="morv.example",
+            tax_registered=True, tax_id="123-456-789", commercial_register="12345",
+            thanks="شكرًا", policy="الاستبدال خلال 14 يومًا", show_hours=False, paper="r80"))
         saved = shop.load(self.con)
+        self.assertEqual("إطارات", saved.activity)
+        self.assertEqual("01222222222", saved.phone2)
         self.assertEqual("123-456-789", saved.tax_id)
-        self.assertEqual("12345", saved.commercial_register)
-        self.assertEqual("الضمان سنة", saved.invoice_footer)
+        self.assertEqual("الاستبدال خلال 14 يومًا", saved.policy)
+        self.assertEqual("r80", saved.paper)
+        self.assertTrue(saved.tax_registered)
+        self.assertFalse(saved.show_hours)
+        self.assertTrue(saved.show_policy, "a switch left alone keeps its default")

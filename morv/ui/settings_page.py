@@ -1,15 +1,16 @@
 """Settings tabs: shop, users, audit log, shortcuts, backup."""
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPlainTextEdit, QPushButton, QScrollArea, QSpinBox, QTableView, QTabWidget, QVBoxLayout,
-                               QWidget)
+                               QPlainTextEdit, QPushButton, QScrollArea, QSpinBox, QTableView, QTabBar, QTabWidget,
+                               QVBoxLayout, QWidget)
 
 from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, settings, shop, users, vault
+from morv.ui import print_doc
 from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
 from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, form, info, ltr_edit, muted,
@@ -108,64 +109,204 @@ class AppearanceTab(QWidget):
             win.set_font(self.family.currentText(), self.size.currentData())
 
 
+PAPER_TABS = (("a4", "A4"), ("a5", "A5"), ("r80", "رول 80مم"), ("r58", "رول 58مم"))
+
+
 class ShopTab(QWidget):
     def __init__(self, session):
         super().__init__()
         self.session = session
-        lay = QVBoxLayout(self)
-        box, inner = card("بيانات المحل")
-        inner.addWidget(muted("تظهر في ترويسة الفواتير والإيصالات."))
-        f = form()
+        self.editable = session.can("settings.edit")
+        self.notice = Notice()
         data = shop.load(session.con)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        left = QVBoxLayout()
+        left.addWidget(self._identity_card(data))
+        left.addWidget(self._words_card(data))
+        left.addWidget(self.notice)
+        save = primary_button("حفظ")
+        save.clicked.connect(self.save)
+        save.setEnabled(self.editable)
+        left.addWidget(save, 0, Qt.AlignmentFlag.AlignLeading)
+        left.addStretch(1)
+        row.addLayout(left, 1)
+        row.addWidget(self._print_card(data), 0)
+        self.redraw = QTimer(self)
+        self.redraw.setSingleShot(True)
+        self.redraw.setInterval(250)
+        self.redraw.timeout.connect(self._draw_preview)
+        self.lines = (self.name, self.activity, self.phone, self.phone2, self.whatsapp, self.address,
+                      self.hours, self.website, self.tax_id, self.register_no, self.thanks)
+        for w in self.lines:
+            w.textChanged.connect(self.redraw.start)
+        self.policy.textChanged.connect(self.redraw.start)
+        for cb in self.switches.values():
+            cb.toggled.connect(self.redraw.start)
+        self.paper.currentIndexChanged.connect(self._paper_chosen)
+        if not self.editable:
+            for w in (*self.lines, self.policy, self.tax_registered, self.pick, self.drop,
+                      self.printer, self.paper, *self.switches.values()):
+                w.setEnabled(False)
+        self._show_logo()
+        self._tax_toggled()
+
+    def _identity_card(self, data) -> QFrame:
+        box, inner = card("بيانات المحل")
+        inner.addWidget(muted("تظهر في ترويسة كل مستند مطبوع."))
+        f = form()
         self.name = QLineEdit(data.name)
+        self.activity = QLineEdit(data.activity)
+        self.activity.setPlaceholderText("سطر تحت اسم المحل: إطارات · بطاريات · خدمات سريعة")
         self.phone = ltr_edit("01xxxxxxxxx")
         self.phone.setText(data.phone)
+        self.phone2 = ltr_edit("اختياري")
+        self.phone2.setText(data.phone2)
+        self.whatsapp = ltr_edit("اختياري")
+        self.whatsapp.setText(data.whatsapp)
         self.address = QLineEdit(data.address)
-        f.addRow("اسم المحل *", self.name)
-        f.addRow("رقم الهاتف *", self.phone)
-        f.addRow("العنوان", self.address)
-        self.tax_id = ltr_edit("يُطبع على الفواتير بعد التسجيل")
+        self.hours = QLineEdit(data.hours)
+        self.hours.setPlaceholderText("السبت - الخميس · 9 ص إلى 10 م")
+        self.website = QLineEdit(data.website)
+        self.website.setPlaceholderText("صفحة فيسبوك أو موقع")
+        for label, w in (("اسم المحل *", self.name), ("النشاط", self.activity), ("هاتف 1 *", self.phone),
+                         ("هاتف 2", self.phone2), ("واتساب المحل", self.whatsapp), ("العنوان", self.address),
+                         ("مواعيد العمل", self.hours), ("فيسبوك أو موقع", self.website)):
+            f.addRow(label, w)
+        logo_row = QWidget()
+        logo_lay = QHBoxLayout(logo_row)
+        logo_lay.setContentsMargins(0, 0, 0, 0)
+        self.logo = QLabel()
+        self.logo.setFixedSize(64, 64)
+        self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pick = QPushButton("اختيار شعار")
+        self.pick.clicked.connect(self.pick_logo)
+        self.drop = QPushButton("إزالة")
+        self.drop.clicked.connect(self.remove_logo)
+        logo_lay.addWidget(self.logo)
+        logo_lay.addWidget(self.pick)
+        logo_lay.addWidget(self.drop)
+        logo_lay.addStretch(1)
+        f.addRow("الشعار", logo_row)
+        self.tax_registered = QCheckBox("المحل مسجل ضريبيًا")
+        self.tax_registered.setChecked(data.tax_registered)
+        self.tax_registered.toggled.connect(self._tax_toggled)
+        self.tax_id = ltr_edit("رقم التسجيل الضريبي")
         self.tax_id.setText(data.tax_id)
         self.register_no = ltr_edit("رقم السجل التجاري")
         self.register_no.setText(data.commercial_register)
+        f.addRow("", self.tax_registered)
         f.addRow("الرقم الضريبي", self.tax_id)
         f.addRow("السجل التجاري", self.register_no)
-        logo_row = QHBoxLayout()
-        self.logo = QLabel()
-        self.logo.setFixedSize(96, 96)
-        self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pick = QPushButton("اختيار شعار")
-        pick.clicked.connect(self.pick_logo)
-        remove = QPushButton("إزالة")
-        remove.clicked.connect(self.remove_logo)
-        logo_row.addWidget(self.logo)
-        logo_row.addWidget(pick)
-        logo_row.addWidget(remove)
-        logo_row.addStretch(1)
-        f.addRow("الشعار", logo_row)
-        self.invoice_footer = QPlainTextEdit(data.invoice_footer)
-        self.invoice_footer.setPlaceholderText("يُطبع أسفل كل مستند: الضمان، الاستبدال، أو أي كلمة للعميل")
-        self.invoice_footer.setFixedHeight(64)
-        f.addRow("تذييل المستندات", self.invoice_footer)
         inner.addLayout(f)
-        self.notice = Notice()
-        inner.addWidget(self.notice)
-        editable = session.can("settings.edit")
-        save = primary_button("حفظ")
-        save.clicked.connect(self.save)
-        save.setEnabled(editable)
-        for w in (self.name, self.phone, self.address, pick, remove):
-            w.setEnabled(editable)
-        inner.addWidget(save, 0, Qt.AlignmentFlag.AlignLeading)
-        lay.addWidget(box)
-        lay.addStretch(1)
-        self._show_logo()
+        return box
+
+    def _words_card(self, data) -> QFrame:
+        box, inner = card("نصوص المستندات وما يظهر فيها")
+        f = form()
+        self.thanks = QLineEdit(data.thanks)
+        self.thanks.setPlaceholderText("شكرًا لتعاملكم معنا")
+        self.policy = QPlainTextEdit(data.policy)
+        self.policy.setPlaceholderText("الاستبدال خلال 14 يومًا بالفاتورة · الضمان لا يغطي سوء الاستخدام")
+        self.policy.setFixedHeight(56)
+        f.addRow("عبارة الشكر", self.thanks)
+        f.addRow("سياسة الاستبدال والضمان", self.policy)
+        inner.addLayout(f)
+        self.switches = {}
+        for key, label in (("show_logo", "إظهار الشعار في المستندات"),
+                           ("show_whatsapp", "إظهار رقم واتساب في التذييل"),
+                           ("show_hours", "إظهار مواعيد العمل في التذييل"),
+                           ("show_policy", "إظهار السياسة في الفاتورة")):
+            cb = QCheckBox(label)
+            cb.setChecked(getattr(data, key))
+            self.switches[key] = cb
+            inner.addWidget(cb)
+        return box
+
+    def _print_card(self, data) -> QFrame:
+        from PySide6.QtPrintSupport import QPrinterInfo
+        box, inner = card("الطباعة")
+        f = form()
+        self.printer = QComboBox()
+        self.printer.addItem("الطابعة الافتراضية", "")
+        for name in QPrinterInfo.availablePrinterNames():
+            self.printer.addItem(name, name)
+        at = self.printer.findData(data.printer)
+        self.printer.setCurrentIndex(at if at >= 0 else 0)
+        self.paper = QComboBox()
+        for key, label in PAPER_TABS:
+            self.paper.addItem(label, key)
+        at = self.paper.findData(data.paper)
+        self.paper.setCurrentIndex(at if at >= 0 else 0)
+        f.addRow("الطابعة", self.printer)
+        f.addRow("مقاس الورق", self.paper)
+        inner.addLayout(f)
+        self.sizes = QTabBar()
+        for key, label in PAPER_TABS:
+            self.sizes.addTab(label)
+            self.sizes.setTabData(self.sizes.count() - 1, key)
+        keys = [key for key, _label in PAPER_TABS]
+        self.sizes.setCurrentIndex(keys.index(data.paper) if data.paper in keys else 0)
+        self.sizes.currentChanged.connect(self._draw_preview)
+        inner.addWidget(self.sizes)
+        self.preview = QLabel()
+        self.preview.setMinimumWidth(200)
+        self.preview.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+        self.preview.setObjectName("printPreview")
+        inner.addWidget(self.preview, 1)
+        trial = primary_button("طباعة صفحة تجريبية")
+        trial.clicked.connect(self.trial_print)
+        trial.setEnabled(self.editable)
+        inner.addWidget(trial, 0, Qt.AlignmentFlag.AlignLeading)
+        inner.addWidget(muted("التصميم مناسب للطابعات الأبيض والأسود: خلفيات بيضاء وخطوط فاصلة فقط."))
+        box.setMinimumWidth(260)
+        box.setMaximumWidth(400)
+        return box
+
+    def collect(self):
+        """Reads the screen without validating, so the preview keeps drawing while a field is half typed."""
+        return shop.Shop(
+            name=self.name.text(), activity=self.activity.text(), phone=self.phone.text(),
+            phone2=self.phone2.text(), whatsapp=self.whatsapp.text(), address=self.address.text(),
+            hours=self.hours.text(), website=self.website.text(),
+            tax_registered=self.tax_registered.isChecked(), tax_id=self.tax_id.text(),
+            commercial_register=self.register_no.text(), thanks=self.thanks.text(),
+            policy=self.policy.toPlainText(), paper=self.paper.currentData(),
+            printer=self.printer.currentData(),
+            **{k: cb.isChecked() for k, cb in self.switches.items()})
+
+    def shape(self):
+        key = self.sizes.tabData(self.sizes.currentIndex()) or "a4"
+        return print_doc.SHAPES[key]
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.redraw.start()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.redraw.start()
+
+    def _draw_preview(self) -> None:
+        width = max(200, self.preview.width())
+        image = print_doc.preview_image(self.collect(), print_doc.sample_document(), self.shape(), width)
+        self.preview.setPixmap(QPixmap.fromImage(image))
+
+    def _paper_chosen(self) -> None:
+        keys = [key for key, _label in PAPER_TABS]
+        self.sizes.setCurrentIndex(keys.index(self.paper.currentData()))
+
+    def _tax_toggled(self) -> None:
+        on = self.tax_registered.isChecked()
+        for w in (self.tax_id, self.register_no):
+            w.setEnabled(on and self.editable)
+        self.redraw.start()
 
     def _show_logo(self) -> None:
         p = shop.Shop().logo_path
         if p:
-            self.logo.setPixmap(QPixmap(str(p)).scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio,
-                                                      Qt.TransformationMode.SmoothTransformation))
+            self.logo.setPixmap(QPixmap(str(p)).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio,
+                                                       Qt.TransformationMode.SmoothTransformation))
         else:
             self.logo.setPixmap(QPixmap())
             self.logo.setText("لا شعار")
@@ -175,21 +316,33 @@ class ShopTab(QWidget):
         if p:
             shop.save_logo(p)
             self._show_logo()
+            self._draw_preview()
 
     def remove_logo(self) -> None:
         shop.remove_logo()
         self._show_logo()
+        self._draw_preview()
+
+    def trial_print(self) -> None:
+        from PySide6.QtPrintSupport import QPrinter, QPrinterInfo
+        name = self.printer.currentData()
+        chosen = QPrinterInfo.printerInfo(name) if name else QPrinterInfo.defaultPrinter()
+        if chosen.isNull():
+            self.notice.show_message("لا توجد طابعة مثبتة على هذا الجهاز")
+            return
+        printer = QPrinter(chosen, QPrinter.PrinterMode.HighResolution)
+        print_doc.to_printer(self.collect(), print_doc.sample_document(), printer, self.shape())
+        self.notice.show_message(f"أُرسلت صفحة تجريبية إلى {chosen.printerName()}", "success")
 
     def save(self) -> None:
         try:
-            shop.save(self.session.con, self.session.user, self.name.text(), self.phone.text(),
-                      self.address.text(), self.tax_id.text(), self.register_no.text(),
-                      self.invoice_footer.toPlainText())
+            shop.save(self.session.con, self.session.user, self.collect())
         except shop.ShopError as e:
             self.notice.show_message(str(e))
             return
         users.audit(self.session.con, self.session.user, "shop.save")
         self.notice.show_message("تم الحفظ", "success")
+        self._draw_preview()
 
 
 class UsersTab(QWidget):

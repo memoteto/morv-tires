@@ -34,7 +34,7 @@ def run_first_setup(con, *, shop_name: str, shop_phone: str, shop_address: str, 
     ring, scheme = backup.prepare_keyring(backup_password, recovery_key)
     try:
         with transaction(con):
-            shop.put(con, name, phone, address)
+            shop.put(con, shop.Shop(name=name, phone=phone, address=address))
             uid = users.put_first_manager(con, username, admin_name.strip(), pw_hash)
             backup.store_keyring(con, ring, scheme)
             if usb_dir.strip():

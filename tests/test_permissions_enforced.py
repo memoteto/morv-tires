@@ -62,4 +62,4 @@ class PermissionsEnforcedTest(unittest.TestCase):
         with self.assertRaises(ItemError):
             items.create(self.con, self.cashier, None)
         with self.assertRaises(shop.ShopError):
-            shop.save(self.con, self.cashier, "محل", "01000000000", "")
+            shop.save(self.con, self.cashier, shop.Shop(name="محل", phone="01000000000"))
