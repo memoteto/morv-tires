@@ -144,10 +144,9 @@ class ShopTab(QWidget):
         self.policy.textChanged.connect(self.redraw.start)
         for cb in self.switches.values():
             cb.toggled.connect(self.redraw.start)
-        self.paper.currentIndexChanged.connect(self._paper_chosen)
         if not self.editable:
             for w in (*self.lines, self.policy, self.tax_registered, self.pick, self.drop,
-                      self.printer, self.paper, *self.switches.values()):
+                      self.printer, self.sizes, *self.switches.values()):
                 w.setEnabled(False)
         self._show_logo()
         self._tax_toggled()
@@ -188,9 +187,9 @@ class ShopTab(QWidget):
             grid.addWidget(widget, row, col * 2 + 1)
         self.tax_registered = QCheckBox("المحل مسجل ضريبيًا — بدونه لا يُطبع رقم ضريبي ولا سجل تجاري")
         self.tax_registered.setChecked(data.tax_registered)
-        grid.addWidget(self.tax_registered, len(pairs) // 2, 0, 1, 4)
+        grid.addWidget(self.tax_registered, len(pairs) // 2, 0, 1, 2)
         self.logo = QLabel()
-        self.logo.setFixedSize(52, 52)
+        self.logo.setFixedSize(40, 40)
         self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.pick = QPushButton("اختيار شعار")
         self.pick.clicked.connect(self.pick_logo)
@@ -203,7 +202,7 @@ class ShopTab(QWidget):
         logo_row.addWidget(self.pick)
         logo_row.addWidget(self.drop)
         logo_row.addStretch(1)
-        grid.addLayout(logo_row, len(pairs) // 2 + 1, 0, 1, 4)
+        grid.addLayout(logo_row, len(pairs) // 2, 2, 1, 2)
         self.tax_registered.toggled.connect(self._tax_toggled)
         inner.addLayout(grid)
         return box
@@ -231,13 +230,7 @@ class ShopTab(QWidget):
             self.printer.addItem(name, name)
         at = self.printer.findData(data.printer)
         self.printer.setCurrentIndex(at if at >= 0 else 0)
-        self.paper = QComboBox()
-        for key, label in PAPER_TABS:
-            self.paper.addItem(label, key)
-        at = self.paper.findData(data.paper)
-        self.paper.setCurrentIndex(at if at >= 0 else 0)
         f.addRow("الطابعة", self.printer)
-        f.addRow("مقاس الورق", self.paper)
         inner.addLayout(f)
         self.switches = {}
         switch_grid = QGridLayout()
@@ -250,6 +243,7 @@ class ShopTab(QWidget):
             switch_grid.addWidget(cb, *divmod(i, 2))
         inner.addWidget(muted("يظهر في المستند:"))
         inner.addLayout(switch_grid)
+        inner.addWidget(muted("مقاس الورق:"))
         self.sizes = QTabBar()
         for key, label in PAPER_TABS:
             self.sizes.addTab(label)
@@ -259,7 +253,7 @@ class ShopTab(QWidget):
         self.sizes.currentChanged.connect(self._draw_preview)
         inner.addWidget(self.sizes)
         self.preview = QLabel()
-        self.preview.setMinimumSize(190, 200)
+        self.preview.setMinimumSize(170, 150)
         self.preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview.setObjectName("printPreview")
@@ -281,7 +275,7 @@ class ShopTab(QWidget):
             hours=self.hours.text(), website=self.website.text(),
             tax_registered=self.tax_registered.isChecked(), tax_id=self.tax_id.text(),
             commercial_register=self.register_no.text(), thanks=self.thanks.text(),
-            policy=self.policy.toPlainText(), paper=self.paper.currentData(),
+            policy=self.policy.toPlainText(), paper=self.shape().key,
             printer=self.printer.currentData(),
             **{k: cb.isChecked() for k, cb in self.switches.items()})
 
@@ -308,10 +302,6 @@ class ShopTab(QWidget):
     def _draw_preview(self) -> None:
         self.page = print_doc.preview_image(self.collect(), print_doc.sample_document(), self.shape())
         self._fit()
-
-    def _paper_chosen(self) -> None:
-        keys = [key for key, _label in PAPER_TABS]
-        self.sizes.setCurrentIndex(keys.index(self.paper.currentData()))
 
     def _tax_toggled(self) -> None:
         on = self.tax_registered.isChecked()

@@ -123,6 +123,28 @@ class PrintedSheetTest(unittest.TestCase):
             held = text.resource(QTextDocument.ResourceType.ImageResource, QUrl(src))
             self.assertTrue(held is not None and not held.isNull(), f"{src} is not registered")
 
+    @staticmethod
+    def _inked_rows(image) -> list[int]:
+        return [y for y in range(image.height())
+                if any(image.pixel(x, y) & 0xFFFFFF != 0xFFFFFF for x in range(0, image.width(), 3))]
+
+    def test_the_contact_bar_is_pinned_to_the_foot_of_the_sheet(self):
+        from morv.ui.print_doc import SHAPES, body_html, footer_html, preview_image
+        shape = SHAPES["a4"]
+        self.assertNotIn("morv:icon/pin", body_html(_shop(), _doc(), shape),
+                         "the bar must not flow with the body, or it lands mid-page")
+        self.assertIn("morv:icon/pin", footer_html(_shop(), shape))
+        image = preview_image(_shop(), _doc(), shape)
+        inked = self._inked_rows(image)
+        self.assertGreater(max(inked), image.height() - 60, "the bar must reach the foot of the page")
+        middle = [y for y in inked if image.height() // 3 < y < image.height() - 60]
+        self.assertEqual([], middle, "a one-page document leaves the middle of the sheet empty")
+
+    def test_a_roll_keeps_its_contact_lines_in_the_body(self):
+        from morv.ui.print_doc import SHAPES, body_html, footer_html
+        self.assertEqual("", footer_html(_shop(), SHAPES["r80"]), "a roll has no page foot to pin to")
+        self.assertIn("morv:icon/pin", body_html(_shop(), _doc(), SHAPES["r80"]))
+
     def test_money_prints_as_pounds_and_stays_left_to_right(self):
         self.assertIn("12,900.00", self.reads())
         self.assertNotIn("1290000", self.reads())

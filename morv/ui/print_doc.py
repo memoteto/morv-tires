@@ -1,7 +1,7 @@
 """Builds every printed document from the approved design in design/Shop.dc.html, for sheet and roll."""
 from dataclasses import dataclass, field
 
-from PySide6.QtCore import QMarginsF, QSizeF, Qt, QUrl
+from PySide6.QtCore import QMarginsF, QRectF, QSizeF, Qt, QUrl
 from PySide6.QtGui import QFont, QImage, QPageLayout, QPageSize, QPainter, QTextDocument
 from PySide6.QtPrintSupport import QPrinter
 
@@ -173,7 +173,7 @@ def _totals_block(doc: Document, shape: Shape) -> str:
             f"<td width='48%'>{inner}</td><td width='52%'></td></tr></table>")
 
 
-def _sheet_foot(shop, doc: Document, shape: Shape) -> str:
+def _sheet_tail(shop, doc: Document, shape: Shape) -> str:
     out = ""
     if doc.note:
         out += (f"<div dir='rtl' style='margin-top:8px;color:{INK};font-size:{_pt(shape, 9.5)}'>"
@@ -184,6 +184,10 @@ def _sheet_foot(shop, doc: Document, shape: Shape) -> str:
     if shop.show_policy and shop.policy:
         out += _band(DASH) + (f"<div dir='rtl' style='color:{MUTED};font-size:{_pt(shape, 8)}'>"
                               f"{shop.policy.replace(chr(10), '<br>')}</div>")
+    return out
+
+
+def _contact_bar(shop, shape: Shape) -> str:
     items = []
     if shop.address:
         items.append(("pin", shop.address))
@@ -194,13 +198,12 @@ def _sheet_foot(shop, doc: Document, shape: Shape) -> str:
         items.append(("chat", _ltr(shop.whatsapp)))
     if shop.show_hours and shop.hours:
         items.append(("clock", shop.hours))
-    if items:
-        size = max(10, round(12 * shape.scale))
-        cells = "&nbsp;&nbsp;&nbsp;&nbsp;".join(
-            f"{_icon(name, size)}&nbsp;{text}" for name, text in items)
-        out += _band(INK, 1.2) + (f"<div align='center' dir='rtl' style='color:{INK};"
-                                  f"font-size:{_pt(shape, 8.5)}'>{cells}</div>")
-    return out
+    if not items:
+        return ""
+    size = max(10, round(12 * shape.scale))
+    cells = "&nbsp;&nbsp;&nbsp;&nbsp;".join(f"{_icon(name, size)}&nbsp;{text}" for name, text in items)
+    return _band(INK, 1.2) + (f"<div align='center' dir='rtl' style='color:{INK};"
+                              f"font-size:{_pt(shape, 8.5)}'>{cells}</div>")
 
 
 def _roll(shop, doc: Document, shape: Shape) -> str:
@@ -254,13 +257,28 @@ def _roll(shop, doc: Document, shape: Shape) -> str:
     return out
 
 
+def _shell(inner: str) -> str:
+    return f"<html><body dir='rtl' bgcolor='#FFFFFF' style='color:{INK}'>{inner}</body></html>"
+
+
+def body_html(shop, doc: Document, shape: Shape) -> str:
+    if shape.roll:
+        return _shell(_roll(shop, doc, shape) + _contact_bar(shop, shape))
+    return _shell(_sheet_head(shop, doc, shape) + _info_box(doc, shape) + _lines_table(doc, shape)
+                  + _totals_block(doc, shape) + _sheet_tail(shop, doc, shape))
+
+
+def footer_html(shop, shape: Shape) -> str:
+    """The contact bar, which a sheet pins to the foot of every page instead of letting it flow."""
+    return "" if shape.roll else _shell(_contact_bar(shop, shape))
+
+
 def document_html(shop, doc: Document, shape: Shape) -> str:
     if shape.roll:
-        body = _roll(shop, doc, shape)
-    else:
-        body = (_sheet_head(shop, doc, shape) + _info_box(doc, shape) + _lines_table(doc, shape)
-                + _totals_block(doc, shape) + _sheet_foot(shop, doc, shape))
-    return (f"<html><body dir='rtl' bgcolor='#FFFFFF' style='color:{INK}'>{body}</body></html>")
+        return body_html(shop, doc, shape)
+    inner = _sheet_head(shop, doc, shape) + _info_box(doc, shape) + _lines_table(doc, shape) \
+        + _totals_block(doc, shape) + _sheet_tail(shop, doc, shape) + _contact_bar(shop, shape)
+    return _shell(inner)
 
 
 def print_font(shape: Shape) -> QFont:
@@ -287,31 +305,67 @@ def _load_images(text: QTextDocument, shop) -> None:
                          QImage(str(shop.logo_path)))
 
 
-def render(shop, doc: Document, shape: Shape) -> QTextDocument:
-    layout = page_layout(shape)
+def _layout(html: str, shop, shape: Shape, width_px: float) -> QTextDocument:
     text = QTextDocument()
     _load_images(text, shop)
     text.setDefaultFont(print_font(shape))
-    text.setPageSize(layout.paintRectPixels(96).size().toSizeF())
-    text.setHtml(document_html(shop, doc, shape))
+    text.setDocumentMargin(0)
+    text.setTextWidth(width_px)
+    text.setHtml(html)
     return text
 
 
+def render(shop, doc: Document, shape: Shape) -> QTextDocument:
+    layout = page_layout(shape)
+    size = layout.paintRectPixels(96).size().toSizeF()
+    text = _layout(document_html(shop, doc, shape), shop, shape, size.width())
+    text.setPageSize(size)
+    return text
+
+
+def content_px(shape: Shape) -> tuple[float, float]:
+    rect = page_layout(shape).paintRectPixels(96)
+    return rect.width(), rect.height()
+
+
+def paint(shop, doc: Document, shape: Shape, painter: QPainter, width_px: float, height_px: float,
+          new_page=None) -> int:
+    """Draws the pages and pins the contact bar to the foot of each, which a flowing document cannot do."""
+    foot_html = footer_html(shop, shape)
+    foot = _layout(foot_html, shop, shape, width_px) if foot_html else None
+    foot_h = (foot.size().height() + 8) if foot else 0
+    body_h = max(60.0, height_px - foot_h)
+    body = _layout(body_html(shop, doc, shape), shop, shape, width_px)
+    body.setPageSize(QSizeF(width_px, body_h))
+    pages = max(1, body.pageCount())
+    for index in range(pages):
+        if index and new_page:
+            new_page()
+        painter.save()
+        painter.setClipRect(QRectF(0, 0, width_px, body_h))
+        painter.translate(0, -index * body_h)
+        body.drawContents(painter, QRectF(0, index * body_h, width_px, body_h))
+        painter.restore()
+        if foot:
+            painter.save()
+            painter.translate(0, height_px - foot.size().height())
+            foot.drawContents(painter)
+            painter.restore()
+    return pages
+
+
 def preview_image(shop, doc: Document, shape: Shape, width_px: int = 0) -> QImage:
-    """Draws the paper at its true proportions so the preview and the printed sheet cannot drift apart."""
-    real_px = max(1, round((shape.width_mm - 2 * shape.margin_mm) / 25.4 * 96))
-    text = render(shop, doc, shape)
-    text.setTextWidth(real_px)
-    height = max(1, round(text.size().height()))
-    if not shape.roll:
-        # A sheet is shown whole, so the reader sees how much of the page the document fills
-        height = max(height, round((shape.height_mm - 2 * shape.margin_mm) / 25.4 * 96))
-    image = QImage(real_px, height, QImage.Format.Format_RGB32)
+    """Draws the paper as it prints, so the preview and the printed sheet cannot drift apart."""
+    real_w, real_h = content_px(shape)
+    if shape.roll:
+        # A roll has no page end, so it is as long as the document
+        real_h = max(1.0, _layout(body_html(shop, doc, shape), shop, shape, real_w).size().height())
+    image = QImage(round(real_w), round(real_h), QImage.Format.Format_RGB32)
     image.fill(0xFFFFFFFF)
     painter = QPainter(image)
-    text.drawContents(painter)
+    paint(shop, doc, shape, painter, real_w, real_h)
     painter.end()
-    if width_px and width_px != real_px:
+    if width_px and width_px != round(real_w):
         return image.scaledToWidth(width_px, Qt.TransformationMode.SmoothTransformation)
     return image
 
@@ -331,7 +385,13 @@ def sample_document() -> Document:
 
 def to_printer(shop, doc: Document, printer: QPrinter, shape: Shape) -> None:
     printer.setPageLayout(page_layout(shape))
-    render(shop, doc, shape).print_(printer)
+    rect = printer.pageLayout().paintRectPixels(printer.resolution())
+    width_px, _ = content_px(shape)
+    scale = rect.width() / width_px
+    painter = QPainter(printer)
+    painter.scale(scale, scale)
+    paint(shop, doc, shape, painter, width_px, rect.height() / scale, printer.newPage)
+    painter.end()
 
 
 def write_pdf(shop, doc: Document, path: str, shape_key: str = "a4") -> None:
