@@ -19,6 +19,7 @@ from morv.ui import icons
 from morv.ui.inventory_page import ItemDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
+from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
 from morv.ui.widgets import (DateEdit, deferred_button, field, field_label, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
 
 ITEM_CHOICES = 50
@@ -66,6 +67,19 @@ class PurchasesListPage(ListPage):
     def can_edit(self) -> bool:
         return self.session.can("purchases.post")
 
+    def extra_actions(self) -> list:
+        """A purchase return had no trace on this screen; it could only be found under its supplier."""
+        self.returns_btn = None
+        if not self.session.can("purchases.post"):
+            return []
+        self.returns_btn = QPushButton("مرتجعات الشراء")
+        self.returns_btn.clicked.connect(self.open_returns)
+        return [self.returns_btn]
+
+    def open_returns(self) -> None:
+        SupplierReturnsDialog(self.session, parent=self).exec()
+        self.reload(keep_id=self.current_id)
+
     def can_view(self, con=None) -> bool:
         return self.session.can("purchases.post", con) or self.session.can("items.cost_view", con)
 
@@ -98,6 +112,15 @@ class PurchasesListPage(ListPage):
             [(f"{ln.line_no}. {ln.item_name}", ltr(str(ln.qty)), ltr(fmt(ln.unit_cost)),
               ltr(fmt(ln.line_total)), ltr(ln.dot) if ln.dot else "")
              for ln in inv.lines])
+        if self.session.can("purchases.post"):
+            send_back = QPushButton("مرتجع للمورد")
+            send_back.clicked.connect(lambda: self.open_return(inv))
+            self.actions(send_back)
+
+    def open_return(self, inv) -> None:
+        dlg = PurchaseReturnDialog(self.session, inv.supplier_id, inv.supplier_name, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.reload(keep_id=inv.id)
 
     def open_dialog(self, row_id):
         if row_id is not None:
