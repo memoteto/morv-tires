@@ -8,7 +8,7 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.infra import customer_receipts, ledger
 from morv.infra.customer_receipts import ReceiptError
 from morv.ui.modal import Modal
-from morv.ui.widgets import DateEdit, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, field, form, ltr_edit, muted
 
 METHOD_LABELS = {"cash": "نقدًا", "card": "بطاقة", "transfer": "تحويل", "wallet": "محفظة إلكترونية"}
 
@@ -31,10 +31,10 @@ class ReceiptDialog(Modal):
             self.amount.setText(fmt(owed).replace(",", ""))
         self.notes = QLineEdit()
         self.notes.setPlaceholderText("ملاحظات (اختياري)")
-        f.addRow("طريقة القبض *", self.method)
-        f.addRow("التاريخ *", self.date)
-        f.addRow("المبلغ *", self.amount)
-        f.addRow("ملاحظات", self.notes)
+        f.addRow(field("طريقة القبض *", self.method))
+        f.addRow(field("التاريخ *", self.date))
+        f.addRow(field("المبلغ *", self.amount))
+        f.addRow(field("ملاحظات", self.notes))
         self.body.addLayout(f)
         self.add_footer("تسجيل السند", self.save)
         self.amount.setFocus()
@@ -65,7 +65,7 @@ class ReverseReceiptDialog(Modal):
         f = form()
         self.reason = QLineEdit()
         self.reason.setPlaceholderText("سبب العكس (إلزامي)")
-        f.addRow("سبب العكس *", self.reason)
+        f.addRow(field("سبب العكس *", self.reason))
         self.body.addLayout(f)
         self.add_footer("عكس السند", self.save)
         self.reason.setFocus()

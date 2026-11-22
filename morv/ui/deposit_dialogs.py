@@ -2,14 +2,14 @@
 import uuid
 from datetime import date
 
-from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit
+from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QVBoxLayout, QWidget
 
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.infra import customer_deposits, customer_receipts, ledger
 from morv.infra.customer_deposits import DepositError
 from morv.ui.modal import Modal
 from morv.ui.receipt_dialogs import METHOD_LABELS, ReverseReceiptDialog
-from morv.ui.widgets import DateEdit, danger_button, form, ltr_edit, muted
+from morv.ui.widgets import danger_button, DateEdit, field, field_label, form, ltr_edit, muted
 
 KIND_LABELS = {"deposit": "إيداع عربون", "refund": "رد عربون", "apply": "تسوية العربون على الدين"}
 
@@ -35,12 +35,18 @@ class DepositDialog(Modal):
         self.amount = ltr_edit("0.00")
         self.notes = QLineEdit()
         self.notes.setPlaceholderText("ملاحظات (اختياري)")
-        self.method_label = muted("طريقة الدفع *")
-        f.addRow("العملية *", self.kind)
-        f.addRow(self.method_label, self.method)
-        f.addRow("التاريخ *", self.date)
-        f.addRow("المبلغ *", self.amount)
-        f.addRow("ملاحظات", self.notes)
+        self.method_label = field_label("طريقة الدفع *")
+        method_box = QWidget()
+        method_v = QVBoxLayout(method_box)
+        method_v.setContentsMargins(0, 0, 0, 0)
+        method_v.setSpacing(6)
+        method_v.addWidget(self.method_label)
+        method_v.addWidget(self.method)
+        f.addRow(field("العملية *", self.kind))
+        f.addRow(method_box)
+        f.addRow(field("التاريخ *", self.date))
+        f.addRow(field("المبلغ *", self.amount))
+        f.addRow(field("ملاحظات", self.notes))
         self.body.addLayout(f)
         self.kind.currentIndexChanged.connect(self._kind_changed)
         self.add_footer("تسجيل", self.save)
@@ -77,7 +83,7 @@ class ReverseDepositDialog(Modal):
         f = form()
         self.reason = QLineEdit()
         self.reason.setPlaceholderText("سبب العكس (إلزامي)")
-        f.addRow("سبب العكس *", self.reason)
+        f.addRow(field("سبب العكس *", self.reason))
         self.body.addLayout(f)
         self.add_footer("عكس المستند", self.save)
         self.reason.setFocus()

@@ -2,7 +2,7 @@
 import uuid
 from datetime import date
 
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLabel, QLineEdit, QWidget
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLabel, QLineEdit, QVBoxLayout, QWidget
 
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
@@ -10,7 +10,7 @@ from morv.infra import cash_closing, ledger, safe_count, suppliers, treasury, tr
 from morv.infra.cash_closing import ClosingError
 from morv.infra.treasury import NeedsConfirmation, TreasuryError
 from morv.ui.modal import Modal
-from morv.ui.widgets import DateEdit, ask, danger_button, form, ltr_edit, muted
+from morv.ui.widgets import ask, danger_button, DateEdit, field, form, ltr_edit, muted
 
 # kind -> (label of the money account row, label of the counterpart row or None)
 _ROWS = {
@@ -68,8 +68,15 @@ class MovementDialog(Modal):
             ("reference", "المرجع", self.reference),
         ):
             label = QLabel(text)
+            label.setObjectName("fieldLabel")
             self._labels[key] = label
-            f.addRow(label, widget)
+            box = QWidget()
+            v = QVBoxLayout(box)
+            v.setContentsMargins(0, 0, 0, 0)
+            v.setSpacing(6)
+            v.addWidget(label)
+            v.addWidget(widget)
+            f.addRow(box)
         self._widgets = {"other": self.other, "partner": self.partner, "partner_info": self.partner_info,
                          "supplier": self.supplier, "supplier_info": self.supplier_info}
         self.body.addLayout(f)
@@ -151,7 +158,7 @@ class ReverseDialog(Modal):
         f = form()
         self.memo = QLineEdit()
         self.memo.setPlaceholderText("سبب العكس (إلزامي)")
-        f.addRow("سبب العكس *", self.memo)
+        f.addRow(field("سبب العكس *", self.memo))
         self.body.addLayout(f)
         self.add_footer("عكس الحركة", self.save)
         self.memo.setFocus()
@@ -185,11 +192,11 @@ class CloseDialog(Modal):
         self.diff_label = QLabel("—")
         self.memo = QLineEdit()
         self.memo.setPlaceholderText("سبب الفرق (إلزامي إن وُجد فرق)")
-        f.addRow("تاريخ الإقفال", self.date)
-        f.addRow("رصيد الصندوق الدفتري", self.book_label)
-        f.addRow("العد الفعلي *", self.counted)
-        f.addRow("الفرق", self.diff_label)
-        f.addRow("سبب الفرق", self.memo)
+        f.addRow(field("تاريخ الإقفال", self.date))
+        f.addRow(field("رصيد الصندوق الدفتري", self.book_label))
+        f.addRow(field("العد الفعلي *", self.counted))
+        f.addRow(field("الفرق", self.diff_label))
+        f.addRow(field("سبب الفرق", self.memo))
         self.body.addLayout(f)
         self.hand_check = QCheckBox("تسليم الفائض بعد الإقفال")
         self.body.addWidget(self.hand_check)
@@ -202,8 +209,8 @@ class CloseDialog(Modal):
             self.hand_to.addItem(f"سحب شريك: {name}", f"partner:{pid}")
         self.keep = ltr_edit("0.00")
         self.keep.setText("0.00")
-        hf.addRow("الوجهة", self.hand_to)
-        hf.addRow("يبقى في الدُّرج", self.keep)
+        hf.addRow(field("الوجهة", self.hand_to))
+        hf.addRow(field("يبقى في الدُّرج", self.keep))
         self.hand_box = QWidget()
         self.hand_box.setLayout(hf)
         self.hand_box.setVisible(False)
@@ -290,7 +297,7 @@ class CancelClosingDialog(Modal):
         self.body.addWidget(muted("يُسجَّل مستند إلغاء ويُعكس قيد الفرق إن وُجد، ثم يمكن إقفال التاريخ من جديد."))
         f = form()
         self.memo = QLineEdit()
-        f.addRow("سبب الإلغاء *", self.memo)
+        f.addRow(field("سبب الإلغاء *", self.memo))
         self.body.addLayout(f)
         self.add_footer("إلغاء الإقفال", self.save)
 
@@ -321,11 +328,11 @@ class SafeCountDialog(Modal):
         self.diff_label = QLabel("—")
         self.memo = QLineEdit()
         self.memo.setPlaceholderText("سبب الفرق (إلزامي إن وُجد فرق)")
-        f.addRow("تاريخ الجرد", self.date)
-        f.addRow("رصيد الخزنة الدفتري", QLabel(ltr(fmt(self._book))))
-        f.addRow("العد الفعلي *", self.counted)
-        f.addRow("الفرق", self.diff_label)
-        f.addRow("سبب الفرق", self.memo)
+        f.addRow(field("تاريخ الجرد", self.date))
+        f.addRow(field("رصيد الخزنة الدفتري", QLabel(ltr(fmt(self._book)))))
+        f.addRow(field("العد الفعلي *", self.counted))
+        f.addRow(field("الفرق", self.diff_label))
+        f.addRow(field("سبب الفرق", self.memo))
         self.body.addLayout(f)
         self.counted.textChanged.connect(self._diff)
         self.cancel_btn = danger_button("إلغاء آخر جرد")
@@ -377,7 +384,7 @@ class CancelSafeCountDialog(Modal):
         self.body.addWidget(muted("يُسجَّل مستند إلغاء ويُعكس قيد الفرق إن وُجد، ثم يمكن جرد التاريخ من جديد."))
         f = form()
         self.memo = QLineEdit()
-        f.addRow("سبب الإلغاء *", self.memo)
+        f.addRow(field("سبب الإلغاء *", self.memo))
         self.body.addLayout(f)
         self.add_footer("إلغاء الجرد", self.save)
 

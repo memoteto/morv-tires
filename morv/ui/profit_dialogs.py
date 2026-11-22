@@ -10,7 +10,7 @@ from morv.core.text import ltr
 from morv.infra import ledger, profit, treasury
 from morv.infra.profit import ProfitError
 from morv.ui.modal import Modal
-from morv.ui.widgets import DateEdit, ask, danger_button, form, ltr_edit, muted
+from morv.ui.widgets import ask, danger_button, DateEdit, field, form, ltr_edit, muted
 
 
 class ShareSetDialog(Modal):
@@ -31,15 +31,15 @@ class ShareSetDialog(Modal):
             edit.setText(profit_rules.fmt_percent(default) if default else "")
             edit.textChanged.connect(self._sum)
             self.edits[pid] = edit
-            f.addRow(f"{name} %", edit)
+            f.addRow(field(f"{name} %", edit))
         self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         self.memo = QLineEdit()
         self.memo.setPlaceholderText("مرجع الاعتماد (محضر أو عقد)")
         self.total_label = QLabel("")
-        f.addRow("المجموع", self.total_label)
-        f.addRow("تاريخ السريان", self.date)
-        f.addRow("مرجع الاعتماد *", self.memo)
+        f.addRow(field("المجموع", self.total_label))
+        f.addRow(field("تاريخ السريان", self.date))
+        f.addRow(field("مرجع الاعتماد *", self.memo))
         self.body.addLayout(f)
         self.add_footer("اعتماد الحصص", self.save)
         self._sum()
@@ -88,12 +88,12 @@ class DistributionDialog(Modal):
         self.amount = ltr_edit("0.00")
         self.memo = QLineEdit()
         self.memo.setPlaceholderText("بيان التوزيع (قرار الشركاء)")
-        f.addRow("حتى نهاية", self.through)
+        f.addRow(field("حتى نهاية", self.through))
         self.info = muted("")
         self.info.setWordWrap(True)
-        f.addRow("الحساب", self.info)
-        f.addRow("المبلغ الموزَّع *", self.amount)
-        f.addRow("البيان *", self.memo)
+        f.addRow(field("الحساب", self.info))
+        f.addRow(field("المبلغ الموزَّع *", self.amount))
+        f.addRow(field("البيان *", self.memo))
         self.body.addLayout(f)
         self.through.textChanged.connect(self._refresh)
         self.reverse_btn = danger_button("عكس آخر توزيع")
@@ -157,7 +157,7 @@ class ReverseDistributionDialog(Modal):
         self.body.addWidget(muted("يُسجَّل قيد عكسي بتاريخ اليوم، ويعود المبلغ قابلًا للتوزيع."))
         f = form()
         self.memo = QLineEdit()
-        f.addRow("سبب العكس *", self.memo)
+        f.addRow(field("سبب العكس *", self.memo))
         self.body.addLayout(f)
         self.add_footer("عكس التوزيع", self.save)
 
