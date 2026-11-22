@@ -1,7 +1,7 @@
 """Builds every printed document from the approved design in design/Shop.dc.html, for sheet and roll."""
 from dataclasses import dataclass, field
 
-from PySide6.QtCore import QMarginsF, QSizeF, Qt
+from PySide6.QtCore import QMarginsF, QSizeF, Qt, QUrl
 from PySide6.QtGui import QFont, QImage, QPageLayout, QPageSize, QPainter, QTextDocument
 from PySide6.QtPrintSupport import QPrinter
 
@@ -14,6 +14,9 @@ MUTED = "#4B5563"
 LINE = "#E1E6EE"
 FILL = "#F3F5F9"
 DASH = "#C9D2DF"
+ICON_URL = "morv:icon/"       # a file:// image never loads in a QTextDocument
+LOGO_URL = "morv:logo"
+FOOT_ICONS = ("pin", "phone", "chat", "clock")
 
 
 @dataclass(frozen=True)
@@ -70,14 +73,13 @@ def _band(color: str, height_pt: float = 0.8) -> str:
             f"<tr><td style='font-size:{height_pt}pt'>&nbsp;</td></tr></table>")
 
 
-def _icon(name: str, color: str, size: int) -> str:
-    return f"<img src='file://{icons.svg_file(name, color)}' width='{size}' height='{size}'>"
+def _icon(name: str, size: int) -> str:
+    return f"<img src='{ICON_URL}{name}' width='{size}' height='{size}'>"
 
 
 def _logo_cell(shop, size: int) -> str:
-    path = shop.logo_path
-    if path:
-        return f"<img src='file://{path.as_posix()}' width='{size}' height='{size}'>"
+    if shop.logo_path:
+        return f"<img src='{LOGO_URL}' width='{size}' height='{size}'>"
     return (f"<table width='{size}' cellspacing='0' cellpadding='0' bgcolor='{BLUE}'><tr>"
             f"<td align='center' style='color:#FFFFFF;font-weight:bold;font-size:{size * 3 // 5}pt'>"
             f"{shop.initial}</td></tr></table>")
@@ -195,7 +197,7 @@ def _sheet_foot(shop, doc: Document, shape: Shape) -> str:
     if items:
         size = max(10, round(12 * shape.scale))
         cells = "&nbsp;&nbsp;&nbsp;&nbsp;".join(
-            f"{_icon(name, MUTED, size)}&nbsp;{text}" for name, text in items)
+            f"{_icon(name, size)}&nbsp;{text}" for name, text in items)
         out += _band(INK, 1.2) + (f"<div align='center' dir='rtl' style='color:{INK};"
                                   f"font-size:{_pt(shape, 8.5)}'>{cells}</div>")
     return out
@@ -275,9 +277,20 @@ def page_layout(shape: Shape) -> QPageLayout:
     return QPageLayout(size, QPageLayout.Orientation.Portrait, margin, QPageLayout.Unit.Millimeter)
 
 
+def _load_images(text: QTextDocument, shop) -> None:
+    """Qt draws an image on paper only from a resource it holds, never from a file path in the markup."""
+    for name in FOOT_ICONS:
+        image = icons.icon(name, MUTED, 48).pixmap(48, 48).toImage()
+        text.addResource(QTextDocument.ResourceType.ImageResource, QUrl(f"{ICON_URL}{name}"), image)
+    if shop.logo_path:
+        text.addResource(QTextDocument.ResourceType.ImageResource, QUrl(LOGO_URL),
+                         QImage(str(shop.logo_path)))
+
+
 def render(shop, doc: Document, shape: Shape) -> QTextDocument:
     layout = page_layout(shape)
     text = QTextDocument()
+    _load_images(text, shop)
     text.setDefaultFont(print_font(shape))
     text.setPageSize(layout.paintRectPixels(96).size().toSizeF())
     text.setHtml(document_html(shop, doc, shape))

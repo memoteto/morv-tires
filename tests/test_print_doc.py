@@ -106,6 +106,19 @@ class PrintedSheetTest(unittest.TestCase):
         self.assertIn(">م<", self.html(), "no logo file, so the design's blue square stands in")
         self.assertNotIn(">م<", self.html(_shop(show_logo=False)))
 
+    def test_every_picture_is_a_resource_the_renderer_holds(self):
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QTextDocument
+        from morv.ui.print_doc import SHAPES, render
+        sources = set(re.findall(r"<img src='([^']+)'", self.html()))
+        self.assertTrue(sources, "the footer draws its icons")
+        self.assertEqual([], [s for s in sources if s.startswith("file:")],
+                         "a file path draws a broken-image box on paper")
+        text = render(_shop(), _doc(), SHAPES["a4"])
+        for src in sources:
+            held = text.resource(QTextDocument.ResourceType.ImageResource, QUrl(src))
+            self.assertTrue(held is not None and not held.isNull(), f"{src} is not registered")
+
     def test_money_prints_as_pounds_and_stays_left_to_right(self):
         self.assertIn("12,900.00", self.reads())
         self.assertNotIn("1290000", self.reads())
