@@ -107,6 +107,15 @@ class Modal(QDialog):
         self.footer_layout.insertWidget(self.footer_layout.count() - 1, w)
         self.footer.show()
 
+    def _fit_height(self) -> None:
+        """Grow to the content up to the screen limit; Qt alone caps a scroll area at 2/3 of the screen."""
+        # Size hints, not geometry: a shown window's geometry may not be updated yet
+        self.scroll.setMinimumHeight(0)
+        chrome = self.sizeHint().height() - self.scroll.sizeHint().height()
+        wanted = self.scroll.widget().sizeHint().height()
+        self.scroll.setMinimumHeight(max(0, min(wanted, self.maximumHeight() - chrome)))
+        self.resize(self.width(), min(self.sizeHint().height(), self.maximumHeight()))
+
     # ---------- Dragging by the header ----------
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.LeftButton and self.header.geometry().contains(e.position().toPoint()):
@@ -125,7 +134,7 @@ class Modal(QDialog):
     def showEvent(self, e) -> None:
         super().showEvent(e)
         if not self.table_mode:
-            self.adjustSize()
+            self._fit_height()
         anchor = self.parentWidget().window() if self.parentWidget() else None
         geo = anchor.frameGeometry() if anchor else QGuiApplication.primaryScreen().availableGeometry()
         self.move(geo.center() - self.rect().center())

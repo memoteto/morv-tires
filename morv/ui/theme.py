@@ -65,6 +65,10 @@ def palette(t: dict) -> QPalette:
 
 
 def qss(t: dict) -> str:
+    from morv.ui import icons
+    # QSS takes arrow images only as files, so the theme colour is drawn into one per mode
+    t = {"arrow": icons.svg_file("chevron_down", t["muted"]),
+         "arrow_off": icons.svg_file("chevron_down", t["border_strong"]), **t}
     return f"""
 QWidget#side {{ background:{t['side']}; }}
 QLabel#brand {{ color:#FFFFFF; font-size:{t['fs']+3}px; font-weight:700; }}
@@ -175,12 +179,17 @@ QTabWidget::pane {{ border:1px solid {t['border']}; border-radius:12px; backgrou
 QTabBar::tab {{ padding:8px 16px; margin:0 2px; border:1px solid transparent; border-bottom:0;
                 border-top-left-radius:8px; border-top-right-radius:8px; color:{t['muted']}; }}
 QTabBar::tab:selected {{ background:{t['surface']}; border-color:{t['border']}; color:{t['text']}; font-weight:600; }}
-QComboBox {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px; padding:0 10px; }}
+QComboBox {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px;
+             padding-left:24px; padding-right:8px; }}
+QComboBox::drop-down {{ subcontrol-origin:padding; subcontrol-position:center left; width:20px; border:0;
+                       background:transparent; }}
+QComboBox::down-arrow {{ image:url({t.get('arrow', '')}); width:12px; height:12px; }}
+QComboBox::down-arrow:disabled {{ image:url({t.get('arrow_off', '')}); }}
 QComboBox QAbstractItemView {{ background:{t['surface']}; selection-background-color:{t['select']}; border:1px solid {t['border']}; }}
 QComboBox#statementFilter {{ padding-left:30px; padding-right:10px; }}
 QComboBox#statementFilter::drop-down {{ subcontrol-origin:border; subcontrol-position:top left;
                                        width:26px; border:0; background:transparent; }}
-QComboBox#statementFilter::down-arrow {{ width:10px; height:10px; }}
+QComboBox#statementFilter::down-arrow {{ image:none; width:10px; height:10px; }}
 QCheckBox::indicator {{ width:18px; height:18px; }}
 QListWidget#userList {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:10px; }}
 QListWidget#userList::item {{ padding:10px; border-radius:8px; }}
@@ -191,7 +200,7 @@ QDateEdit#statementDate {{ background:{t['surface']}; color:{t['text']};
 QDateEdit#statementDate:focus {{ border:2px solid {t['primary']}; }}
 QDateEdit#statementDate::drop-down {{ subcontrol-origin:border; subcontrol-position:top left;
                                      width:26px; border:0; background:transparent; }}
-QDateEdit#statementDate::down-arrow {{ width:10px; height:10px; }}
+QDateEdit#statementDate::down-arrow {{ image:none; width:10px; height:10px; }}
 QCalendarWidget#statementCalendar {{ background:{t['surface']}; }}
 QCalendarWidget#statementCalendar QWidget#qt_calendar_navigationbar {{ background:{t['surface2']}; }}
 QCalendarWidget#statementCalendar QToolButton {{ color:{t['text']}; background:{t['surface2']};
@@ -242,7 +251,7 @@ QFrame#payBox {{ background:{t['surface2']}; border:1px solid {t['border']}; bor
 QFrame#changeBox {{ background:{t['success_soft']}; border:0; border-radius:8px; }}
 QLabel#changeLabel {{ color:{t['success']}; font-size:{t['fs']+1}px; font-weight:700; }}
 QLabel#changeValue {{ color:{t['success']}; font-size:{t['fs']+4}px; font-weight:700; }}
-QComboBox#payMethod {{ min-height:56px; padding:0 12px; font-weight:600; }}
+QComboBox#payMethod {{ min-height:56px; padding-left:24px; padding-right:10px; font-weight:600; }}
 QPushButton#primaryLarge {{ background:{t['primary']}; color:{t['on_primary']}; border:0; border-radius:10px;
                            min-height:54px; font-size:{t['fs']+4}px; font-weight:700; }}
 QPushButton#primaryLarge:disabled {{ background:{t['border']}; color:{t['muted']}; }}

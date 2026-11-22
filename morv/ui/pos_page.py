@@ -309,6 +309,9 @@ class PosPage(QWidget):
         method_row = QHBoxLayout()
         self.pay1_method = self._method_combo(first_blank=False)
         self.pay1_method.setObjectName("payMethod")
+        # Sized to its longest hint, it forced the payment column wide enough to clip the page at 1366px
+        self.pay1_method.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.pay1_method.setMinimumContentsLength(14)
         self.pay1_method.currentIndexChanged.connect(self._on_method_changed)
         method_row.addWidget(self.pay1_method, 1)
         method_row.addWidget(self._kbd("F8"))

@@ -1,4 +1,7 @@
 """Sidebar icons: small inline SVG drawings, tinted by theme."""
+import tempfile
+from pathlib import Path
+
 from PySide6.QtCore import QByteArray, QRectF, Qt
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
@@ -52,6 +55,18 @@ PATHS = {
     "cash": "<rect x='3' y='6' width='18' height='12' rx='2'/><circle cx='12' cy='12' r='2.5'/><path d='M6 9v.01M18 15v.01'/>",
     "trash": "<path d='M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3'/>",
 }
+
+
+def svg_file(name: str, color: str) -> str:
+    """Writes the icon as an SVG file and returns its path, for QSS url(); Qt QSS cannot take inline SVG."""
+    folder = Path(tempfile.gettempdir()) / "morv_icons"
+    folder.mkdir(exist_ok=True)
+    path = folder / f"{name}_{color.lstrip('#')}.svg"
+    if not path.exists():
+        path.write_text(f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='{color}' "
+                        f"stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'>{PATHS[name]}</svg>",
+                        encoding="utf-8")
+    return path.as_posix()
 
 
 def icon(name: str, color: str, size: int = 20) -> QIcon:
