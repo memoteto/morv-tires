@@ -30,7 +30,7 @@ class _Base(unittest.TestCase):
         from morv.core import security
         from morv.infra import backup, shop, users
         self.admin = users.create_user(self.con, None, "admin", "المدير", PW_LOGIN, "manager")
-        shop.save(self.con, self.admin, "مورف للإطارات", "01000000000", "")
+        shop.save(self.con, self.admin, shop.Shop(name="مورف للإطارات", phone="01000000000"))
         self.rk = security.new_recovery_key()
         backup.setup_encryption(self.con, PW_BACKUP, self.rk)
         return self.admin

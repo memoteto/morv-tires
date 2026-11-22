@@ -85,6 +85,8 @@ QLabel#muted {{ color:{t['muted']}; }}
 QLabel#loginLogo {{ background:{t['primary']}; color:{t['on_primary']}; border-radius:14px;
                    font-size:24px; font-weight:700; }}
 QFrame#card {{ background:{t['surface']}; border:1px solid {t['border']}; border-radius:12px; }}
+QLabel#printPreview {{ background:{t['surface2']}; border:1px solid {t['border']}; border-radius:12px;
+                       padding:10px; }}
 QToolButton#topButton {{ background:transparent; border:1px solid {t['border']}; border-radius:8px; padding:6px 10px; }}
 QToolButton#topButton:hover {{ background:{t['surface2']}; }}
 QLineEdit {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px;

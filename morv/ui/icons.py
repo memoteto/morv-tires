@@ -54,6 +54,10 @@ PATHS = {
     "printer": "<path d='M7 9V3h10v6'/><rect x='3' y='9' width='18' height='8' rx='2'/><path d='M7 14h10v7H7z'/>",
     "cash": "<rect x='3' y='6' width='18' height='12' rx='2'/><circle cx='12' cy='12' r='2.5'/><path d='M6 9v.01M18 15v.01'/>",
     "trash": "<path d='M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3'/>",
+    "pin": "<path d='M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z'/><circle cx='12' cy='10' r='2.5'/>",
+    # A plain speech bubble: the WhatsApp mark itself is a trademark we do not reproduce
+    "chat": "<path d='M21 12a8.5 8.5 0 0 1-12.3 7.6L4 21l1.4-4.3A8.5 8.5 0 1 1 21 12z'/>",
+    "clock": "<circle cx='12' cy='12' r='9'/><path d='M12 7v5.5l4 2'/>",
 }
 
 
