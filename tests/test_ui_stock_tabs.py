@@ -138,8 +138,7 @@ class StockTabsTest(unittest.TestCase):
         stock = self.stock_page(self.cashier_session)
         self.assertTrue(all(r[6] is None for r in stock.model.rows))
         self.assertNotIn("القيمة", stock.count_label.text())
-        self.assertFalse(stock.add_btn.isEnabled())
-        stock.open_dialog(None)      # without permission there is no dialog, which would hang the test
+        self.assertIsNone(stock.match_btn, "matching is hidden without the cost permission")
 
     def test_stock_summary_quantities_and_value(self):
         from morv.infra import inventory
@@ -166,12 +165,13 @@ class StockTabsTest(unittest.TestCase):
         stock_pages.info = lambda _p, title, text, error=False: shown.append((title, text, error))
         self.addCleanup(setattr, stock_pages, "info", original)
         page = self.stock_page()
-        page.open_dialog(None)
+        self.assertIsNone(page.add_btn, "matching is a check, so it must not sit in the create slot")
+        page.match_btn.click()
         self.assertEqual(shown[-1][0], "المطابقة")
         self.assertFalse(shown[-1][2])
         self.assertIn("متطابق", shown[-1][1])
         self.con.execute("UPDATE stock_lots SET qty_on_hand = qty_on_hand - 1 WHERE item_id = ?", (self.battery,))
-        page.open_dialog(None)
+        page.match_btn.click()
         self.assertTrue(shown[-1][2])
         self.assertIn("فروق", shown[-1][1])
 

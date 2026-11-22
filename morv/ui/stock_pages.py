@@ -86,8 +86,9 @@ class LotsPage(ListPage):
 
 class StockPage(ListPage):
     title = "الجرد والتسويات"
-    add_label = "تشغيل المطابقة"
-    add_icon = "check"
+    # Nothing is created here: an adjustment belongs to one item and opens from its row,
+    # and matching is a check, not a new document, so neither sits in the create slot
+    add_label = None
     search_placeholder = "الصنف أو الكود (F2)"
     filters = [("all", "الكل"), ("stock", "بها رصيد"), ("low", "تحت حد الطلب")]
     columns = [
@@ -101,6 +102,19 @@ class StockPage(ListPage):
 
     def can_edit(self) -> bool:
         return _cost_ok(self.session)
+
+    def extra_actions(self) -> list:
+        self.match_btn = self.history_btn = None
+        actions = []
+        if _cost_ok(self.session):
+            self.match_btn = QPushButton("تشغيل المطابقة")
+            self.match_btn.clicked.connect(self.run_match)
+            actions.append(self.match_btn)
+        if self.session.can("stock.adjust"):
+            self.history_btn = QPushButton("سجل التسويات")
+            self.history_btn.clicked.connect(self.open_history)
+            actions.append(self.history_btn)
+        return actions
 
     def fetch(self, con, query, filter_key, offset):
         rows = stock_view.summary(con, query, filter_key, offset=offset)
@@ -154,9 +168,7 @@ class StockPage(ListPage):
         AdjustmentsHistoryDialog(self.session, self).exec()
         self.reload()
 
-    def open_dialog(self, row_id):
-        if row_id is not None or not self.can_edit():
-            return
+    def run_match(self) -> None:
         problems = inventory.reconcile(self.session.con)
         if problems:
             info(self, "المطابقة", f"وُجدت {len(problems)} فروق:\n" + "\n".join(problems[:15]), error=True)

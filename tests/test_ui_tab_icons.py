@@ -32,6 +32,18 @@ class TabAndHeaderIconsTest(unittest.TestCase):
         bare = [page.tabs.tabText(i) for i in range(page.tabs.count()) if page.tabs.tabIcon(i).isNull()]
         self.assertEqual([], bare, "these inventory tabs still have no icon")
 
+    def test_a_lazily_built_inventory_tab_keeps_its_icon(self):
+        from morv.ui.inventory_page import InventoryPage
+        from morv.ui.widgets import dispose
+        page = InventoryPage(self.session)
+        self.addCleanup(dispose, page, self.app)
+        # tabs 1 and 2 start as empty placeholders and are rebuilt on first selection
+        for index in (1, 2):
+            page.tabs.setCurrentIndex(index)
+            self.app.processEvents()
+            self.assertFalse(page.tabs.tabIcon(index).isNull(),
+                             f"the tab {page.tabs.tabText(index)} lost its icon when it was built")
+
     def test_yes_no_columns_show_an_icon_and_keep_their_title_as_a_tooltip(self):
         from morv.ui.inventory_page import ItemFieldsTab
         from morv.ui.widgets import dispose
