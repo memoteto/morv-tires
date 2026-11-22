@@ -69,6 +69,16 @@ class DateEditTest(unittest.TestCase):
         w.clear()
         self.assertEqual(w.text(), "")
 
+    def test_blank_optional_field_opens_its_calendar_on_this_month(self):
+        w = self.make(optional=True)
+        cal = w.calendarWidget()
+        cal.show()
+        self.app.processEvents()
+        self.addCleanup(cal.hide)
+        today = date.today()
+        self.assertEqual((cal.yearShown(), cal.monthShown()), (today.year, today.month))
+        self.assertEqual(w.text(), "")                       # opening the calendar picks no date
+
     def test_no_text_date_fields_left_in_the_ui(self):
         from pathlib import Path
         root = Path(__file__).resolve().parent.parent / "morv" / "ui"

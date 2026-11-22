@@ -87,6 +87,7 @@ class DateEdit(QDateEdit):
         cal.setObjectName("dateCalendar")
         cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
         cal.setGridVisible(False)
+        cal.installEventFilter(self)
         self.setDate(self._BLANK if optional else QDate.currentDate())
         self.dateChanged.connect(self._changed)
 
@@ -98,6 +99,13 @@ class DateEdit(QDateEdit):
         super().changeEvent(e)
         if e.type() == QEvent.Type.LayoutDirectionChange:
             self._apply_format()
+
+    def eventFilter(self, obj, e) -> bool:
+        # A blank optional field would open its calendar on the 'no date' value (January 2000)
+        if obj is self.calendarWidget() and e.type() == QEvent.Type.Show and self.text() == "":
+            today = QDate.currentDate()
+            obj.setCurrentPage(today.year(), today.month())
+        return super().eventFilter(obj, e)
 
     def _changed(self, _day) -> None:
         self._raw = None
