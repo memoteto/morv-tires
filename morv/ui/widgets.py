@@ -2,7 +2,7 @@
 from PySide6.QtCore import QDate, QEvent, QLocale, Qt, Signal
 from PySide6.QtGui import QColor, QPalette, QTextCharFormat
 from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
-                               QPushButton, QToolButton, QVBoxLayout, QWidget)
+                               QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
 from morv.ui import icons
 from morv.ui.tokens import DARK, LIGHT
@@ -84,6 +84,10 @@ def style_calendar(cal: QCalendarWidget) -> None:
     cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
     cal.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
     cal.setGridVisible(False)
+    view = cal.findChild(QTableView)
+    if view is not None:      # the hidden header's text-based minimum pushed four day columns out of view
+        view.horizontalHeader().setMinimumSectionSize(1)
+        view.verticalHeader().setMinimumSectionSize(1)
     dark = cal.palette().color(QPalette.ColorRole.Window).lightness() < 128
     weekend, plain = QTextCharFormat(), QTextCharFormat()
     weekend.setForeground(QColor((DARK if dark else LIGHT)["danger"]))
