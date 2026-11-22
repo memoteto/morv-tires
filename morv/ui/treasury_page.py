@@ -44,6 +44,8 @@ class TreasuryPage(ListPage):
         self.close_btn = None
         self.safe_btn = None
         self.bank_btn = None
+        self.distribute_btn = None
+        self.lock_btn = None
         self.close_note = None
         super().__init__(session)
 
@@ -75,16 +77,34 @@ class TreasuryPage(ListPage):
         return grid_host
 
     def extra_actions(self) -> list:
-        """Closing, safe count and bank matching are periodic checks, so they sit beside the main action."""
-        if not self.session.can("treasury.close"):
-            return []
-        self.close_btn = QPushButton("إقفال الصندوق")
-        self.close_btn.clicked.connect(self.close_day)
-        self.safe_btn = QPushButton("جرد الخزنة")
-        self.safe_btn.clicked.connect(self.count_safe)
-        self.bank_btn = QPushButton("مطابقة البنك")
-        self.bank_btn.clicked.connect(self.reconcile_banks)
-        return [self.close_btn, self.safe_btn, self.bank_btn]
+        """Periodic money checks and the two period-end decisions; each follows its own permission."""
+        actions = []
+        if self.session.can("treasury.close"):
+            self.close_btn = QPushButton("إقفال الصندوق")
+            self.close_btn.clicked.connect(self.close_day)
+            self.safe_btn = QPushButton("جرد الخزنة")
+            self.safe_btn.clicked.connect(self.count_safe)
+            self.bank_btn = QPushButton("مطابقة البنك")
+            self.bank_btn.clicked.connect(self.reconcile_banks)
+            actions += [self.close_btn, self.safe_btn, self.bank_btn]
+        # Both moved off the reports screen, which reads and exports and decides nothing
+        if self.session.can("profit.manage"):
+            self.distribute_btn = QPushButton("توزيع الأرباح")
+            self.distribute_btn.clicked.connect(self.distribute_profit)
+            actions.append(self.distribute_btn)
+        if self.session.can("period.lock"):
+            self.lock_btn = QPushButton("قفل الفترة")
+            self.lock_btn.clicked.connect(self.lock_period)
+            actions.append(self.lock_btn)
+        return actions
+
+    def distribute_profit(self) -> None:
+        from morv.ui.profit_dialogs import DistributionDialog
+        DistributionDialog(self.session, self).exec()
+
+    def lock_period(self) -> None:
+        from morv.ui.period_dialogs import PeriodLockDialog
+        PeriodLockDialog(self.session, self).exec()
 
     def count_safe(self) -> None:
         if SafeCountDialog(self.session, self).exec() == QDialog.DialogCode.Accepted:

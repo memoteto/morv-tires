@@ -161,7 +161,7 @@ class SummaryDetailRow(QWidget):
 class ListPage(QWidget):
     columns: list = []
     title = ""
-    add_label = "جديد"
+    add_label: str | None = "جديد"      # None on a page that creates nothing, so no button is built
     add_icon = "plus"
     add_primary = True
     row_icon = None            # row -> icon name, for the name column
@@ -184,12 +184,16 @@ class ListPage(QWidget):
         head.addWidget(self.count_label, 1)
         for extra_btn in self.extra_actions():
             head.addWidget(extra_btn)
-        # One primary action per page: a page whose header action is administrative shows it as secondary
-        self.add_btn = (primary_button(self.add_label, self.add_icon) if self.add_primary
-                        else icon_button(self.add_label, self.add_icon) if self.add_icon else QPushButton(self.add_label))
-        self.add_btn.clicked.connect(lambda: self.open_dialog(None))
-        self.add_btn.setEnabled(self.can_edit())
-        head.addWidget(self.add_btn)
+        # One primary action per page: a page whose header action is administrative shows it as secondary,
+        # and a page that creates nothing (add_label None) gets no button at all
+        self.add_btn = None
+        if self.add_label is not None:
+            self.add_btn = (primary_button(self.add_label, self.add_icon) if self.add_primary
+                            else icon_button(self.add_label, self.add_icon) if self.add_icon
+                            else QPushButton(self.add_label))
+            self.add_btn.clicked.connect(lambda: self.open_dialog(None))
+            self.add_btn.setEnabled(self.can_edit())
+            head.addWidget(self.add_btn)
         root.addLayout(head)
         extra = self.extra_header()
         if extra is not None:
