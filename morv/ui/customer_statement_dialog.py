@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDateEdit, QFrame, 
 
 from morv.core.money import MoneyError, fmt
 from morv.core.text import ltr
-from morv.ui import icons
+from morv.ui import icons, tokens
 from morv.ui.listpage import TupleModel
 from morv.ui.modal import Modal
 from morv.ui.widgets import field, muted, primary_button, style_calendar
@@ -148,7 +148,7 @@ class CustomerStatementDialog(Modal):
         empty_layout.setSpacing(10)
         empty_layout.addStretch(1)
         image = QLabel()
-        image.setPixmap(icons.icon("sales", "#8792A3", 36).pixmap(36, 36))
+        image.setPixmap(icons.icon("sales", tokens.ICON_MUTED, 36).pixmap(36, 36))
         image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_layout.addWidget(image)
         self.empty_label = QLabel("لا توجد حركات خلال الفترة المحددة")

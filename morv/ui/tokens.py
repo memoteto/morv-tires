@@ -1,5 +1,12 @@
 """Approved design-system colours v1.0, light and dark."""
 
+# Icon tints. One tint serves both themes on purpose: a page keeps the icons it was built with,
+# and only the shell retints its own on a theme switch, so a theme-bound tint would go stale.
+ICON_MUTED = "#8792A3"
+ICON_PRIMARY = "#1F5FD6"
+ICON_DANGER = "#B42323"
+ICON_ON_PRIMARY = "#FFFFFF"
+
 LIGHT = dict(
     bg="#F3F5F9", surface="#FFFFFF", surface2="#F6F8FB", border="#E1E6EE", border_strong="#8792A3",
     text="#0F172A", muted="#566173", primary="#1F5FD6", primary_soft="#E8F0FE", on_primary="#FFFFFF",
