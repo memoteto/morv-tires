@@ -177,7 +177,7 @@ QLabel#wizStepCur {{ color:#FFFFFF; background:{t['side_hover']}; font-weight:60
 QLabel#wizStepDone {{ color:{t['success']}; padding:8px 12px; border-radius:8px; }}
 QLabel#wizBrand {{ color:#FFFFFF; font-size:18px; font-weight:700; }}
 QTabWidget::pane {{ border:1px solid {t['border']}; border-radius:12px; background:{t['surface']}; top:-1px; }}
-QTabBar::tab {{ padding:8px 12px; margin:0 2px; border:1px solid transparent; border-bottom:0;
+QTabBar::tab {{ padding:8px 16px; margin:0 2px; border:1px solid transparent; border-bottom:0;
                 border-top-left-radius:8px; border-top-right-radius:8px; color:{t['muted']}; }}
 QTabBar::tab:selected {{ background:{t['surface']}; border-color:{t['border']}; color:{t['text']}; font-weight:600; }}
 QComboBox {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px; min-height:38px;
