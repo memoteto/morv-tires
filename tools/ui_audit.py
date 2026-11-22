@@ -129,6 +129,13 @@ def run(out: Path, size: tuple) -> dict:
                     dlg.show()
                     _settle(app)
                     dlg.grab().save(str(out / f"{name}.png"))
+                    if dname == "period_lock":      # the calendar popup is a separate window; capture it too
+                        from morv.ui.widgets import DateEdit
+                        popup = dlg.findChild(DateEdit).calendarWidget().window()
+                        popup.show()
+                        _settle(app)
+                        popup.grab().save(str(out / f"popup_calendar_{w}x{h}_{mode}.png"))
+                        popup.hide()
                     info = _measure(dlg)
                     info["size"] = [dlg.width(), dlg.height()]
                     info["screen_h"] = h

@@ -8,7 +8,7 @@ from morv.core.money import fmt
 from morv.infra import ledger, purchase_returns
 from morv.infra.purchase_returns import PurchaseReturnError, ReturnLine
 from morv.ui.modal import Modal
-from morv.ui.widgets import danger_button, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, danger_button, form, ltr_edit, muted
 
 
 class PurchaseReturnDialog(Modal):
@@ -29,7 +29,7 @@ class PurchaseReturnDialog(Modal):
         self.qty.setText("1")
         self.reason = QLineEdit()
         self.reason.setPlaceholderText("سبب المرتجع (إلزامي)")
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         f.addRow("الدفعة *", self.lot)
         f.addRow("الكمية *", self.qty)

@@ -1,9 +1,11 @@
 """Small shared UI pieces, so screens stay consistent."""
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtCore import QDate, QEvent, QLocale, Qt, Signal
+from PySide6.QtGui import QColor, QPalette, QTextCharFormat
+from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+                               QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
 from morv.ui import icons
+from morv.ui.tokens import DARK, LIGHT
 
 
 def card(title: str | None = None) -> tuple[QFrame, QVBoxLayout]:
@@ -62,6 +64,120 @@ def ltr_edit(placeholder: str = "") -> QLineEdit:
     # The value is Latin so the field alone runs LTR: field content, not layout
     e.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
     return e
+
+
+def arabic_latin_locale() -> QLocale:
+    """Arabic day and month names with Latin digits, which Egypt's own Arabic locale does not give."""
+    for name in ("ar_LY", "ar_TN", "ar_DZ", "ar_MA"):
+        loc = QLocale(name)
+        if loc.language() == QLocale.Language.Arabic and loc.zeroDigit() == "0" and loc.monthName(5) == "مايو":
+            loc.setNumberOptions(QLocale.NumberOption.OmitGroupSeparator)      # a year reads 2026, not 2.026
+            return loc
+    return QLocale(QLocale.Language.Arabic, QLocale.Territory.Egypt)
+
+
+def style_calendar(cal: QCalendarWidget) -> None:
+    """One calendar look for every date field: Arabic names, Latin digits, Friday and Saturday weekend."""
+    cal.setLocale(arabic_latin_locale())
+    cal.setFirstDayOfWeek(Qt.DayOfWeek.Saturday)
+    cal.setFixedSize(316, 272)
+    cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+    cal.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
+    cal.setGridVisible(False)
+    view = cal.findChild(QTableView)
+    if view is not None:      # the hidden header's text-based minimum pushed four day columns out of view
+        view.horizontalHeader().setMinimumSectionSize(1)
+        view.verticalHeader().setMinimumSectionSize(1)
+    header = QTextCharFormat()
+    header.setFontPointSize(8)      # Arabic day names are full words; this keeps the longest uncut in 316px
+    cal.setHeaderTextFormat(header)
+    dark = cal.palette().color(QPalette.ColorRole.Window).lightness() < 128
+    weekend, plain = QTextCharFormat(), QTextCharFormat()
+    weekend.setForeground(QColor((DARK if dark else LIGHT)["danger"]))
+    plain.setForeground(cal.palette().color(QPalette.ColorRole.Text))
+    for day in Qt.DayOfWeek:
+        cal.setWeekdayTextFormat(day, weekend if day in (Qt.DayOfWeek.Friday, Qt.DayOfWeek.Saturday) else plain)
+
+
+class DateEdit(QDateEdit):
+    """Calendar date field speaking ISO text like the line edit it replaced; engines still validate it."""
+
+    textChanged = Signal(str)
+    _BLANK = QDate(2000, 1, 1)      # the 'no date' value of an optional field, shown as an empty box
+
+    def __init__(self, optional: bool = False, allow_future: bool = False):
+        super().__init__()
+        self.setObjectName("dateEdit")
+        self.optional = optional
+        self._raw: str | None = None
+        self.setCalendarPopup(True)
+        self._apply_format()
+        self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
+        self.setMinimumDate(self._BLANK)
+        if not allow_future:      # posting engines refuse future dates, so the calendar offers none
+            self.setMaximumDate(QDate.currentDate())
+        if optional:
+            self.setSpecialValueText(" ")
+        # No step buttons: invisible ones still caught clicks and moved the year (an empty field became 2001)
+        self.setButtonSymbols(QDateEdit.ButtonSymbols.NoButtons)
+        cal = self.calendarWidget()
+        cal.setObjectName("dateCalendar")
+        style_calendar(cal)
+        cal.installEventFilter(self)
+        self.setDate(self._BLANK if optional else QDate.currentDate())
+        self.dateChanged.connect(self._changed)
+
+    def _apply_format(self) -> None:
+        """Qt lays a date's sections out by direction, so RTL needs the mirrored format to show 2026-11-21."""
+        self.setDisplayFormat("dd-MM-yyyy" if self.isRightToLeft() else "yyyy-MM-dd")
+
+    def changeEvent(self, e) -> None:
+        super().changeEvent(e)
+        if e.type() == QEvent.Type.LayoutDirectionChange:
+            self._apply_format()
+
+    def eventFilter(self, obj, e) -> bool:
+        # A blank optional field would open its calendar on the 'no date' value (January 2000)
+        if obj is self.calendarWidget() and e.type() == QEvent.Type.Show and self.text() == "":
+            today = QDate.currentDate()
+            obj.setCurrentPage(today.year(), today.month())
+        return super().eventFilter(obj, e)
+
+    def stepBy(self, steps: int) -> None:
+        if self.text() == "":      # arrows or the wheel on an empty field start from today, not year 2000
+            self.setDate(QDate.currentDate())
+            return
+        super().stepBy(steps)
+
+    def _changed(self, _day) -> None:
+        self._raw = None
+        self.textChanged.emit(self.text())
+
+    def text(self) -> str:
+        if self._raw is not None:
+            return self._raw
+        if self.optional and self.date() == self._BLANK:
+            return ""
+        return self.date().toString(Qt.DateFormat.ISODate)
+
+    def setText(self, value: str) -> None:
+        """An invalid or out-of-range value is kept as typed, so the engine reports it as before."""
+        value = (value or "").strip()
+        day = QDate.fromString(value, Qt.DateFormat.ISODate)
+        had_raw, self._raw = self._raw is not None, None
+        if not value and self.optional:
+            self.setDate(self._BLANK)
+        elif day.isValid() and self.minimumDate() <= day <= self.maximumDate():
+            self.setDate(day)
+        else:
+            self._raw = value
+            self.textChanged.emit(value)
+            return
+        if had_raw:      # leaving a kept raw value changes the text even when the date did not move
+            self.textChanged.emit(self.text())
+
+    def clear(self) -> None:
+        self.setText("")
 
 
 class PasswordEdit(QWidget):

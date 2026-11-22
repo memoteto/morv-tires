@@ -8,7 +8,7 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.infra import ledger, stock_adjustments
 from morv.infra.stock_adjustments import AdjustLine, StockAdjustError
 from morv.ui.modal import Modal
-from morv.ui.widgets import danger_button, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, danger_button, form, ltr_edit, muted
 
 SOURCE_TEXT = {"source_lot": "تكلفة الدفعة المصدر", "last_purchase": "آخر تكلفة شراء", "manual": "تكلفة يدوية",
                "fifo": "تكلفة FIFO"}
@@ -40,7 +40,7 @@ class StockAdjustmentDialog(Modal):
         self.cost.setPlaceholderText("تكلفة الوحدة: تُطلب فقط إن لم يوجد مرجع تكلفة للصنف")
         self.reason = QLineEdit()
         self.reason.setPlaceholderText("سبب التسوية (إلزامي)")
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         f.addRow("الصنف *", self.item)
         f.addRow("النوع *", self.direction)

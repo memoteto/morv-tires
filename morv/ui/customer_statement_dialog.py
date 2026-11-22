@@ -1,6 +1,6 @@
 """Customer statement dialog: period, totals and the ledger movements of one customer."""
 from PySide6.QtCore import QDate, QEvent, QObject, Qt
-from PySide6.QtWidgets import (QAbstractItemView, QCalendarWidget, QComboBox, QDateEdit, QFrame, QHBoxLayout,
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDateEdit, QFrame, QHBoxLayout,
                                QHeaderView, QLabel, QSizePolicy, QTableView, QVBoxLayout, QWidget)
 
 from morv.core.money import MoneyError, fmt
@@ -8,7 +8,7 @@ from morv.core.text import ltr
 from morv.ui import icons
 from morv.ui.listpage import TupleModel
 from morv.ui.modal import Modal
-from morv.ui.widgets import field, muted, primary_button
+from morv.ui.widgets import field, muted, primary_button, style_calendar
 
 
 class _InputIndicator(QObject):
@@ -87,10 +87,7 @@ class CustomerStatementDialog(Modal):
             _InputIndicator(edit, "calendar")
             calendar = edit.calendarWidget()
             calendar.setObjectName("statementCalendar")
-            calendar.setFixedSize(316, 272)
-            calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
-            calendar.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
-            calendar.setGridVisible(False)
+            style_calendar(calendar)
         self.date_from.setDate(QDate(today.year(), today.month(), 1))
         self.date_to.setDate(today)
         dates.addWidget(field("من تاريخ", self.date_from))

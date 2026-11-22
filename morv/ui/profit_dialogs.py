@@ -10,7 +10,7 @@ from morv.core.text import ltr
 from morv.infra import ledger, profit, treasury
 from morv.infra.profit import ProfitError
 from morv.ui.modal import Modal
-from morv.ui.widgets import ask, danger_button, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, ask, danger_button, form, ltr_edit, muted
 
 
 class ShareSetDialog(Modal):
@@ -32,7 +32,7 @@ class ShareSetDialog(Modal):
             edit.textChanged.connect(self._sum)
             self.edits[pid] = edit
             f.addRow(f"{name} %", edit)
-        self.date = ltr_edit("YYYY-MM-DD")
+        self.date = DateEdit()
         self.date.setText(date.today().isoformat())
         self.memo = QLineEdit()
         self.memo.setPlaceholderText("مرجع الاعتماد (محضر أو عقد)")
@@ -83,7 +83,7 @@ class DistributionDialog(Modal):
         self.body.addWidget(muted("يُوزَّع الربح القابل للتوزيع فقط، بعد خسائر الفترات السابقة والتوزيعات والاحتياطي. القيد لا يمس النقد."))
         self.body.addWidget(muted("آخر توزيع حتى: " + (ltr(last[2]) if last else "لا يوجد")))
         f = form()
-        self.through = ltr_edit("YYYY-MM-DD")
+        self.through = DateEdit(optional=True)
         self.through.setText(locked or "")
         self.amount = ltr_edit("0.00")
         self.memo = QLineEdit()
@@ -106,6 +106,9 @@ class DistributionDialog(Modal):
 
     def _refresh(self) -> None:
         self._preview = None
+        if not self.through.text().strip():      # nothing chosen yet is a prompt, not an error
+            self.info.setText("اختر تاريخ نهاية فترة مقفلة لعرض الربح القابل للتوزيع.")
+            return
         try:
             p = profit.preview(self.session.con, self.through.text().strip())
         except ProfitError as e:

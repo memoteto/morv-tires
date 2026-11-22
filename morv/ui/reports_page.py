@@ -9,7 +9,7 @@ from morv.ui import report_export
 from morv.ui.listpage import ListPage
 from morv.ui.period_dialogs import PeriodLockDialog
 from morv.ui.profit_dialogs import DistributionDialog
-from morv.ui.widgets import ltr_edit, muted
+from morv.ui.widgets import DateEdit, muted
 
 _INDENT = {"head": "", "line": "    ", "total": "", "grand": ""}
 CUSTOM = "custom"
@@ -62,7 +62,8 @@ class ReportsPage(ListPage):
             self.report_combo.addItem(reports.TITLES[key], key)
         self.account_combo = QComboBox()
         self._filled_for = None
-        self.from_edit, self.to_edit = ltr_edit("YYYY-MM-DD"), ltr_edit("YYYY-MM-DD")
+        self.from_edit, self.to_edit = (DateEdit(optional=True, allow_future=True),
+                                        DateEdit(optional=True, allow_future=True))
         self.range_labels = (muted("من"), muted("إلى"))
         self.compare_box = QCheckBox("مقارنة بالفترة السابقة")
         self.export_csv_btn = QPushButton("تصدير Excel")
