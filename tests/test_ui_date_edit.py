@@ -72,9 +72,10 @@ class DateEditTest(unittest.TestCase):
     def test_blank_optional_field_opens_its_calendar_on_this_month(self):
         w = self.make(optional=True)
         cal = w.calendarWidget()
-        cal.show()
+        popup = cal.window()                  # the field opens the calendar inside its popup window
+        popup.show()
         self.app.processEvents()
-        self.addCleanup(cal.hide)
+        self.addCleanup(popup.hide)
         today = date.today()
         self.assertEqual((cal.yearShown(), cal.monthShown()), (today.year, today.month))
         self.assertEqual(w.text(), "")                       # opening the calendar picks no date
