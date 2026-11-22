@@ -135,9 +135,11 @@ class ReportsPageTest(unittest.TestCase):
         from morv.infra import ledger
         from morv.ui.period_dialogs import PeriodLockDialog
         from morv.ui.widgets import dispose
-        page = self.page()
-        self.assertTrue(page.can_edit())
-        self.assertFalse(self.page(self.cashier_session).can_edit())
+        from morv.ui.treasury_page import TreasuryPage
+        treasury = TreasuryPage(self.session)
+        self.addCleanup(dispose, treasury, self.app)
+        self.assertIsNotNone(treasury.lock_btn, "the period lock lives in the treasury now")
+        self.assertFalse(self.page().can_edit(), "a report line must not open a financial dialog")
         dlg = PeriodLockDialog(self.session)
         self.addCleanup(dispose, dlg, self.app)
         dlg.save()
@@ -180,7 +182,6 @@ class ProfitUiTest(unittest.TestCase):
         from morv.infra import profit, treasury
         from morv.ui.partners_tab import PartnersTab
         from morv.ui.profit_dialogs import DistributionDialog, ShareSetDialog
-        from morv.ui.reports_page import ReportsPage
         from morv.ui.widgets import dispose
         sd = ShareSetDialog(self.session)
         self.addCleanup(dispose, sd, self.app)
@@ -200,10 +201,11 @@ class ProfitUiTest(unittest.TestCase):
         self.assertIsNotNone(dd.saved)
         self.assertEqual(treasury.partner_balance(self.con, self.a), 60000)
         self.assertEqual(profit.latest_distribution(self.con)[3], 100000)
-        page = ReportsPage(self.session)
+        from morv.ui.treasury_page import TreasuryPage
+        page = TreasuryPage(self.session)
         self.addCleanup(dispose, page, self.app)
         self.assertIsNotNone(page.distribute_btn)
-        other = ReportsPage(self.cashier_session)
+        other = TreasuryPage(self.cashier_session)
         self.addCleanup(dispose, other, self.app)
         self.assertIsNone(other.distribute_btn)
         tab = PartnersTab(self.session)

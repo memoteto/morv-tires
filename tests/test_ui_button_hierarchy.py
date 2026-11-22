@@ -54,6 +54,8 @@ class OnePrimaryPerPageTest(unittest.TestCase):
         reports = ReportsPage(self.session)
         for page in (treasury, reports):
             self.addCleanup(dispose, page, self.app)
-        for btn in (treasury.close_btn, treasury.safe_btn, treasury.bank_btn, reports.add_btn):
+        for btn in (treasury.close_btn, treasury.safe_btn, treasury.bank_btn,
+                    treasury.distribute_btn, treasury.lock_btn):
             self.assertNotIn(btn.objectName(), PRIMARY_NAMES, btn.text())
         self.assertEqual(treasury.add_btn.objectName(), "primary")
+        self.assertIsNone(reports.add_btn, "the reports screen creates nothing, so it needs no button")
