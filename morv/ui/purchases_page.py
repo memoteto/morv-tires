@@ -54,10 +54,11 @@ class PurchasesListPage(ListPage):
     search_placeholder = "رقم الفاتورة، المورد، أو رقم فاتورة المورد (F2)"
     columns = [
         ("الفاتورة", lambda r: ltr(r[1])),
+        ("التاريخ", lambda r: ltr(r[4])),
         ("المورد", lambda r: r[2]),
         ("رقم فاتورة المورد", lambda r: ltr(r[3])),
-        ("التاريخ", lambda r: ltr(r[4])),
         ("الإجمالي", lambda r: ltr(fmt(r[5]))),
+        ("المرتجع", lambda r: ltr(fmt(r[6])) if r[6] else "—"),
     ]
 
     def __init__(self, session, stack=None):
@@ -105,7 +106,10 @@ class PurchasesListPage(ListPage):
         if inv.notes:
             details.append(("ملاحظات", inv.notes))
         self.summary_details(details)
-        self.summary_metrics([("إجمالي الفاتورة", ltr(fmt(inv.total)))])
+        metrics = [("إجمالي الفاتورة", ltr(fmt(inv.total)))]
+        if inv.returned:
+            metrics += [("المرتجع", ltr(fmt(inv.returned))), ("الصافي", ltr(fmt(inv.total - inv.returned)))]
+        self.summary_metrics(metrics)
         self.summary_section("تفاصيل الأصناف", "tire")
         self.summary_records(
             ["الصنف", "الكمية", "تكلفة الوحدة", "الإجمالي", "DOT"],
