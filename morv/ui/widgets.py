@@ -88,6 +88,9 @@ def style_calendar(cal: QCalendarWidget) -> None:
     if view is not None:      # the hidden header's text-based minimum pushed four day columns out of view
         view.horizontalHeader().setMinimumSectionSize(1)
         view.verticalHeader().setMinimumSectionSize(1)
+    header = QTextCharFormat()
+    header.setFontPointSize(8)      # Arabic day names are full words; this keeps the longest uncut in 316px
+    cal.setHeaderTextFormat(header)
     dark = cal.palette().color(QPalette.ColorRole.Window).lightness() < 128
     weekend, plain = QTextCharFormat(), QTextCharFormat()
     weekend.setForeground(QColor((DARK if dark else LIGHT)["danger"]))
