@@ -56,8 +56,9 @@ class PosCompactTest(PosFixture):
         from PySide6.QtWidgets import QPushButton
         _win, pos = self.window_on_pos()
         shown = [b.text() for b in pos.findChildren(QPushButton) if b.isVisibleTo(pos)]
-        for label in ("آجل", "حفظ كمسودة", "اعتماد وطباعة", "تعليق الفاتورة", "معاينة الطباعة"):
+        for label in ("آجل", "حفظ كمسودة", "تعليق الفاتورة", "معاينة الطباعة"):
             self.assertNotIn(label, shown)
+        self.assertIn("اعتماد وطباعة", shown, "this one is built now: it posts and prints")
         self.assertFalse(hasattr(pos, "_build_hints"))
 
     def test_folded_details_are_saved_and_summarised(self):
