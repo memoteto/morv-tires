@@ -150,7 +150,8 @@ class PrintedSheetTest(unittest.TestCase):
         doc = Document(title="فاتورة بيع", number="S-1", date="2026-11-23",
                        lines=[Line("بطارية ACDelco 70 أمبير", "", "1", 100, 100)],
                        totals=[("ض.ق.م 14%", "5,250.00"), ("الصافي", "42,750.00 ج.م")])
-        html = document_html(_shop(), doc, SHAPES["a4"])
+        # The order-pinning spans sit between the words, so read what the eye reads
+        html = re.sub(r"<[^>]+>", "", document_html(_shop(), doc, SHAPES["a4"]))
         for joined in ("ض.ق.م\u00a014%", "42,750.00\u00a0ج.م", "بطارية\u00a0ACDelco", "70\u00a0أمبير"):
             self.assertIn(joined, html, f"a plain space here is dropped when printing: {joined!r}")
         self.assertIn("ACDelco 70", html, "between two Latin runs the space is in no danger")
