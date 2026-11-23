@@ -144,6 +144,13 @@ def run(out: Path, size: tuple) -> dict:
         for w, h in [size]:
             win.resize(w, h - CHROME_PX)
             _settle(app)
+            if win.collapsed:       # narrow screens start collapsed; the open sidebar is the tighter case
+                win.toggle_sidebar()
+                _settle(app)
+                win.grab().save(str(out / f"sidebar_open_{w}x{h}_{mode}.png"))
+                report["pages"][f"sidebar_open_{w}x{h}_{mode}"] = _measure(win)
+                win.toggle_sidebar()
+                _settle(app)
             for key, _title, _icon, _phase in NAV:
                 win.go_key(key)
                 _settle(app)
