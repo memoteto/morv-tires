@@ -150,7 +150,8 @@ class PrintedSheetTest(unittest.TestCase):
         doc = Document(title="فاتورة بيع", number="S-1", date="2026-11-23",
                        lines=[Line("بطارية ACDelco 70 أمبير", "", "1", 100, 100)],
                        totals=[("ض.ق.م 14%", "5,250.00"), ("الصافي", "42,750.00 ج.م")])
-        html = document_html(_shop(), doc, SHAPES["a4"])
+        # The order-pinning spans sit between the words, so read what the eye reads
+        html = re.sub(r"<[^>]+>", "", document_html(_shop(), doc, SHAPES["a4"]))
         for joined in ("ض.ق.م\u00a014%", "42,750.00\u00a0ج.م", "بطارية\u00a0ACDelco", "70\u00a0أمبير"):
             self.assertIn(joined, html, f"a plain space here is dropped when printing: {joined!r}")
         self.assertIn("ACDelco 70", html, "between two Latin runs the space is in no danger")
@@ -166,6 +167,18 @@ class PrintedSheetTest(unittest.TestCase):
         html = self.html()
         self.assertNotIn("margin-top", html, "Qt's print engine draws no margin on a block")
         self.assertIn("العميل:&nbsp;", html, "a space between two tags is whitespace Qt may drop")
+
+    def test_a_date_or_a_code_keeps_its_groups_in_order(self):
+        from morv.ui.print_doc import SHAPES, Document, Line, document_html
+        doc = Document(title="فاتورة بيع", number="S-1", date="2026-11-23",
+                       lines=[Line("بطارية", "ضمان حتى 2027-11-22", "1", 100, 100),
+                              Line("إطار", "205/55R16 · 91V", "2", 100, 200)],
+                       totals=[("الصافي", "42,750.00 ج.م")])
+        html = document_html(_shop(), doc, SHAPES["a4"])
+        for value in ("2027-11-22", "205/55R16", "42,750.00"):
+            self.assertIn(f"<span dir='ltr'>{value}</span>", html,
+                          f"{value} reverses group by group inside an Arabic line")
+        self.assertNotIn("<span dir='ltr'>أمبير", html, "Arabic words are left alone")
 
     def test_money_prints_as_pounds_and_stays_left_to_right(self):
         self.assertIn("12,900.00", self.reads())
