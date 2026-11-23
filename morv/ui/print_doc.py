@@ -1,4 +1,5 @@
 """Builds every printed document from the approved design in design/Shop.dc.html, for sheet and roll."""
+import re
 from dataclasses import dataclass, field
 
 from PySide6.QtCore import QMarginsF, QRectF, QSizeF, Qt, QUrl
@@ -67,6 +68,36 @@ def _ltr(text: str) -> str:
     return f"<span dir='ltr'>{text}</span>"
 
 
+_ARABIC = re.compile(r"[\u0600-\u06FF]")
+_LATIN = re.compile(r"[0-9A-Za-z]")
+
+
+def _keep_spaces(text: str) -> str:
+    """Printing on Windows swallows a space where Arabic meets Latin; a non-breaking one survives."""
+    out = []
+    for i, ch in enumerate(text):
+        if ch == " " and 0 < i < len(text) - 1:
+            before, after = text[i - 1], text[i + 1]
+            if ((_ARABIC.match(before) and _LATIN.match(after))
+                    or (_LATIN.match(before) and _ARABIC.match(after))):
+                out.append("\u00a0")
+                continue
+        out.append(ch)
+    return "".join(out)
+
+
+def _shell(inner: str) -> str:
+    # Only the text between tags is touched, never an attribute
+    inner = re.sub(r">([^<]+)<", lambda m: ">" + _keep_spaces(m.group(1)) + "<", inner)
+    return f"<html><body dir='rtl' bgcolor='#FFFFFF' style='color:{INK}'>{inner}</body></html>"
+
+
+def _gap(height_pt: float) -> str:
+    """Vertical space as an empty row: Qt's print engine ignores a margin on a block."""
+    return (f"<table width='100%' cellspacing='0' cellpadding='0'>"
+            f"<tr><td style='font-size:{height_pt}pt'>&nbsp;</td></tr></table>")
+
+
 def _band(color: str, height_pt: float = 0.8) -> str:
     """A filled one-cell table: Qt's print engine ignores a CSS border on a block, but paints this."""
     return (f"<table width='100%' cellspacing='0' cellpadding='0' bgcolor='{color}'>"
@@ -122,13 +153,13 @@ def _info_box(doc: Document, shape: Shape) -> str:
         cells = ""
         for label, value in reversed(pair):      # emitted left to right, so the first pair lands on the right
             cells += (f"<td width='50%' dir='rtl' style='font-size:{_pt(shape, 9)}'>"
-                      f"<span style='color:{MUTED}'>{label}:</span> "
+                      f"<span style='color:{MUTED}'>{label}:&nbsp;</span>"
                       f"<span style='color:{INK}'>{value}</span></td>")
         if len(pair) == 1:
             cells = "<td width='50%'></td>" + cells
         rows += f"<tr>{cells}</tr>"
-    return (f"<table width='100%' cellspacing='0' cellpadding='4' bgcolor='{FILL}' dir='ltr'"
-            f" style='margin-top:6px'>{rows}</table>")
+    return _gap(4) + (f"<table width='100%' cellspacing='0' cellpadding='4' bgcolor='{FILL}' "
+                      f"dir='ltr'>{rows}</table>")
 
 
 _COLS = (("الإجمالي", "11%"), ("السعر", "11%"), ("الكمية", "8%"), ("الصنف", "64%"), ("م", "6%"))
@@ -150,9 +181,9 @@ def _lines_table(doc: Document, shape: Shape) -> str:
                  f"<td align='center' dir='ltr' style='padding:4px;color:{MUTED}'>{i}</td></tr>")
     # Columns are emitted in visual left-to-right order inside an LTR table: Qt then puts
     # the serial on the right and the total on the left, as the design shows them.
-    return (f"<table width='100%' cellspacing='0' cellpadding='0' border='1' dir='ltr'"
-            f" style='margin-top:8px;border-color:{LINE};font-size:{_pt(shape, 9.5)}'>"
-            f"<tr bgcolor='{FILL}'>{head}</tr>{body}</table>")
+    return _gap(5) + (f"<table width='100%' cellspacing='0' cellpadding='0' border='1' dir='ltr'"
+                      f" style='border-color:{LINE};font-size:{_pt(shape, 9.5)}'>"
+                      f"<tr bgcolor='{FILL}'>{head}</tr>{body}</table>")
 
 
 def _totals_block(doc: Document, shape: Shape) -> str:
@@ -169,21 +200,22 @@ def _totals_block(doc: Document, shape: Shape) -> str:
         rows += (f"<tr><td align='left' dir='rtl' style='padding:2px 4px;{style}'>{value}</td>"
                  f"<td align='right' dir='rtl' style='padding:2px 4px;{style}'>{label}</td></tr>")
     inner = f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr'>{rows}</table>"
-    return (f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr' style='margin-top:8px'><tr>"
-            f"<td width='48%'>{inner}</td><td width='52%'></td></tr></table>")
+    return _gap(5) + (f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr'><tr>"
+                      f"<td width='48%'>{inner}</td><td width='52%'></td></tr></table>")
 
 
 def _sheet_tail(shop, doc: Document, shape: Shape) -> str:
     out = ""
     if doc.note:
-        out += (f"<div dir='rtl' style='margin-top:8px;color:{INK};font-size:{_pt(shape, 9.5)}'>"
-                f"{doc.note}</div>")
+        out += _gap(5) + (f"<div dir='rtl' style='color:{INK};font-size:{_pt(shape, 9.5)}'>"
+                          f"{doc.note}</div>")
     if shop.thanks:
-        out += (f"<div align='center' style='margin-top:10px;color:{BLUE};font-weight:bold;"
-                f"font-size:{_pt(shape, 10)}'>{shop.thanks}</div>")
+        out += _gap(7) + (f"<div align='center' style='color:{BLUE};font-weight:bold;"
+                          f"font-size:{_pt(shape, 10)}'>{shop.thanks}</div>")
     if shop.show_policy and shop.policy:
-        out += _band(DASH) + (f"<div dir='rtl' style='color:{MUTED};font-size:{_pt(shape, 8)}'>"
-                              f"{shop.policy.replace(chr(10), '<br>')}</div>")
+        out += _gap(6) + _band(DASH) + _gap(3) + (
+            f"<div dir='rtl' style='color:{MUTED};font-size:{_pt(shape, 8)}'>"
+            f"{shop.policy.replace(chr(10), '<br>')}</div>")
     return out
 
 
@@ -202,8 +234,8 @@ def _contact_bar(shop, shape: Shape) -> str:
         return ""
     size = max(10, round(12 * shape.scale))
     cells = "&nbsp;&nbsp;&nbsp;&nbsp;".join(f"{_icon(name, size)}&nbsp;{text}" for name, text in items)
-    return _band(INK, 1.2) + (f"<div align='center' dir='rtl' style='color:{INK};"
-                              f"font-size:{_pt(shape, 8.5)}'>{cells}</div>")
+    return _band(INK, 1.2) + _gap(3) + (f"<div align='center' dir='rtl' style='color:{INK};"
+                                        f"font-size:{_pt(shape, 8.5)}'>{cells}</div>")
 
 
 def _roll(shop, doc: Document, shape: Shape) -> str:
@@ -250,15 +282,11 @@ def _roll(shop, doc: Document, shape: Shape) -> str:
         out += rule()
         out += f"<div align='center' style='font-weight:bold;font-size:{_pt(shape, 9.5)}'>{shop.thanks}</div>"
     if shop.show_policy and shop.policy:
-        out += (f"<div align='center' dir='rtl' style='margin-top:4px;color:{MUTED};"
-                f"font-size:{_pt(shape, 8)}'>{shop.policy.replace(chr(10), '<br>')}</div>")
+        out += _gap(3) + (f"<div align='center' dir='rtl' style='color:{MUTED};"
+                          f"font-size:{_pt(shape, 8)}'>{shop.policy.replace(chr(10), '<br>')}</div>")
     if shop.show_hours and shop.hours:
-        out += f"<div align='center' style='margin-top:4px;font-size:{_pt(shape, 8.5)}'>{shop.hours}</div>"
+        out += _gap(3) + f"<div align='center' style='font-size:{_pt(shape, 8.5)}'>{shop.hours}</div>"
     return out
-
-
-def _shell(inner: str) -> str:
-    return f"<html><body dir='rtl' bgcolor='#FFFFFF' style='color:{INK}'>{inner}</body></html>"
 
 
 def body_html(shop, doc: Document, shape: Shape) -> str:

@@ -145,6 +145,28 @@ class PrintedSheetTest(unittest.TestCase):
         self.assertEqual("", footer_html(_shop(), SHAPES["r80"]), "a roll has no page foot to pin to")
         self.assertIn("morv:icon/pin", body_html(_shop(), _doc(), SHAPES["r80"]))
 
+    def test_a_space_where_arabic_meets_latin_is_made_unbreakable(self):
+        from morv.ui.print_doc import SHAPES, Document, Line, document_html
+        doc = Document(title="فاتورة بيع", number="S-1", date="2026-11-23",
+                       lines=[Line("بطارية ACDelco 70 أمبير", "", "1", 100, 100)],
+                       totals=[("ض.ق.م 14%", "5,250.00"), ("الصافي", "42,750.00 ج.م")])
+        html = document_html(_shop(), doc, SHAPES["a4"])
+        for joined in ("ض.ق.م\u00a014%", "42,750.00\u00a0ج.م", "بطارية\u00a0ACDelco", "70\u00a0أمبير"):
+            self.assertIn(joined, html, f"a plain space here is dropped when printing: {joined!r}")
+        self.assertIn("ACDelco 70", html, "between two Latin runs the space is in no danger")
+
+    def test_it_leaves_ordinary_spaces_and_the_markup_alone(self):
+        from morv.ui.print_doc import SHAPES, document_html
+        html = document_html(_shop(), _doc(), SHAPES["a4"])
+        self.assertIn("أحمد محمود", html, "a space between two Arabic words needs no protection")
+        self.assertNotIn("\u00a0", html.split(">")[0], "attributes must not be touched")
+        self.assertIn("cellspacing='0' cellpadding='0'", html)
+
+    def test_vertical_space_is_a_row_because_a_block_margin_is_ignored(self):
+        html = self.html()
+        self.assertNotIn("margin-top", html, "Qt's print engine draws no margin on a block")
+        self.assertIn("العميل:&nbsp;", html, "a space between two tags is whitespace Qt may drop")
+
     def test_money_prints_as_pounds_and_stays_left_to_right(self):
         self.assertIn("12,900.00", self.reads())
         self.assertNotIn("1290000", self.reads())
@@ -170,7 +192,7 @@ class PrintedRollTest(unittest.TestCase):
         return document_html(shop or _shop(), _doc(), SHAPES[key])
 
     def test_a_roll_stacks_each_line_and_uses_no_column_table(self):
-        html = self.html()
+        html = self.html().replace("\u00a0", " ")
         self.assertNotIn("border='1'", html, "a roll is too narrow for a bordered column table")
         self.assertNotIn(">م<", html, "a roll carries no serial column")
         from morv.ui.print_doc import DASH
