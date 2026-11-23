@@ -26,6 +26,10 @@ class InstallerScriptTest(unittest.TestCase):
             self.assertNotIn(place, self.directives.lower(),
                              f"the installer has no business with {place}")
 
+    def test_it_writes_the_setup_where_the_build_looks_for_it(self):
+        self.assertIn(r"OutputDir=..\dist", self.directives,
+                      "OutputDir is relative to this file, which sits in tools/")
+
     def test_it_closes_a_running_copy_rather_than_failing_the_upgrade(self):
         self.assertIn("CloseApplications=yes", self.text)
 
