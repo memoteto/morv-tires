@@ -34,6 +34,19 @@ def _selfcheck(argv, con, paths) -> int:
     return 0 if ok else 1
 
 
+def _cannot_open(argv, error) -> int:
+    """Data this build cannot read must say so: a windowed build has no console to print to."""
+    from PySide6.QtWidgets import QApplication
+
+    from morv.ui import widgets
+    app = QApplication(argv)
+    widgets.info(None, "تعذّر فتح بيانات المحل",
+                 f"{error}\n\nقد تكون البيانات من إصدار أحدث من البرنامج. ثبّت أحدث إصدار، "
+                 "أو استعد نسخة احتياطية تناسب هذا الإصدار. لم يتغيّر شيء في بياناتك.", error=True)
+    del app
+    return 1
+
+
 def _relaunch() -> None:
     if getattr(sys, "frozen", False):
         subprocess.Popen([sys.executable])
@@ -53,8 +66,12 @@ def main(argv: list[str] | None = None) -> int:
             sys.stderr.write("وسيطة غير معروفة: " + " ".join(unknown) + "\n")
         return 2
     selfcheck = SELFCHECK in argv
+    import sqlite3
+
     from morv.infra import paths
     from morv.infra.db.bootstrap import open_main_db
+    from morv.infra.db.connection import UnsafeDatabase
+    from morv.infra.db.migrator import MigrationError
     from morv.infra.logs import log, setup_logging
 
     setup_logging()
@@ -69,7 +86,11 @@ def main(argv: list[str] | None = None) -> int:
         del app
         return 1
     _mark(log, "logging_ready")
-    con = open_main_db()
+    try:
+        con = open_main_db()
+    except (MigrationError, UnsafeDatabase, sqlite3.DatabaseError) as e:
+        log.exception("تعذّر فتح قاعدة البيانات")
+        return _cannot_open(argv, e)
     _mark(log, "db_opened")
     if selfcheck:
         code = _selfcheck(argv, con, paths)
