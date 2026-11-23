@@ -72,6 +72,15 @@ _ARABIC = re.compile(r"[\u0600-\u06FF]")
 _LATIN = re.compile(r"[0-9A-Za-z]")
 
 
+# A date or a code reverses segment by segment inside an Arabic line: 2027-11-22 prints as 22-11-2027
+_GROUPED = re.compile(r"[0-9A-Za-z]+(?:[-/:.,][0-9A-Za-z]+)+")
+
+
+def _hold_order(text: str) -> str:
+    """Pins a grouped value left to right with the embedding marks themselves: Qt ignores dir on a span."""
+    return _GROUPED.sub(lambda m: f"\u202a{m.group(0)}\u202c", text)
+
+
 def _keep_spaces(text: str) -> str:
     """Printing on Windows swallows a space where Arabic meets Latin; a non-breaking one survives."""
     out = []
@@ -88,7 +97,7 @@ def _keep_spaces(text: str) -> str:
 
 def _shell(inner: str) -> str:
     # Only the text between tags is touched, never an attribute
-    inner = re.sub(r">([^<]+)<", lambda m: ">" + _keep_spaces(m.group(1)) + "<", inner)
+    inner = re.sub(r">([^<]+)<", lambda m: ">" + _hold_order(_keep_spaces(m.group(1))) + "<", inner)
     return f"<html><body dir='rtl' bgcolor='#FFFFFF' style='color:{INK}'>{inner}</body></html>"
 
 
@@ -152,11 +161,14 @@ def _info_box(doc: Document, shape: Shape) -> str:
         pair = doc.info[i:i + 2]
         cells = ""
         for label, value in reversed(pair):      # emitted left to right, so the first pair lands on the right
-            cells += (f"<td width='50%' dir='rtl' style='font-size:{_pt(shape, 9)}'>"
-                      f"<span style='color:{MUTED}'>{label}:&nbsp;</span>"
-                      f"<span style='color:{INK}'>{value}</span></td>")
+            # Label and value sit in cells of their own, and a right-to-left mark after the colon
+            # keeps that neutral character beside its label instead of at the far edge of the line
+            cells += (f"<td width='37%' align='right' dir='rtl' style='color:{INK};"
+                      f"font-size:{_pt(shape, 9)}'>{value}</td>"
+                      f"<td width='13%' align='right' dir='rtl' style='color:{MUTED};"
+                      f"font-size:{_pt(shape, 9)}'>{label}:&#8207;&nbsp;</td>")
         if len(pair) == 1:
-            cells = "<td width='50%'></td>" + cells
+            cells = "<td width='37%'></td><td width='13%'></td>" + cells
         rows += f"<tr>{cells}</tr>"
     return _gap(4) + (f"<table width='100%' cellspacing='0' cellpadding='4' bgcolor='{FILL}' "
                       f"dir='ltr'>{rows}</table>")
