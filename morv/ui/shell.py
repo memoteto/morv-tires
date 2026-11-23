@@ -1,6 +1,6 @@
 """Main window shell: collapsible sidebar, top bar and the page area."""
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtGui import QGuiApplication, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget,
                                QListWidgetItem, QMainWindow, QStackedWidget, QToolButton,
                                QVBoxLayout, QWidget)
@@ -25,6 +25,8 @@ from morv.ui.treasury_page import TreasuryPage
 
 SIDE_WIDE = 244     # sidebar width when open
 SIDE_NARROW = 72    # sidebar width when collapsed to icons
+# As tall as the nav budget allows: eleven entries still fit at 1366x768 and 125% scale (about 6px spare)
+LOGO_HEIGHT = 52
 
 # (key, label, icon, the phase that builds the page), in sidebar order.
 # A flat list, no groups or separators, by the owner's decision.
@@ -105,6 +107,13 @@ class MainWindow(QMainWindow):
         self.health_timer.start(60_000)
 
     # ---------- Building ----------
+    def _logo_pixmap(self) -> QPixmap:
+        ratio = self.devicePixelRatioF()
+        logo = QPixmap(str(theme.ASSETS_DIR / "sidebar_logo.png"))
+        logo = logo.scaledToHeight(round(LOGO_HEIGHT * ratio), Qt.TransformationMode.SmoothTransformation)
+        logo.setDevicePixelRatio(ratio)
+        return logo
+
     def _build_side(self) -> QWidget:
         self.side = QWidget()
         self.side.setObjectName("side")
@@ -117,11 +126,12 @@ class MainWindow(QMainWindow):
         self.side_toggle.setObjectName("sideToggle")
         self.side_toggle.setIconSize(QSize(20, 20))
         self.side_toggle.clicked.connect(self.toggle_sidebar)
-        self.brand = QLabel(APP_NAME)
+        self.brand = QLabel()
         self.brand.setObjectName("brand")
+        self.brand.setPixmap(self._logo_pixmap())
         self.brand.setToolTip(f"{APP_NAME} {VERSION}")
-        top.addWidget(self.side_toggle)
-        top.addWidget(self.brand, 1)
+        top.addWidget(self.side_toggle, 0, Qt.AlignmentFlag.AlignVCenter)
+        top.addWidget(self.brand, 1, Qt.AlignmentFlag.AlignVCenter)
         lay.addLayout(top)
         self.nav = QListWidget()
         self.nav.setObjectName("nav")

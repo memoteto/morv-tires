@@ -98,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         return code
 
     from PySide6.QtCore import QLocale, QTimer
+    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication, QDialog
 
     from morv import APP_NAME
@@ -112,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     QLocale.setDefault(QLocale("en_US"))   # Latin digits whatever the system locale
     app = QApplication(argv)
     app.setApplicationName(APP_NAME)
+    app.setWindowIcon(QIcon(str(theme.ASSETS_DIR / "app_icon.ico")))
     theme.apply(app, False)
 
     if paths.looks_synced_or_network(paths.data_dir()):

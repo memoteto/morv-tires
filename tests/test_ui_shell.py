@@ -35,6 +35,30 @@ class ShellTest(unittest.TestCase):
         self.addCleanup(dispose, w, self.app)
         return w
 
+    def test_sidebar_shows_the_logo_in_proportion_and_hides_it_when_collapsed(self):
+        from morv.ui.shell import LOGO_HEIGHT
+        w = self.window()
+        w.show()
+        shown = w.brand.pixmap()
+        self.assertFalse(shown.isNull())
+        self.assertEqual(round(shown.height() / shown.devicePixelRatio()), LOGO_HEIGHT)
+        self.assertAlmostEqual(shown.width() / shown.height(), 939 / 487, delta=0.01)
+        self.assertEqual(w.brand.text(), "", "the logo already says Morv Tires")
+        w.collapsed = False
+        w._apply_collapse()
+        self.assertTrue(w.brand.isVisible())
+        w.toggle_sidebar()
+        self.assertFalse(w.brand.isVisible())
+
+    def test_every_entry_fits_with_the_logo_at_1366x768_and_125_percent(self):
+        from morv.infra import settings
+        settings.put(self.con, "ui.sidebar_collapsed", "0")
+        w = self.window()
+        w.resize(1093, 614 - 40)
+        w.show()
+        self.app.processEvents()
+        self.assertEqual(w.nav.verticalScrollBar().maximum(), 0, "an entry would need scrolling")
+
     def test_live_window_exits_cleanly(self):
         import os
         import subprocess

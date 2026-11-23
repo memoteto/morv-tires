@@ -8,6 +8,7 @@ from morv.ui.tokens import DARK, LIGHT
 
 # OFL Arabic fonts shipped with the app, so it never depends on what Windows has
 FONTS_DIR = Path(__file__).with_name("fonts")
+ASSETS_DIR = Path(__file__).with_name("assets")
 BUNDLED = {"IBM Plex Sans Arabic": ["IBMPlexSansArabic-Regular.ttf", "IBMPlexSansArabic-Bold.ttf"],
            "Cairo": ["Cairo-Variable.ttf"]}
 FONT_CHOICES = ["IBM Plex Sans Arabic", "Cairo", "Segoe UI", "Tahoma"]

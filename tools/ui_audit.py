@@ -9,7 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-SIZES = [(1366, 768), (1920, 1080)]
+# 1093x614 is 1366x768 at Windows 125% scale, in logical pixels
+SIZES = [(1366, 768), (1920, 1080), (1093, 614)]
 # A window on a screen of that size is shorter: the title bar and the task bar take this much
 CHROME_PX = 40
 
@@ -143,6 +144,13 @@ def run(out: Path, size: tuple) -> dict:
         for w, h in [size]:
             win.resize(w, h - CHROME_PX)
             _settle(app)
+            if win.collapsed:       # narrow screens start collapsed; the open sidebar is the tighter case
+                win.toggle_sidebar()
+                _settle(app)
+                win.grab().save(str(out / f"sidebar_open_{w}x{h}_{mode}.png"))
+                report["pages"][f"sidebar_open_{w}x{h}_{mode}"] = _measure(win)
+                win.toggle_sidebar()
+                _settle(app)
             for key, _title, _icon, _phase in NAV:
                 win.go_key(key)
                 _settle(app)
