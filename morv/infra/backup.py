@@ -13,6 +13,7 @@ from pathlib import Path
 from morv import APP_ID
 from morv.core.text import ltr
 from morv.infra import keystore, paths, settings, vault
+from morv.infra.db import migrator
 from morv.infra.db.connection import transaction
 from morv.infra.logs import log
 
@@ -79,6 +80,14 @@ def verify_db_file(path) -> tuple:
             row = con.execute("SELECT v FROM app_meta WHERE k='app_id'").fetchone()
             if not row or row[0] != APP_ID:
                 return False, "ليست نسخة من قاعدة Morv Tires"
+            broken = con.execute("PRAGMA foreign_key_check").fetchall()
+            if broken:
+                where = "، ".join(sorted({str(r[0]) for r in broken})[:3])
+                return False, f"علاقات مكسورة في {ltr(str(len(broken)))} سطرًا ({where})"
+            try:
+                migrator.pending(con)   # Refuses a file from a newer build, or one whose migrations were edited
+            except migrator.MigrationError as e:
+                return False, str(e)
             version = con.execute("SELECT max(version) FROM schema_migrations").fetchone()[0]
             tables = con.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
             return True, f"سليمة · ترقية {version} · {tables} جدول"
