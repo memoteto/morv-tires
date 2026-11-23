@@ -3,6 +3,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -125,18 +126,48 @@ class ScheduleTest(_Device):
     def test_usb_copy_and_health(self):
         self.assertEqual(backup.health(self.con)[0], "danger")        # no backup yet
         backup.run_scheduled(self.con)
-        self.assertEqual(backup.health(self.con)[0], "ok")
+        state, text = backup.health(self.con)
+        self.assertEqual("warn", state, "a copy that lives on the same machine is not a backup of the machine")
+        self.assertIn("خارج الجهاز", text)
         usb = self.dir / "usb"
         settings.put(self.con, "backup.usb_dir", str(usb))
-        self.assertEqual(backup.health(self.con)[0], "warn")          # a USB folder is set but nothing was copied
+        self.assertEqual("danger", backup.health(self.con)[0])        # a folder is set, nothing ever reached it
         with self.assertRaisesRegex(backup.BackupError, "غير موصولة"):
             backup.copy_to_usb(self.con)
         usb.mkdir()
         r = backup.copy_to_usb(self.con)
         self.assertTrue(r.ok and r.path.parent == usb)
-        self.assertEqual(backup.health(self.con)[0], "ok")
+        state, text = backup.health(self.con)
+        self.assertEqual("warn", state, "the temp folder shares the machine's disk")
+        self.assertIn("قرص الجهاز نفسه", text)
         settings.put(self.con, "backup.last_ok_at", "2020-01-01 00:00:00")
         self.assertEqual(backup.health(self.con)[0], "danger")        # an old backup
+
+    def test_the_scheduler_carries_a_copy_off_the_machine_without_being_asked(self):
+        usb = self.dir / "usb"
+        usb.mkdir()
+        settings.put(self.con, "backup.usb_dir", str(usb))
+        self.assertIn("نسخة على الفلاشة", backup.run_scheduled(self.con))
+        self.assertEqual(1, len(list(usb.glob("*.mtb"))))
+        self.assertNotIn("نسخة على الفلاشة", backup.run_scheduled(self.con), "one copy a day is enough")
+
+    def test_the_restore_test_reads_the_copy_a_shop_would_actually_restore_from(self):
+        usb = self.dir / "usb"
+        usb.mkdir()
+        settings.put(self.con, "backup.usb_dir", str(usb))
+        self.assertIn("اختبار استعادة من الفلاشة: نجح", backup.run_scheduled(self.con))
+
+    def test_an_off_device_copy_that_stopped_arriving_turns_red(self):
+        usb = self.dir / "usb"
+        usb.mkdir()
+        settings.put(self.con, "backup.usb_dir", str(usb))
+        backup.run_scheduled(self.con)
+        # A temp folder always shares the machine's disk, so stand in for a real external drive
+        with mock.patch.object(backup, "same_drive_as_data", return_value=False):
+            for days, expected in ((0, "ok"), (8, "warn"), (20, "danger")):
+                settings.put(self.con, "backup.last_usb_at",
+                             (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S"))
+                self.assertEqual(expected, backup.off_device_state(self.con)[0], f"{days} days old")
 
 
 class NewDeviceRestoreTest(unittest.TestCase):

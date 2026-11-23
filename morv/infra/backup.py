@@ -26,7 +26,8 @@ _RELINK_HINT = "أعد ربط الجهاز بكلمة مرور النسخ من �
 _BUSY = "قاعدة البيانات مفتوحة في نافذة أو برنامج آخر؛ أغلقه ثم أعد المحاولة"
 RESTORE_TEST_DAYS = 7
 STALE_DAYS = 2
-USB_STALE_DAYS = 7
+OFF_DEVICE_STALE_DAYS = 7      # RPO for the copy that survives losing the machine
+OFF_DEVICE_LOST_DAYS = 14      # past this the shop counts as having no off-device copy at all
 _NAME = re.compile(r"^morv_tires_(\d{8})_(\d{6})_\d+_([a-z_]+)\.(db|mtb)$")
 _TS = "%Y-%m-%d %H:%M:%S"
 
@@ -321,6 +322,24 @@ def usb_available(con) -> bool:
     return bool(d) and d.exists()
 
 
+def off_device_state(con) -> tuple[str, str]:
+    """No off-device copy is a standing gap, not a silent default: losing the disk would lose everything."""
+    folder = usb_dir(con)
+    if not folder:
+        return "warn", "لا توجد نسخة خارج الجهاز؛ حدّد مجلد فلاشة أو قرص خارجي من الإعدادات"
+    last = _parse(settings.get(con, "backup.last_usb_at", ""))
+    if last is None:
+        return "danger", "لم تُنقل أي نسخة خارج الجهاز بعد"
+    days = (datetime.now() - last).days
+    if days >= OFF_DEVICE_LOST_DAYS:
+        return "danger", f"آخر نسخة خارج الجهاز منذ {ltr(str(days))} يومًا"
+    if days >= OFF_DEVICE_STALE_DAYS:
+        return "warn", f"آخر نسخة خارج الجهاز منذ {ltr(str(days))} يومًا"
+    if same_drive_as_data(folder):
+        return "warn", "مجلد النسخ الخارجي على قرص الجهاز نفسه، فيضيع معه"
+    return "ok", ""
+
+
 def copy_to_usb(con, username: str | None = None) -> BackupResult:
     started = _now_s()
     d = usb_dir(con)
@@ -505,6 +524,16 @@ def _parse(ts: str) -> datetime | None:
     return datetime.strptime(ts, _TS) if ts else None
 
 
+def _test_target(con) -> tuple[BackupInfo | None, str]:
+    """Prefers the off-device copy: that is the one a shop restores from after losing the machine."""
+    folder = usb_dir(con)
+    if folder and folder.exists():
+        off = next((b for b in list_backups(folder) if b.kind in ("daily", "manual")), None)
+        if off:
+            return off, "الفلاشة"
+    return next((b for b in list_backups() if b.kind in ("daily", "manual")), None), "الجهاز"
+
+
 def run_scheduled(con, username: str | None = None) -> list[str]:
     done = []
     if not is_encryption_ready(con):
@@ -520,12 +549,18 @@ def run_scheduled(con, username: str | None = None) -> list[str]:
                 done.append(f"حُذفت نسخة قديمة {p.name}")
         except BackupError as e:
             done.append(f"فشلت النسخة اليومية: {e}")
+    if usb_available(con) and settings.get(con, "backup.last_usb_at", "")[:10] != today.isoformat():
+        try:
+            copy_to_usb(con, username)
+            done.append("نسخة على الفلاشة")
+        except BackupError as e:
+            done.append(f"فشل النسخ إلى الفلاشة: {e}")
     last_test = _parse(settings.get(con, "backup.last_test_at", ""))
     if last_test is None or (datetime.now() - last_test).days >= RESTORE_TEST_DAYS:
-        latest = next((b for b in list_backups() if b.kind in ("daily", "manual")), None)
+        latest, where = _test_target(con)
         if latest:
             r = restore_test(con, latest.path, username=username)
-            done.append("اختبار استعادة: " + ("نجح" if r.ok else f"فشل: {r.detail}"))
+            done.append(f"اختبار استعادة من {where}: " + ("نجح" if r.ok else f"فشل: {r.detail}"))
     return done
 
 
@@ -544,10 +579,11 @@ def health(con) -> tuple[str, str]:
         return "danger", "لم تُؤخذ نسخة احتياطية بعد"
     if datetime.now() - last_ok > timedelta(days=STALE_DAYS):
         return "danger", f"آخر نسخة احتياطية منذ {ltr(str((datetime.now() - last_ok).days))} أيام"
+    off_state, off_text = off_device_state(con)
+    if off_state == "danger":
+        return "danger", off_text
     if key_state == "missing":
         return "warn", "مفتاح الجهاز مفقود؛ أعد ربط الجهاز من الإعدادات"
-    if usb_dir(con):
-        last_usb = _parse(settings.get(con, "backup.last_usb_at", ""))
-        if last_usb is None or datetime.now() - last_usb > timedelta(days=USB_STALE_DAYS):
-            return "warn", "لم تُنقل نسخة إلى الفلاشة منذ أكثر من أسبوع"
+    if off_state == "warn":
+        return "warn", off_text
     return "ok", f"آخر نسخة {ltr(last_ok.strftime('%Y-%m-%d %H:%M'))}"

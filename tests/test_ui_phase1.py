@@ -271,7 +271,9 @@ class ShellHealthTest(_Base):
         self.assertEqual(w.health_pill.objectName(), "pillDanger")
         backup.run_scheduled(self.con)
         w.refresh_health()
-        self.assertEqual(w.health_pill.objectName(), "pillOk")
+        # A local copy alone leaves the shop one disk failure away from losing everything
+        self.assertEqual(w.health_pill.objectName(), "pillWarn")
+        self.assertIn("خارج الجهاز", w.health_pill.toolTip())
         w.open_backup()
         self.assertEqual(w.title.text(), "الإعدادات")
         page = w.pages["settings"]
