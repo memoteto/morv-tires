@@ -67,12 +67,12 @@ jobs:
         run: python -m pip install -r requirements.txt -r requirements-dev.txt
       - name: بناء MorvTires.exe
         run: python tools/build_exe.py
-      - name: تشغيل النسخة المبنية (smoke)
+      - name: تشغيل النسخة المبنية (فحص ذاتي)
         shell: pwsh
         run: |
           $env:MORV_DATA_DIR = "$env:RUNNER_TEMP\morv_smoke"
           $env:QT_QPA_PLATFORM = "offscreen"
-          $p = Start-Process -FilePath "dist\MorvTires\MorvTires.exe" -ArgumentList "--smoke" -PassThru
+          $p = Start-Process -FilePath "dist\MorvTires\MorvTires.exe" -ArgumentList "--selfcheck" -PassThru
           if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "البرنامج لم يُغلق خلال 60 ثانية" }
           if ($p.ExitCode -ne 0) { throw "البرنامج خرج برمز $($p.ExitCode) (انهيار عند الإغلاق؟)" }
           $f = "$env:MORV_DATA_DIR\startup.txt"
@@ -80,6 +80,16 @@ jobs:
           Get-Content $f
           if (-not ((Get-Content $f) -match '^ok')) { throw "النتيجة ليست ok" }
           if (-not (Test-Path "$env:MORV_DATA_DIR\morv_tires.db")) { throw "قاعدة البيانات لم تُنشأ" }
+      - name: النسخة الموزّعة لا تُنشئ حسابًا ثابتًا
+        shell: pwsh
+        run: |
+          $env:MORV_DATA_DIR = "$env:RUNNER_TEMP\morv_smoke"
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $p = Start-Process -FilePath "dist\MorvTires\MorvTires.exe" -ArgumentList "--smoke" -PassThru
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "البرنامج لم يُغلق خلال 60 ثانية" }
+          if ($p.ExitCode -ne 2) { throw "كان يجب رفض --smoke برمز 2، وخرج برمز $($p.ExitCode)" }
+          python -c "import os, sqlite3, sys; c = sqlite3.connect(os.path.join(os.environ['MORV_DATA_DIR'], 'morv_tires.db')); n = c.execute('select count(*) from users').fetchone()[0]; sys.exit(0 if n == 0 else 1)"
+          if ($LASTEXITCODE -ne 0) { throw "النسخة الموزّعة أنشأت مستخدمًا" }
       - name: اسم الأرتيفكت الآمن
         id: art
         shell: pwsh

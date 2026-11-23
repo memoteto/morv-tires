@@ -6,14 +6,32 @@ import time
 T_START = time.perf_counter()
 
 
-def _smoke_prepare(con) -> None:
-    from morv.core import security
+SELFCHECK = "--selfcheck"
+# --smoke was removed: a shipped build must never create a known administrator, whatever it is passed
+
+
+def _selfcheck(argv, con, paths) -> int:
+    """Proves a built copy opens its database and raises Qt, creating neither a shop nor a user."""
+    from PySide6.QtWidgets import QApplication
+
+    from morv import APP_NAME
     from morv.infra import setup
-    if not setup.is_complete(con):
-        setup.run_first_setup(
-            con, shop_name="محل تجريبي", shop_phone="01000000000", shop_address="",
-            admin_username="admin", admin_name="اختبار", admin_password="Smoke12345",
-            backup_password="Smoke-Backup-2026", recovery_key=security.new_recovery_key())
+    from morv.ui import theme
+    app = QApplication(argv)
+    app.setApplicationName(APP_NAME)
+    theme.apply(app, False)
+    if setup.is_complete(con):
+        from morv.ui.login import LoginDialog
+        dialog = LoginDialog(con)
+    else:
+        from morv.ui.setup_wizard import SetupWizard
+        dialog = SetupWizard(con)
+    ok = dialog.sizeHint().isValid() and bool(theme.pick_font().family())
+    ms = (time.perf_counter() - T_START) * 1000
+    (paths.data_dir() / "startup.txt").write_text(f"{'ok' if ok else 'fail'} {ms:.0f}ms\n", encoding="utf-8")
+    from morv.ui.widgets import dispose
+    dispose(dialog, app)
+    return 0 if ok else 1
 
 
 def _relaunch() -> None:
@@ -29,7 +47,11 @@ def _mark(log, label: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
-    smoke = "--smoke" in argv
+    unknown = [a for a in argv[1:] if a.startswith("-") and a != SELFCHECK]
+    if unknown:
+        sys.stderr.write("وسيطة غير معروفة: " + " ".join(unknown) + "\n")
+        return 2
+    selfcheck = SELFCHECK in argv
     from morv.infra import paths
     from morv.infra.db.bootstrap import open_main_db
     from morv.infra.logs import log, setup_logging
@@ -48,6 +70,10 @@ def main(argv: list[str] | None = None) -> int:
     _mark(log, "logging_ready")
     con = open_main_db()
     _mark(log, "db_opened")
+    if selfcheck:
+        code = _selfcheck(argv, con, paths)
+        con.close()
+        return code
 
     from PySide6.QtCore import QLocale, QTimer
     from PySide6.QtWidgets import QApplication, QDialog
@@ -66,9 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationName(APP_NAME)
     theme.apply(app, False)
 
-    if smoke:
-        _smoke_prepare(con)
-    elif paths.looks_synced_or_network(paths.data_dir()):
+    if paths.looks_synced_or_network(paths.data_dir()):
         # Owner rule: cloud sync can corrupt a live SQLite file. Warn, never block.
         from morv.ui.widgets import info
         log.warning("مجلد البيانات داخل مجلد مزامنة أو شبكة: %s", paths.data_dir())
@@ -137,15 +161,12 @@ def main(argv: list[str] | None = None) -> int:
         QTimer.singleShot(0, show_login)
 
     def show_login() -> None:
-        if smoke:
-            user = users.login(state["con"], "admin", "Smoke12345")
-        else:
-            dlg = LoginDialog(state["con"])
-            _mark(log, "login_shown")
-            if dlg.exec() != QDialog.DialogCode.Accepted:
-                app.quit()
-                return
-            user = dlg.user
+        dlg = LoginDialog(state["con"])
+        _mark(log, "login_shown")
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            app.quit()
+            return
+        user = dlg.user
         _mark(log, "login_accepted")
         session = Session(state["con"], user, on_logout=do_logout, on_restore=do_restore)
         window = MainWindow(session, app)
@@ -154,11 +175,16 @@ def main(argv: list[str] | None = None) -> int:
         window.showMaximized()
         _mark(log, "window_shown")
         QTimer.singleShot(1500, lambda: _scheduled(window, session))
-        if smoke:
-            QTimer.singleShot(300, lambda: _smoke_done(app, paths, window))
 
     def _scheduled(window, session) -> None:
-        for line in backup.run_scheduled(session.con, session.user.username):
+        from morv.ui.backup_runner import BackupRunner
+        runner = BackupRunner(session.user.username, window)
+        state["runner"] = runner
+        runner.done.connect(lambda lines: _scheduled_done(window, lines))
+        runner.start()
+
+    def _scheduled_done(window, lines) -> None:
+        for line in lines:
             log.info("نسخ مجدول: %s", line)
         if state["window"] is window:
             window.refresh_health()
@@ -176,9 +202,3 @@ def main(argv: list[str] | None = None) -> int:
     log.info("إغلاق البرنامج")
     return code
 
-
-def _smoke_done(app, paths, window) -> None:
-    ms = (time.perf_counter() - T_START) * 1000
-    ok = window.isVisible() and window.stack.count() > 0
-    (paths.data_dir() / "startup.txt").write_text(f"{'ok' if ok else 'fail'} {ms:.0f}ms\n", encoding="utf-8")
-    app.quit()

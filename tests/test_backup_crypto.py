@@ -1,6 +1,7 @@
 """Encrypted backup tests: vault, device key, both locks, tampering, USB, retention."""
 import os
 import shutil
+import sqlite3
 import tempfile
 import unittest
 from unittest import mock
@@ -239,3 +240,65 @@ class NewDeviceRestoreTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RestorePreflightTest(unittest.TestCase):
+    """A file that is structurally fine can still be logically broken; it must not reach the live path."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir, True)
+
+    def _good_db(self) -> Path:
+        from morv.infra.db.bootstrap import open_main_db
+        path = self.dir / "source.db"
+        con = open_main_db(path)
+        con.close()
+        return path
+
+    def test_a_backup_with_broken_relations_is_refused(self):
+        path = self._good_db()
+        con = sqlite3.connect(path)
+        con.execute("PRAGMA foreign_keys = OFF")
+        con.execute("INSERT INTO customer_vehicles (customer_id, make, plate, plate_norm) "
+                    "VALUES (99999, 'تويوتا', 'ق س ط 1', 'QST1')")
+        con.commit()
+        con.close()
+        ok, detail = backup.verify_db_file(path)
+        self.assertFalse(ok)
+        self.assertIn("علاقات مكسورة", detail)
+
+    def test_a_backup_from_a_newer_build_is_refused_instead_of_half_understood(self):
+        path = self._good_db()
+        con = sqlite3.connect(path)
+        con.execute("INSERT INTO schema_migrations (version, name, checksum, applied_at) "
+                    "VALUES (9999, 'from_the_future', 'x', '2030-01-01 00:00:00')")
+        con.commit()
+        con.close()
+        ok, detail = backup.verify_db_file(path)
+        self.assertFalse(ok)
+        self.assertIn("9999", detail)
+
+    def test_a_backup_whose_migration_was_edited_after_the_fact_is_refused(self):
+        path = self._good_db()
+        con = sqlite3.connect(path)
+        con.execute("UPDATE schema_migrations SET checksum = 'tampered' WHERE version = 1")
+        con.commit()
+        con.close()
+        self.assertFalse(backup.verify_db_file(path)[0])
+
+    def test_a_refused_backup_leaves_the_live_database_untouched(self):
+        live = self._good_db()
+        bad = self.dir / "bad.db"
+        shutil.copyfile(live, bad)
+        con = sqlite3.connect(bad)
+        con.execute("PRAGMA foreign_keys = OFF")
+        con.execute("INSERT INTO customer_vehicles (customer_id, make, plate, plate_norm) "
+                    "VALUES (99999, 'تويوتا', 'ق س ط 1', 'QST1')")
+        con.commit()
+        con.close()
+        before = live.read_bytes()
+        with self.assertRaises(backup.BackupError):
+            backup.restore_file(live, bad)
+        self.assertEqual(before, live.read_bytes(), "the live database must stand after a refusal")
+        self.assertFalse(live.with_name(live.name + ".restore-new").exists(), "no staged file left behind")

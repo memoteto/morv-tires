@@ -1,6 +1,4 @@
 """Main window shell: collapsible sidebar, top bar and the page area."""
-from datetime import date
-
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget,
@@ -21,9 +19,9 @@ from morv.ui.sales_page import SalesPage
 from morv.ui.settings_page import SettingsPage
 from morv.ui.shell_placeholder import placeholder
 from morv.ui.suppliers_page import SuppliersPage
+from morv.ui.backup_runner import BackupRunner
 from morv.ui.reports_page import ReportsPage
 from morv.ui.treasury_page import TreasuryPage
-from morv.ui.widgets import ask
 
 SIDE_WIDE = 244     # sidebar width when open
 SIDE_NARROW = 72    # sidebar width when collapsed to icons
@@ -200,15 +198,12 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         if backup.is_encryption_ready(self.con):
-            backup.run_scheduled(self.con, self.session.user.username)
-            last_usb = settings.get(self.con, "backup.last_usb_at", "")[:10]
-            today = date.today().isoformat()
-            if backup.usb_available(self.con) and last_usb != today and ask(
-                    self, "نسخة على الفلاشة", "الفلاشة موصولة ولم تُنسخ إليها نسخة اليوم. ننسخ الآن قبل الإغلاق؟"):
-                try:
-                    backup.copy_to_usb(self.con, self.session.user.username)
-                except backup.BackupError:
-                    pass
+            self.health_pill.setText("جارٍ النسخ الاحتياطي…")
+            runner = BackupRunner(self.session.user.username, None)
+            runner.start()
+            # Pumping the loop keeps the window painting, so a slow copy never looks like a hang
+            while not runner.wait(50):
+                QApplication.processEvents()
         super().closeEvent(event)
 
     # ---------- Behaviour ----------
