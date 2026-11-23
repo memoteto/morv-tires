@@ -72,6 +72,15 @@ _ARABIC = re.compile(r"[\u0600-\u06FF]")
 _LATIN = re.compile(r"[0-9A-Za-z]")
 
 
+# A date or a code reverses segment by segment inside an Arabic line: 2027-11-22 prints as 22-11-2027
+_GROUPED = re.compile(r"[0-9A-Za-z]+(?:[-/:.,][0-9A-Za-z]+)+")
+
+
+def _hold_order(text: str) -> str:
+    """Pins a value built of groups and separators left to right, whatever surrounds it."""
+    return _GROUPED.sub(lambda m: f"<span dir='ltr'>{m.group(0)}</span>", text)
+
+
 def _keep_spaces(text: str) -> str:
     """Printing on Windows swallows a space where Arabic meets Latin; a non-breaking one survives."""
     out = []
@@ -88,7 +97,7 @@ def _keep_spaces(text: str) -> str:
 
 def _shell(inner: str) -> str:
     # Only the text between tags is touched, never an attribute
-    inner = re.sub(r">([^<]+)<", lambda m: ">" + _keep_spaces(m.group(1)) + "<", inner)
+    inner = re.sub(r">([^<]+)<", lambda m: ">" + _hold_order(_keep_spaces(m.group(1))) + "<", inner)
     return f"<html><body dir='rtl' bgcolor='#FFFFFF' style='color:{INK}'>{inner}</body></html>"
 
 
