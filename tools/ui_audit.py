@@ -9,7 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-SIZES = [(1366, 768), (1920, 1080)]
+# 1093x614 is 1366x768 at Windows 125% scale, in logical pixels
+SIZES = [(1366, 768), (1920, 1080), (1093, 614)]
 # A window on a screen of that size is shorter: the title bar and the task bar take this much
 CHROME_PX = 40
 

@@ -29,6 +29,7 @@ CloseApplications=yes
 RestartApplications=no
 UninstallDisplayName=Morv Tires {#AppVersion}
 UninstallDisplayIcon={app}\MorvTires.exe
+SetupIconFile=..\morv\ui\assets\app_icon.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
