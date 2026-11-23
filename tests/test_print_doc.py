@@ -173,7 +173,8 @@ class PrintedSheetTest(unittest.TestCase):
     def test_vertical_space_is_a_row_because_a_block_margin_is_ignored(self):
         html = self.html()
         self.assertNotIn("margin-top", html, "Qt's print engine draws no margin on a block")
-        self.assertIn("العميل:&nbsp;", html, "a space between two tags is whitespace Qt may drop")
+        self.assertIn("العميل:&#8207;&nbsp;", html,
+                      "a neutral colon needs a strong right-to-left neighbour, then its own space")
 
     def test_a_date_or_a_code_keeps_its_groups_in_order(self):
         from morv.ui.print_doc import SHAPES, Document, Line, document_html
