@@ -49,7 +49,8 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
     unknown = [a for a in argv[1:] if a.startswith("-") and a != SELFCHECK]
     if unknown:
-        sys.stderr.write("وسيطة غير معروفة: " + " ".join(unknown) + "\n")
+        if sys.stderr is not None:      # A windowed build has no streams; writing to one would hang it
+            sys.stderr.write("وسيطة غير معروفة: " + " ".join(unknown) + "\n")
         return 2
     selfcheck = SELFCHECK in argv
     from morv.infra import paths

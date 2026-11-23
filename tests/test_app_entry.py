@@ -12,6 +12,16 @@ class EntryArgumentsTest(unittest.TestCase):
         from morv.app.main import main
         self.assertEqual(2, main(["morv", "--smoke"]))
 
+    def test_the_refusal_survives_a_build_that_has_no_streams(self):
+        import sys
+        from morv.app.main import main
+        saved = sys.stderr
+        sys.stderr = None                 # what PyInstaller leaves a windowed build
+        try:
+            self.assertEqual(2, main(["morv", "--smoke"]))
+        finally:
+            sys.stderr = saved
+
     def test_any_unknown_switch_is_refused_rather_than_ignored(self):
         from morv.app.main import main
         for switch in ("--demo", "--reset", "-x"):
