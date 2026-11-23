@@ -58,3 +58,37 @@ class ScheduledBackupThreadTest(unittest.TestCase):
         source = inspect.getsource(backup_job.run_scheduled_alone)
         self.assertIn("open_db", source)
         self.assertIn("con.close()", source)
+
+
+@require_qt()
+class OlderProgramNewerDataTest(unittest.TestCase):
+    """Rolling back to an older build must not open data it cannot understand."""
+
+    def setUp(self):
+        import os
+        import shutil
+        import sqlite3
+        import tempfile
+        from morv.infra.db.bootstrap import open_main_db
+        self.tmp = Path(tempfile.mkdtemp())
+        os.environ["MORV_DATA_DIR"] = str(self.tmp)
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.addCleanup(os.environ.pop, "MORV_DATA_DIR", None)
+        con = open_main_db()
+        con.close()
+        con = sqlite3.connect(self.tmp / "morv_tires.db")
+        con.execute("INSERT INTO schema_migrations (version, name, checksum, applied_at) "
+                    "VALUES (9999, 'from_a_newer_build', 'x', '2030-01-01 00:00:00')")
+        con.commit()
+        con.close()
+
+    def test_it_explains_itself_instead_of_crashing_with_no_window(self):
+        from unittest import mock
+        from morv.app.main import main
+        from morv.ui import widgets
+        with mock.patch.object(widgets, "info") as shown:
+            self.assertEqual(1, main(["morv"]))
+        shown.assert_called_once()
+        said = " ".join(str(a) for a in shown.call_args.args)
+        self.assertIn("9999", said)
+        self.assertIn("نسخة احتياطية", said)

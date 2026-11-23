@@ -96,6 +96,16 @@ jobs:
           if ($p.ExitCode -ne 2) { throw "كان يجب رفض --smoke برمز 2، وخرج برمز $($p.ExitCode)" }
           python -c "import os, sqlite3, sys; c = sqlite3.connect(os.path.join(os.environ['MORV_DATA_DIR'], 'morv_tires.db')); n = c.execute('select count(*) from users').fetchone()[0]; sys.exit(0 if n == 0 else 1)"
           if ($LASTEXITCODE -ne 0) { throw "النسخة الموزّعة أنشأت مستخدمًا" }
+      - name: بصمة الحزمة وإصدارها
+        shell: pwsh
+        run: |
+          $v = python -c "import morv; print(morv.VERSION)"
+          "MorvTires $v" | Out-File -FilePath dist\MorvTires\RELEASE.txt -Encoding utf8
+          "commit: $env:GITHUB_SHA" | Out-File -FilePath dist\MorvTires\RELEASE.txt -Append -Encoding utf8
+          Get-FileHash dist\MorvTires\MorvTires.exe -Algorithm SHA256 |
+            ForEach-Object { "sha256: $($_.Hash)" } |
+            Out-File -FilePath dist\MorvTires\RELEASE.txt -Append -Encoding utf8
+          Get-Content dist\MorvTires\RELEASE.txt
       - name: اسم الأرتيفكت الآمن
         id: art
         shell: pwsh
