@@ -162,6 +162,11 @@ class PrintedSheetTest(unittest.TestCase):
         self.assertNotIn("\u00a0", html.split(">")[0], "attributes must not be touched")
         self.assertIn("cellspacing='0' cellpadding='0'", html)
 
+    def test_vertical_space_is_a_row_because_a_block_margin_is_ignored(self):
+        html = self.html()
+        self.assertNotIn("margin-top", html, "Qt's print engine draws no margin on a block")
+        self.assertIn("العميل:&nbsp;", html, "a space between two tags is whitespace Qt may drop")
+
     def test_money_prints_as_pounds_and_stays_left_to_right(self):
         self.assertIn("12,900.00", self.reads())
         self.assertNotIn("1290000", self.reads())
