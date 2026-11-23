@@ -106,6 +106,26 @@ jobs:
             ForEach-Object { "sha256: $($_.Hash)" } |
             Out-File -FilePath dist\MorvTires\RELEASE.txt -Append -Encoding utf8
           Get-Content dist\MorvTires\RELEASE.txt
+      - name: بناء المثبِّت
+        shell: pwsh
+        run: |
+          $v = python -c "import morv; print(morv.VERSION)"
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          if (-not (Test-Path $iscc)) { throw "تعذّر تجهيز Inno Setup على المشغّل" }
+          & $iscc "/DAppVersion=$v" tools\installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "فشل بناء المثبِّت" }
+          $setup = Get-ChildItem dist\MorvTires-Setup-*.exe | Select-Object -First 1
+          Get-FileHash $setup.FullName -Algorithm SHA256 |
+            ForEach-Object { "setup sha256: $($_.Hash)" } |
+            Out-File -FilePath dist\MorvTires\RELEASE.txt -Append -Encoding utf8
+          Get-Content dist\MorvTires\RELEASE.txt
+      - name: رفع المثبِّت
+        uses: actions/upload-artifact@v4
+        with:
+          name: MorvTires-Setup-${{ github.run_number }}
+          path: dist/MorvTires-Setup-*.exe
+          retention-days: 14
       - name: اسم الأرتيفكت الآمن
         id: art
         shell: pwsh
