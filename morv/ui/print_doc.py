@@ -77,8 +77,8 @@ _GROUPED = re.compile(r"[0-9A-Za-z]+(?:[-/:.,][0-9A-Za-z]+)+")
 
 
 def _hold_order(text: str) -> str:
-    """Pins a value built of groups and separators left to right, whatever surrounds it."""
-    return _GROUPED.sub(lambda m: f"<span dir='ltr'>{m.group(0)}</span>", text)
+    """Pins a grouped value left to right with the embedding marks themselves: Qt ignores dir on a span."""
+    return _GROUPED.sub(lambda m: f"\u202a{m.group(0)}\u202c", text)
 
 
 def _keep_spaces(text: str) -> str:

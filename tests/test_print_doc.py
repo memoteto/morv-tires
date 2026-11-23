@@ -170,6 +170,15 @@ class PrintedSheetTest(unittest.TestCase):
         self.assertNotIn("\u00a0", html.split(">")[0], "attributes must not be touched")
         self.assertIn("cellspacing='0' cellpadding='0'", html)
 
+    def test_a_date_is_wrapped_in_the_marks_that_stop_it_reversing(self):
+        from morv.ui.print_doc import SHAPES, Document, Line, document_html
+        doc = Document(title="فاتورة بيع", number="S-1", date="2026-11-23",
+                       lines=[Line("بطارية", "ضمان حتى 2027-11-22", "1", 100, 100)])
+        html = document_html(_shop(), doc, SHAPES["a4"])
+        self.assertIn("\u202a2027-11-22\u202c", html,
+                      "a dir attribute on a span does not reach Qt's layout; the marks do")
+        self.assertNotIn("<span dir='ltr'>2027", html)
+
     def test_vertical_space_is_a_row_because_a_block_margin_is_ignored(self):
         html = self.html()
         self.assertNotIn("margin-top", html, "Qt's print engine draws no margin on a block")
