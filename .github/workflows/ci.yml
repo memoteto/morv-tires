@@ -67,6 +67,12 @@ jobs:
         run: python -m pip install -r requirements.txt -r requirements-dev.txt
       - name: بناء MorvTires.exe
         run: python tools/build_exe.py
+      - name: قائمة المكونات (SBOM) داخل الحزمة
+        shell: pwsh
+        run: |
+          python --version | Out-File -FilePath dist\MorvTires\SBOM.txt -Encoding utf8
+          python -m pip freeze --exclude-editable | Out-File -FilePath dist\MorvTires\SBOM.txt -Append -Encoding utf8
+          Get-Content dist\MorvTires\SBOM.txt
       - name: تشغيل النسخة المبنية (فحص ذاتي)
         shell: pwsh
         run: |
@@ -139,3 +145,31 @@ jobs:
           git add -A
           git commit -q -m "ui audit images from ${{ github.head_ref || github.ref_name }} @ ${{ github.event.pull_request.head.sha || github.sha }}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ui-audit-images
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: تثبيت ما يُشحن مع البرنامج
+        run: python -m pip install -r requirements.txt
+      - name: قائمة المكونات (SBOM)
+        run: |
+          python --version | tee sbom.txt
+          python -m pip freeze --exclude-editable | tee -a sbom.txt
+      # أداة الفحص نفسها لا تُشحن، فلا تُثبَّت على إصدار؛ إصدارها يُسجَّل في السجل
+      # لقبول ثغرة بقرار موثّق: أضف --ignore-vuln <المعرّف> هنا مع تعليق يذكر السبب
+      - name: فحص الثغرات المعروفة
+        run: |
+          python -m pip install pip-audit
+          pip-audit --version
+          pip-audit --strict
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom
+          path: sbom.txt
+          retention-days: 90
