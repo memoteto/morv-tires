@@ -76,10 +76,36 @@ class SalesPage(ListPage):
             reasons = [(ltr(r[0]), r[3]) for r in inv.returns if r[3]]
             if reasons:
                 self.summary_details(reasons)
+        buttons = []
+        for label, handler in (("طباعة", self.print_sale), ("معاينة الطباعة", self.preview_sale)):
+            btn = QPushButton(label)
+            btn.clicked.connect(lambda _=False, h=handler: h(inv))
+            buttons.append(btn)
         if self.can_return():
             btn = QPushButton("مرتجع من الفاتورة")
             btn.clicked.connect(lambda: self.open_return(row_id))
-            self.actions(btn)
+            buttons.append(btn)
+        self.actions(*buttons)
+
+    def _shop(self):
+        from morv.infra import shop
+        return shop.load(self.session.con)
+
+    def print_sale(self, inv) -> None:
+        from morv.ui import printing
+        from morv.ui.widgets import info
+        shop_data = self._shop()
+        try:
+            where = printing.send(shop_data, printing.sale_document(inv, shop_data))
+        except printing.PrintError as e:
+            info(self, "الطباعة", str(e), error=True)
+            return
+        info(self, "الطباعة", f"أُرسلت الفاتورة {inv.number} إلى {where}")
+
+    def preview_sale(self, inv) -> None:
+        from morv.ui import printing
+        shop_data = self._shop()
+        printing.PrintPreview(self, shop_data, printing.sale_document(inv, shop_data)).exec()
 
     def can_return(self) -> bool:
         return self.session.can("sales.return")

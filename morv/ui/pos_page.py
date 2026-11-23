@@ -413,7 +413,10 @@ class PosPage(QWidget):
         body.addWidget(self.post_btn)
         row = QHBoxLayout()
         row.addWidget(deferred_button("حفظ كمسودة"), 1)
-        row.addWidget(deferred_button("اعتماد وطباعة", "printer"), 1)
+        self.post_print_btn = QPushButton("اعتماد وطباعة")
+        self.post_print_btn.setIcon(icons.icon("printer", tokens.ICON_MUTED, 16))
+        self.post_print_btn.clicked.connect(lambda: self.post(and_print=True))
+        row.addWidget(self.post_print_btn, 1)
         body.addLayout(row)
         self._on_method_changed()
 
@@ -797,7 +800,7 @@ class PosPage(QWidget):
             out.append(sales_rules.Payment(method=self.pay2_method.currentData(), amount=amount))
         return out
 
-    def post(self) -> None:
+    def post(self, and_print: bool = False) -> None:
         """Posts through the engine; any refusal is shown and nothing is written."""
         if self._busy:
             return
@@ -832,11 +835,26 @@ class PosPage(QWidget):
             sale_id = self.posted.id
             self._reset_after_post()
             self.notice.show_message(f"تم ترحيل الفاتورة رقم {self.posted.number}", "success")
+            if and_print:
+                self._print_posted(sale_id)
             if on_instalments:
                 self.contract_needed.emit(sale_id)
         finally:
             self._busy = False
             self.post_btn.setEnabled(True)
+
+    def _print_posted(self, sale_id: int) -> None:
+        """A failed print never undoes a posted invoice; it is reprinted from the sales screen."""
+        from morv.infra import sale_view, shop
+        from morv.ui import printing
+        try:
+            shop_data = shop.load(self.session.con)
+            saved = sale_view.get_sale(self.session.con, sale_id)
+            where = printing.send(shop_data, printing.sale_document(saved, shop_data))
+        except (printing.PrintError, LookupError) as e:
+            self.notice.show_message(f"رُحِّلت الفاتورة ولم تُطبع: {e}")
+            return
+        self.notice.show_message(f"رُحِّلت الفاتورة وأُرسلت إلى {where}", "success")
 
     def _reset_after_post(self) -> None:
         self._request_key = uuid.uuid4().hex
