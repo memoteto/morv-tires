@@ -65,6 +65,13 @@ class PrintedSheetTest(unittest.TestCase):
         for invented in ("الخصم", "فئة السعر", "المدفوع نقدًا", "الباقي للعميل"):
             self.assertNotIn(invented, reads, f"{invented} is not in the approved design")
 
+    def test_the_colon_stays_beside_its_label_and_never_drifts_to_the_edge(self):
+        html = self.html()
+        self.assertIn("العميل:&#8207;", html, "a colon is a neutral: without a mark it jumps to the line's edge")
+        for label in ("الموبايل", "المركبة", "الدفع"):
+            self.assertIn(f"{label}:&#8207;", html, label)
+        self.assertIn(">أحمد محمود</td>", html, "the value owns its cell, so no run spans the colon")
+
     def test_the_customer_pair_on_the_right_is_the_one_emitted_last(self):
         html = self.html()
         self.assertLess(html.index("الموبايل"), html.index("العميل"),

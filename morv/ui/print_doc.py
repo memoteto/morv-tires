@@ -161,11 +161,14 @@ def _info_box(doc: Document, shape: Shape) -> str:
         pair = doc.info[i:i + 2]
         cells = ""
         for label, value in reversed(pair):      # emitted left to right, so the first pair lands on the right
-            cells += (f"<td width='50%' dir='rtl' style='font-size:{_pt(shape, 9)}'>"
-                      f"<span style='color:{MUTED}'>{label}:&nbsp;</span>"
-                      f"<span style='color:{INK}'>{value}</span></td>")
+            # Label and value sit in cells of their own, and a right-to-left mark after the colon
+            # keeps that neutral character beside its label instead of at the far edge of the line
+            cells += (f"<td width='37%' align='right' dir='rtl' style='color:{INK};"
+                      f"font-size:{_pt(shape, 9)}'>{value}</td>"
+                      f"<td width='13%' align='right' dir='rtl' style='color:{MUTED};"
+                      f"font-size:{_pt(shape, 9)}'>{label}:&#8207;&nbsp;</td>")
         if len(pair) == 1:
-            cells = "<td width='50%'></td>" + cells
+            cells = "<td width='37%'></td><td width='13%'></td>" + cells
         rows += f"<tr>{cells}</tr>"
     return _gap(4) + (f"<table width='100%' cellspacing='0' cellpadding='4' bgcolor='{FILL}' "
                       f"dir='ltr'>{rows}</table>")
