@@ -51,6 +51,21 @@ jobs:
         run: |
           python -m pip install -r requirements-dev.txt
           python tools/check_test_discovery.py
+      # الورق يُرسم على ويندوز بخطوط ومحرك مختلفين؛ هذه النماذج هي الطريقة الوحيدة لرؤيته
+      - name: نماذج المستندات المطبوعة على ويندوز
+        if: runner.os == 'Windows'
+        run: python tools/print_samples.py print_win
+      - name: رفع نماذج ويندوز إلى فرع معزول للمراجعة
+        if: runner.os == 'Windows' && always()
+        shell: bash
+        run: |
+          cd print_win
+          git init -q -b print-images-win
+          git config user.name "print-samples"
+          git config user.email "print-samples@users.noreply.github.com"
+          git add -A
+          git commit -q -m "windows print samples from ${{ github.head_ref || github.ref_name }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" print-images-win
 
   build-windows:
     needs: test
