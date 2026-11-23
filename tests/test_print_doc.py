@@ -151,9 +151,9 @@ class PrintedSheetTest(unittest.TestCase):
                        lines=[Line("بطارية ACDelco 70 أمبير", "", "1", 100, 100)],
                        totals=[("ض.ق.م 14%", "5,250.00"), ("الصافي", "42,750.00 ج.م")])
         html = document_html(_shop(), doc, SHAPES["a4"])
-        for joined in ("ض.ق.م\u00a014%", "42,750.00\u00a0ج.م", "بطارية\u00a0ACDelco",
-                       "ACDelco\u00a070", "70\u00a0أمبير"):
+        for joined in ("ض.ق.م\u00a014%", "42,750.00\u00a0ج.م", "بطارية\u00a0ACDelco", "70\u00a0أمبير"):
             self.assertIn(joined, html, f"a plain space here is dropped when printing: {joined!r}")
+        self.assertIn("ACDelco 70", html, "between two Latin runs the space is in no danger")
 
     def test_it_leaves_ordinary_spaces_and_the_markup_alone(self):
         from morv.ui.print_doc import SHAPES, document_html
@@ -187,7 +187,7 @@ class PrintedRollTest(unittest.TestCase):
         return document_html(shop or _shop(), _doc(), SHAPES[key])
 
     def test_a_roll_stacks_each_line_and_uses_no_column_table(self):
-        html = self.html()
+        html = self.html().replace("\u00a0", " ")
         self.assertNotIn("border='1'", html, "a roll is too narrow for a bordered column table")
         self.assertNotIn(">م<", html, "a roll carries no serial column")
         from morv.ui.print_doc import DASH
