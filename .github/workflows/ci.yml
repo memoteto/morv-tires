@@ -26,6 +26,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write        # the Windows run pushes its printed samples to their own branch
     env:
       QT_QPA_PLATFORM: offscreen
       MORV_REQUIRE_QT: "1"          # اختبارات الواجهة تفشل ولا تُتخطى إن غابت Qt
