@@ -145,6 +145,23 @@ class PrintedSheetTest(unittest.TestCase):
         self.assertEqual("", footer_html(_shop(), SHAPES["r80"]), "a roll has no page foot to pin to")
         self.assertIn("morv:icon/pin", body_html(_shop(), _doc(), SHAPES["r80"]))
 
+    def test_a_space_where_arabic_meets_latin_is_made_unbreakable(self):
+        from morv.ui.print_doc import SHAPES, Document, Line, document_html
+        doc = Document(title="فاتورة بيع", number="S-1", date="2026-11-23",
+                       lines=[Line("بطارية ACDelco 70 أمبير", "", "1", 100, 100)],
+                       totals=[("ض.ق.م 14%", "5,250.00"), ("الصافي", "42,750.00 ج.م")])
+        html = document_html(_shop(), doc, SHAPES["a4"])
+        for joined in ("ض.ق.م\u00a014%", "42,750.00\u00a0ج.م", "بطارية\u00a0ACDelco",
+                       "ACDelco\u00a070", "70\u00a0أمبير"):
+            self.assertIn(joined, html, f"a plain space here is dropped when printing: {joined!r}")
+
+    def test_it_leaves_ordinary_spaces_and_the_markup_alone(self):
+        from morv.ui.print_doc import SHAPES, document_html
+        html = document_html(_shop(), _doc(), SHAPES["a4"])
+        self.assertIn("أحمد محمود", html, "a space between two Arabic words needs no protection")
+        self.assertNotIn("\u00a0", html.split(">")[0], "attributes must not be touched")
+        self.assertIn("cellspacing='0' cellpadding='0'", html)
+
     def test_money_prints_as_pounds_and_stays_left_to_right(self):
         self.assertIn("12,900.00", self.reads())
         self.assertNotIn("1290000", self.reads())

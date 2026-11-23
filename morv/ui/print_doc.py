@@ -1,4 +1,5 @@
 """Builds every printed document from the approved design in design/Shop.dc.html, for sheet and roll."""
+import re
 from dataclasses import dataclass, field
 
 from PySide6.QtCore import QMarginsF, QRectF, QSizeF, Qt, QUrl
@@ -65,6 +66,30 @@ def _pt(shape: Shape, size: float) -> str:
 def _ltr(text: str) -> str:
     """Isolates a Latin or numeric value so an RTL paragraph cannot reorder its digits."""
     return f"<span dir='ltr'>{text}</span>"
+
+
+_ARABIC = re.compile(r"[\u0600-\u06FF]")
+_LATIN = re.compile(r"[0-9A-Za-z]")
+
+
+def _keep_spaces(text: str) -> str:
+    """Printing on Windows swallows a space where Arabic meets Latin; a non-breaking one survives."""
+    out = []
+    for i, ch in enumerate(text):
+        if ch == " " and 0 < i < len(text) - 1:
+            before, after = text[i - 1], text[i + 1]
+            if ((_ARABIC.match(before) and _LATIN.match(after))
+                    or (_LATIN.match(before) and _ARABIC.match(after))):
+                out.append("\u00a0")
+                continue
+        out.append(ch)
+    return "".join(out)
+
+
+def _shell(inner: str) -> str:
+    # Only the text between tags is touched, never an attribute
+    inner = re.sub(r">([^<]+)<", lambda m: ">" + _keep_spaces(m.group(1)) + "<", inner)
+    return f"<html><body dir='rtl' bgcolor='#FFFFFF' style='color:{INK}'>{inner}</body></html>"
 
 
 def _band(color: str, height_pt: float = 0.8) -> str:
@@ -255,10 +280,6 @@ def _roll(shop, doc: Document, shape: Shape) -> str:
     if shop.show_hours and shop.hours:
         out += f"<div align='center' style='margin-top:4px;font-size:{_pt(shape, 8.5)}'>{shop.hours}</div>"
     return out
-
-
-def _shell(inner: str) -> str:
-    return f"<html><body dir='rtl' bgcolor='#FFFFFF' style='color:{INK}'>{inner}</body></html>"
 
 
 def body_html(shop, doc: Document, shape: Shape) -> str:
