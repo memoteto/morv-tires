@@ -251,7 +251,8 @@ class SettingsTest(_Base):
         audit_before = users.audit_rows(self.con)
         for action, target in ((tab.change_password, "change_backup_password"),
                                (tab.new_recovery_key, "regenerate_recovery_key")):
-            with self.subTest(action=target), (
+            with (
+                self.subTest(action=target),
                 patch("morv.ui.settings_page.SecretDialog") as dialog,
                 patch("morv.ui.settings_page.ShowKeyDialog"),
                 patch("morv.ui.settings_page.backup." + target) as operation,
