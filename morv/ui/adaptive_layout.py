@@ -112,6 +112,14 @@ class PageFrame(QWidget):
         root.addWidget(self.footer)
         self.footer.hide()
 
+    def header_fits(self, width: int, height: int) -> bool:
+        layout = self.header.layout()
+        minimum = layout.minimumSize().expandedTo(self.header.minimumSize())
+        if width < minimum.width() or height < minimum.height():
+            return False
+        needed = layout.totalHeightForWidth(width)
+        return max(minimum.height(), needed) <= height
+
     def set_header_host(self, host=None):
         """Move the same header between the page and an optional shell layout."""
         if host is self._header_host:
