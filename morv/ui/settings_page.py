@@ -219,9 +219,11 @@ class UsersTab(QWidget):
         self.detail, inner = card()
         self.title = QLabel()
         self.title.setObjectName("cardTitle")
-        inner.addWidget(self.title)
+        self.title.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute)
+        self.title.setWordWrap(True)
         self.sub = muted("")
-        inner.addWidget(self.sub)
+        self.sub.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute)
+        inner.addWidget(AdaptiveFields([self.title, self.sub]))
         self.role = QComboBox()
         for key, label in security.ROLES.items():
             self.role.addItem(label, key)
@@ -247,7 +249,7 @@ class UsersTab(QWidget):
         cards = []
         bodies = {}
         for title, prefixes in groups:
-            box, body = card(title)
+            box, body = card(title, compact=True)
             cards.append(box)
             for prefix in prefixes:
                 bodies[prefix] = body
@@ -308,6 +310,8 @@ class UsersTab(QWidget):
         for key, cb in self.checks.items():
             cb.setChecked(key in perms)
             cb.setEnabled(editable and not u.is_manager)
+        self.discount_cap.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons if u.is_manager
+                                           else QSpinBox.ButtonSymbols.UpDownArrows)
         self.discount_cap.setSpecialValueText("غير محدود" if u.is_manager else "")
         self.discount_cap.setValue(users.configured_permission_limit(self.session.con, u, "sales.discount") or 0)
         self.discount_cap.setEnabled(editable and not u.is_manager)

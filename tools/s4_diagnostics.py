@@ -54,7 +54,7 @@ def security_probe(con, admin):
 
 def geometry_probe(con, admin):
     from PySide6.QtCore import QPoint, QRect
-    from PySide6.QtWidgets import QAbstractButton, QScrollArea
+    from PySide6.QtWidgets import QAbstractButton
     from tests.qt_app import get_app
     from morv.infra import users
     from morv.ui import theme
@@ -73,9 +73,7 @@ def geometry_probe(con, admin):
         page = win.pages["settings"]
         assert page.open_page("users"), "users route did not open"
         tab = page.users_tab
-        scrolls = tab.detail.findChildren(QScrollArea)
-        assert len(scrolls) == 1, "unexpected permissions scroll count"
-        scroll = scrolls[0]
+        scroll = tab.permission_grid
 
         def settle():
             for _ in range(12):
