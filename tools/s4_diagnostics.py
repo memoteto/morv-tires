@@ -128,6 +128,7 @@ def geometry_probe(con, admin):
                                    scroll=box(scroll, tab), viewport=[scroll.viewport().width(), scroll.viewport().height()],
                                    content=[content.width(), content.height()], content_min=minimum(content),
                                    grid_min=content.layout().minimumSize().width(),
+                                   permission_columns=tab.permission_grid.columns,
                                    right_pane_min=tab.layout().itemAt(0).layout().minimumSize().width(),
                                    max_check_hint=max(w.sizeHint().width() for w in tab.checks.values()),
                                    narrow_checks=narrow_checks, horizontal_max=scroll.horizontalScrollBar().maximum(),

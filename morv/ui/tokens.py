@@ -31,6 +31,7 @@ LAYOUT = dict(
     shop_logo_preview=80, form_field_min=180, print_policy_min_height=80,
     print_preview_min_height=300, print_preview_min_width=170,
     settings_card_min=320, settings_group_header_min=54, settings_link_min=44,
+    settings_user_list_max=320,
     adaptive_table_row_min=36, adaptive_table_control_target=92,
     item_field_name_weight=320, item_field_example_weight=350,
     preview_scroll_gutter=14, preview_scroll_end_gap=4,

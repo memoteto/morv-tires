@@ -1,20 +1,20 @@
 """Settings hub and the existing settings pages."""
 
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
+from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPushButton, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget, QTableView,
+                               QPushButton, QSizePolicy, QSpinBox, QStackedWidget, QTableView,
                                QVBoxLayout, QWidget)
 
 from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, settings, users, vault
 from morv.ui import tokens
-from morv.ui.adaptive_layout import AdaptiveCards, PageFrame
+from morv.ui.adaptive_layout import AdaptiveCards, AdaptiveFields, PageFrame
 from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
 from morv.ui.shop_settings import PrintingTab, ShopTab
-from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, form, info, ltr_edit, muted,
+from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, field, form, info, ltr_edit, muted,
                              primary_button, section_card, icon_button)
 
 SHORTCUTS = [("F2", "التركيز على مربع البحث في شاشات القوائم"), ("Ctrl+N", "إضافة جديد في شاشة القوائم المفتوحة"),
@@ -202,17 +202,18 @@ class UsersTab(QWidget):
         self.session = session
         self.current: users.User | None = None
         row = QHBoxLayout(self)
+        row.setSpacing(tokens.LAYOUT["pane_gap"])
         left = QVBoxLayout()
         self.list = QListWidget()
+        self.list.setMaximumWidth(tokens.LAYOUT["settings_user_list_max"])
         self.list.setObjectName("userList")
         self.list.setSpacing(2)
         self.list.setUniformItemSizes(True)
         self.list.currentRowChanged.connect(self._select)
         self.new_btn = primary_button("مستخدم جديد", "plus")
         self.new_btn.clicked.connect(self.new_user)
-        left.addWidget(self.new_btn)
+        left.addWidget(self.new_btn, alignment=Qt.AlignmentFlag.AlignLeading)
         left.addWidget(self.list, 1)
-        left.addWidget(muted("كل عملية حساسة تُسجَّل باسم المستخدم ووقتها في سجل العمليات."))
         row.addLayout(left, 1)
 
         self.detail, inner = card()
@@ -221,37 +222,45 @@ class UsersTab(QWidget):
         inner.addWidget(self.title)
         self.sub = muted("")
         inner.addWidget(self.sub)
-        f = form()
         self.role = QComboBox()
         for key, label in security.ROLES.items():
             self.role.addItem(label, key)
         self.role.currentIndexChanged.connect(self._role_changed)
-        f.addRow("الدور", self.role)
-        inner.addLayout(f)
-        inner.addWidget(muted("الصلاحيات (المدير يملكها كلها دائمًا):"))
-        self.checks: dict[str, QCheckBox] = {}
-        perms_box = QWidget()
-        grid = QGridLayout(perms_box)
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(24)
-        for i, (key, label) in enumerate(security.PERMISSIONS.items()):
-            cb = QCheckBox(label)
-            cb.toggled.connect(lambda on, k=key: self._perm_changed(k, on))
-            self.checks[key] = cb
-            grid.addWidget(cb, i // 2, i % 2)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidget(perms_box)
-        cap_row = QHBoxLayout()
-        cap_row.addWidget(muted("الحد الأقصى للخصم (٪ من قيمة الفاتورة):"))
         self.discount_cap = QSpinBox()
         self.discount_cap.setRange(0, 100)
         self.discount_cap.valueChanged.connect(lambda _v: self._perm_changed("sales.discount", self.checks["sales.discount"].isChecked()))
-        cap_row.addWidget(self.discount_cap)
-        cap_row.addStretch(1)
-        inner.addLayout(cap_row)
-        inner.addWidget(scroll, 1)       # permissions scroll; the buttons below always stay visible
+        inner.addWidget(AdaptiveFields([
+            field("الدور", self.role),
+            field("الحد الأقصى للخصم (٪)", self.discount_cap),
+        ]))
+        heading = QLabel("الصلاحيات")
+        heading.setObjectName("cardTitle")
+        inner.addWidget(heading)
+
+        # Presentation groups only; permissions and labels still come from security.PERMISSIONS.
+        groups = [
+            ("المبيعات والعملاء", ("customers", "sales", "installments", "receipts")),
+            ("المشتريات والمخزون", ("suppliers", "items", "purchases", "stock")),
+            ("الإدارة المالية", ("treasury", "reports", "profit", "period", "opening")),
+            ("إدارة النظام", ("users", "settings", "backup")),
+        ]
+        cards = []
+        bodies = {}
+        for title, prefixes in groups:
+            box, body = card(title)
+            cards.append(box)
+            for prefix in prefixes:
+                bodies[prefix] = body
+        self.checks: dict[str, QCheckBox] = {}
+        for key, label in security.PERMISSIONS.items():
+            cb = QCheckBox(label)
+            cb.toggled.connect(lambda on, k=key: self._perm_changed(k, on))
+            self.checks[key] = cb
+            bodies.get(key.split(".", 1)[0], bodies["users"]).addWidget(cb)
+        for body in set(bodies.values()):
+            body.addStretch(1)
+        self.permission_grid = AdaptiveCards(cards, minimum_width=tokens.LAYOUT["form_field_min"])
+        inner.addWidget(self.permission_grid, 1)  # actions remain outside the permissions scroll
         btns = QHBoxLayout()
         self.pw_btn = QPushButton("إعادة تعيين كلمة المرور")
         self.pw_btn.clicked.connect(self.reset_password)
@@ -274,7 +283,8 @@ class UsersTab(QWidget):
         for u in self.users:
             item = QListWidgetItem(f"{u.display_name} — {security.ROLES[u.role]}" + ("" if u.active else " (موقوف)"))
             item.setData(Qt.ItemDataRole.UserRole, u.id)
-            item.setSizeHint(QSize(0, 44))
+            item.setToolTip(item.text())
+            item.setSizeHint(QSize(0, tokens.LAYOUT["settings_link_min"]))
             self.list.addItem(item)
         self.list.blockSignals(False)
         idx = next((i for i, u in enumerate(self.users) if u.id == select_id), 0)
@@ -287,7 +297,8 @@ class UsersTab(QWidget):
         self.current = u = self.users[row]
         self._loading = True
         self.title.setText(u.display_name)
-        self.sub.setText(f"اسم الدخول: {ltr(u.username)}")
+        status = "نشط" if u.active else "موقوف"
+        self.sub.setText(f"اسم الدخول: {ltr(u.username)} · {status}")
         self.role.setCurrentIndex(list(security.ROLES).index(u.role))
         editable = self.session.can("users.manage")
         perms = users.configured_permissions(self.session.con, u)
@@ -297,6 +308,7 @@ class UsersTab(QWidget):
         for key, cb in self.checks.items():
             cb.setChecked(key in perms)
             cb.setEnabled(editable and not u.is_manager)
+        self.discount_cap.setSpecialValueText("غير محدود" if u.is_manager else "")
         self.discount_cap.setValue(users.configured_permission_limit(self.session.con, u, "sales.discount") or 0)
         self.discount_cap.setEnabled(editable and not u.is_manager)
         self.active_btn.setText("إيقاف الحساب" if u.active else "تفعيل الحساب")

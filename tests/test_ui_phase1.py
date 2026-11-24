@@ -173,6 +173,36 @@ class SettingsTest(_Base):
         self.assertFalse(p.backup_tab.usb_dir.isEnabled())
         self.assertTrue(p.backup_tab.backup_btn.isEnabled())
 
+    def test_users_tab_grouped_permissions_and_current_discount_display(self):
+        from PySide6.QtWidgets import QLabel
+        from morv.core import security
+        from morv.infra import users
+        from morv.ui.settings_page import SettingsPage
+        self.make_admin()
+        cashier = users.create_user(self.con, self.admin, "cashier", "Cashier", "Cash12345", "cashier")
+        users.set_permission(self.con, self.admin, cashier.id, "sales.discount", True, 5)
+        page = SettingsPage(self.session())
+        tab = page.users_tab
+        before = users.audit_rows(self.con)
+        self.assertEqual(set(tab.checks), set(security.PERMISSIONS))
+        self.assertEqual(len(tab.permission_grid.cards), 4)
+        for key, check in tab.checks.items():
+            self.assertEqual(check.text(), security.PERMISSIONS[key])
+            self.assertEqual(sum(card.isAncestorOf(check) for card in tab.permission_grid.cards), 1)
+        labels = [label.text() for label in tab.findChildren(QLabel)]
+        self.assertFalse(any("كل عملية حساسة" in label for label in labels))
+        self.assertFalse(any("المدير يملكها" in label for label in labels))
+        tab.reload(self.admin.id)
+        self.assertEqual(tab.discount_cap.text(), "غير محدود")
+        self.assertFalse(tab.discount_cap.isEnabled())
+        self.assertTrue(all(check.isChecked() and not check.isEnabled() for check in tab.checks.values()))
+        tab.reload(cashier.id)
+        self.assertEqual(tab.discount_cap.specialValueText(), "")
+        self.assertEqual(tab.discount_cap.value(), 5)
+        self.assertTrue(tab.discount_cap.isEnabled())
+        self.assertTrue(tab.checks["sales.discount"].isChecked())
+        self.assertEqual(users.audit_rows(self.con), before)
+
     def test_permissions_scroll_so_the_action_buttons_stay_visible(self):
         from PySide6.QtWidgets import QScrollArea
         from morv.ui.settings_page import SettingsPage
