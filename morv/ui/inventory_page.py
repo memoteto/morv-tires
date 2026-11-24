@@ -1,6 +1,6 @@
 """Stock screen tabs: items, lots and stocktake."""
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLineEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget,
+from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QLineEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget,
                                QVBoxLayout, QWidget)
 
 from morv.core import validate
@@ -8,10 +8,12 @@ from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
 from morv.infra import inventory, items
 from morv.infra.items import Item
+from morv.ui import tokens
+from morv.ui.adaptive_layout import AdaptiveTableColumns
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.stock_pages import LotsPage, StockPage
-from morv.ui.widgets import Notice, ask, danger_button, form, ltr_edit, muted, muted_icon, primary_button
+from morv.ui.widgets import Notice, ask, danger_button, field, form, ltr_edit, muted, muted_icon, primary_button
 
 
 class InventoryPage(QWidget):
@@ -290,69 +292,104 @@ class ItemDialog(Modal):
 
 class ItemFieldsTab(QWidget):
     COLS = ["الحقل", "مثال", "إظهار", "إلزامي", "في الطباعة", "فلتر بحث"]
-    # The four yes/no columns carry their title as an icon and a tooltip, so each one
-    # costs an icon's width instead of a whole Arabic header.
-    COL_ICONS = {2: "eye", 3: "alert", 4: "printer", 5: "search"}
+    CONTROLS = {2: ("إظهار", "eye"), 3: ("إلزامي", "alert"),
+                4: ("طباعة", "printer"), 5: ("بحث", "search")}
 
     def __init__(self, session):
         super().__init__()
         self.session = session
+        self._loading = False
+        self._loaded_kind = None
         lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(tokens.LAYOUT["pane_gap"])
+        self.hint = muted("")
+        lay.addWidget(self.hint)
         top = QHBoxLayout()
+        top.setSpacing(tokens.LAYOUT["page_back_gap"])
         self.kind = QComboBox()
         for k, label in (("common", "مشترك"), *items.KINDS.items()):
             self.kind.addItem(label, k)
-        self.kind.currentIndexChanged.connect(self.reload)
         top.addWidget(muted("مجموعة الحقول"))
         top.addWidget(self.kind)
         top.addStretch(1)
-        add = QPushButton("إضافة حقل مخصص")
-        add.clicked.connect(self.add_custom)
-        top.addWidget(add)
+        self.add_btn = primary_button("إضافة حقل مخصص", "plus")
+        self.add_btn.clicked.connect(self.add_custom)
+        top.addWidget(self.add_btn)
         lay.addLayout(top)
         self.table = QTableWidget(0, len(self.COLS))
         self.table.setHorizontalHeaderLabels(self.COLS)
-        for col, name in self.COL_ICONS.items():
-            head = QTableWidgetItem()
-            head.setIcon(muted_icon(name))
+        controls = {}
+        for col, (label, name) in self.CONTROLS.items():
+            head = self.table.horizontalHeaderItem(col)
+            head.setText(label)
             head.setToolTip(self.COLS[col])
-            self.table.setHorizontalHeaderItem(col, head)
+            head.setData(Qt.ItemDataRole.AccessibleTextRole, self.COLS[col])
+            controls[col] = (label, muted_icon(name))
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for col in self.COL_ICONS:
-            self.table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.setAlternatingRowColors(True)
+        self.columns = AdaptiveTableColumns(
+            self.table, {0: tokens.LAYOUT["item_field_name_weight"],
+                         1: tokens.LAYOUT["item_field_example_weight"]}, controls)
         self.table.itemChanged.connect(self.on_change)
         lay.addWidget(self.table, 1)
-        lay.addWidget(muted("الحقول المقفلة يعتمد عليها البرنامج في البحث والفواتير فتبقى ظاهرة وإلزامية. "
-                            "عند جعل حقل إلزاميًا بعد وجود أصناف، الأصناف القديمة لا تُمنع من البيع."))
+        lay.addWidget(muted("الحقول المقفلة تبقى ظاهرة وإلزامية. "
+                            "جعل حقل إلزاميًا لا يمنع بيع الأصناف القديمة."))
         self.notice = Notice()
         lay.addWidget(self.notice)
-        self._loading = False
+        self.kind.currentIndexChanged.connect(self.reload)
+        self.reload()
+
+    def showEvent(self, event):
+        super().showEvent(event)
         self.reload()
 
     def reload(self) -> None:
-        self._loading = True
         kind = self.kind.currentData()
+        current = self.table.currentRow()
+        selected = self.table.item(current, 0) if current >= 0 else None
+        key = selected.data(Qt.ItemDataRole.UserRole) if selected and self._loaded_kind == kind else None
+        column = max(0, self.table.currentColumn())
+        editable = self.session.can("items.manage")
+        self.add_btn.setEnabled(editable)
+        self.hint.setText("تُحفظ التعديلات فورًا." if editable else "عرض فقط — تعديل الحقول يتطلب صلاحية إدارة الأصناف.")
         rows = [f for f in items.fields(self.session.con, kind) if f.kind == kind]
-        self.table.setRowCount(len(rows))
-        for i, f in enumerate(rows):
-            name = QTableWidgetItem(f.label + ("  🔒" if f.builtin else ""))
-            name.setData(Qt.ItemDataRole.UserRole, f.key)
-            self.table.setItem(i, 0, name)
-            self.table.setItem(i, 1, QTableWidgetItem(ltr(f.example) if f.example else ""))
-            for col, val, locked in ((2, f.show, f.builtin), (3, f.required, f.builtin), (4, f.print, False), (5, f.filter, False)):
-                cell = QTableWidgetItem()
-                flags = Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
-                if locked:
+        self._loading = True
+        try:
+            self.table.setRowCount(len(rows))
+            for i, f in enumerate(rows):
+                name = QTableWidgetItem(f.label)
+                name.setData(Qt.ItemDataRole.UserRole, f.key)
+                if f.builtin:
+                    name.setIcon(muted_icon("lock"))
+                name.setToolTip(f.label + (" — حقل أساسي" if f.builtin else ""))
+                self.table.setItem(i, 0, name)
+                example = QTableWidgetItem(ltr(f.example) if f.example else "")
+                example.setToolTip(example.text())
+                self.table.setItem(i, 1, example)
+                for col, val, locked in ((2, f.show, f.builtin), (3, f.required, f.builtin),
+                                         (4, f.print, False), (5, f.filter, False)):
+                    cell = QTableWidgetItem()
                     flags = Qt.ItemFlag.ItemIsUserCheckable
-                cell.setFlags(flags)
-                cell.setCheckState(Qt.CheckState.Checked if val else Qt.CheckState.Unchecked)
-                self.table.setItem(i, col, cell)
-        self._loading = False
+                    if editable and not locked:
+                        flags |= Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+                    cell.setFlags(flags)
+                    cell.setCheckState(Qt.CheckState.Checked if val else Qt.CheckState.Unchecked)
+                    cell.setToolTip(self.COLS[col] + (" — حقل أساسي" if locked else ""))
+                    self.table.setItem(i, col, cell)
+                if f.key == key:
+                    self.table.setCurrentCell(i, column)
+            self._loaded_kind = kind
+        finally:
+            self._loading = False
+        self.columns.schedule()
 
     def on_change(self, cell: QTableWidgetItem) -> None:
-        if self._loading or cell.column() < 2:
+        if self._loading or cell.row() < 0 or cell.column() < 2:
+            return
+        if not cell.flags() & Qt.ItemFlag.ItemIsEnabled:
+            self.reload()
             return
         key = self.table.item(cell.row(), 0).data(Qt.ItemDataRole.UserRole)
         on = cell.checkState() == Qt.CheckState.Checked
@@ -364,13 +401,21 @@ class ItemFieldsTab(QWidget):
         self.reload()
 
     def add_custom(self) -> None:
-        dlg = CustomFieldDialog(self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            try:
-                items.add_custom_field(self.session.con, self.session.user, self.kind.currentData(), dlg.label, dlg.ftype, dlg.options)
-            except items.ItemError as e:
-                self.notice.show_message(str(e))
+        if not self.session.can("items.manage"):
+            self.notice.show_message("لا تملك صلاحية إدارة الأصناف")
             self.reload()
+            return
+        dlg = CustomFieldDialog(self)
+        try:
+            if dlg.exec() == QDialog.DialogCode.Accepted:
+                try:
+                    items.add_custom_field(self.session.con, self.session.user, self.kind.currentData(),
+                                           dlg.label, dlg.ftype, dlg.options)
+                except items.ItemError as e:
+                    self.notice.show_message(str(e))
+                self.reload()
+        finally:
+            dlg.deleteLater()
 
 
 class CustomFieldDialog(Modal):
@@ -378,22 +423,36 @@ class CustomFieldDialog(Modal):
         super().__init__("حقل مخصص", parent, width=440)
         self.label = self.ftype = ""
         self.options = []
-        lay = self.body
-        f = form()
         self.name = QLineEdit()
         self.type = QComboBox()
         for k, v in (("text", "نص"), ("num", "رقم"), ("sel", "قائمة اختيارات"), ("bool", "نعم / لا")):
             self.type.addItem(v, k)
         self.opts = QLineEdit()
-        self.opts.setPlaceholderText("للقائمة: الاختيارات مفصولة بـ |")
-        f.addRow("اسم الحقل", self.name)
-        f.addRow("النوع", self.type)
-        f.addRow("الاختيارات", self.opts)
-        lay.addLayout(f)
+        self.opts.setPlaceholderText("الاختيارات مفصولة بـ |")
+        self.body.addWidget(field("اسم الحقل *", self.name))
+        self.body.addWidget(field("النوع", self.type))
+        self.options_field = field("الاختيارات *", self.opts)
+        self.body.addWidget(self.options_field)
+        self.type.currentIndexChanged.connect(self._type_changed)
+        self._type_changed()
         self.add_footer("إضافة", self.go)
 
+    def _type_changed(self):
+        self.options_field.setVisible(self.type.currentData() == "sel")
+        if self.isVisible():
+            self._fit_height()
+
     def go(self) -> None:
-        self.label = self.name.text()
-        self.ftype = self.type.currentData()
-        self.options = [o for o in self.opts.text().split("|") if o.strip()]
+        label = self.name.text().strip()
+        ftype = self.type.currentData()
+        options = [o.strip() for o in self.opts.text().split("|") if o.strip()] if ftype == "sel" else []
+        if not label:
+            self.notice.show_message("اسم الحقل مطلوب")
+            self.name.setFocus()
+            return
+        if ftype == "sel" and not options:
+            self.notice.show_message("قائمة الاختيارات مطلوبة")
+            self.opts.setFocus()
+            return
+        self.label, self.ftype, self.options = label, ftype, options
         self.accept()
