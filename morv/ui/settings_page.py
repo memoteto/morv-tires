@@ -431,18 +431,39 @@ class AuditTab(QWidget):
     def __init__(self, session):
         super().__init__()
         lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(tokens.LAYOUT["pane_gap"])
+        lay.addWidget(muted("يعرض سجل العمليات من الأحدث إلى الأقدم. استخدم تحميل الأقدم لعرض المزيد."))
+        listing, inner = card("سجل العمليات", compact=True)
         self.model = AuditModel(session.con)
         self.view = _table(self.model)
-        lay.addWidget(self.view, 1)
-        row = QHBoxLayout()
-        refresh = QPushButton("تحديث")
-        refresh.clicked.connect(self.model.reload)
-        more = QPushButton("تحميل الأقدم")
-        more.clicked.connect(self.model.load_more)
-        row.addWidget(refresh)
-        row.addWidget(more)
-        row.addStretch(1)
+        self.view.setTextElideMode(Qt.TextElideMode.ElideNone)
+        self.columns = AdaptiveTableColumns(self.view, {0: 200, 1: 170, 2: 220, 3: 448}, {})
+        self.model.modelReset.connect(self.columns.schedule)
+        self.model.rowsInserted.connect(self.columns.schedule)
+        inner.addWidget(self.view, 1)
+        lay.addWidget(listing, 1)
+        self.refresh_btn = QPushButton("تحديث")
+        self.refresh_btn.clicked.connect(self.model.reload)
+        self.more_btn = QPushButton("تحميل الأقدم")
+        self.more_btn.clicked.connect(self.load_older)
+        self.count = muted("")
+        row = action_row(self.refresh_btn, self.more_btn)
+        row.addWidget(self.count)
         lay.addLayout(row)
+        self.model.modelReset.connect(self.update_count)
+        self.model.rowsInserted.connect(self.update_count)
+        self.update_count()
+
+    def update_count(self) -> None:
+        count = self.model.rowCount()
+        self.count.setText(f"{count} سجل معروض")
+        self.more_btn.setEnabled(count > 0)
+
+    def load_older(self) -> None:
+        if not self.model.load_more():
+            self.count.setText(f"{self.model.rowCount()} سجل معروض · لا توجد سجلات أقدم")
+            self.more_btn.setEnabled(False)
 
 
 class ShortcutsTab(QWidget):
