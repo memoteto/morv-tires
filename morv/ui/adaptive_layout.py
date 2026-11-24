@@ -88,9 +88,10 @@ class AdaptiveSplit(QWidget):
 
     mode_changed = Signal(bool)
 
-    def __init__(self, primary, detail):
+    def __init__(self, primary, detail, *, detail_max=None):
         super().__init__()
         self.primary, self.detail = primary, detail
+        self.detail_max = LAYOUT["preview_max"] if detail_max is None else detail_max
         self.compact = False
         self._detail_open = False
         self._state = None
@@ -135,7 +136,7 @@ class AdaptiveSplit(QWidget):
         self.compact = compact
         self.primary.setMinimumWidth(0 if compact else primary_min)
         self.detail.setMinimumWidth(0 if compact else detail_min)
-        self.detail.setMaximumWidth(16777215 if compact else max(detail_min, LAYOUT["preview_max"]))
+        self.detail.setMaximumWidth(16777215 if compact else max(detail_min, self.detail_max))
         self.primary.setVisible(not compact or not self._detail_open)
         self.detail.setVisible(not compact or self._detail_open)
         self.mode_changed.emit(compact)
@@ -236,9 +237,10 @@ class AdaptiveTableColumns(QObject):
 
 
 class AdaptiveFields(QWidget):
-    def __init__(self, fields):
+    def __init__(self, fields, *, minimum_width=None):
         super().__init__()
         self.fields = tuple(fields)
+        self.minimum_width = LAYOUT["form_field_min"] if minimum_width is None else minimum_width
         self.columns = 0
         self.grid = QGridLayout(self)
         self.grid.setContentsMargins(0, 0, 0, 0)
@@ -251,7 +253,7 @@ class AdaptiveFields(QWidget):
         self._reflow()
 
     def _field_minimum(self):
-        return max((max(LAYOUT["form_field_min"], w.minimumWidth(), w.minimumSizeHint().width())
+        return max((max(self.minimum_width, w.minimumWidth(), w.minimumSizeHint().width())
                     for w in self.fields), default=0)
 
     def minimumSizeHint(self):

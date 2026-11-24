@@ -130,6 +130,12 @@ class SummaryDetailRow(QWidget):
         self._stacked = False
         self._adapt()
 
+    def set_value(self, value: str) -> None:
+        self.value_label.setText(value or "—")
+        self.value_label.setToolTip(value or "—")
+        self._adapt()
+        self.updateGeometry()
+
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._adapt()

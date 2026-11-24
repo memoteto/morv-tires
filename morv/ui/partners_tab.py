@@ -1,14 +1,16 @@
 """Settings partner table, adaptive details, and existing profit controls."""
+from datetime import date
+
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QDialog, QLabel, QLineEdit, QPushButton,
-                               QTableView, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QDialog, QLineEdit, QPushButton,
+                               QSizePolicy, QTableView, QVBoxLayout, QWidget)
 
 from morv.core import profit_rules
 from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra import profit, treasury
-from morv.ui.adaptive_layout import AdaptiveSplit, AdaptiveTableColumns, scroll_content
-from morv.ui.listpage import TupleModel
+from morv.ui.adaptive_layout import AdaptiveFields, AdaptiveSplit, AdaptiveTableColumns, scroll_content
+from morv.ui.listpage import SummaryDetailRow, TupleModel
 from morv.ui.modal import Modal
 from morv.ui.profit_dialogs import ShareSetDialog
 from morv.ui.tokens import LAYOUT
@@ -55,33 +57,34 @@ class PartnersTab(QWidget):
 
         detail = QWidget()
         detail_layout = QVBoxLayout(detail)
-        detail_layout.setContentsMargins(0, 0, 0, 0)
+        detail_layout.setContentsMargins(0, 0, LAYOUT["preview_scroll_gutter"], 0)
         detail_layout.setSpacing(LAYOUT["pane_gap"])
         self.back_btn = QPushButton("رجوع إلى الشركاء")
         detail_layout.addLayout(action_row(self.back_btn))
         content = QWidget()
         cards = QVBoxLayout(content)
-        cards.setContentsMargins(0, 0, LAYOUT["preview_scroll_gutter"], 0)
+        cards.setContentsMargins(0, 0, 0, 0)
         cards.setSpacing(LAYOUT["pane_gap"])
         identity, inner = card("تفاصيل الشريك", compact=True)
-        self.name_label = QLabel()
-        self.name_label.setWordWrap(True)
-        self.name_label.setTextFormat(Qt.TextFormat.PlainText)
-        self.account_label = QLabel()
-        self.balance_label = QLabel()
-        self.status_label = QLabel()
-        for label, widget in (
-            ("اسم الشريك", self.name_label), ("الحساب الجاري", self.account_label),
-            ("رصيد الحساب الجاري", self.balance_label), ("الحالة", self.status_label),
-        ):
-            inner.addWidget(field(label, widget))
-        cards.addWidget(identity)
+        self.identity_card = identity
+        self.name_row, self.account_row, self.balance_row, self.status_row = (
+            self._detail_row(inner, label) for label in
+            ("اسم الشريك", "الحساب الجاري", "رصيد الجاري", "الحالة")
+        )
+        self.name_label = self.name_row.value_label
+        self.account_label = self.account_row.value_label
+        self.balance_label = self.balance_row.value_label
+        self.status_label = self.status_row.value_label
         self.active_btn = danger_button("إيقاف الشريك")
         self.active_btn.clicked.connect(self.toggle_active)
+        inner.addLayout(action_row(self.active_btn))
+        detail_layout.addWidget(identity)
         self.shares_btn = None
+        self.share_row = None
         self.reserve_edit = None
         if session.can("profit.manage"):
             shares, inner = card("حصص الأرباح", compact=True)
+            self.share_row = self._detail_row(inner, "الحصة السارية")
             self.shares_btn = primary_button("اعتماد الحصص")
             self.shares_btn.clicked.connect(self.edit_shares)
             inner.addLayout(action_row(self.shares_btn))
@@ -92,14 +95,17 @@ class PartnersTab(QWidget):
             self.reserve_edit.setText(profit_rules.fmt_percent(profit.reserve_bp(session.con)) or "0")
             save = primary_button("حفظ النسبة", "save")
             save.clicked.connect(self.save_reserve)
-            inner.addWidget(field("نسبة الاحتياطي من ربح الفترة %", self.reserve_edit))
-            inner.addLayout(action_row(save))
+            save.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            controls = AdaptiveFields([self.reserve_edit, save], minimum_width=0)
+            inner.addWidget(field("نسبة الاحتياطي من ربح الفترة %", controls))
             cards.addWidget(reserve)
         cards.addStretch(1)
         self.detail_scroll = scroll_content(content)
         detail_layout.addWidget(self.detail_scroll, 1)
-        detail_layout.addLayout(action_row(self.active_btn))
-        self.split = AdaptiveSplit(table_panel, detail)
+        self.detail_scroll.setVisible(self.share_row is not None)
+        if self.share_row is None:
+            detail_layout.addStretch(1)
+        self.split = AdaptiveSplit(table_panel, detail, detail_max=LAYOUT["settings_partner_preview_max"])
         lay.addWidget(self.split, 1)
         self.split.mode_changed.connect(self._sync_mode)
         self.details_btn.clicked.connect(self.split.show_detail)
@@ -110,6 +116,15 @@ class PartnersTab(QWidget):
         lay.addWidget(self.notice)
         self.reload()
         self._sync_mode(self.split.compact)
+
+    @staticmethod
+    def _detail_row(layout, title):
+        row = SummaryDetailRow(title, "")
+        row.value_label.setTextFormat(Qt.TextFormat.PlainText)
+        row.value_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute
+                                     | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(row)
+        return row
 
     def _sync_mode(self, compact):
         self.details_btn.setVisible(compact)
@@ -123,10 +138,16 @@ class PartnersTab(QWidget):
 
     def _update_detail(self):
         cur = self._current()
-        self.name_label.setText(cur[1] if cur else "—")
-        self.account_label.setText(ltr(cur[2]) if cur else "—")
-        self.balance_label.setText(ltr(fmt(cur[4])) if cur else "—")
-        self.status_label.setText(("نشط" if cur[3] else "موقوف") if cur else "—")
+        self.name_row.set_value(cur[1] if cur else "—")
+        self.account_row.set_value(ltr(cur[2]) if cur else "—")
+        self.balance_row.set_value(ltr(fmt(cur[4])) if cur else "—")
+        self.status_row.set_value(("نشط" if cur[3] else "موقوف") if cur else "—")
+        if self.share_row is not None:
+            effective = (profit.shares_effective(self.session.con, date.today().isoformat())
+                         if cur and self.session.can("profit.manage") else None)
+            bp = next((bp for pid, _, bp in effective[2] if pid == cur[0]), None) if effective else None
+            self.share_row.set_value(ltr(profit_rules.fmt_percent(bp) + "%") if bp is not None
+                                     else "غير معتمدة" if cur else "—")
         active = cur is None or cur[3]
         self.active_btn.setText("إيقاف الشريك" if active else "تفعيل الشريك")
         self.active_btn.setObjectName("danger" if active else "success")
