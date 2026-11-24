@@ -54,12 +54,18 @@ class PartnerStatusTest(_Base):
             self.assertTrue(tab.identity_card.isAncestorOf(tab.active_btn))
             self.assertFalse(tab.detail_scroll.isAncestorOf(tab.active_btn))
             today = date.today()
+            profit.set_shares(self.con, self.admin, request_key="s5-previous-test",
+                              effective_from=(today - timedelta(days=1)).isoformat(),
+                              shares=[(a.id, 5000), (b.id, 5000)], memo="Test previous")
+            tab.reload(a.id)
+            self.assertEqual(tab.share_row.value_label.text(), ltr("50%"))
             profit.set_shares(self.con, self.admin, request_key="s5-current-test",
                               effective_from=today.isoformat(),
                               shares=[(a.id, 6000), (b.id, 4000)], memo="Test current")
-            profit.set_shares(self.con, self.admin, request_key="s5-future-test",
-                              effective_from=(today + timedelta(days=1)).isoformat(),
-                              shares=[(a.id, 5000), (b.id, 5000)], memo="Test future")
+            with self.assertRaisesRegex(profit.ProfitError, "في المستقبل"):
+                profit.set_shares(self.con, self.admin, request_key="s5-future-test",
+                                  effective_from=(today + timedelta(days=1)).isoformat(),
+                                  shares=[(a.id, 5000), (b.id, 5000)], memo="Test future")
             tab.reload(a.id)
             self.assertEqual(tab.share_row.value_label.text(), ltr("60%"))
             tab.table.setCurrentIndex(tab.model.index(1, 0))

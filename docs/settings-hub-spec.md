@@ -362,3 +362,7 @@ PR #146 مسودة، CI 45394449322 للرأس 6d6f16a41eedb6a814a69634151855441
 
 ### S5 — owner visual review and approved refinements (2026-11-24)
 - Owner screenshots on `3d29e71`: correct table/selection and status labels in both themes; awkward value alignment and distant status button. Approved compact shared detail rows, fixed identity action inside its card, effective selected-partner profit share (read only, no future shares), adaptive reserve input/save and a narrower detail cap. Existing accounting, permissions and save methods unchanged. Linux CI for prior commit succeeded; Windows was pending at review. New CI and owner geometry/visual acceptance pending.
+
+### S5 — correct invalid regression fixture (2026-11-24)
+- Owner local run on `258e260`: 58 tests, 57 passed, one error in the new test because ledger.valid_date rejects future share effective dates. Confirmed from source; this is a fixture error, not a change request to accounting.
+- Test now approves yesterday's 50/50 shares, checks the displayed value, approves today's 60/40 shares, explicitly asserts rejection of tomorrow's shares, then retains both current-share and fixed-action assertions. Only test and this log changed. Re-run pending; no product or accounting change.
