@@ -1,4 +1,4 @@
-"""Tabs carry an icon beside their title, and yes/no columns carry theirs as an icon plus a tooltip."""
+"""Navigation icons and adaptive check-column headers retain their accessible titles."""
 import os
 import shutil
 import tempfile
@@ -44,16 +44,21 @@ class TabAndHeaderIconsTest(unittest.TestCase):
             self.assertFalse(page.tabs.tabIcon(index).isNull(),
                              f"the tab {page.tabs.tabText(index)} lost its icon when it was built")
 
-    def test_yes_no_columns_show_an_icon_and_keep_their_title_as_a_tooltip(self):
+    def test_yes_no_columns_keep_titles_and_tooltips_when_wide(self):
+        from PySide6.QtCore import Qt
         from morv.ui.inventory_page import ItemFieldsTab
         from morv.ui.widgets import dispose
         tab = ItemFieldsTab(self.session)
         self.addCleanup(dispose, tab, self.app)
-        for col in ItemFieldsTab.COL_ICONS:
+        tab.resize(1100, 500)
+        tab.show()
+        for _ in range(12):
+            self.app.processEvents()
+        for col, (label, _) in ItemFieldsTab.CONTROLS.items():
             head = tab.table.horizontalHeaderItem(col)
-            self.assertFalse(head.icon().isNull(), f"column {col} lost its icon")
-            self.assertEqual("", head.text(), f"column {col} still spends width on a title")
-            self.assertEqual(ItemFieldsTab.COLS[col], head.toolTip(), f"column {col} lost its tooltip")
+            self.assertEqual(label, head.text())
+            self.assertEqual(ItemFieldsTab.COLS[col], head.toolTip())
+            self.assertEqual(ItemFieldsTab.COLS[col], head.data(Qt.ItemDataRole.AccessibleTextRole))
 
     def test_tabbed_pages_fit_on_one_row_at_1366_with_the_sidebar_open(self):
         from morv.ui.shell import MainWindow
@@ -79,16 +84,34 @@ class TabAndHeaderIconsTest(unittest.TestCase):
                 tight.append(f"{key}: tabs want {needed}px, bar has {tabs.width()}px")
         self.assertEqual([], tight, "tabs would hide behind scroll arrows")
 
-    def test_the_icon_columns_are_narrower_than_the_titles_they_replaced(self):
-        from PySide6.QtWidgets import QHeaderView
+    def test_compact_icons_and_wrapped_long_field_at_narrow_width(self):
+        from PySide6.QtCore import Qt
+        from morv.infra import items
         from morv.ui.inventory_page import ItemFieldsTab
-        from morv.ui.widgets import dispose
+        from morv.ui.widgets import dispose, muted_icon
+        long_name = " ".join(["اسم حقل مخصص طويل"] * 20)
+        key = items.add_custom_field(self.con, self.session.user, "common", long_name, "text")
         tab = ItemFieldsTab(self.session)
         self.addCleanup(dispose, tab, self.app)
-        tab.resize(900, 500)
+        tab.resize(620, 500)
         tab.show()
-        self.app.processEvents()
-        header = tab.table.horizontalHeader()
-        for col, title in ((c, ItemFieldsTab.COLS[c]) for c in ItemFieldsTab.COL_ICONS):
-            self.assertEqual(QHeaderView.ResizeMode.ResizeToContents, header.sectionResizeMode(col),
-                             f"column {col} ({title}) would keep its old fixed width")
+        for _ in range(12):
+            self.app.processEvents()
+        table = tab.table
+        for col, (_, icon_name) in ItemFieldsTab.CONTROLS.items():
+            head = table.horizontalHeaderItem(col)
+            self.assertEqual("", head.text())
+            self.assertFalse(head.icon().isNull())
+            self.assertEqual(head.icon().pixmap(16, 16).toImage(),
+                             muted_icon(icon_name).pixmap(16, 16).toImage())
+            self.assertEqual(ItemFieldsTab.COLS[col], head.toolTip())
+            self.assertEqual(ItemFieldsTab.COLS[col], head.data(Qt.ItemDataRole.AccessibleTextRole))
+            self.assertGreaterEqual(table.columnWidth(col), table.sizeHintForColumn(col))
+            self.assertGreaterEqual(table.columnWidth(col), table.horizontalHeader().sectionSizeHint(col))
+        row = next(r for r in range(table.rowCount())
+                   if table.item(r, 0).data(Qt.ItemDataRole.UserRole) == key)
+        self.assertEqual(table.item(row, 0).text(), long_name)
+        self.assertEqual(table.item(row, 0).toolTip(), long_name)
+        self.assertFalse(table.horizontalScrollBar().isVisible())
+        self.assertGreater(table.rowHeight(row), 36)
+        self.assertGreaterEqual(table.rowHeight(row), table.sizeHintForRow(row))

@@ -1,6 +1,7 @@
 """Shared adaptive card layout and page chrome without business dependencies."""
-from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QScrollArea,
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLayout, QScrollArea,
                                QSizePolicy, QVBoxLayout, QWidget)
 
 from morv.ui.tokens import LAYOUT
@@ -80,6 +81,100 @@ class AdaptiveCards(QScrollArea):
             self.grid.addWidget(card, index // columns, index % columns)
         self.columns = columns
         self.grid.invalidate()
+
+
+class AdaptiveTableColumns(QObject):
+    """Opt-in measured column allocation for tables with flexible text and compact controls."""
+
+    def __init__(self, table, text_weights, controls):
+        super().__init__(table)
+        self.table = table
+        self.text_weights = dict(text_weights)
+        self.controls = dict(controls)
+        header = table.horizontalHeader()
+        # Qt's automatic minimum can be wider than an entire check-state cell.
+        header.setMinimumSectionSize(1)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        header.setStretchLastSection(False)
+        rows = table.verticalHeader()
+        rows.setMinimumSectionSize(LAYOUT["adaptive_table_row_min"])
+        rows.setDefaultSectionSize(LAYOUT["adaptive_table_row_min"])
+        table.setWordWrap(True)
+        self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.reflow)
+        table.installEventFilter(self)
+        table.viewport().installEventFilter(self)
+        self.schedule()
+
+    def schedule(self):
+        self.timer.start(0)
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.Resize, QEvent.Type.Show,
+                            QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            self.schedule()
+        return super().eventFilter(watched, event)
+
+    def _headers(self, compact):
+        for col, (label, icon) in self.controls.items():
+            item = self.table.horizontalHeaderItem(col)
+            text = "" if compact else label
+            if item.text() != text or item.icon().isNull() == compact:
+                item.setText(text)
+                item.setIcon(icon if compact else QIcon())
+
+    def _natural_width(self, col):
+        return max(1, self.table.sizeHintForColumn(col),
+                   self.table.horizontalHeader().sectionSizeHint(col)) + 1
+
+    def _weighted_widths(self, budget, minima):
+        # Honor measured minima before dividing the remaining width by the reference weights.
+        if budget <= sum(minima.values()):
+            return dict(minima)
+        result = {}
+        pending = list(self.text_weights)
+        while pending:
+            total_weight = sum(self.text_weights[c] for c in pending)
+            constrained = [c for c in pending
+                           if budget * self.text_weights[c] < minima[c] * total_weight]
+            if not constrained:
+                for col in pending[:-1]:
+                    result[col] = budget * self.text_weights[col] // total_weight
+                result[pending[-1]] = budget - sum(result[c] for c in pending[:-1])
+                break
+            for col in constrained:
+                result[col] = minima[col]
+                budget -= minima[col]
+                pending.remove(col)
+        return result
+
+    def reflow(self):
+        if not self.table.isVisible():
+            return
+        width = self.table.viewport().width()
+        if width <= 0:
+            return
+        header = self.table.horizontalHeader()
+        self._headers(False)
+        text_need = {c: self._natural_width(c) for c in self.text_weights}
+        controls = {c: max(LAYOUT["adaptive_table_control_target"], self._natural_width(c))
+                    for c in self.controls}
+        if sum(text_need.values()) + sum(controls.values()) > width:
+            controls = {c: self._natural_width(c) for c in self.controls}
+        if sum(text_need.values()) + sum(controls.values()) > width:
+            self._headers(True)
+            controls = {c: self._natural_width(c) for c in self.controls}
+        budget = width - sum(controls.values())
+        minima = text_need
+        if sum(minima.values()) > budget:
+            minima = {c: max(1, header.sectionSizeHint(c)) + 1 for c in self.text_weights}
+        widths = self._weighted_widths(budget, minima)
+        widths.update(controls)
+        for col, size in widths.items():
+            if self.table.columnWidth(col) != size:
+                self.table.setColumnWidth(col, size)
+        self.table.resizeRowsToContents()
 
 
 class AdaptiveFields(QWidget):
