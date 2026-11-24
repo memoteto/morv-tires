@@ -9,12 +9,18 @@ from morv.ui import icons, tokens
 from morv.ui.tokens import DARK, LIGHT
 
 
-def card(title: str | None = None) -> tuple[QFrame, QVBoxLayout]:
+def card(title: str | None = None, *, compact: bool = False) -> tuple[QFrame, QVBoxLayout]:
     box = QFrame()
     box.setObjectName("card")
     lay = QVBoxLayout(box)
-    lay.setContentsMargins(18, 16, 18, 16)
-    lay.setSpacing(12)
+    if compact:
+        x = tokens.LAYOUT["compact_card_padding_x"]
+        y = tokens.LAYOUT["compact_card_padding_y"]
+        lay.setContentsMargins(x, y, x, y)
+        lay.setSpacing(tokens.LAYOUT["compact_card_spacing"])
+    else:
+        lay.setContentsMargins(18, 16, 18, 16)
+        lay.setSpacing(12)
     if title:
         head = QLabel(title)
         head.setObjectName("cardTitle")
