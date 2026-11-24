@@ -146,11 +146,11 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         from morv.ui.widgets import dispose
         page = SettingsPage(self.session)
         self.addCleanup(dispose, page, self.app)
-        titles = [page.tabs.tabText(i) for i in range(page.tabs.count())]
+        titles = [page.title_for(key) for key in page.destinations]
         self.assertIn("الشركاء", titles)
         other = SettingsPage(self.cashier_session)
         self.addCleanup(dispose, other, self.app)
-        self.assertNotIn("الشركاء", [other.tabs.tabText(i) for i in range(other.tabs.count())])
+        self.assertNotIn("الشركاء", [other.title_for(key) for key in other.destinations])
 
     def test_close_dialog_closes_the_till_and_the_page_shows_the_note(self):
         from morv.core.text import ltr

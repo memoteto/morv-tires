@@ -38,8 +38,7 @@ def _dialogs(session, item_id):
 
 
 # Tabs holding a table or form of their own, which a shot of the page's first tab never shows
-EXTRA_TABS = {"settings": (("item_fields", "حقول بطاقة الصنف"), ("audit", "سجل العمليات")),
-              "inventory": (("lots", "الدفعات (DOT)"), ("stock", "الجرد والتسويات"))}
+EXTRA_TABS = {"inventory": (("lots", "الدفعات (DOT)"), ("stock", "الجرد والتسويات"))}
 
 
 def _open_first_preview(page, app) -> bool:
@@ -164,6 +163,25 @@ def run(out: Path, size: tuple) -> dict:
                     win.grab().save(str(out / f"{shot}.png"))
                     report["pages"][shot] = _measure(win)
                     win.go_key(key)          # rebuild the page so the next shot starts without a preview
+                    _settle(app)
+                if key == "settings":
+                    page = win.stack.currentWidget()
+                    win.toggle_sidebar()
+                    _settle(app)
+                    side = "collapsed" if win.collapsed else "open"
+                    shot = f"page_settings_sidebar_{side}_{w}x{h}_{mode}"
+                    win.grab().save(str(out / f"{shot}.png"))
+                    report["pages"][shot] = _measure(win)
+                    win.toggle_sidebar()
+                    _settle(app)
+                    for route in page.destinations:
+                        if not page.open_page(route):
+                            raise RuntimeError(f"audit: cannot open settings/{route}")
+                        _settle(app)
+                        shot = f"page_settings_tab_{route}_{w}x{h}_{mode}"
+                        win.grab().save(str(out / f"{shot}.png"))
+                        report["pages"][shot] = _measure(win)
+                    page.show_hub()
                     _settle(app)
                 tabs = getattr(win.stack.currentWidget(), "tabs", None)
                 for tab_name, tab_index in _tabs_worth_capturing(tabs, key):

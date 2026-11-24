@@ -66,7 +66,7 @@ class TabAndHeaderIconsTest(unittest.TestCase):
         if win.collapsed:                 # the open sidebar is the narrow case, so measure that one
             win.toggle_sidebar()
         tight = []
-        for key in ("settings", "inventory"):
+        for key in ("inventory",):
             win.go_key(key)
             for _ in range(5):
                 self.app.processEvents()

@@ -159,11 +159,13 @@ class SettingsTest(_Base):
         self.make_admin()
         k = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
         admin_page = SettingsPage(self.session())        # kept in a variable, or Qt takes it and its tabs away
-        self.assertEqual(admin_page.tabs.count(), 9)     # shop, users, log, fields, partners, opening, appearance, shortcuts, backup
+        self.assertEqual(len(admin_page.destinations), 9)     # shop, users, log, fields, partners, opening, appearance, shortcuts, backup
         self.assertIsNotNone(admin_page.fields_tab)
         p = SettingsPage(self.session(k))
-        self.assertEqual(p.tabs.count(), 3)               # appearance, shortcuts and backup only
+        self.assertEqual(len(p.destinations), 3)               # appearance, shortcuts and backup only
         self.assertIsNone(p.shop_tab)                     # never sees shop data at all
+        self.assertFalse(p.open_page("shop"))
+        self.assertTrue(p.open_page("backup"))
         self.assertFalse(p.backup_tab.restore_btn.isVisibleTo(p))
         self.assertFalse(p.backup_tab.pw_btn.isVisibleTo(p))      # the backup password is for a manager only
         self.assertFalse(p.backup_tab.usb_dir.isEnabled())
@@ -277,7 +279,8 @@ class ShellHealthTest(_Base):
         w.open_backup()
         self.assertEqual(w.title.text(), "الإعدادات")
         page = w.pages["settings"]
-        self.assertIs(page.tabs.currentWidget(), page.backup_tab)
+        self.assertEqual(page.current_key, "backup")
+        self.assertIs(page.stack.currentWidget(), page.backup_tab)
 
 
 if __name__ == "__main__":

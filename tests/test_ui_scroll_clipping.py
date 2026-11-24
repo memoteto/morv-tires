@@ -72,6 +72,13 @@ class ScrollAreaClippingTest(unittest.TestCase):
                     self.app.processEvents()
                     side = "collapsed" if collapsed == "1" else "open"
                     problems += [f"{key} @{width}x{height} sidebar {side}: {c}" for c in self.clipped(win)]
+                    if key == "settings":
+                        page = win.pages[key]
+                        self.assertTrue(page.open_page("shop"))
+                        self.app.processEvents()
+                        problems += [f"settings/shop @{width}x{height} sidebar {side}: {c}"
+                                     for c in self.clipped(win)]
+                        page.show_hub()
             win.close()
         self.assertEqual(problems, [], "scroll areas clip their content sideways")
 

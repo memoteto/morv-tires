@@ -200,8 +200,8 @@ class MainWindow(QMainWindow):
     def open_backup(self) -> None:
         self.go_key("settings")
         page = self.pages["settings"]
-        page.tabs.setCurrentWidget(page.backup_tab)
-        page.backup_tab.refresh()
+        if page.open_page("backup"):
+            page.backup_tab.refresh()
 
     def logout(self) -> None:
         self.session.on_logout()
