@@ -208,9 +208,9 @@ class UsersTab(QWidget):
         self.list.setSpacing(2)
         self.list.setUniformItemSizes(True)
         self.list.currentRowChanged.connect(self._select)
-        new = primary_button("مستخدم جديد", "plus")
-        new.clicked.connect(self.new_user)
-        left.addWidget(new)
+        self.new_btn = primary_button("مستخدم جديد", "plus")
+        self.new_btn.clicked.connect(self.new_user)
+        left.addWidget(self.new_btn)
         left.addWidget(self.list, 1)
         left.addWidget(muted("كل عملية حساسة تُسجَّل باسم المستخدم ووقتها في سجل العمليات."))
         row.addLayout(left, 1)
@@ -289,14 +289,18 @@ class UsersTab(QWidget):
         self.title.setText(u.display_name)
         self.sub.setText(f"اسم الدخول: {ltr(u.username)}")
         self.role.setCurrentIndex(list(security.ROLES).index(u.role))
-        perms = users.permissions(self.session.con, u)
+        editable = self.session.can("users.manage")
+        perms = users.configured_permissions(self.session.con, u)
+        self.new_btn.setEnabled(editable)
+        self.role.setEnabled(editable)
+        self.pw_btn.setEnabled(editable)
         for key, cb in self.checks.items():
             cb.setChecked(key in perms)
-            cb.setEnabled(not u.is_manager)
-        self.discount_cap.setValue(users.permission_limit(self.session.con, u, "sales.discount") or 0)
-        self.discount_cap.setEnabled(not u.is_manager)
+            cb.setEnabled(editable and not u.is_manager)
+        self.discount_cap.setValue(users.configured_permission_limit(self.session.con, u, "sales.discount") or 0)
+        self.discount_cap.setEnabled(editable and not u.is_manager)
         self.active_btn.setText("إيقاف الحساب" if u.active else "تفعيل الحساب")
-        self.active_btn.setEnabled(u.id != self.session.user.id)
+        self.active_btn.setEnabled(editable and u.id != self.session.user.id)
         self.notice.show_message("")
         self._loading = False
 
@@ -309,26 +313,36 @@ class UsersTab(QWidget):
         try:
             users.set_role(self.session.con, self.session.user, self.current.id, role)
         except users.AuthError as e:
+            self.reload(self.current.id)
             self.notice.show_message(str(e))
-            self._loading = True
-            self.role.setCurrentIndex(list(security.ROLES).index(self.current.role))
-            self._loading = False
             return
+        if self.current.id == self.session.user.id:
+            self.session.refresh_user()
         self.reload(self.current.id)
 
     def _perm_changed(self, key: str, on: bool) -> None:
         if self._loading or not self.current or self.current.is_manager:
             return
         limit = self.discount_cap.value() if key == "sales.discount" else None
-        users.set_permission(self.session.con, self.session.user, self.current.id, key, on, limit)
+        try:
+            users.set_permission(self.session.con, self.session.user, self.current.id, key, on, limit)
+        except users.AuthError as e:
+            self.reload(self.current.id)
+            self.notice.show_message(str(e))
+            return
+        if self.current.id == self.session.user.id:
+            self.reload(self.current.id)
 
     def new_user(self) -> None:
+        if not self.session.can("users.manage"):
+            self.reload()
+            return
         dlg = NewUserDialog(self.session, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.reload(dlg.created.id)
 
     def reset_password(self) -> None:
-        if not self.current:
+        if not self.current or not self.session.can("users.manage"):
             return
         dlg = TempPasswordDialog(self.session, self.current, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:

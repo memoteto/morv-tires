@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QFrame, QGridLayo
 from morv.core import sales_rules
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
-from morv.infra import customers, items, sale_view, sales
+from morv.infra import customers, items, sale_view, sales, users
 from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons, tokens
 from morv.ui.inventory_page import ItemDialog
@@ -126,7 +126,7 @@ class PosPage(QWidget):
         for key, label in TIER_LABELS.items():
             self.tier_combo.addItem(label, key)
         self.tier_combo.currentIndexChanged.connect(lambda _i: self._set_tier(self.tier_combo.currentData()))
-        self.tier_combo.setEnabled(bool(getattr(self.session.user, "is_manager", False)))
+        self.tier_combo.setEnabled(users.is_active_manager(self.session.con, self.session.user))
         self.odometer = ltr_edit("مثال: 84500")
 
         self.customer = QComboBox()

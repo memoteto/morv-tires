@@ -84,9 +84,9 @@ def check_new_user(username: str, display_name: str, password: str, role: str) -
 def create_user(con, by: User | None, username: str, display_name: str, password: str, role: str,
                 must_change_pw: bool = False) -> User:
     u, pw_hash = check_new_user(username, display_name, password, role)
-    if not (by is None and con.execute("SELECT 1 FROM users").fetchone() is None):   # only the very first manager is unauthenticated
-        require(con, by, "users.manage")
     with transaction(con):
+        if not (by is None and con.execute("SELECT 1 FROM users").fetchone() is None):
+            require(con, by, "users.manage")
         uid = insert_user(con, by, u, display_name.strip(), role, pw_hash, must_change_pw)
     return get_user(con, uid)
 
@@ -131,47 +131,69 @@ def _active_managers(con, excluding: int | None = None) -> int:
 
 
 def set_active(con, by: User, user_id: int, active: bool) -> None:
-    require(con, by, "users.manage", AuthError)
-    target = get_user(con, user_id)
-    if not active:
-        if by.id == user_id:
-            raise AuthError("لا يمكنك إيقاف حسابك الحالي")
-        if target.is_manager and _active_managers(con, excluding=user_id) == 0:
-            raise AuthError("لا بد من مدير واحد نشط على الأقل")
     with transaction(con):
+        require(con, by, "users.manage", AuthError)
+        target = get_user(con, user_id)
+        if not active:
+            if by.id == user_id:
+                raise AuthError("لا يمكنك إيقاف حسابك الحالي")
+            if target.is_manager and _active_managers(con, excluding=user_id) == 0:
+                raise AuthError("لا بد من مدير واحد نشط على الأقل")
         con.execute("UPDATE users SET active=? WHERE id=?", (int(active), user_id))
         audit(con, by, "user.activate" if active else "user.deactivate", "user", user_id, target.username)
 
 
 def set_role(con, by: User, user_id: int, role: str) -> None:
-    require(con, by, "users.manage", AuthError)
-    if role not in security.ROLES:
-        raise AuthError("دور غير معروف")
-    target = get_user(con, user_id)
-    if target.is_manager and role != "manager" and _active_managers(con, excluding=user_id) == 0:
-        raise AuthError("لا بد من مدير واحد نشط على الأقل")
     with transaction(con):
+        require(con, by, "users.manage", AuthError)
+        if role not in security.ROLES:
+            raise AuthError("دور غير معروف")
+        target = get_user(con, user_id)
+        if target.is_manager and role != "manager" and _active_managers(con, excluding=user_id) == 0:
+            raise AuthError("لا بد من مدير واحد نشط على الأقل")
         con.execute("UPDATE users SET role=? WHERE id=?", (role, user_id))
         _reset_permissions(con, user_id, role)
         audit(con, by, "user.role", "user", user_id, f"{target.username} → {security.ROLES[role]}")
 
 
 def set_permission(con, by: User, user_id: int, perm: str, allowed: bool, limit_value: int | None = None) -> None:
-    require(con, by, "users.manage", AuthError)
-    if perm not in security.PERMISSIONS:
-        raise AuthError("صلاحية غير معروفة")
     with transaction(con):
+        require(con, by, "users.manage", AuthError)
+        if perm not in security.PERMISSIONS:
+            raise AuthError("صلاحية غير معروفة")
         con.execute("INSERT INTO user_permissions (user_id, perm, allowed, limit_value) VALUES (?,?,?,?) "
                     "ON CONFLICT(user_id, perm) DO UPDATE SET allowed=excluded.allowed, limit_value=excluded.limit_value",
                     (user_id, perm, int(allowed), limit_value))
         audit(con, by, "user.permission", "user", user_id, f"{perm}={'1' if allowed else '0'}")
 
 
-def permissions(con, user: User) -> set:
-    if user.is_manager:
+def _permission_rows(con, user: User):
+    return con.execute(
+        "SELECT u.role, u.active, p.perm FROM users u LEFT JOIN user_permissions p "
+        "ON p.user_id=u.id AND p.allowed=1 WHERE u.id=?", (user.id,)).fetchall()
+
+
+def _permissions(con, user: User, effective: bool) -> set:
+    rows = _permission_rows(con, user)
+    if not rows or (effective and not rows[0][1]):
+        return set()
+    if rows[0][0] == "manager":
         return set(security.PERMISSIONS)
-    rows = con.execute("SELECT perm FROM user_permissions WHERE user_id=? AND allowed=1", (user.id,)).fetchall()
-    return {r[0] for r in rows} & set(security.PERMISSIONS)
+    return {r[2] for r in rows} & set(security.PERMISSIONS)
+
+
+def permissions(con, user: User) -> set:
+    return _permissions(con, user, effective=True)
+
+
+def configured_permissions(con, user: User) -> set:
+    """Show saved permissions in user administration, not for authorization."""
+    return _permissions(con, user, effective=False)
+
+
+def is_active_manager(con, user: User) -> bool:
+    row = con.execute("SELECT role, active FROM users WHERE id=?", (user.id,)).fetchone()
+    return bool(row and row[1] and row[0] == "manager")
 
 
 def has_permission(con, user: User, perm: str) -> bool:
@@ -184,13 +206,24 @@ def require(con, by, perm: str, error=AuthError) -> None:
         raise error(f"لا تملك صلاحية: {security.PERMISSIONS[perm]}")
 
 
+def _permission_limit(con, user: User, perm: str, effective: bool) -> int | None:
+    row = con.execute(
+        "SELECT u.role, u.active, p.limit_value FROM users u LEFT JOIN user_permissions p "
+        "ON p.user_id=u.id AND p.perm=? AND p.allowed=1 WHERE u.id=?",
+        (perm, user.id)).fetchone()
+    if not row or (effective and not row[1]):
+        return 0
+    return None if row[0] == "manager" else (row[2] or 0)
+
+
 def permission_limit(con, user: User, perm: str) -> int | None:
-    """Numeric cap for a permission; None means unlimited (managers), a missing cap means 0."""
-    if user.is_manager:
-        return None
-    row = con.execute("SELECT limit_value FROM user_permissions WHERE user_id=? AND perm=? AND allowed=1",
-                      (user.id, perm)).fetchone()
-    return row[0] or 0 if row else 0
+    """Numeric cap for a permission; None means unlimited (active managers)."""
+    return _permission_limit(con, user, perm, effective=True)
+
+
+def configured_permission_limit(con, user: User, perm: str) -> int | None:
+    """Display the saved cap even for an inactive account."""
+    return _permission_limit(con, user, perm, effective=False)
 
 
 def set_password(con, by: User, user_id: int, new_password: str, must_change: bool = False) -> None:
@@ -198,17 +231,21 @@ def set_password(con, by: User, user_id: int, new_password: str, must_change: bo
         pw_hash = security.hash_password(new_password)
     except ValueError as e:
         raise AuthError(str(e)) from e
-    if by.id != user_id:
-        require(con, by, "users.manage")
     with transaction(con):
+        if by is None or by.id != user_id:
+            require(con, by, "users.manage")
+        elif not get_user(con, by.id).active:
+            raise AuthError("الحساب موقوف")
         con.execute("UPDATE users SET pw_hash=?, must_change_pw=?, failed_count=0, locked_until=NULL WHERE id=?",
                     (pw_hash, int(must_change), user_id))
         audit(con, by, "user.password", "user", user_id, "تعيين كلمة مرور" if by.id != user_id else "تغيير كلمة المرور")
 
 
 def change_own_password(con, user: User, old_password: str, new_password: str) -> None:
-    stored = con.execute("SELECT pw_hash FROM users WHERE id=?", (user.id,)).fetchone()[0]
-    if not security.verify_password(old_password, stored):
+    row = con.execute("SELECT pw_hash FROM users WHERE id=? AND active=1", (user.id,)).fetchone()
+    if row is None:
+        raise AuthError("الحساب غير موجود أو موقوف")
+    if not security.verify_password(old_password, row[0]):
         raise AuthError("كلمة المرور الحالية غير صحيحة")
     # Found in testing: the temporary password was accepted again, so the manager still knew it
     if new_password == old_password:

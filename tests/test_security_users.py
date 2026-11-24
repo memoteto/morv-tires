@@ -97,8 +97,16 @@ class UsersTest(unittest.TestCase):
             users.set_active(self.con, self.admin, self.admin.id, False)
         second = users.create_user(self.con, self.admin, "boss2", "مدير ثانٍ", "Boss123456", "manager")
         users.set_active(self.con, second, self.admin.id, False)   # now another manager is active
-        with self.assertRaisesRegex(users.AuthError, "مدير واحد"):
+        with self.assertRaisesRegex(users.AuthError, "صلاحية"):
             users.set_active(self.con, self.admin, second.id, False)
+        delegate = users.create_user(self.con, second, "delegate", "Delegate", "Delegate123", "cashier")
+        users.set_permission(self.con, second, delegate.id, "users.manage", True)
+        with self.assertRaisesRegex(users.AuthError, "مدير واحد"):
+            users.set_active(self.con, delegate, second.id, False)
+        with self.assertRaisesRegex(users.AuthError, "مدير واحد"):
+            users.set_role(self.con, delegate, second.id, "cashier")
+        self.assertTrue(users.get_user(self.con, second.id).active)
+        self.assertEqual(users.get_user(self.con, second.id).role, "manager")
 
     def test_permissions(self):
         c = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
@@ -195,6 +203,30 @@ class UsersTest(unittest.TestCase):
             self.assertEqual(users.audit_rows(self.con), before)
         users.set_active(self.con, self.admin, cashier.id, True)
         self.assertEqual(users.login(self.con, "cashier", "Cash12345").id, cashier.id)
+
+    def test_inactive_configuration_is_preserved(self):
+        cashier = users.create_user(self.con, self.admin, "cashier", "Cashier", "Cash12345", "cashier")
+        users.set_permission(self.con, self.admin, cashier.id, "sales.discount", True, 5)
+        before = users.permissions(self.con, cashier)
+        users.set_active(self.con, self.admin, cashier.id, False)
+        self.assertEqual(users.permissions(self.con, cashier), set())
+        self.assertEqual(users.configured_permissions(self.con, cashier), before)
+        self.assertEqual(users.configured_permission_limit(self.con, cashier, "sales.discount"), 5)
+        self.assertEqual(users.permission_limit(self.con, cashier, "sales.discount"), 0)
+        users.set_active(self.con, self.admin, cashier.id, True)
+        self.assertEqual(users.permissions(self.con, cashier), before)
+        self.assertEqual(users.permission_limit(self.con, cashier, "sales.discount"), 5)
+
+    def test_manager_check_reads_current_role_and_activity(self):
+        manager = users.create_user(self.con, self.admin, "manager2", "Manager", "Boss12345", "manager")
+        self.assertTrue(users.is_active_manager(self.con, manager))
+        users.set_role(self.con, self.admin, manager.id, "cashier")
+        self.assertFalse(users.is_active_manager(self.con, manager))
+        users.set_role(self.con, self.admin, manager.id, "manager")
+        users.set_active(self.con, self.admin, manager.id, False)
+        self.assertFalse(users.is_active_manager(self.con, manager))
+        self.assertEqual(users.configured_permissions(self.con, manager), set(security.PERMISSIONS))
+        self.assertIsNone(users.configured_permission_limit(self.con, manager, "sales.discount"))
 
     def test_password_change(self):
         with self.assertRaises(users.AuthError):
