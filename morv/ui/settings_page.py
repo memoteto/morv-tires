@@ -1,20 +1,21 @@
-"""Settings tabs: shop, users, audit log, shortcuts, backup."""
+"""Settings hub and the existing settings pages."""
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTableView, QTabBar, QTabWidget,
+                               QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget, QTableView, QTabBar,
                                QVBoxLayout, QWidget)
 
 from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, settings, shop, users, vault
-from morv.ui import print_doc
+from morv.ui import print_doc, tokens
+from morv.ui.adaptive_layout import AdaptiveCards, PageFrame, scroll_content
 from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
 from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, form, info, ltr_edit, muted,
-                             primary_button)
+                             primary_button, section_card, icon_button)
 
 SHORTCUTS = [("F2", "التركيز على مربع البحث في شاشات القوائم"), ("Ctrl+N", "إضافة جديد في شاشة القوائم المفتوحة"),
              ("Ctrl+B", "طي الشريط الجانبي أو فتحه"), ("Ctrl+D", "التبديل بين الوضع الفاتح والداكن"),
@@ -34,42 +35,124 @@ def _table(model) -> QTableView:
     return v
 
 
-class SettingsPage(QWidget):
+SETTINGS_GROUPS = (
+    ("إدارة المحل", "home", (
+        ("shop", "بيانات المحل والطباعة", "home", "settings.edit"),
+        ("item_fields", "حقول بطاقة الصنف", "inventory", "settings.edit"),
+    )),
+    ("الإدارة المالية", "treasury", (
+        ("partners", "الشركاء", "customers", "treasury.manage"),
+        ("opening", "الأرصدة الافتتاحية", "cash", "opening.post"),
+    )),
+    ("الأمان والبيانات", "shield", (
+        ("users", "المستخدمون والصلاحيات", "user", "users.manage"),
+        ("audit", "سجل العمليات", "reports", "users.manage"),
+        ("backup", "النسخ الاحتياطي والاستعادة", "usb", None),
+    )),
+    ("تفضيلات البرنامج", "settings", (
+        ("appearance", "المظهر والخطوط", "font", None),
+        ("shortcuts", "اختصارات لوحة المفاتيح", "settings", None),
+    )),
+)
+
+
+class SettingsPage(PageFrame):
     def __init__(self, session):
         super().__init__()
         self.session = session
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 20)
-        self.tabs = QTabWidget()
-        self.shop_tab = None
-        if session.can("settings.edit"):      # A cashier never sees shop data, by the owner's decision
-            self.shop_tab = ShopTab(session)
-            self.tabs.addTab(self.shop_tab, "المحل")
-        if session.can("users.manage"):
-            self.users_tab = UsersTab(session)
-            self.tabs.addTab(self.users_tab, "المستخدمون والصلاحيات")
-            self.audit_tab = AuditTab(session)
-            self.tabs.addTab(self.audit_tab, "سجل العمليات")
-        self.fields_tab = None
-        if session.can("settings.edit"):
-            from morv.ui.inventory_page import ItemFieldsTab   # local import to avoid a cycle
-            self.fields_tab = ItemFieldsTab(session)
-            self.tabs.addTab(self.fields_tab, "حقول بطاقة الصنف")
-        self.partners_tab = None
-        if session.can("treasury.manage"):
+        self.shop_tab = self.fields_tab = self.partners_tab = None
+        self.destinations = {}
+        self.links = {}
+        self._routes = {}
+        self._views = {}
+        self.current_key = None
+        self.stack = QStackedWidget()
+        self.stack.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.body.addWidget(self.stack, 1)
+        self.back.clicked.connect(self.show_hub)
+
+        cards = []
+        for title, icon_name, routes in SETTINGS_GROUPS:
+            allowed = [r for r in routes if r[3] is None or session.can(r[3])]
+            if not allowed:
+                continue
+            box, inner, header = section_card(title, icon_name)
+            header.parentWidget().setMinimumHeight(tokens.LAYOUT["settings_group_header_min"])
+            for key, label, icon, permission in allowed:
+                widget = self._build(key)
+                self.destinations[key] = widget
+                self._routes[key] = (label, permission)
+                # Preserve the legacy shop form until its coordinated split in S2.
+                view = scroll_content(widget) if key == "shop" else widget
+                self._views[key] = view
+                self.stack.addWidget(view)
+                button = icon_button(label, icon)
+                button.setMinimumHeight(tokens.LAYOUT["settings_link_min"])
+                button.clicked.connect(lambda _checked=False, route=key: self.open_page(route))
+                inner.addWidget(button)
+                self.links[key] = button
+            inner.addStretch(1)
+            cards.append(box)
+        self.hub = AdaptiveCards(cards, minimum_width=tokens.LAYOUT["settings_card_min"])
+        self.stack.insertWidget(0, self.hub)
+        self.show_hub()
+
+    def _build(self, key):
+        if key == "shop":
+            self.shop_tab = ShopTab(self.session)
+            return self.shop_tab
+        if key == "item_fields":
+            from morv.ui.inventory_page import ItemFieldsTab
+            self.fields_tab = ItemFieldsTab(self.session)
+            return self.fields_tab
+        if key == "partners":
             from morv.ui.partners_tab import PartnersTab
-            self.partners_tab = PartnersTab(session)
-            self.tabs.addTab(self.partners_tab, "الشركاء")
-        if session.can("opening.post"):
+            self.partners_tab = PartnersTab(self.session)
+            return self.partners_tab
+        if key == "opening":
             from morv.ui.opening_dialogs import OpeningTab
-            self.opening_tab = OpeningTab(session)
-            self.tabs.addTab(self.opening_tab, "الأرصدة الافتتاحية")
-        self.appearance_tab = AppearanceTab(session)
-        self.tabs.addTab(self.appearance_tab, "المظهر")
-        self.tabs.addTab(ShortcutsTab(), "الاختصارات")
-        self.backup_tab = BackupTab(session)
-        self.tabs.addTab(self.backup_tab, "النسخ الاحتياطي")
-        lay.addWidget(self.tabs)
+            self.opening_tab = OpeningTab(self.session)
+            return self.opening_tab
+        if key == "users":
+            self.users_tab = UsersTab(self.session)
+            return self.users_tab
+        if key == "audit":
+            self.audit_tab = AuditTab(self.session)
+            return self.audit_tab
+        if key == "backup":
+            self.backup_tab = BackupTab(self.session)
+            return self.backup_tab
+        if key == "appearance":
+            self.appearance_tab = AppearanceTab(self.session)
+            return self.appearance_tab
+        if key == "shortcuts":
+            return ShortcutsTab()
+        raise KeyError(key)
+
+    def title_for(self, key):
+        return self._routes[key][0]
+
+    def open_page(self, key) -> bool:
+        if key not in self.destinations:
+            return False
+        title, permission = self._routes[key]
+        if permission is not None and not self.session.can(permission):
+            return False
+        self.current_key = key
+        self.set_header(title, "", back=True)
+        self.stack.setCurrentWidget(self._views[key])
+        return True
+
+    def show_hub(self):
+        previous = self.current_key
+        self.current_key = None
+        self.set_header("مركز الإعدادات", "إدارة وتخصيص إعدادات المحل والبرنامج", back=False)
+        self.stack.setCurrentWidget(self.hub)
+        if previous in self.links:
+            self.links[previous].setFocus()
+
+    def refresh(self):
+        self.show_hub()
 
 
 class AppearanceTab(QWidget):

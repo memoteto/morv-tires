@@ -39,14 +39,13 @@ class SettingsTabHeightTest(unittest.TestCase):
         self.app.processEvents()
         page = win.pages["settings"]
         squeezed = []
-        for index in range(page.tabs.count()):
-            page.tabs.setCurrentIndex(index)
+        for key, tab in page.destinations.items():
+            self.assertTrue(page.open_page(key))
             self.app.processEvents()
-            tab = page.tabs.widget(index)
             layout = tab.layout()
             if layout is None:
                 continue
             needs = layout.minimumSize().height()
             if needs > tab.height():
-                squeezed.append(f"{page.tabs.tabText(index)}: needs {needs}px, has {tab.height()}px")
+                squeezed.append(f"{page.title_for(key)}: needs {needs}px, has {tab.height()}px")
         self.assertEqual([], squeezed, "a squeezed tab draws its rows on top of each other")

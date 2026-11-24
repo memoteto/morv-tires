@@ -26,6 +26,7 @@ DARK = dict(
 # Logical Qt pixels shared by all list-preview screens.
 LAYOUT = dict(
     page_margin=24, pane_gap=12, preview_padding=16,
+    settings_card_min=320, settings_group_header_min=54, settings_link_min=44, settings_header_min=56,
     preview_scroll_gutter=14, preview_scroll_end_gap=4,
     preview_min=380, preview_max=540, preview_share_pct=41, list_min=640,
     search_min=190, filter_min=95, field_label_max=160, field_spacing=10,
