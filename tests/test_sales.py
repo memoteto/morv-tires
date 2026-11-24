@@ -202,6 +202,39 @@ class SalesTest(unittest.TestCase):
         row = self.con.execute("SELECT detail FROM audit_log WHERE action='sale.post' ORDER BY id DESC").fetchone()
         self.assertIn("سعر معدّل", row[0])
 
+    def test_inactive_cashier_sale_does_not_write(self):
+        item = self.cheap_item()
+        users.set_active(self.con, self.admin, self.cashier.id, False)
+        before = self.counts()
+        lots = self.con.execute("SELECT * FROM stock_lots ORDER BY id").fetchall()
+        journal = self.con.execute("SELECT * FROM journal_lines ORDER BY id").fetchall()
+        with self.subTest(check="authorization"), self.assertRaisesRegex(SaleError, "صلاحية"):
+            self.cashier_sale(20000, item=item)
+        with self.subTest(check="no mutation"):
+            self.assertEqual(self.counts(), before)
+            self.assertEqual(self.con.execute("SELECT * FROM stock_lots ORDER BY id").fetchall(), lots)
+            self.assertEqual(self.con.execute("SELECT * FROM journal_lines ORDER BY id").fetchall(), journal)
+
+    def test_demoted_manager_sale_obeys_current_discount_cap(self):
+        item = self.cheap_item()
+        second = users.create_user(self.con, self.admin, "manager2", "Manager", "Boss12345", "manager")
+        users.set_role(self.con, second, self.admin.id, "cashier")
+        users.set_permission(self.con, second, self.admin.id, "sales.discount", True, 5)
+        before = self.counts()
+        lots = self.con.execute("SELECT * FROM stock_lots ORDER BY id").fetchall()
+        journal = self.con.execute("SELECT * FROM journal_lines ORDER BY id").fetchall()
+        with self.subTest(check="discount cap"), self.assertRaisesRegex(SaleError, "يتجاوز"):
+            self.post([SaleLineIn(item, 1, 20000, line_discount=1001)],
+                      [Payment("cash", 18999, received=18999)])
+        with self.subTest(check="no mutation"):
+            self.assertEqual(self.counts(), before)
+            self.assertEqual(self.con.execute("SELECT * FROM stock_lots ORDER BY id").fetchall(), lots)
+            self.assertEqual(self.con.execute("SELECT * FROM journal_lines ORDER BY id").fetchall(), journal)
+        result = self.post([SaleLineIn(item, 1, 20000, line_discount=1000)],
+                           [Payment("cash", 19000, received=19000)])
+        self.assertEqual(result.total, 19000)
+        self.assertEqual(inventory.reconcile(self.con), [])
+
     def test_posted_sale_is_immutable(self):
         r = self.post([SaleLineIn(self.service, 1, 1000)], [Payment("cash", 1000, received=1000)])
         for stmt in ("UPDATE sales SET total=1 WHERE id=?", "DELETE FROM sales WHERE id=?",

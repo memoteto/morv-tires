@@ -111,6 +111,91 @@ class UsersTest(unittest.TestCase):
         with self.assertRaises(users.AuthError):
             users.set_permission(self.con, self.admin, c.id, "sale.void", True)
 
+    def test_session_permission_grant_and_revoke(self):
+        from morv.ui.session import Session
+
+        cashier = users.create_user(self.con, self.admin, "cashier", "Cashier", "Cash12345", "cashier")
+        session = Session(self.con, cashier)
+        users.set_permission(self.con, self.admin, cashier.id, "items.manage", True)
+        self.assertTrue(session.can("items.manage"))
+        users.set_permission(self.con, self.admin, cashier.id, "items.manage", False)
+        self.assertFalse(session.can("items.manage"))
+
+    def test_promoted_session_uses_current_role_and_limit(self):
+        from morv.ui.session import Session
+
+        cashier = users.create_user(self.con, self.admin, "cashier", "Cashier", "Cash12345", "cashier")
+        session = Session(self.con, cashier)
+        users.set_role(self.con, self.admin, cashier.id, "manager")
+        self.assertEqual(users.get_user(self.con, cashier.id).role, "manager")
+        self.assertEqual(users.permissions(self.con, session.user), set(security.PERMISSIONS))
+        self.assertIsNone(users.permission_limit(self.con, session.user, "sales.discount"))
+
+    def test_demoted_session_uses_current_role_and_limit(self):
+        from morv.ui.session import Session
+
+        manager = users.create_user(self.con, self.admin, "manager2", "Manager", "Boss12345", "manager")
+        session = Session(self.con, manager)
+        users.set_role(self.con, self.admin, manager.id, "cashier")
+        self.assertEqual(users.get_user(self.con, manager.id).role, "cashier")
+        with self.subTest(check="effective permissions"):
+            self.assertEqual(users.permissions(self.con, session.user), security.ROLE_DEFAULTS["cashier"])
+            self.assertFalse(session.can("users.manage"))
+        with self.subTest(check="discount limit"):
+            self.assertEqual(users.permission_limit(self.con, session.user, "sales.discount"), 0)
+
+    def test_demoted_manager_write_is_refused_without_changes(self):
+        manager = users.create_user(self.con, self.admin, "manager2", "Manager", "Boss12345", "manager")
+        cashier = users.create_user(self.con, self.admin, "cashier", "Cashier", "Cash12345", "cashier")
+        users.set_role(self.con, self.admin, manager.id, "cashier")
+        before = users.permissions(self.con, cashier)
+        audit_before = users.audit_rows(self.con)
+        with self.subTest(check="authorization"), self.assertRaises(users.AuthError):
+            users.set_permission(self.con, manager, cashier.id, "items.manage", True)
+        with self.subTest(check="target unchanged"):
+            self.assertEqual(users.permissions(self.con, cashier), before)
+            self.assertEqual(users.audit_rows(self.con), audit_before)
+
+    def test_inactive_account_has_no_effective_permissions(self):
+        from morv.ui.session import Session
+
+        for role in ("cashier", "manager"):
+            with self.subTest(role=role):
+                user = users.create_user(self.con, self.admin, role + "2", role, "Test12345", role)
+                session = Session(self.con, user)
+                original = users.permissions(self.con, user)
+                users.set_active(self.con, self.admin, user.id, False)
+                self.assertFalse(users.get_user(self.con, user.id).active)
+                with self.subTest(check="permissions"):
+                    self.assertEqual(users.permissions(self.con, session.user), set())
+                    self.assertFalse(session.can("sales.post"))
+                with self.subTest(check="limit"):
+                    self.assertEqual(users.permission_limit(self.con, session.user, "sales.discount"), 0)
+                users.set_active(self.con, self.admin, user.id, True)
+                self.assertEqual(users.permissions(self.con, session.user), original)
+
+    def test_missing_account_has_no_effective_permissions(self):
+        from dataclasses import replace
+
+        missing = replace(self.admin, id=-1)
+        with self.subTest(check="permission"):
+            self.assertFalse(users.has_permission(self.con, missing, "users.manage"))
+        with self.subTest(check="limit"):
+            self.assertEqual(users.permission_limit(self.con, missing, "sales.discount"), 0)
+        with self.subTest(check="require"), self.assertRaises(users.AuthError):
+            users.require(self.con, missing, "users.manage")
+
+    def test_inactive_user_cannot_change_own_password(self):
+        cashier = users.create_user(self.con, self.admin, "cashier", "Cashier", "Cash12345", "cashier")
+        users.set_active(self.con, self.admin, cashier.id, False)
+        before = users.audit_rows(self.con)
+        with self.subTest(check="password change"), self.assertRaises(users.AuthError):
+            users.change_own_password(self.con, cashier, "Cash12345", "NewPass12345")
+        with self.subTest(check="audit unchanged"):
+            self.assertEqual(users.audit_rows(self.con), before)
+        users.set_active(self.con, self.admin, cashier.id, True)
+        self.assertEqual(users.login(self.con, "cashier", "Cash12345").id, cashier.id)
+
     def test_password_change(self):
         with self.assertRaises(users.AuthError):
             users.change_own_password(self.con, self.admin, "wrong", "NewPass12345")
