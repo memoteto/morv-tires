@@ -137,9 +137,13 @@ class TreasuryMovementsUiTest(unittest.TestCase):
         dlg.name.setText("محمد")
         dlg.save()
         tab.reload(dlg.created.id)
-        self.assertEqual(tab.list.count(), 1)
+        self.assertEqual(tab.model.rowCount(), 1)
         tab.toggle_active()
-        self.assertIn("موقوف", tab.list.item(0).text())
+        self.assertEqual(tab.model.index(0, 3).data(), "موقوف")
+        self.assertEqual(tab.active_btn.text(), "تفعيل الشريك")
+        tab.toggle_active()
+        self.assertEqual(tab.model.index(0, 3).data(), "نشط")
+        self.assertEqual(tab.active_btn.text(), "إيقاف الشريك")
 
     def test_settings_shows_partners_tab_only_to_treasury_managers(self):
         from morv.ui.settings_page import SettingsPage
