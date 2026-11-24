@@ -144,6 +144,8 @@ def post_sale(con: sqlite3.Connection, by, *, request_key: str, customer_id: int
     plate = (vehicle_plate or "").strip() or None
     payments = [p if isinstance(p, Payment) else Payment(*p) for p in payments]
     with transaction(con):
+        if by is None or not has_permission(con, by, "sales.post"):
+            raise SaleError("لا تملك صلاحية ترحيل فواتير البيع")
         shaped = _shape(lines)
         h = _payload_hash(customer_id, day, shaped, payments, invoice_discount, odometer, plate)
         old = con.execute("SELECT id, number, total, payload_hash FROM sales WHERE request_key=?", (key,)).fetchone()

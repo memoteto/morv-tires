@@ -221,6 +221,125 @@ class SettingsTest(_Base):
         self.assertIn("نجح", tab.notice.text())
         self.assertNotEqual(tab.stat_test[1].text(), "لم يُجرَ بعد")
 
+    def test_existing_backup_tab_refuses_usb_save_after_self_demotion(self):
+        from unittest.mock import patch
+        from morv.infra import settings, users
+        from morv.ui.settings_page import BackupTab
+        self.make_admin()
+        users.create_user(self.con, self.admin, "boss2", "Second manager", "Boss12345", "manager")
+        tab = BackupTab(self.session())
+        self.assertTrue(tab.usb_dir.isEnabled())
+        before = settings.get(self.con, "backup.usb_dir")
+        users.set_role(self.con, self.admin, self.admin.id, "cashier")
+        self.assertFalse(users.is_active_manager(self.con, self.admin))
+        audit_before = users.audit_rows(self.con)
+        tab.usb_dir.setText(str(self.tmp / "fake-usb"))
+        with patch("morv.ui.settings_page.backup.same_drive_as_data", return_value=False):
+            tab.save_usb()
+        self.assertEqual(settings.get(self.con, "backup.usb_dir"), before)
+        self.assertEqual(users.audit_rows(self.con), audit_before)
+
+    def test_existing_backup_tab_refuses_key_actions_after_demotion(self):
+        from unittest.mock import patch
+        from PySide6.QtWidgets import QDialog
+        from morv.infra import users
+        from morv.ui.settings_page import BackupTab
+        self.make_admin()
+        second = users.create_user(self.con, self.admin, "boss2", "Second manager", "Boss12345", "manager")
+        tab = BackupTab(self.session())
+        users.set_role(self.con, second, self.admin.id, "cashier")
+        audit_before = users.audit_rows(self.con)
+        for action, target in ((tab.change_password, "change_backup_password"),
+                               (tab.new_recovery_key, "regenerate_recovery_key")):
+            with (
+                self.subTest(action=target),
+                patch("morv.ui.settings_page.SecretDialog") as dialog,
+                patch("morv.ui.settings_page.ShowKeyDialog"),
+                patch("morv.ui.settings_page.backup." + target) as operation,
+            ):
+                dialog.return_value.exec.return_value = QDialog.DialogCode.Accepted
+                dialog.return_value.secret = PW_BACKUP
+                dialog.return_value.new_secret = "FakeNewSecret2026"
+                action()
+                operation.assert_not_called()
+        self.assertEqual(users.audit_rows(self.con), audit_before)
+
+    def test_existing_backup_tab_refuses_revoked_restore(self):
+        from datetime import datetime
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        from PySide6.QtWidgets import QDialog
+        from morv.infra import users
+        from morv.ui.settings_page import BackupTab
+        self.make_admin()
+        cashier = users.create_user(self.con, self.admin, "cashier", "Cashier", "Cash12345", "cashier")
+        users.set_permission(self.con, self.admin, cashier.id, "backup.restore", True)
+        session = self.session(cashier)
+        session.on_restore = Mock()
+        tab = BackupTab(session)
+        fake = SimpleNamespace(path=self.tmp / "never-restore.morvbak", at=datetime.now())
+        users.set_permission(self.con, self.admin, cashier.id, "backup.restore", False)
+        self.assertFalse(session.can("backup.restore"))
+        audit_before = users.audit_rows(self.con)
+        with patch.object(tab, "_selected", return_value=fake), patch(
+            "morv.ui.settings_page.RestoreConfirmDialog"
+        ) as dialog:
+            dialog.return_value.exec.return_value = QDialog.DialogCode.Accepted
+            dialog.return_value.secret = None
+            tab.restore_selected()
+        session.on_restore.assert_not_called()
+        self.assertEqual(users.audit_rows(self.con), audit_before)
+
+    def test_backup_restore_rechecks_permission_after_confirmation(self):
+        from datetime import datetime
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        from PySide6.QtWidgets import QDialog
+        from morv.infra import users
+        from morv.ui.settings_page import BackupTab
+        self.make_admin()
+        cashier = users.create_user(self.con, self.admin, "cashier", "Cashier", "Cash12345", "cashier")
+        users.set_permission(self.con, self.admin, cashier.id, "backup.restore", True)
+        session = self.session(cashier)
+        session.on_restore = Mock()
+        tab = BackupTab(session)
+        fake = SimpleNamespace(path=self.tmp / "never-restore.morvbak", at=datetime.now())
+
+        def confirm_and_revoke():
+            users.set_permission(self.con, self.admin, cashier.id, "backup.restore", False)
+            return QDialog.DialogCode.Accepted
+
+        with patch.object(tab, "_selected", return_value=fake), patch(
+            "morv.ui.settings_page.RestoreConfirmDialog"
+        ) as dialog:
+            dialog.return_value.secret = None
+            dialog.return_value.exec.side_effect = confirm_and_revoke
+            tab.restore_selected()
+        self.assertFalse(session.can("backup.restore"))
+        session.on_restore.assert_not_called()
+
+    def test_backup_restore_keeps_delegated_permission(self):
+        from datetime import datetime
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        from PySide6.QtWidgets import QDialog
+        from morv.infra import users
+        from morv.ui.settings_page import BackupTab
+        self.make_admin()
+        cashier = users.create_user(self.con, self.admin, "cashier", "Cashier", "Cash12345", "cashier")
+        users.set_permission(self.con, self.admin, cashier.id, "backup.restore", True)
+        session = self.session(cashier)
+        session.on_restore = Mock()
+        tab = BackupTab(session)
+        fake = SimpleNamespace(path=self.tmp / "never-restore.morvbak", at=datetime.now())
+        with patch.object(tab, "_selected", return_value=fake), patch(
+            "morv.ui.settings_page.RestoreConfirmDialog"
+        ) as dialog:
+            dialog.return_value.secret = None
+            dialog.return_value.exec.return_value = QDialog.DialogCode.Accepted
+            tab.restore_selected()
+        session.on_restore.assert_called_once_with(str(fake.path), None)
+
     def test_shop_tab_save(self):
         from morv.infra import shop
         from morv.ui.settings_page import SettingsPage

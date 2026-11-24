@@ -208,9 +208,9 @@ class UsersTab(QWidget):
         self.list.setSpacing(2)
         self.list.setUniformItemSizes(True)
         self.list.currentRowChanged.connect(self._select)
-        new = primary_button("مستخدم جديد", "plus")
-        new.clicked.connect(self.new_user)
-        left.addWidget(new)
+        self.new_btn = primary_button("مستخدم جديد", "plus")
+        self.new_btn.clicked.connect(self.new_user)
+        left.addWidget(self.new_btn)
         left.addWidget(self.list, 1)
         left.addWidget(muted("كل عملية حساسة تُسجَّل باسم المستخدم ووقتها في سجل العمليات."))
         row.addLayout(left, 1)
@@ -289,14 +289,18 @@ class UsersTab(QWidget):
         self.title.setText(u.display_name)
         self.sub.setText(f"اسم الدخول: {ltr(u.username)}")
         self.role.setCurrentIndex(list(security.ROLES).index(u.role))
-        perms = users.permissions(self.session.con, u)
+        editable = self.session.can("users.manage")
+        perms = users.configured_permissions(self.session.con, u)
+        self.new_btn.setEnabled(editable)
+        self.role.setEnabled(editable)
+        self.pw_btn.setEnabled(editable)
         for key, cb in self.checks.items():
             cb.setChecked(key in perms)
-            cb.setEnabled(not u.is_manager)
-        self.discount_cap.setValue(users.permission_limit(self.session.con, u, "sales.discount") or 0)
-        self.discount_cap.setEnabled(not u.is_manager)
+            cb.setEnabled(editable and not u.is_manager)
+        self.discount_cap.setValue(users.configured_permission_limit(self.session.con, u, "sales.discount") or 0)
+        self.discount_cap.setEnabled(editable and not u.is_manager)
         self.active_btn.setText("إيقاف الحساب" if u.active else "تفعيل الحساب")
-        self.active_btn.setEnabled(u.id != self.session.user.id)
+        self.active_btn.setEnabled(editable and u.id != self.session.user.id)
         self.notice.show_message("")
         self._loading = False
 
@@ -309,26 +313,36 @@ class UsersTab(QWidget):
         try:
             users.set_role(self.session.con, self.session.user, self.current.id, role)
         except users.AuthError as e:
+            self.reload(self.current.id)
             self.notice.show_message(str(e))
-            self._loading = True
-            self.role.setCurrentIndex(list(security.ROLES).index(self.current.role))
-            self._loading = False
             return
+        if self.current.id == self.session.user.id:
+            self.session.refresh_user()
         self.reload(self.current.id)
 
     def _perm_changed(self, key: str, on: bool) -> None:
         if self._loading or not self.current or self.current.is_manager:
             return
         limit = self.discount_cap.value() if key == "sales.discount" else None
-        users.set_permission(self.session.con, self.session.user, self.current.id, key, on, limit)
+        try:
+            users.set_permission(self.session.con, self.session.user, self.current.id, key, on, limit)
+        except users.AuthError as e:
+            self.reload(self.current.id)
+            self.notice.show_message(str(e))
+            return
+        if self.current.id == self.session.user.id:
+            self.reload(self.current.id)
 
     def new_user(self) -> None:
+        if not self.session.can("users.manage"):
+            self.reload()
+            return
         dlg = NewUserDialog(self.session, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.reload(dlg.created.id)
 
     def reset_password(self) -> None:
-        if not self.current:
+        if not self.current or not self.session.can("users.manage"):
             return
         dlg = TempPasswordDialog(self.session, self.current, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
@@ -460,7 +474,6 @@ class BackupTab(QWidget):
         self.usb_btn.clicked.connect(self.copy_usb)
         self.restore_btn = danger_button("استعادة النسخة المختارة")
         self.restore_btn.clicked.connect(self.restore_selected)
-        self.restore_btn.setVisible(session.can("backup.restore"))
         for b in (self.backup_btn, self.test_btn, self.usb_btn, self.restore_btn):
             actions.addWidget(b)
         actions.addStretch(1)
@@ -477,17 +490,13 @@ class BackupTab(QWidget):
         urow = QHBoxLayout()
         self.usb_dir = ltr_edit("مثال: E:\\MorvBackup")
         self.usb_dir.setText(settings.get(session.con, "backup.usb_dir", ""))
-        pick = QPushButton("اختيار")
-        pick.clicked.connect(self.pick_usb)
-        save = QPushButton("حفظ")
-        save.clicked.connect(self.save_usb)
-        # Only a manager changes the USB folder and backup password; a cashier backs up and tests
-        manager = session.user.is_manager
-        for w in (self.usb_dir, pick, save):
-            w.setEnabled(manager)
+        self.pick_btn = QPushButton("اختيار")
+        self.pick_btn.clicked.connect(self.pick_usb)
+        self.save_usb_btn = QPushButton("حفظ")
+        self.save_usb_btn.clicked.connect(self.save_usb)
         urow.addWidget(self.usb_dir, 1)
-        urow.addWidget(pick)
-        urow.addWidget(save)
+        urow.addWidget(self.pick_btn)
+        urow.addWidget(self.save_usb_btn)
         usb_inner.addLayout(urow)
         usb_inner.addWidget(muted("فلاشتان بالتناوب: واحدة في المحل وأخرى في البيت، وبدّل بينهما أسبوعيًا."))
         bottom.addWidget(usb_box, 1)
@@ -495,10 +504,8 @@ class BackupTab(QWidget):
         krow = QHBoxLayout()
         pw_btn = QPushButton("تغيير كلمة مرور النسخ")
         pw_btn.clicked.connect(self.change_password)
-        pw_btn.setVisible(manager)
         self.rk_btn = QPushButton("مفتاح استرداد جديد")
         self.rk_btn.clicked.connect(self.new_recovery_key)
-        self.rk_btn.setVisible(session.user.is_manager)
         self.relink_btn = QPushButton("إعادة ربط هذا الجهاز")
         self.relink_btn.clicked.connect(self.relink)
         self.pw_btn = pw_btn
@@ -522,7 +529,25 @@ class BackupTab(QWidget):
         inner.addWidget(sub)
         return box, value, sub
 
+    def _refresh_permissions(self) -> None:
+        # The tab can outlive the role or permission it was built with.
+        manager = users.is_active_manager(self.session.con, self.session.user)
+        for widget in (self.usb_dir, self.pick_btn, self.save_usb_btn):
+            widget.setEnabled(manager)
+        self.pw_btn.setVisible(manager)
+        self.rk_btn.setVisible(manager)
+        self.restore_btn.setVisible(self.session.can("backup.restore"))
+
+    def _allow_sensitive(self, *, restore: bool = False) -> bool:
+        allowed = (self.session.can("backup.restore") if restore
+                   else users.is_active_manager(self.session.con, self.session.user))
+        if not allowed:
+            self._refresh_permissions()
+            self.notice.show_message("لا تملك صلاحية تنفيذ هذه العملية")
+        return allowed
+
     def refresh(self) -> None:
+        self._refresh_permissions()
         con = self.session.con
         last_ok = settings.get(con, "backup.last_ok_at", "")
         self.stat_local[1].setText(ltr(last_ok[:16]) if last_ok else "لا نسخة بعد")
@@ -573,24 +598,34 @@ class BackupTab(QWidget):
         self.refresh()
 
     def pick_usb(self) -> None:
+        if not self._allow_sensitive():
+            return
         d = QFileDialog.getExistingDirectory(self, "مجلد النسخ على الفلاشة")
-        if d:
+        if d and self._allow_sensitive():
             self.usb_dir.setText(d)
 
     def save_usb(self) -> None:
+        if not self._allow_sensitive():
+            return
         folder = self.usb_dir.text().strip()
         if folder and backup.same_drive_as_data(folder):
             if not ask(self, "تنبيه", "هذا المجلد على نفس قرص الجهاز، فلو تعطّل الجهاز ضاعت النسخة معه. "
                                        "المقصود مجلد على فلاشة أو قرص خارجي. هل تحفظه على أي حال؟"):
                 return
+        if not self._allow_sensitive():
+            return
         settings.put(self.session.con, "backup.usb_dir", folder)
         users.audit(self.session.con, self.session.user, "settings.usb", None, None, folder)
         self.notice.show_message("تم حفظ مجلد الفلاشة" + (" (على نفس القرص — مؤقتًا)" if folder and backup.same_drive_as_data(folder) else ""), "success")
         self.refresh()
 
     def change_password(self) -> None:
+        if not self._allow_sensitive():
+            return
         dlg = SecretDialog("تغيير كلمة مرور النسخ", "كلمة المرور الحالية أو مفتاح الاسترداد", new_password=True, parent=self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        if not self._allow_sensitive():
             return
         try:
             backup.change_backup_password(self.session.con, dlg.secret, dlg.new_secret)
@@ -601,8 +636,12 @@ class BackupTab(QWidget):
         self.notice.show_message("تم تغيير كلمة مرور النسخ. النسخ الجديدة تُفتح بها، والقديمة بالقديمة أو بمفتاح الاسترداد.", "success")
 
     def new_recovery_key(self) -> None:
+        if not self._allow_sensitive():
+            return
         dlg = SecretDialog("مفتاح استرداد جديد", "كلمة مرور النسخ الحالية", parent=self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        if not self._allow_sensitive():
             return
         key = security.new_recovery_key()
         try:
@@ -628,11 +667,15 @@ class BackupTab(QWidget):
         self.refresh()
 
     def restore_selected(self) -> None:
+        if not self._allow_sensitive(restore=True):
+            return
         b = self._selected()
         if not b:
             return
         dlg = RestoreConfirmDialog(self.session, b, self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        if not self._allow_sensitive(restore=True):
             return
         users.audit(self.session.con, self.session.user, "backup.restore", None, None, b.path.name)
         self.session.on_restore(str(b.path), dlg.secret)
@@ -723,6 +766,9 @@ class RestoreConfirmDialog(Modal):
         self.add_footer("حفظ نسخة أمان ثم الاستعادة", self.go).setObjectName("danger")
 
     def go(self) -> None:
+        if not self.session.can("backup.restore"):
+            self.notice.show_message("لا تملك صلاحية استعادة النسخة")
+            return
         if self.word.text().strip() != "استعادة":
             self.notice.show_message("اكتب كلمة «استعادة» للتأكيد")
             return

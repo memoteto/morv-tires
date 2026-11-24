@@ -196,7 +196,7 @@ class ItemDialog(Modal):
         f = form()
         self.widgets = {}
         it = self.it
-        price_ok = self.session.user.is_manager or self.session.can("items.prices")
+        price_ok = self.session.can("items.prices")
         for fld in self._ordered_fields(kind):
             label = fld.label + (" *" if fld.required else "")
             current = ""

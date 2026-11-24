@@ -143,7 +143,7 @@ class CustomerDialog(Modal):
         self.level = QComboBox()
         for k, v in customers.LEVELS.items():
             self.level.addItem(v, k)
-        self.level.setEnabled(session.user.is_manager or session.can("items.prices"))
+        self.level.setEnabled(session.can("items.prices"))
         self.ctype = QComboBox()
         for k, v in customers.TYPES.items():
             self.ctype.addItem(v, k)
