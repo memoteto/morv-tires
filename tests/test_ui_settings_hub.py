@@ -43,6 +43,7 @@ class SettingsHubTest(unittest.TestCase):
         self.assertEqual(len(page.hub.cards), 4)
         self.assertEqual(set(page.destinations), set(page.links))
         self.assertEqual(len(page.links), 9)
+        self.assertTrue(all(not btn.icon().isNull() for btn in page.links.values()))
         page.links["shop"].click()
         self.assertEqual(page.current_key, "shop")
         page.shop_tab.name.setText("Unsaved example")
@@ -89,11 +90,13 @@ class SettingsHubTest(unittest.TestCase):
         area = AdaptiveCards(cards, minimum_width=320)
         self.addCleanup(dispose, area, self.app)
         area.show()
+        buttons[0].setFocus()
         for width, expected in ((900, 2), (450, 1), (900, 2)):
             area.resize(width, 300)
             self.settle()
             self.assertEqual(area.columns, expected)
             self.assertEqual(tuple(cards), area.cards)
+            self.assertIs(area.focusWidget(), buttons[0])
             self.assertFalse(area.horizontalScrollBar().isVisible())
             for a, b in combinations(cards, 2):
                 self.assertFalse(a.geometry().intersects(b.geometry()))
@@ -122,9 +125,12 @@ class SettingsHubTest(unittest.TestCase):
                     if win.collapsed != collapsed:
                         win.toggle_sidebar()
                     for w, h in ((1920, 1080), (1093, 614), (1366, 768)):
+                        # Match the shell's minimum for the simulated logical screen.
+                        win.setMinimumSize(min(1024, w - 40), min(640, h - 80))
                         win.resize(w, h - 40)
                         self.settle()
                         with self.subTest(font=font, dark=dark, collapsed=collapsed, size=(w, h)):
+                            self.assertEqual((w, h - 40), (win.width(), win.height()))
                             hub = page.hub
                             self.assertFalse(hub.horizontalScrollBar().isVisible())
                             self.assertLessEqual(hub.content.minimumSizeHint().width(), hub.viewport().width())
@@ -134,6 +140,8 @@ class SettingsHubTest(unittest.TestCase):
                                      for btn in page.links.values()]
                             for a, b in combinations(rects, 2):
                                 self.assertFalse(a.intersects(b))
+                            for rect in rects:
+                                self.assertTrue(hub.content.rect().contains(rect))
                             for btn in page.links.values():
                                 self.assertGreaterEqual(btn.height(), btn.minimumSizeHint().height())
                                 self.assertGreaterEqual(btn.width(), btn.minimumSizeHint().width())

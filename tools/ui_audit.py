@@ -166,6 +166,14 @@ def run(out: Path, size: tuple) -> dict:
                     _settle(app)
                 if key == "settings":
                     page = win.stack.currentWidget()
+                    win.toggle_sidebar()
+                    _settle(app)
+                    side = "collapsed" if win.collapsed else "open"
+                    shot = f"page_settings_sidebar_{side}_{w}x{h}_{mode}"
+                    win.grab().save(str(out / f"{shot}.png"))
+                    report["pages"][shot] = _measure(win)
+                    win.toggle_sidebar()
+                    _settle(app)
                     for route in page.destinations:
                         if not page.open_page(route):
                             raise RuntimeError(f"audit: cannot open settings/{route}")

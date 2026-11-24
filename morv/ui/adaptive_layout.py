@@ -70,13 +70,14 @@ class AdaptiveCards(QScrollArea):
 
 
 class PageFrame(QWidget):
-    def __init__(self):
+    def __init__(self, back_text, back_icon):
         super().__init__()
         root = QVBoxLayout(self)
-        root.setContentsMargins(LAYOUT["page_margin"], 16, LAYOUT["page_margin"], 16)
+        root.setContentsMargins(LAYOUT["page_margin"], LAYOUT["page_margin_y"],
+                                LAYOUT["page_margin"], LAYOUT["page_margin_y"])
         root.setSpacing(LAYOUT["pane_gap"])
         self.header = QWidget()
-        self.header.setMinimumHeight(LAYOUT["settings_header_min"])
+        self.header.setMinimumHeight(LAYOUT["page_header_min"])
         head = QHBoxLayout(self.header)
         head.setContentsMargins(0, 0, 0, 0)
         head.setSpacing(LAYOUT["pane_gap"])
@@ -89,13 +90,14 @@ class PageFrame(QWidget):
         titles.addWidget(self.title)
         titles.addWidget(self.description)
         head.addLayout(titles, 1)
-        self.back = icon_button("جميع الإعدادات", "collapse")
+        self.back = icon_button(back_text, back_icon)
         head.addWidget(self.back, 0, Qt.AlignmentFlag.AlignVCenter)
         root.addWidget(self.header)
         self.body = QVBoxLayout()
         self.body.setContentsMargins(0, 0, 0, 0)
         root.addLayout(self.body, 1)
         self.footer = QWidget()
+        self.footer.setMinimumHeight(LAYOUT["page_footer_min"])
         self.footer_layout = QHBoxLayout(self.footer)
         self.footer_layout.setContentsMargins(0, 0, 0, 0)
         root.addWidget(self.footer)
