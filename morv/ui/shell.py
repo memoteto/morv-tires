@@ -283,7 +283,7 @@ class MainWindow(QMainWindow):
         active = detail if detail is not None and detail.header_fits(room.width(), room.height()) else None
         if active is self._external_header_page:
             return
-        focus = self.app.focusWidget()
+        focus = self.focusWidget()
         restore_focus = detail is not None and focus is not None and detail.header.isAncestorOf(focus)
         if self._external_header_page is not None:
             self._external_header_page.set_header_host()
