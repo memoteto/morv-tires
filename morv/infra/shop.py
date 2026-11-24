@@ -7,14 +7,18 @@ from pathlib import Path
 from morv.core.money import to_latin
 from morv.infra import paths, settings
 from morv.infra.db.connection import transaction
-from morv.infra.users import require
+from morv.infra.users import audit, require
 
 LOGO_FILE = "shop_logo.png"
 PAPERS = ("a4", "a5", "r80", "r58")
 _PHONE = re.compile(r"^01[0-9]{9}$")
-_TEXT = ("name", "activity", "phone", "phone2", "whatsapp", "address", "hours", "website",
-         "tax_id", "commercial_register", "thanks", "policy", "paper", "printer")
-_FLAGS = ("tax_registered", "show_logo", "show_whatsapp", "show_hours", "show_policy")
+_IDENTITY_TEXT = ("name", "activity", "phone", "phone2", "whatsapp", "address", "hours", "website",
+                  "tax_id", "commercial_register")
+_IDENTITY_FLAGS = ("tax_registered",)
+_PRINT_TEXT = ("thanks", "policy", "paper", "printer")
+_PRINT_FLAGS = ("show_logo", "show_whatsapp", "show_hours", "show_policy")
+_TEXT = _IDENTITY_TEXT + _PRINT_TEXT
+_FLAGS = _IDENTITY_FLAGS + _PRINT_FLAGS
 
 
 @dataclass
@@ -83,11 +87,13 @@ def check(name: str, phone: str, address: str) -> tuple[str, str, str]:
     return name, phone, address
 
 
-def clean(data: Shop) -> Shop:
-    """Trims every line, checks the optional numbers, and refuses tax ids without registration."""
-    out = Shop(**{f.name: getattr(data, f.name) for f in fields(Shop)})
-    for name in _TEXT:
-        setattr(out, name, (getattr(out, name) or "").strip())
+def _trim(data: Shop, names) -> None:
+    for name in names:
+        setattr(data, name, (getattr(data, name) or "").strip())
+
+
+def _clean_identity(out: Shop) -> None:
+    _trim(out, _IDENTITY_TEXT)
     out.name, out.phone, out.address = check(out.name, out.phone, out.address)
     for name, label in (("phone2", "الهاتف الثاني"), ("whatsapp", "رقم واتساب")):
         value = to_latin(getattr(out, name)).replace(" ", "")
@@ -98,16 +104,31 @@ def clean(data: Shop) -> Shop:
     out.commercial_register = to_latin(out.commercial_register)
     if not out.tax_registered:
         out.tax_id = out.commercial_register = ""
+
+
+def _clean_print(out: Shop) -> None:
+    _trim(out, _PRINT_TEXT)
     if out.paper not in PAPERS:
         out.paper = "a4"
+
+
+def clean(data: Shop) -> Shop:
+    """Trims every line, checks the optional numbers, and refuses tax ids without registration."""
+    out = Shop(**{f.name: getattr(data, f.name) for f in fields(Shop)})
+    _clean_identity(out)
+    _clean_print(out)
     return out
 
 
-def put(con, data: Shop) -> None:
-    for name in _TEXT:
+def _put_fields(con, data: Shop, text_names, flag_names) -> None:
+    for name in text_names:
         settings.put(con, f"shop.{name}", getattr(data, name))
-    for name in _FLAGS:
+    for name in flag_names:
         settings.put(con, f"shop.{name}", "1" if getattr(data, name) else "0")
+
+
+def put(con, data: Shop) -> None:
+    _put_fields(con, data, _TEXT, _FLAGS)
 
 
 def save(con, by, data: Shop) -> Shop:
@@ -116,6 +137,25 @@ def save(con, by, data: Shop) -> Shop:
     with transaction(con):
         put(con, data)
     return load(con)
+
+
+def _save_section(con, by, data: Shop, cleaner, text_names, flag_names, detail: str) -> Shop:
+    with transaction(con):
+        require(con, by, "settings.edit", ShopError)
+        draft = Shop(**{name: getattr(data, name) for name in (*text_names, *flag_names)})
+        cleaner(draft)
+        _put_fields(con, draft, text_names, flag_names)
+        audit(con, by, "shop.save", detail=detail)
+        saved = load(con)
+    return saved
+
+
+def save_identity(con, by, data: Shop) -> Shop:
+    return _save_section(con, by, data, _clean_identity, _IDENTITY_TEXT, _IDENTITY_FLAGS, "identity")
+
+
+def save_print(con, by, data: Shop) -> Shop:
+    return _save_section(con, by, data, _clean_print, _PRINT_TEXT, _PRINT_FLAGS, "printing")
 
 
 def save_logo(src_path) -> Path:
