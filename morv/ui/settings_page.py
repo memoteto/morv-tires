@@ -10,11 +10,11 @@ from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, settings, users, vault
 from morv.ui import tokens
-from morv.ui.adaptive_layout import AdaptiveCards, AdaptiveFields, PageFrame
+from morv.ui.adaptive_layout import AdaptiveCards, AdaptiveFields, AdaptiveTableColumns, PageFrame
 from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
 from morv.ui.shop_settings import PrintingTab, ShopTab
-from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, field, form, info, ltr_edit, muted,
+from morv.ui.widgets import (Notice, PasswordEdit, action_row, ask, card, danger_button, field, form, info, ltr_edit, muted,
                              primary_button, section_card, icon_button)
 
 SHORTCUTS = [("F2", "التركيز على مربع البحث في شاشات القوائم"), ("Ctrl+N", "إضافة جديد في شاشة القوائم المفتوحة"),
@@ -469,9 +469,11 @@ class BackupTab(QWidget):
         super().__init__()
         self.session = session
         lay = QVBoxLayout(self)
-        lay.setSpacing(12)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(tokens.LAYOUT["pane_gap"])
 
         stats = QHBoxLayout()
+        stats.setSpacing(tokens.LAYOUT["pane_gap"])
         self.stat_local = self._stat("آخر نسخة على الجهاز")
         self.stat_usb = self._stat("نسخة الفلاشة")
         self.stat_test = self._stat("آخر اختبار استعادة")
@@ -480,63 +482,65 @@ class BackupTab(QWidget):
         lay.addLayout(stats)
         self.health = Notice()
         lay.addWidget(self.health)
-
-        actions = QHBoxLayout()
-        self.backup_btn = primary_button("نسخ الآن")
+        self.backup_btn = primary_button("نسخ الآن", "save")
         self.backup_btn.clicked.connect(self.backup_now)
-        self.test_btn = QPushButton("اختبار استعادة النسخة المختارة")
-        self.test_btn.clicked.connect(self.test_selected)
-        self.usb_btn = QPushButton("نسخ أحدث نسخة إلى الفلاشة")
-        self.usb_btn.clicked.connect(self.copy_usb)
-        self.restore_btn = danger_button("استعادة النسخة المختارة")
-        self.restore_btn.clicked.connect(self.restore_selected)
-        for b in (self.backup_btn, self.test_btn, self.usb_btn, self.restore_btn):
-            actions.addWidget(b)
-        actions.addStretch(1)
-        lay.addLayout(actions)
+        lay.addLayout(action_row(self.backup_btn))
         self.notice = Notice()
         lay.addWidget(self.notice)
 
+        listing, inner = card("النسخ المحفوظة", compact=True)
+        listing.setMinimumWidth(tokens.LAYOUT["list_min"])
         self.model = BackupsModel()
         self.view = _table(self.model)
-        lay.addWidget(self.view, 1)
+        self.view.setMinimumHeight(4 * tokens.LAYOUT["summary_table_row_height"])
+        self.columns = AdaptiveTableColumns(self.view, {0: 4, 1: 2, 2: 2, 3: 2}, {})
+        inner.addWidget(self.view, 1)
+        self.test_btn = QPushButton("اختبار النسخة المختارة")
+        self.test_btn.clicked.connect(self.test_selected)
+        self.usb_btn = QPushButton("نسخ أحدث نسخة للفلاشة")
+        self.usb_btn.clicked.connect(self.copy_usb)
+        inner.addLayout(action_row(self.test_btn, self.usb_btn))
+        self.restore_btn = danger_button("استعادة النسخة المختارة")
+        self.restore_btn.clicked.connect(self.restore_selected)
+        inner.addLayout(action_row(self.restore_btn))
 
-        bottom = QHBoxLayout()
-        usb_box, usb_inner = card("مجلد الفلاشة")
-        urow = QHBoxLayout()
+        detail = QWidget()
+        detail.setMinimumWidth(tokens.LAYOUT["preview_min"])
+        side = QVBoxLayout(detail)
+        side.setContentsMargins(0, 0, 0, 0)
+        side.setSpacing(tokens.LAYOUT["pane_gap"])
+        usb_box, usb_inner = card("مجلد الفلاشة", compact=True)
         self.usb_dir = ltr_edit("مثال: E:\\MorvBackup")
         self.usb_dir.setText(settings.get(session.con, "backup.usb_dir", ""))
         self.pick_btn = QPushButton("اختيار")
         self.pick_btn.clicked.connect(self.pick_usb)
         self.save_usb_btn = QPushButton("حفظ")
         self.save_usb_btn.clicked.connect(self.save_usb)
-        urow.addWidget(self.usb_dir, 1)
-        urow.addWidget(self.pick_btn)
-        urow.addWidget(self.save_usb_btn)
-        usb_inner.addLayout(urow)
+        usb_inner.addWidget(self.usb_dir)
+        usb_inner.addLayout(action_row(self.pick_btn, self.save_usb_btn))
         usb_inner.addWidget(muted("فلاشتان بالتناوب: واحدة في المحل وأخرى في البيت، وبدّل بينهما أسبوعيًا."))
-        bottom.addWidget(usb_box, 1)
-        keys_box, keys_inner = card("كلمة مرور النسخ ومفتاح الاسترداد")
-        krow = QHBoxLayout()
-        pw_btn = QPushButton("تغيير كلمة مرور النسخ")
-        pw_btn.clicked.connect(self.change_password)
+        side.addWidget(usb_box)
+        keys_box, keys_inner = card("الأمان والاسترداد", compact=True)
+        self.pw_btn = QPushButton("تغيير كلمة مرور النسخ")
+        self.pw_btn.clicked.connect(self.change_password)
         self.rk_btn = QPushButton("مفتاح استرداد جديد")
         self.rk_btn.clicked.connect(self.new_recovery_key)
         self.relink_btn = QPushButton("إعادة ربط هذا الجهاز")
         self.relink_btn.clicked.connect(self.relink)
-        self.pw_btn = pw_btn
-        for b in (pw_btn, self.rk_btn, self.relink_btn):
-            krow.addWidget(b)
-        krow.addStretch(1)
-        keys_inner.addLayout(krow)
+        for button in (self.pw_btn, self.rk_btn, self.relink_btn):
+            keys_inner.addLayout(action_row(button))
         keys_inner.addWidget(muted("النسخ القديمة تبقى تُفتح بكلمة المرور التي أُخذت بها أو بمفتاح الاسترداد وقتها."))
-        bottom.addWidget(keys_box, 1)
-        lay.addLayout(bottom)
+        side.addWidget(keys_box)
+        side.addStretch(1)
+        self.panes = AdaptiveCards([listing, detail], minimum_width=0, column_weights=(3, 2), fill_height=True)
+        listing.setMinimumWidth(tokens.LAYOUT["list_min"])
+        detail.setMinimumWidth(tokens.LAYOUT["preview_min"])
+        lay.addWidget(self.panes, 1)
         self.refresh()
 
     @staticmethod
     def _stat(title: str) -> tuple:
-        box, inner = card()
+        box, inner = card(compact=True)
         inner.addWidget(muted(title))
         value = QLabel("—")
         value.setObjectName("cardTitle")
@@ -567,7 +571,8 @@ class BackupTab(QWidget):
         con = self.session.con
         last_ok = settings.get(con, "backup.last_ok_at", "")
         self.stat_local[1].setText(ltr(last_ok[:16]) if last_ok else "لا نسخة بعد")
-        n = len(self.model.items) if self.model.items else 0
+        self.model.reload()
+        n = len(self.model.items)
         self.stat_local[2].setText(f"{n} نسخة محفوظة · الاحتفاظ: 14 يومية + 12 شهرية")
         usb = backup.usb_dir(con)
         last_usb = settings.get(con, "backup.last_usb_at", "")
@@ -579,7 +584,7 @@ class BackupTab(QWidget):
         level, text = backup.health(con)
         self.health.show_message(text, {"ok": "success", "warn": "warn", "danger": "error"}[level])
         self.relink_btn.setVisible(backup.device_dek(con) is None)
-        self.model.reload()
+        self.columns.schedule()
 
     def _selected(self) -> backup.BackupInfo | None:
         rows = self.view.selectionModel().selectedRows() if self.view.selectionModel() else []
@@ -704,15 +709,13 @@ class SecretDialog(Modal):
         self.new_secret = ""
         self.with_new = new_password
         lay = self.body
-        f = form()
         self.cur = PasswordEdit()
-        f.addRow(label, self.cur)
+        lay.addWidget(field(label, self.cur))
         if new_password:
             self.new = PasswordEdit()
             self.new2 = PasswordEdit()
-            f.addRow("كلمة المرور الجديدة", self.new)
-            f.addRow("تأكيدها", self.new2)
-        lay.addLayout(f)
+            lay.addWidget(field("كلمة المرور الجديدة", self.new))
+            lay.addWidget(field("تأكيدها", self.new2))
         self.add_footer("متابعة", self.go)
 
     def go(self) -> None:
@@ -772,13 +775,11 @@ class RestoreConfirmDialog(Modal):
                           "قبل الاستعادة تُحفظ نسخة أمان من الوضع الحالي تلقائيًا، فيمكن الرجوع عنها. "
                           "سيُغلق البرنامج ويُعاد تشغيله.", "warn")
         lay.addWidget(warn)
-        f = form()
         self.login_pw = PasswordEdit()
         self.word = QLineEdit()
         self.word.setPlaceholderText("استعادة")
-        f.addRow("كلمة مرور دخولك", self.login_pw)
-        f.addRow("للتأكيد اكتب: استعادة", self.word)
-        lay.addLayout(f)
+        lay.addWidget(field("كلمة مرور دخولك", self.login_pw))
+        lay.addWidget(field("للتأكيد اكتب: استعادة", self.word))
         self.add_footer("حفظ نسخة أمان ثم الاستعادة", self.go).setObjectName("danger")
 
     def go(self) -> None:
