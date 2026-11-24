@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout
                                QSizePolicy, QVBoxLayout, QWidget)
 
 from morv.ui.tokens import LAYOUT
-from morv.ui.widgets import icon_button, muted
+from morv.ui.widgets import Notice, action_row, icon_button, muted, primary_button
 
 
 def scroll_content(content: QWidget) -> QScrollArea:
@@ -18,11 +18,13 @@ def scroll_content(content: QWidget) -> QScrollArea:
 
 
 class AdaptiveCards(QScrollArea):
-    def __init__(self, cards, *, minimum_width, max_columns=2):
+    def __init__(self, cards, *, minimum_width, max_columns=2, column_weights=None, fill_height=False):
         super().__init__()
         self.cards = tuple(cards)
         self.minimum_width = minimum_width
         self.max_columns = max_columns
+        self.column_weights = column_weights
+        self.fill_height = fill_height
         self.columns = 0
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
@@ -32,7 +34,8 @@ class AdaptiveCards(QScrollArea):
         self.grid = QGridLayout(self.content)
         self.grid.setContentsMargins(0, 0, 0, 0)
         self.grid.setSpacing(LAYOUT["pane_gap"])
-        self.grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        if not fill_height:
+            self.grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.grid.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         for card in self.cards:
             card.setMinimumWidth(minimum_width)
@@ -56,17 +59,94 @@ class AdaptiveCards(QScrollArea):
         minimum = max((max(self.minimum_width, c.minimumWidth(), c.minimumSizeHint().width())
                        for c in self.cards), default=self.minimum_width)
         width = self.viewport().width()
-        columns = max(1, min(self.max_columns, len(self.cards), (width + gap) // (minimum + gap)))
+        if self.column_weights is None:
+            columns = max(1, min(self.max_columns, len(self.cards), (width + gap) // (minimum + gap)))
+        else:
+            # A weighted pair has different natural minima, not two copies of the wider one.
+            needed = sum(max(self.minimum_width, c.minimumWidth(), c.minimumSizeHint().width())
+                         for c in self.cards) + gap * (len(self.cards) - 1)
+            columns = len(self.cards) if width >= needed else 1
         if columns == self.columns:
             return
         for card in self.cards:
             self.grid.removeWidget(card)
         for col in range(self.max_columns):
-            self.grid.setColumnStretch(col, int(col < columns))
+            weight = self.column_weights[col] if self.column_weights and columns > 1 else 1
+            self.grid.setColumnStretch(col, weight if col < columns else 0)
+        if self.fill_height:
+            for row in range(len(self.cards)):
+                self.grid.setRowStretch(row, int(row == (len(self.cards) - 1) // columns))
         for index, card in enumerate(self.cards):
             self.grid.addWidget(card, index // columns, index % columns)
         self.columns = columns
         self.grid.invalidate()
+
+
+class AdaptiveFields(QWidget):
+    def __init__(self, fields):
+        super().__init__()
+        self.fields = tuple(fields)
+        self.columns = 0
+        self.grid = QGridLayout(self)
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        self.grid.setSpacing(LAYOUT["pane_gap"])
+        self.grid.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._reflow)
+        self._reflow()
+
+    def _field_minimum(self):
+        return max((max(LAYOUT["form_field_min"], w.minimumWidth(), w.minimumSizeHint().width())
+                    for w in self.fields), default=0)
+
+    def minimumSizeHint(self):
+        # Permit the parent card to shrink before rearranging the same inputs.
+        return QSize(self._field_minimum(), self.grid.minimumSize().height())
+
+    def event(self, event):
+        if hasattr(self, "_timer") and event.type() in (
+                QEvent.Type.Resize, QEvent.Type.LayoutRequest, QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            self._timer.start(0)
+        return super().event(event)
+
+    def _reflow(self):
+        columns = 2 if len(self.fields) > 1 and self.width() >= (
+            2 * self._field_minimum() + LAYOUT["pane_gap"]) else 1
+        if columns == self.columns:
+            return
+        for widget in self.fields:
+            self.grid.removeWidget(widget)
+        for col in range(2):
+            self.grid.setColumnStretch(col, int(col < columns))
+        for i, widget in enumerate(self.fields):
+            self.grid.addWidget(widget, i // columns, i % columns)
+        self.columns = columns
+        self.grid.invalidate()
+        self.updateGeometry()
+
+
+class FormBody(QWidget):
+    def __init__(self):
+        super().__init__()
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(LAYOUT["pane_gap"])
+        self.body = QVBoxLayout()
+        self.body.setContentsMargins(0, 0, 0, 0)
+        root.addLayout(self.body, 1)
+        self.footer = QWidget()
+        self.footer.setMinimumHeight(LAYOUT["page_footer_min"])
+        actions = QVBoxLayout(self.footer)
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(LAYOUT["page_back_gap"])
+        self.notice = Notice()
+        self.save_btn = primary_button("حفظ", "save")
+        self.save_btn.clicked.connect(self.save)
+        actions.addWidget(self.notice)
+        actions.addLayout(action_row(self.save_btn))
+        root.addWidget(self.footer)
 
 
 class PageFrame(QWidget):

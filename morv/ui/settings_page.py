@@ -1,19 +1,19 @@
 """Settings hub and the existing settings pages."""
 
-from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget, QTableView, QTabBar,
+                               QPushButton, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget, QTableView,
                                QVBoxLayout, QWidget)
 
 from morv.core import security
 from morv.core.text import ltr
-from morv.infra import backup, settings, shop, users, vault
-from morv.ui import print_doc, tokens
-from morv.ui.adaptive_layout import AdaptiveCards, PageFrame, scroll_content
+from morv.infra import backup, settings, users, vault
+from morv.ui import tokens
+from morv.ui.adaptive_layout import AdaptiveCards, PageFrame
 from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
+from morv.ui.shop_settings import PrintingTab, ShopTab
 from morv.ui.widgets import (Notice, PasswordEdit, ask, card, danger_button, form, info, ltr_edit, muted,
                              primary_button, section_card, icon_button)
 
@@ -37,7 +37,8 @@ def _table(model) -> QTableView:
 
 SETTINGS_GROUPS = (
     ("إدارة المحل", "home", (
-        ("shop", "بيانات المحل والطباعة", "home", "settings.edit"),
+        ("shop", "بيانات المحل", "home", "settings.edit"),
+        ("printing", "المستندات والطباعة", "printer", "settings.edit"),
         ("item_fields", "حقول بطاقة الصنف", "inventory", "settings.edit"),
     )),
     ("الإدارة المالية", "treasury", (
@@ -60,7 +61,7 @@ class SettingsPage(PageFrame):
     def __init__(self, session):
         super().__init__("الرجوع إلى جميع الإعدادات", "collapse")
         self.session = session
-        self.shop_tab = self.fields_tab = self.partners_tab = None
+        self.shop_tab = self.printing_tab = self.fields_tab = self.partners_tab = None
         self.destinations = {}
         self.links = {}
         self._routes = {}
@@ -82,10 +83,8 @@ class SettingsPage(PageFrame):
                 widget = self._build(key)
                 self.destinations[key] = widget
                 self._routes[key] = (label, permission)
-                # Preserve the legacy shop form until its coordinated split in S2.
-                view = scroll_content(widget) if key == "shop" else widget
-                self._views[key] = view
-                self.stack.addWidget(view)
+                self._views[key] = widget
+                self.stack.addWidget(widget)
                 button = icon_button(label, icon)
                 button.setMinimumHeight(tokens.LAYOUT["settings_link_min"])
                 button.clicked.connect(lambda _checked=False, route=key: self.open_page(route))
@@ -93,6 +92,8 @@ class SettingsPage(PageFrame):
                 self.links[key] = button
             inner.addStretch(1)
             cards.append(box)
+        if self.shop_tab is not None and self.printing_tab is not None:
+            self.shop_tab.changed.connect(self.printing_tab.refresh_preview)
         self.hub = AdaptiveCards(cards, minimum_width=tokens.LAYOUT["settings_card_min"])
         self.stack.insertWidget(0, self.hub)
         self.show_hub()
@@ -101,6 +102,9 @@ class SettingsPage(PageFrame):
         if key == "shop":
             self.shop_tab = ShopTab(self.session)
             return self.shop_tab
+        if key == "printing":
+            self.printing_tab = PrintingTab(self.session)
+            return self.printing_tab
         if key == "item_fields":
             from morv.ui.inventory_page import ItemFieldsTab
             self.fields_tab = ItemFieldsTab(self.session)
@@ -190,251 +194,6 @@ class AppearanceTab(QWidget):
         win = self.window()
         if hasattr(win, "set_font"):
             win.set_font(self.family.currentText(), self.size.currentData())
-
-
-PAPER_TABS = (("a4", "A4"), ("a5", "A5"), ("r80", "رول 80مم"), ("r58", "رول 58مم"))
-
-
-class ShopTab(QWidget):
-    def __init__(self, session):
-        super().__init__()
-        self.session = session
-        self.editable = session.can("settings.edit")
-        self.page = None
-        self.notice = Notice()
-        data = shop.load(session.con)
-        row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 0)
-        left = QVBoxLayout()
-        left.addWidget(self._identity_card(data))
-        left.addWidget(self._words_card(data))
-        left.addStretch(1)
-        left.addWidget(self.notice)
-        self.save_btn = primary_button("حفظ")
-        self.save_btn.clicked.connect(self.save)
-        self.save_btn.setEnabled(self.editable)
-        left.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignLeading)
-        row.addLayout(left, 1)
-        row.addWidget(self._print_card(data), 0)
-        self.redraw = QTimer(self)
-        self.redraw.setSingleShot(True)
-        self.redraw.setInterval(250)
-        self.redraw.timeout.connect(self._draw_preview)
-        self.lines = (self.name, self.activity, self.phone, self.phone2, self.whatsapp, self.address,
-                      self.hours, self.website, self.tax_id, self.register_no, self.thanks)
-        for w in self.lines:
-            w.textChanged.connect(self.redraw.start)
-        self.policy.textChanged.connect(self.redraw.start)
-        for cb in self.switches.values():
-            cb.toggled.connect(self.redraw.start)
-        if not self.editable:
-            for w in (*self.lines, self.policy, self.tax_registered, self.pick, self.drop,
-                      self.printer, self.sizes, *self.switches.values()):
-                w.setEnabled(False)
-        self._show_logo()
-        self._tax_toggled()
-        self._draw_preview()
-
-    def _identity_card(self, data) -> QFrame:
-        box, inner = card("بيانات المحل")
-        self.name = QLineEdit(data.name)
-        self.activity = QLineEdit(data.activity)
-        self.activity.setPlaceholderText("إطارات · بطاريات · خدمات سريعة")
-        self.phone = ltr_edit("01xxxxxxxxx")
-        self.phone.setText(data.phone)
-        self.phone2 = ltr_edit("اختياري")
-        self.phone2.setText(data.phone2)
-        self.whatsapp = ltr_edit("اختياري")
-        self.whatsapp.setText(data.whatsapp)
-        self.address = QLineEdit(data.address)
-        self.hours = QLineEdit(data.hours)
-        self.hours.setPlaceholderText("السبت - الخميس · 9 ص إلى 10 م")
-        self.website = QLineEdit(data.website)
-        self.website.setPlaceholderText("صفحة فيسبوك أو موقع")
-        self.tax_id = ltr_edit("رقم التسجيل الضريبي")
-        self.tax_id.setText(data.tax_id)
-        self.register_no = ltr_edit("رقم السجل التجاري")
-        self.register_no.setText(data.commercial_register)
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(8)
-        grid.setColumnStretch(1, 1)
-        grid.setColumnStretch(3, 1)
-        pairs = (("اسم المحل *", self.name), ("النشاط", self.activity), ("هاتف 1 *", self.phone),
-                 ("هاتف 2", self.phone2), ("واتساب المحل", self.whatsapp), ("العنوان", self.address),
-                 ("مواعيد العمل", self.hours), ("فيسبوك أو موقع", self.website),
-                 ("الرقم الضريبي", self.tax_id), ("السجل التجاري", self.register_no))
-        for i, (label, widget) in enumerate(pairs):
-            row, col = divmod(i, 2)
-            grid.addWidget(QLabel(label), row, col * 2)
-            grid.addWidget(widget, row, col * 2 + 1)
-        self.tax_registered = QCheckBox("المحل مسجل ضريبيًا")
-        self.tax_registered.setChecked(data.tax_registered)
-        self.logo = QLabel()
-        size = tokens.LAYOUT["shop_logo_preview"]
-        self.logo.setFixedSize(size, size)
-        self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.pick = QPushButton("اختيار شعار")
-        self.pick.clicked.connect(self.pick_logo)
-        self.drop = QPushButton("إزالة")
-        self.drop.clicked.connect(self.remove_logo)
-        logo_row = QHBoxLayout()
-        logo_row.setContentsMargins(0, 0, 0, 0)
-        logo_row.addWidget(QLabel("الشعار"))
-        logo_row.addWidget(self.logo)
-        logo_row.addWidget(self.pick)
-        logo_row.addWidget(self.drop)
-        details = QHBoxLayout()
-        details.addWidget(self.tax_registered)
-        details.addStretch(1)
-        details.addLayout(logo_row)
-        grid.addLayout(details, len(pairs) // 2, 0, 1, 4)
-        self.tax_registered.toggled.connect(self._tax_toggled)
-        inner.addLayout(grid)
-        return box
-
-    def _words_card(self, data) -> QFrame:
-        box, inner = card("نصوص المستندات")
-        f = form()
-        self.thanks = QLineEdit(data.thanks)
-        self.thanks.setPlaceholderText("شكرًا لتعاملكم معنا")
-        self.policy = QPlainTextEdit(data.policy)
-        self.policy.setPlaceholderText("الاستبدال خلال 14 يومًا بالفاتورة · الضمان لا يغطي سوء الاستخدام")
-        self.policy.setFixedHeight(52)
-        f.addRow("عبارة الشكر", self.thanks)
-        f.addRow("سياسة الاستبدال والضمان", self.policy)
-        inner.addLayout(f)
-        return box
-
-    def _print_card(self, data) -> QFrame:
-        from PySide6.QtPrintSupport import QPrinterInfo
-        box, inner = card("الطباعة")
-        f = form()
-        self.printer = QComboBox()
-        self.printer.addItem("الطابعة الافتراضية", "")
-        for name in QPrinterInfo.availablePrinterNames():
-            self.printer.addItem(name, name)
-        at = self.printer.findData(data.printer)
-        self.printer.setCurrentIndex(at if at >= 0 else 0)
-        f.addRow("الطابعة", self.printer)
-        inner.addLayout(f)
-        self.switches = {}
-        switch_grid = QGridLayout()
-        switch_grid.setHorizontalSpacing(10)
-        for i, (key, label) in enumerate((("show_logo", "الشعار"), ("show_whatsapp", "واتساب"),
-                                          ("show_hours", "المواعيد"), ("show_policy", "السياسة"))):
-            cb = QCheckBox(label)
-            cb.setChecked(getattr(data, key))
-            self.switches[key] = cb
-            switch_grid.addWidget(cb, *divmod(i, 2))
-        inner.addWidget(muted("يظهر في المستند:"))
-        inner.addLayout(switch_grid)
-        inner.addWidget(muted("مقاس الورق:"))
-        self.sizes = QTabBar()
-        for key, label in PAPER_TABS:
-            self.sizes.addTab(label)
-            self.sizes.setTabData(self.sizes.count() - 1, key)
-        keys = [key for key, _label in PAPER_TABS]
-        self.sizes.setCurrentIndex(keys.index(data.paper) if data.paper in keys else 0)
-        self.sizes.currentChanged.connect(self._draw_preview)
-        inner.addWidget(self.sizes)
-        self.preview = QLabel()
-        self.preview.setMinimumSize(170, 150)
-        self.preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-        self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview.setObjectName("printPreview")
-        inner.addWidget(self.preview, 1)
-        trial = QPushButton("طباعة صفحة تجريبية")
-        trial.clicked.connect(self.trial_print)
-        trial.setEnabled(self.editable)
-        inner.addWidget(trial, 0, Qt.AlignmentFlag.AlignLeading)
-        box.setMinimumWidth(250)
-        box.setMaximumWidth(360)
-        return box
-
-    def collect(self):
-        """Reads the screen without validating, so the preview keeps drawing while a field is half typed."""
-        return shop.Shop(
-            name=self.name.text(), activity=self.activity.text(), phone=self.phone.text(),
-            phone2=self.phone2.text(), whatsapp=self.whatsapp.text(), address=self.address.text(),
-            hours=self.hours.text(), website=self.website.text(),
-            tax_registered=self.tax_registered.isChecked(), tax_id=self.tax_id.text(),
-            commercial_register=self.register_no.text(), thanks=self.thanks.text(),
-            policy=self.policy.toPlainText(), paper=self.shape().key,
-            printer=self.printer.currentData(),
-            **{k: cb.isChecked() for k, cb in self.switches.items()})
-
-    def shape(self):
-        key = self.sizes.tabData(self.sizes.currentIndex()) or "a4"
-        return print_doc.SHAPES[key]
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._fit()
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._fit()
-
-    def _fit(self) -> None:
-        """Scales the drawn page into whatever room the column has, keeping the paper's proportions."""
-        box = self.preview.size() - QSize(18, 18)
-        if self.page is None or box.width() < 40 or box.height() < 40:
-            return
-        self.preview.setPixmap(QPixmap.fromImage(self.page).scaled(
-            box, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-
-    def _draw_preview(self) -> None:
-        self.page = print_doc.preview_image(self.collect(), print_doc.sample_document(), self.shape())
-        self._fit()
-
-    def _tax_toggled(self) -> None:
-        on = self.tax_registered.isChecked()
-        for w in (self.tax_id, self.register_no):
-            w.setEnabled(on and self.editable)
-        self.redraw.start()
-
-    def _show_logo(self) -> None:
-        p = shop.Shop().logo_path
-        if p:
-            self.logo.setPixmap(QPixmap(str(p)).scaled(self.logo.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                                                       Qt.TransformationMode.SmoothTransformation))
-        else:
-            self.logo.setPixmap(QPixmap())
-            self.logo.setText("—")
-
-    def pick_logo(self) -> None:
-        p, _ = QFileDialog.getOpenFileName(self, "صورة الشعار", "", "صور (*.png *.jpg *.jpeg)")
-        if p:
-            shop.save_logo(p)
-            self._show_logo()
-            self._draw_preview()
-
-    def remove_logo(self) -> None:
-        shop.remove_logo()
-        self._show_logo()
-        self._draw_preview()
-
-    def trial_print(self) -> None:
-        from PySide6.QtPrintSupport import QPrinter, QPrinterInfo
-        name = self.printer.currentData()
-        chosen = QPrinterInfo.printerInfo(name) if name else QPrinterInfo.defaultPrinter()
-        if chosen.isNull():
-            self.notice.show_message("لا توجد طابعة مثبتة على هذا الجهاز")
-            return
-        printer = QPrinter(chosen, QPrinter.PrinterMode.HighResolution)
-        print_doc.to_printer(self.collect(), print_doc.sample_document(), printer, self.shape())
-        self.notice.show_message(f"أُرسلت صفحة تجريبية إلى {chosen.printerName()}", "success")
-
-    def save(self) -> None:
-        try:
-            shop.save(self.session.con, self.session.user, self.collect())
-        except shop.ShopError as e:
-            self.notice.show_message(str(e))
-            return
-        users.audit(self.session.con, self.session.user, "shop.save")
-        self.notice.show_message("تم الحفظ", "success")
-        self._draw_preview()
 
 
 class UsersTab(QWidget):
