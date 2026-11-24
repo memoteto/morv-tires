@@ -366,3 +366,7 @@ PR #146 مسودة، CI 45394449322 للرأس 6d6f16a41eedb6a814a69634151855441
 ### S5 — correct invalid regression fixture (2026-11-24)
 - Owner local run on `258e260`: 58 tests, 57 passed, one error in the new test because ledger.valid_date rejects future share effective dates. Confirmed from source; this is a fixture error, not a change request to accounting.
 - Test now approves yesterday's 50/50 shares, checks the displayed value, approves today's 60/40 shares, explicitly asserts rejection of tomorrow's shares, then retains both current-share and fixed-action assertions. Only test and this log changed. Re-run pending; no product or accounting change.
+
+### S6 — baseline and approved implementation (2026-11-24)
+- Main `1f9989b`: owner's report 21/21 existing tests, 96 geometry cases, no measured horizontal overflow or bad buttons. All 12 cash-dialog cases showed irrelevant stock fields. Dialogs measured on a single offscreen screen, only empty main-page state; populated and actual-screen verification still required.
+- Owner approved UI-only implementation: status and responsive entry/reversal cards; conditional fields, shared TupleModel and measured table columns, review totals from the existing engine; existing request keys, posting and reversal methods unchanged. Existing tests retained and additional tests for seven kinds, draft and review, 31 lines and reversal reason. No engine/schema changes. CI and owner visual acceptance pending.
