@@ -303,7 +303,8 @@ class ItemFieldsTab(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(tokens.LAYOUT["pane_gap"])
-        self.hint = muted("")
+        self.hint = muted("عرض فقط — تعديل الحقول يتطلب صلاحية إدارة الأصناف.")
+        self.hint.hide()
         lay.addWidget(self.hint)
         top = QHBoxLayout()
         top.setSpacing(tokens.LAYOUT["page_back_gap"])
@@ -334,8 +335,6 @@ class ItemFieldsTab(QWidget):
                          1: tokens.LAYOUT["item_field_example_weight"]}, controls)
         self.table.itemChanged.connect(self.on_change)
         lay.addWidget(self.table, 1)
-        lay.addWidget(muted("الحقول المقفلة تبقى ظاهرة وإلزامية. "
-                            "جعل حقل إلزاميًا لا يمنع بيع الأصناف القديمة."))
         self.notice = Notice()
         lay.addWidget(self.notice)
         self.kind.currentIndexChanged.connect(self.reload)
@@ -353,7 +352,7 @@ class ItemFieldsTab(QWidget):
         column = max(0, self.table.currentColumn())
         editable = self.session.can("items.manage")
         self.add_btn.setEnabled(editable)
-        self.hint.setText("تُحفظ التعديلات فورًا." if editable else "عرض فقط — تعديل الحقول يتطلب صلاحية إدارة الأصناف.")
+        self.hint.setVisible(not editable)
         rows = [f for f in items.fields(self.session.con, kind) if f.kind == kind]
         self._loading = True
         try:

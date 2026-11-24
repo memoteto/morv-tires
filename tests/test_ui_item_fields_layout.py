@@ -202,6 +202,16 @@ class ItemFieldsLayoutTest(unittest.TestCase):
         self.assertEqual(dlg.label, "")
         self.assertIn("مطلوبة", dlg.notice.text())
 
+    def test_editor_has_no_redundant_explanation_rows(self):
+        from PySide6.QtWidgets import QLabel
+
+        self.arrange(1366, 768, 14, "common")
+        self.assertTrue(self.tab.hint.isHidden())
+        for label in self.tab.findChildren(QLabel):
+            self.assertNotIn("تُحفظ التعديلات فورًا", label.text())
+            self.assertNotIn("الحقول المقفلة تبقى", label.text())
+            self.assertNotIn("لا يمنع بيع الأصناف القديمة", label.text())
+
     def test_read_only_permission_and_revocation(self):
         from PySide6.QtCore import Qt
         from morv.infra import items, users
@@ -219,6 +229,8 @@ class ItemFieldsLayoutTest(unittest.TestCase):
                    if tab.table.item(i, 0).data(Qt.ItemDataRole.UserRole) == "season")
         original = next(f for f in items.fields(self.con, "tire") if f.key == "season")
         self.assertFalse(tab.add_btn.isEnabled())
+        self.assertFalse(tab.hint.isHidden())
+        self.assertIn("عرض فقط", tab.hint.text())
         for col in range(2, 6):
             self.assertFalse(tab.table.item(row, col).flags() & Qt.ItemFlag.ItemIsEnabled)
         with patch("morv.ui.inventory_page.CustomFieldDialog") as dialog:
@@ -227,9 +239,11 @@ class ItemFieldsLayoutTest(unittest.TestCase):
         users.set_permission(self.con, self.admin, cashier.id, "items.manage", True)
         tab.reload()
         self.assertTrue(tab.add_btn.isEnabled())
+        self.assertTrue(tab.hint.isHidden())
         self.assertTrue(tab.table.item(row, 2).flags() & Qt.ItemFlag.ItemIsEnabled)
         users.set_permission(self.con, self.admin, cashier.id, "items.manage", False)
         tab.table.item(row, 2).setCheckState(Qt.CheckState.Unchecked if original.show else Qt.CheckState.Checked)
         self.assertEqual(next(f for f in items.fields(self.con, "tire") if f.key == "season"), original)
         self.assertFalse(tab.add_btn.isEnabled())
+        self.assertFalse(tab.hint.isHidden())
         self.assertFalse(tab.table.item(row, 2).flags() & Qt.ItemFlag.ItemIsEnabled)
