@@ -1,5 +1,5 @@
 """Shared adaptive card layout and page chrome without business dependencies."""
-from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QScrollArea,
                                QSizePolicy, QVBoxLayout, QWidget)
 
@@ -80,7 +80,15 @@ class PageFrame(QWidget):
         self.header.setMinimumHeight(LAYOUT["page_header_min"])
         head = QHBoxLayout(self.header)
         head.setContentsMargins(0, 0, 0, 0)
-        head.setSpacing(LAYOUT["pane_gap"])
+        head.setSpacing(LAYOUT["page_back_gap"])
+        self.back = icon_button("", back_icon)
+        self.back.setIconSize(QSize(LAYOUT["page_back_icon"], LAYOUT["page_back_icon"]))
+        self.back.setMinimumSize(LAYOUT["page_back_min"], LAYOUT["page_back_min"])
+        self.back.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.back.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.back.setToolTip(back_text)
+        self.back.setAccessibleName(back_text)
+        head.addWidget(self.back, 0, Qt.AlignmentFlag.AlignVCenter)
         titles = QVBoxLayout()
         titles.setSpacing(4)
         self.title = QLabel()
@@ -90,8 +98,6 @@ class PageFrame(QWidget):
         titles.addWidget(self.title)
         titles.addWidget(self.description)
         head.addLayout(titles, 1)
-        self.back = icon_button(back_text, back_icon)
-        head.addWidget(self.back, 0, Qt.AlignmentFlag.AlignVCenter)
         root.addWidget(self.header)
         self.body = QVBoxLayout()
         self.body.setContentsMargins(0, 0, 0, 0)

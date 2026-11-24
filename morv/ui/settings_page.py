@@ -58,7 +58,7 @@ SETTINGS_GROUPS = (
 
 class SettingsPage(PageFrame):
     def __init__(self, session):
-        super().__init__("جميع الإعدادات", "collapse")
+        super().__init__("الرجوع إلى جميع الإعدادات", "collapse")
         self.session = session
         self.shop_tab = self.fields_tab = self.partners_tab = None
         self.destinations = {}

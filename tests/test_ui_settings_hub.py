@@ -40,6 +40,7 @@ class SettingsHubTest(unittest.TestCase):
         page.show()
         self.settle()
         self.assertIsNone(page.current_key)
+        self.assertTrue(page.back.isHidden())
         self.assertEqual(len(page.hub.cards), 4)
         self.assertEqual(set(page.destinations), set(page.links))
         self.assertEqual(len(page.links), 9)
@@ -49,9 +50,12 @@ class SettingsHubTest(unittest.TestCase):
         page.shop_tab.name.setText("Unsaved example")
         page.back.click()
         self.assertIsNone(page.current_key)
+        self.assertTrue(page.back.isHidden())
         for key in page.destinations:
             self.assertTrue(page.open_page(key))
             self.assertEqual(page.current_key, key)
+            self.assertFalse(page.back.isHidden())
+            self.assertEqual(page.title.text(), page.title_for(key))
             page.show_hub()
         self.assertTrue(page.open_page("shop"))
         self.assertEqual(page.shop_tab.name.text(), "Unsaved example")
@@ -105,7 +109,9 @@ class SettingsHubTest(unittest.TestCase):
 
     def test_hub_geometry_at_reference_sizes(self):
         from itertools import combinations
-        from PySide6.QtCore import QPoint, QRect
+        from PySide6.QtCore import QPoint, QRect, QSize, Qt
+        from PySide6.QtTest import QTest
+        from morv.ui import icons, tokens
         from morv.ui import theme
         from morv.ui.shell import MainWindow
         from morv.ui.widgets import dispose
@@ -145,3 +151,32 @@ class SettingsHubTest(unittest.TestCase):
                             for btn in page.links.values():
                                 self.assertGreaterEqual(btn.height(), btn.minimumSizeHint().height())
                                 self.assertGreaterEqual(btn.width(), btn.minimumSizeHint().width())
+                            self.assertTrue(page.open_page("backup"))
+                            self.settle()
+                            back = page.back
+                            title = page.title
+                            header = page.header
+                            back_rect = QRect(back.mapTo(header, QPoint()), back.size())
+                            title_rect = QRect(title.mapTo(header, QPoint()), title.size())
+                            self.assertTrue(back.isVisible())
+                            self.assertEqual(back.text(), "")
+                            self.assertEqual(back.toolTip(), "الرجوع إلى جميع الإعدادات")
+                            self.assertEqual(back.accessibleName(), back.toolTip())
+                            self.assertEqual(back.iconSize(), QSize(18, 18))
+                            expected = icons.icon("collapse", tokens.ICON_MUTED, 18)
+                            self.assertEqual(back.icon().pixmap(18, 18).toImage(),
+                                             expected.pixmap(18, 18).toImage())
+                            self.assertGreaterEqual(back.width(), 38)
+                            self.assertGreaterEqual(back.height(), 38)
+                            self.assertEqual(back_rect.right(), header.rect().right())
+                            self.assertEqual(back_rect.left() - title_rect.right() - 1, 8)
+                            self.assertTrue(header.rect().contains(back_rect))
+                            self.assertTrue(header.rect().contains(title_rect))
+                            self.assertFalse(back_rect.intersects(title_rect))
+                            back.setFocus()
+                            self.assertIs(page.focusWidget(), back)
+                            QTest.keyClick(back, Qt.Key.Key_Space)
+                            self.settle()
+                            self.assertIsNone(page.current_key)
+                            self.assertTrue(back.isHidden())
+                            self.assertIs(page.focusWidget(), page.links["backup"])

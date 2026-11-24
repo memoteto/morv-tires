@@ -27,6 +27,7 @@ DARK = dict(
 LAYOUT = dict(
     page_margin=24, pane_gap=12, preview_padding=16,
     page_margin_y=16, page_header_min=56, page_footer_min=48,
+    page_back_min=38, page_back_icon=18, page_back_gap=8,
     settings_card_min=320, settings_group_header_min=54, settings_link_min=44,
     preview_scroll_gutter=14, preview_scroll_end_gap=4,
     preview_min=380, preview_max=540, preview_share_pct=41, list_min=640,
