@@ -1,5 +1,5 @@
 """Main window shell: collapsible sidebar, top bar and the page area."""
-from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget,
                                QListWidgetItem, QMainWindow, QStackedWidget, QToolButton,
@@ -171,7 +171,20 @@ class MainWindow(QMainWindow):
         self.logout_button.setIconSize(QSize(18, 18))
         self.logout_button.setToolTip("تسجيل الخروج (Ctrl+L)")
         self.logout_button.clicked.connect(self.logout)
+        self._topbar = bar
+        self._topbar_layout = lay
+        self._header_timer = QTimer(self)
+        self._header_timer.setSingleShot(True)
+        self._header_timer.timeout.connect(self._sync_settings_header)
+        bar.installEventFilter(self)
+        self._detail_host = QWidget(bar)
+        self._detail_layout = QHBoxLayout(self._detail_host)
+        self._detail_layout.setContentsMargins(0, 0, 0, 0)
+        self._detail_layout.setSpacing(0)
+        self._external_header_page = None
         lay.addWidget(self.title, 1)
+        lay.addWidget(self._detail_host, 1)
+        self._detail_host.hide()
         lay.addWidget(self.health_pill)
         lay.addWidget(self.user_label)
         lay.addWidget(self.theme_button)
@@ -233,13 +246,54 @@ class MainWindow(QMainWindow):
             # Wire up signals that require the real page.
             if key == "pos":
                 page.contract_needed.connect(self.open_contract)
+            elif key == "settings":
+                page.header_changed.connect(self._sync_settings_header)
         self.stack.setCurrentIndex(row)
         self.title.setText(NAV[row][1])
         # Other screens may have changed the data since this one was last shown; home refreshes itself.
         if not first_visit and hasattr(self.pages[key], "refresh"):
             self.pages[key].refresh()
+        self._sync_settings_header()
         if key == "settings" and hasattr(self, "health_pill"):
             self.refresh_health()
+
+    def eventFilter(self, watched, event):
+        if (watched is getattr(self, "_topbar", None) and hasattr(self, "stack")
+                and event.type() in (QEvent.Type.Resize, QEvent.Type.LayoutRequest,
+                                     QEvent.Type.FontChange, QEvent.Type.StyleChange)):
+            if not self._header_timer.isActive():
+                self._header_timer.start(0)
+        return super().eventFilter(watched, event)
+
+    def _detail_available_size(self) -> QSize:
+        # Reserve the natural widths even while the detail host is hidden.
+        layout = self._topbar_layout
+        available = layout.contentsRect().size()
+        widgets = (self.title, self.health_pill, self.user_label, self.theme_button, self.logout_button)
+        reserved = sum(w.sizeHint().expandedTo(w.minimumSizeHint()).expandedTo(w.minimumSize()).width()
+                       for w in widgets)
+        return QSize(max(0, available.width() - reserved - len(widgets) * layout.spacing()),
+                     available.height())
+
+    def _sync_settings_header(self):
+        page = self.pages.get("settings")
+        detail = (page if isinstance(page, SettingsPage)
+                  and self.stack.currentWidget() is page and page.current_key is not None else None)
+        room = self._detail_available_size() if detail is not None else QSize()
+        active = detail if detail is not None and detail.header_fits(room.width(), room.height()) else None
+        if active is self._external_header_page:
+            return
+        focus = self.focusWidget()
+        restore_focus = detail is not None and focus is not None and detail.header.isAncestorOf(focus)
+        if self._external_header_page is not None:
+            self._external_header_page.set_header_host()
+        self._external_header_page = active
+        self._detail_host.setVisible(active is not None)
+        if active is not None:
+            active.set_header_host(self._detail_layout)
+        self._topbar_layout.setStretch(0, 0 if active is not None else 1)
+        if restore_focus:
+            focus.setFocus()
 
     def go_key(self, key: str) -> None:
         for i, entry in enumerate(NAV):

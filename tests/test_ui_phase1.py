@@ -159,12 +159,14 @@ class SettingsTest(_Base):
         self.make_admin()
         k = users.create_user(self.con, self.admin, "karim", "كريم", "Karim12345", "cashier")
         admin_page = SettingsPage(self.session())        # kept in a variable, or Qt takes it and its tabs away
-        self.assertEqual(len(admin_page.destinations), 9)     # shop, users, log, fields, partners, opening, appearance, shortcuts, backup
+        self.assertEqual(len(admin_page.destinations), 10)
         self.assertIsNotNone(admin_page.fields_tab)
         p = SettingsPage(self.session(k))
         self.assertEqual(len(p.destinations), 3)               # appearance, shortcuts and backup only
         self.assertIsNone(p.shop_tab)                     # never sees shop data at all
         self.assertFalse(p.open_page("shop"))
+        self.assertIsNone(p.printing_tab)
+        self.assertFalse(p.open_page("printing"))
         self.assertTrue(p.open_page("backup"))
         self.assertFalse(p.backup_tab.restore_btn.isVisibleTo(p))
         self.assertFalse(p.backup_tab.pw_btn.isVisibleTo(p))      # the backup password is for a manager only
