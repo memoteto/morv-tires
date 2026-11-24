@@ -208,12 +208,12 @@ class ShopTab(QWidget):
         left = QVBoxLayout()
         left.addWidget(self._identity_card(data))
         left.addWidget(self._words_card(data))
-        left.addWidget(self.notice)
-        save = primary_button("حفظ")
-        save.clicked.connect(self.save)
-        save.setEnabled(self.editable)
-        left.addWidget(save, 0, Qt.AlignmentFlag.AlignLeading)
         left.addStretch(1)
+        left.addWidget(self.notice)
+        self.save_btn = primary_button("حفظ")
+        self.save_btn.clicked.connect(self.save)
+        self.save_btn.setEnabled(self.editable)
+        left.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignLeading)
         row.addLayout(left, 1)
         row.addWidget(self._print_card(data), 0)
         self.redraw = QTimer(self)
@@ -268,11 +268,11 @@ class ShopTab(QWidget):
             row, col = divmod(i, 2)
             grid.addWidget(QLabel(label), row, col * 2)
             grid.addWidget(widget, row, col * 2 + 1)
-        self.tax_registered = QCheckBox("المحل مسجل ضريبيًا — بدونه لا يُطبع رقم ضريبي ولا سجل تجاري")
+        self.tax_registered = QCheckBox("المحل مسجل ضريبيًا")
         self.tax_registered.setChecked(data.tax_registered)
-        grid.addWidget(self.tax_registered, len(pairs) // 2, 0, 1, 2)
         self.logo = QLabel()
-        self.logo.setFixedSize(40, 40)
+        size = tokens.LAYOUT["shop_logo_preview"]
+        self.logo.setFixedSize(size, size)
         self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.pick = QPushButton("اختيار شعار")
         self.pick.clicked.connect(self.pick_logo)
@@ -284,8 +284,11 @@ class ShopTab(QWidget):
         logo_row.addWidget(self.logo)
         logo_row.addWidget(self.pick)
         logo_row.addWidget(self.drop)
-        logo_row.addStretch(1)
-        grid.addLayout(logo_row, len(pairs) // 2, 2, 1, 2)
+        details = QHBoxLayout()
+        details.addWidget(self.tax_registered)
+        details.addStretch(1)
+        details.addLayout(logo_row)
+        grid.addLayout(details, len(pairs) // 2, 0, 1, 4)
         self.tax_registered.toggled.connect(self._tax_toggled)
         inner.addLayout(grid)
         return box
@@ -345,7 +348,6 @@ class ShopTab(QWidget):
         trial.clicked.connect(self.trial_print)
         trial.setEnabled(self.editable)
         inner.addWidget(trial, 0, Qt.AlignmentFlag.AlignLeading)
-        inner.addWidget(muted("التصميم مناسب للطابعات الأبيض والأسود: خلفيات بيضاء وخطوط فاصلة."))
         box.setMinimumWidth(250)
         box.setMaximumWidth(360)
         return box
@@ -395,7 +397,7 @@ class ShopTab(QWidget):
     def _show_logo(self) -> None:
         p = shop.Shop().logo_path
         if p:
-            self.logo.setPixmap(QPixmap(str(p)).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio,
+            self.logo.setPixmap(QPixmap(str(p)).scaled(self.logo.size(), Qt.AspectRatioMode.KeepAspectRatio,
                                                        Qt.TransformationMode.SmoothTransformation))
         else:
             self.logo.setPixmap(QPixmap())

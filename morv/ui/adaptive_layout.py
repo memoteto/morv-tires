@@ -1,5 +1,5 @@
 """Shared adaptive card layout and page chrome without business dependencies."""
-from PySide6.QtCore import QEvent, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QScrollArea,
                                QSizePolicy, QVBoxLayout, QWidget)
 
@@ -70,9 +70,12 @@ class AdaptiveCards(QScrollArea):
 
 
 class PageFrame(QWidget):
+    header_changed = Signal()
+
     def __init__(self, back_text, back_icon):
         super().__init__()
-        root = QVBoxLayout(self)
+        root = self._root = QVBoxLayout(self)
+        self._header_host = None
         root.setContentsMargins(LAYOUT["page_margin"], LAYOUT["page_margin_y"],
                                 LAYOUT["page_margin"], LAYOUT["page_margin_y"])
         root.setSpacing(LAYOUT["pane_gap"])
@@ -109,8 +112,24 @@ class PageFrame(QWidget):
         root.addWidget(self.footer)
         self.footer.hide()
 
+    def set_header_host(self, host=None):
+        """Move the same header between the page and an optional shell layout."""
+        if host is self._header_host:
+            return
+        if self._header_host is None:
+            self._root.removeWidget(self.header)
+        else:
+            self._header_host.removeWidget(self.header)
+        self._header_host = host
+        if host is None:
+            self._root.insertWidget(0, self.header)
+        else:
+            host.addWidget(self.header)
+        self.header.show()
+
     def set_header(self, title, description="", *, back=False):
         self.title.setText(title)
         self.description.setText(description)
         self.description.setVisible(bool(description))
         self.back.setVisible(back)
+        self.header_changed.emit()

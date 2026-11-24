@@ -171,7 +171,15 @@ class MainWindow(QMainWindow):
         self.logout_button.setIconSize(QSize(18, 18))
         self.logout_button.setToolTip("تسجيل الخروج (Ctrl+L)")
         self.logout_button.clicked.connect(self.logout)
+        self._topbar_layout = lay
+        self._detail_host = QWidget(bar)
+        self._detail_layout = QHBoxLayout(self._detail_host)
+        self._detail_layout.setContentsMargins(0, 0, 0, 0)
+        self._detail_layout.setSpacing(0)
+        self._external_header_page = None
         lay.addWidget(self.title, 1)
+        lay.addWidget(self._detail_host, 1)
+        self._detail_host.hide()
         lay.addWidget(self.health_pill)
         lay.addWidget(self.user_label)
         lay.addWidget(self.theme_button)
@@ -233,13 +241,30 @@ class MainWindow(QMainWindow):
             # Wire up signals that require the real page.
             if key == "pos":
                 page.contract_needed.connect(self.open_contract)
+            elif key == "settings":
+                page.header_changed.connect(self._sync_settings_header)
         self.stack.setCurrentIndex(row)
         self.title.setText(NAV[row][1])
         # Other screens may have changed the data since this one was last shown; home refreshes itself.
         if not first_visit and hasattr(self.pages[key], "refresh"):
             self.pages[key].refresh()
+        self._sync_settings_header()
         if key == "settings" and hasattr(self, "health_pill"):
             self.refresh_health()
+
+    def _sync_settings_header(self):
+        page = self.pages.get("settings")
+        active = (page if isinstance(page, SettingsPage)
+                  and self.stack.currentWidget() is page and page.current_key is not None else None)
+        if active is self._external_header_page:
+            return
+        if self._external_header_page is not None:
+            self._external_header_page.set_header_host()
+        self._external_header_page = active
+        if active is not None:
+            active.set_header_host(self._detail_layout)
+        self._detail_host.setVisible(active is not None)
+        self._topbar_layout.setStretch(0, 0 if active is not None else 1)
 
     def go_key(self, key: str) -> None:
         for i, entry in enumerate(NAV):
