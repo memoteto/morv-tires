@@ -484,12 +484,18 @@ class BackupTab(QWidget):
         lay.addWidget(self.health)
         self.backup_btn = primary_button("نسخ الآن", "save")
         self.backup_btn.clicked.connect(self.backup_now)
-        lay.addLayout(action_row(self.backup_btn))
+        self.usb_settings_btn = icon_button("مجلد الفلاشة", "usb")
+        self.usb_settings_btn.clicked.connect(self.open_usb_settings)
+        self.security_settings_btn = icon_button("الأمان والاسترداد", "shield")
+        self.security_settings_btn.clicked.connect(self.open_security_settings)
+        actions = action_row(self.backup_btn)
+        actions.addWidget(self.usb_settings_btn)
+        actions.addWidget(self.security_settings_btn)
+        lay.addLayout(actions)
         self.notice = Notice()
         lay.addWidget(self.notice)
 
         listing, inner = card("النسخ المحفوظة", compact=True)
-        listing.setMinimumWidth(tokens.LAYOUT["list_min"])
         self.model = BackupsModel()
         self.view = _table(self.model)
         self.view.setMinimumHeight(4 * tokens.LAYOUT["summary_table_row_height"])
@@ -499,44 +505,50 @@ class BackupTab(QWidget):
         self.test_btn.clicked.connect(self.test_selected)
         self.usb_btn = QPushButton("نسخ أحدث نسخة للفلاشة")
         self.usb_btn.clicked.connect(self.copy_usb)
-        inner.addLayout(action_row(self.test_btn, self.usb_btn))
         self.restore_btn = danger_button("استعادة النسخة المختارة")
         self.restore_btn.clicked.connect(self.restore_selected)
-        inner.addLayout(action_row(self.restore_btn))
+        lay.addWidget(listing, 1)
+        footer = action_row(self.test_btn, self.usb_btn)
+        footer.addWidget(self.restore_btn)
+        lay.addLayout(footer)
 
-        detail = QWidget()
-        detail.setMinimumWidth(tokens.LAYOUT["preview_min"])
-        side = QVBoxLayout(detail)
-        side.setContentsMargins(0, 0, 0, 0)
-        side.setSpacing(tokens.LAYOUT["pane_gap"])
-        usb_box, usb_inner = card("مجلد الفلاشة", compact=True)
+        self.usb_dialog = Modal("مجلد الفلاشة", self, width=560)
         self.usb_dir = ltr_edit("مثال: E:\\MorvBackup")
         self.usb_dir.setText(settings.get(session.con, "backup.usb_dir", ""))
         self.pick_btn = QPushButton("اختيار")
         self.pick_btn.clicked.connect(self.pick_usb)
-        self.save_usb_btn = QPushButton("حفظ")
-        self.save_usb_btn.clicked.connect(self.save_usb)
-        usb_inner.addWidget(self.usb_dir)
-        usb_inner.addLayout(action_row(self.pick_btn, self.save_usb_btn))
-        usb_inner.addWidget(muted("فلاشتان بالتناوب: واحدة في المحل وأخرى في البيت، وبدّل بينهما أسبوعيًا."))
-        side.addWidget(usb_box)
-        keys_box, keys_inner = card("الأمان والاسترداد", compact=True)
+        self.usb_dialog.body.addWidget(field("مسار مجلد النسخ الخارجي", self.usb_dir))
+        self.usb_dialog.body.addLayout(action_row(self.pick_btn))
+        self.usb_dialog.body.addWidget(
+            muted("فلاشتان بالتناوب: واحدة في المحل وأخرى في البيت، وبدّل بينهما أسبوعيًا."))
+        self.save_usb_btn = self.usb_dialog.add_footer("حفظ", self.save_usb, "إغلاق")
+
+        self.security_dialog = Modal("الأمان والاسترداد", self, width=460)
         self.pw_btn = QPushButton("تغيير كلمة مرور النسخ")
-        self.pw_btn.clicked.connect(self.change_password)
         self.rk_btn = QPushButton("مفتاح استرداد جديد")
-        self.rk_btn.clicked.connect(self.new_recovery_key)
         self.relink_btn = QPushButton("إعادة ربط هذا الجهاز")
-        self.relink_btn.clicked.connect(self.relink)
-        for button in (self.pw_btn, self.rk_btn, self.relink_btn):
-            keys_inner.addLayout(action_row(button))
-        keys_inner.addWidget(muted("النسخ القديمة تبقى تُفتح بكلمة المرور التي أُخذت بها أو بمفتاح الاسترداد وقتها."))
-        side.addWidget(keys_box)
-        side.addStretch(1)
-        self.panes = AdaptiveCards([listing, detail], minimum_width=0, column_weights=(3, 2), fill_height=True)
-        listing.setMinimumWidth(tokens.LAYOUT["list_min"])
-        detail.setMinimumWidth(tokens.LAYOUT["preview_min"])
-        lay.addWidget(self.panes, 1)
+        for button, handler in ((self.pw_btn, self.change_password), (self.rk_btn, self.new_recovery_key),
+                                (self.relink_btn, self.relink)):
+            button.clicked.connect(self.security_dialog.accept)
+            button.clicked.connect(handler)
+            self.security_dialog.body.addWidget(button)
+        self.security_dialog.body.addWidget(
+            muted("النسخ القديمة تبقى تُفتح بكلمة المرور التي أُخذت بها أو بمفتاح الاسترداد وقتها."))
+        close = QPushButton("إغلاق")
+        close.clicked.connect(self.security_dialog.reject)
+        self.security_dialog.add_footer_widget(close)
         self.refresh()
+
+    def open_usb_settings(self) -> None:
+        self._refresh_permissions()
+        self.usb_dir.setText(settings.get(self.session.con, "backup.usb_dir", ""))
+        self.usb_dialog.notice.hide()
+        self.usb_dialog.open()
+
+    def open_security_settings(self) -> None:
+        self._refresh_permissions()
+        self.relink_btn.setVisible(backup.device_dek(self.session.con) is None)
+        self.security_dialog.open()
 
     @staticmethod
     def _stat(title: str) -> tuple:
@@ -564,6 +576,8 @@ class BackupTab(QWidget):
         if not allowed:
             self._refresh_permissions()
             self.notice.show_message("لا تملك صلاحية تنفيذ هذه العملية")
+            if self.usb_dialog.isVisible():
+                self.usb_dialog.notice.show_message("لا تملك صلاحية تنفيذ هذه العملية")
         return allowed
 
     def refresh(self) -> None:
@@ -621,7 +635,8 @@ class BackupTab(QWidget):
     def pick_usb(self) -> None:
         if not self._allow_sensitive():
             return
-        d = QFileDialog.getExistingDirectory(self, "مجلد النسخ على الفلاشة")
+        parent = self.usb_dialog if self.usb_dialog.isVisible() else self
+        d = QFileDialog.getExistingDirectory(parent, "مجلد النسخ على الفلاشة")
         if d and self._allow_sensitive():
             self.usb_dir.setText(d)
 
@@ -630,7 +645,8 @@ class BackupTab(QWidget):
             return
         folder = self.usb_dir.text().strip()
         if folder and backup.same_drive_as_data(folder):
-            if not ask(self, "تنبيه", "هذا المجلد على نفس قرص الجهاز، فلو تعطّل الجهاز ضاعت النسخة معه. "
+            parent = self.usb_dialog if self.usb_dialog.isVisible() else self
+            if not ask(parent, "تنبيه", "هذا المجلد على نفس قرص الجهاز، فلو تعطّل الجهاز ضاعت النسخة معه. "
                                        "المقصود مجلد على فلاشة أو قرص خارجي. هل تحفظه على أي حال؟"):
                 return
         if not self._allow_sensitive():
@@ -639,6 +655,7 @@ class BackupTab(QWidget):
         users.audit(self.session.con, self.session.user, "settings.usb", None, None, folder)
         self.notice.show_message("تم حفظ مجلد الفلاشة" + (" (على نفس القرص — مؤقتًا)" if folder and backup.same_drive_as_data(folder) else ""), "success")
         self.refresh()
+        self.usb_dialog.accept()
 
     def change_password(self) -> None:
         if not self._allow_sensitive():
