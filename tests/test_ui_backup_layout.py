@@ -7,8 +7,32 @@ from tests import test_ui_settings_hub
 
 @require_qt()
 class BackupLayoutTest(unittest.TestCase):
-    setUp = test_ui_settings_hub.SettingsHubTest.setUp
     settle = test_ui_settings_hub.SettingsHubTest.settle
+
+    def setUp(self):
+        from PySide6.QtCore import Qt
+        test_ui_settings_hub.SettingsHubTest.setUp(self)
+        self.addCleanup(self.app.setLayoutDirection, self.app.layoutDirection())
+        self.app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+
+    def choose_first_backup(self, tab):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+        index = tab.model.index(0, 0)
+        self.assertTrue(index.isValid())
+        tab.view.clearSelection()
+        tab.view.scrollTo(index)
+        tab.panes.ensureWidgetVisible(tab.view)
+        self.settle()
+        point = tab.view.visualRect(index).center()
+        self.assertTrue(tab.view.viewport().rect().contains(point))
+        self.assertEqual(tab.view.indexAt(point), index)
+        # selectRow() can fail in RTL even when clicking the rendered cell works.
+        QTest.mouseClick(tab.view.viewport(), Qt.MouseButton.LeftButton, pos=point)
+        self.assertEqual(tab.view.selectionModel().selectedRows(), [index])
+        selected = tab._selected()
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected.path, tab.model.items[0].path)
 
     def test_backup_layout_and_permissions(self):
         from morv.core import security
@@ -36,8 +60,7 @@ class BackupLayoutTest(unittest.TestCase):
                 self.assertEqual(tab.pw_btn.isVisible(), user.role == "manager")
                 self.assertEqual(tab.rk_btn.isVisible(), user.role == "manager")
                 self.assertEqual(tab.usb_dir.isEnabled(), user.role == "manager")
-                tab.view.selectRow(0)
-                self.assertEqual(tab._selected().path, tab.model.items[0].path)
+                self.choose_first_backup(tab)
             tab.hide()
 
     def test_backup_and_test_refresh_the_real_model(self):
@@ -49,11 +72,14 @@ class BackupLayoutTest(unittest.TestCase):
         backup.setup_encryption(self.con, "TestBackup123", security.new_recovery_key())
         tab = BackupTab(self.session)
         self.addCleanup(dispose, tab, self.app)
+        tab.resize(1074, 636)
+        tab.show()
+        self.settle()
         self.assertEqual(tab.model.rowCount(), 0)
-        tab.backup_now()
+        tab.backup_btn.click()
         self.assertEqual(tab.model.rowCount(), 1)
         self.assertIn("1 نسخة محفوظة", tab.stat_local[2].text())
-        tab.view.selectRow(0)
-        tab.test_selected()
+        self.choose_first_backup(tab)
+        tab.test_btn.click()
         self.assertTrue(settings.get(self.con, "backup.last_test_at", ""))
         self.assertIn("نجح الاختبار", tab.notice.text())
