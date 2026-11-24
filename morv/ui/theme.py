@@ -161,6 +161,7 @@ QLabel#summaryRecordLabel {{ color:{t['muted']}; }}
 QLabel#summaryRecordTitle {{ font-size:{t['fs']+1}px; font-weight:700; }}
 QLabel#summaryRecordValue {{ font-size:{t['fs']+1}px; font-weight:600; }}
 QPushButton#danger {{ color:{t['danger']}; border-color:{t['danger']}; }}
+QPushButton#success {{ color:{t['success']}; border-color:{t['success']}; }}
 QPushButton:disabled {{ color:{t['muted']}; border-color:{t['border']}; }}
 QLabel#noticeError {{ background:{t['danger_soft']}; color:{t['danger']}; border-radius:8px; padding:8px 12px; }}
 QLabel#noticeSuccess {{ background:{t['success_soft']}; color:{t['success']}; border-radius:8px; padding:8px 12px; }}

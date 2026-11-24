@@ -83,6 +83,64 @@ class AdaptiveCards(QScrollArea):
         self.grid.invalidate()
 
 
+class AdaptiveSplit(QWidget):
+    """Two panes with a single-pane fallback and preserved widget state."""
+
+    mode_changed = Signal(bool)
+
+    def __init__(self, primary, detail):
+        super().__init__()
+        self.primary, self.detail = primary, detail
+        self.compact = False
+        self._detail_open = False
+        self._state = None
+        self.row = QHBoxLayout(self)
+        self.row.setContentsMargins(0, 0, 0, 0)
+        self.row.setSpacing(LAYOUT["pane_gap"])
+        self.row.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        self.row.addWidget(primary, 3)
+        self.row.addWidget(detail, 2)
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._reflow)
+        for pane in (primary, detail):
+            pane.installEventFilter(self)
+        self._timer.start(0)
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.LayoutRequest, QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            self._timer.start(0)
+        return super().eventFilter(watched, event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._timer.start(0)
+
+    def show_detail(self):
+        self._detail_open = True
+        self._reflow()
+
+    def show_primary(self):
+        self._detail_open = False
+        self._reflow()
+
+    def _reflow(self):
+        primary_min = max(LAYOUT["list_min"], self.primary.minimumSizeHint().width())
+        detail_min = max(LAYOUT["preview_min"], self.detail.minimumSizeHint().width())
+        compact = self.width() < primary_min + detail_min + LAYOUT["pane_gap"]
+        state = (compact, self._detail_open if compact else False, primary_min, detail_min)
+        if state == self._state:
+            return
+        self._state = state
+        self.compact = compact
+        self.primary.setMinimumWidth(0 if compact else primary_min)
+        self.detail.setMinimumWidth(0 if compact else detail_min)
+        self.detail.setMaximumWidth(16777215 if compact else max(detail_min, LAYOUT["preview_max"]))
+        self.primary.setVisible(not compact or not self._detail_open)
+        self.detail.setVisible(not compact or self._detail_open)
+        self.mode_changed.emit(compact)
+
+
 class AdaptiveTableColumns(QObject):
     """Opt-in measured column allocation for tables with flexible text and compact controls."""
 
