@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from morv.core import validate
+from morv.core import tire_catalog, validate
 from morv.infra import customers, items, suppliers, users
 from morv.infra.customers import Customer, Vehicle
 from morv.infra.db.bootstrap import open_main_db
@@ -35,6 +35,27 @@ class ValidateTest(unittest.TestCase):
         self.assertEqual(validate.tire_size("7.50R16")["aspect"], "")
         with self.assertRaises(validate.ValidationError):
             validate.tire_size("205-55-16")
+
+    def test_egyptian_catalogue_formats_and_suggestions(self):
+        for size in tire_catalog.SIZES:
+            with self.subTest(size=size):
+                self.assertEqual(validate.tire_size(size)["size"], size)
+                self.assertIn(tire_catalog.DEFAULT_CATEGORY[size], tire_catalog.CATEGORIES)
+        self.assertEqual(validate.tire_size("٧٥٠r١٦")["size"], "7.50R16")
+        for size in ("185R14C", "195/70R15C", "12R22.5", "31X10.50R15", "7.50-16", "90/90-17"):
+            self.assertEqual(validate.tire_size(size)["size"], size)
+        for size in ("205-55-16", "bad", "195/70R", "195R14CCC"):
+            with self.assertRaises(validate.ValidationError):
+                validate.tire_size(size)
+        key = tire_catalog.size_search_key
+        self.assertEqual(key("٢"), key("2"))
+        self.assertEqual(key("205 55 16"), key("205/55R16"))
+        self.assertEqual(key("750R16"), key("7.50R16"))
+        self.assertEqual(tire_catalog.suggested_category("205/55R16", {}), "ملاكي")
+        self.assertEqual(tire_catalog.suggested_category("205/55R16", {"فان": 2, "ملاكي": 1}), "فان")
+        self.assertEqual(tire_catalog.suggested_category("205/55R16", {"فان": 1, "ملاكي": 1}), "ملاكي")
+        self.assertEqual(tire_catalog.suggested_category("195/80R16", {"فان": 1, "جامبو": 1}), "")
+        self.assertEqual(tire_catalog.suggested_category("195/80R16", {"نقل ثقيل": 5}), "")
 
     def test_suggestions(self):
         self.assertEqual(validate.suggest_item_name("tire", "ميشلان", "Primacy 4", {"size": "205/55R16", "li": "91", "si": "V"}),
@@ -126,6 +147,37 @@ class ItemsTest(_Db):
             items.create(self.con, self.admin, self.tire(code="X2", barcode="", attrs={"size": "205/55R16", "li": "91", "si": "V", "cat": "طائرة", "cons": "Radial"}))
         with self.assertRaisesRegex(items.ItemError, "الماركة"):
             items.create(self.con, self.admin, self.tire(code="X3", barcode="", brand=""))
+
+    def test_catalogue_learns_saved_sizes_and_preserves_legacy(self):
+        original = self.tire()
+        original.attrs.update(size="195/80R16", cat="فان")
+        self.assertNotIn("195/80R16", items.tyre_catalog(self.con))
+        saved = items.create(self.con, self.admin, original)
+        self.assertEqual(items.tyre_catalog(self.con)["195/80R16"], {"فان": 1})
+        for n in (2, 3):
+            other = self.tire(code=f"T{n}", barcode="")
+            other.attrs.update(size="195/80R16", cat="جامبو")
+            items.create(self.con, self.admin, other)
+        counts = items.tyre_catalog(self.con)["195/80R16"]
+        self.assertEqual(tire_catalog.suggested_category("195/80R16", counts), "جامبو")
+        options = next(f.options for f in items.fields(self.con, "tire") if f.key == "cat")
+        self.assertEqual(tuple(options), tire_catalog.CATEGORIES)
+        for legacy in tire_catalog.LEGACY_CATEGORIES:
+            with self.subTest(legacy=legacy):
+                self.con.execute("UPDATE item_attrs SET value=? WHERE item_id=? AND field_key='cat'", (legacy, saved.id))
+                current = items.get(self.con, saved.id)
+                current.notes = "test"
+                self.assertEqual(items.update(self.con, self.admin, current).attrs["cat"], legacy)
+                new = self.tire(code="NEW", barcode="")
+                new.attrs["cat"] = legacy
+                with self.assertRaisesRegex(items.ItemError, "الفئة"):
+                    items.create(self.con, self.admin, new)
+        current = items.get(self.con, saved.id)
+        current.attrs["cat"] = "ملاكي"
+        self.assertEqual(items.update(self.con, self.admin, current).attrs["cat"], "ملاكي")
+        current.attrs["cat"] = "نقل ثقيل"
+        with self.assertRaisesRegex(items.ItemError, "الفئة"):
+            items.update(self.con, self.admin, current)
 
     def test_unique_code_and_barcode_messages(self):
         items.create(self.con, self.admin, self.tire())
