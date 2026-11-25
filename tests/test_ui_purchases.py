@@ -211,6 +211,119 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertIn("صلاحية", dlg.notice.text())
         self.assertEqual(self.invoices(), 0)
 
+    def _draft_back_button(self, form):
+        from PySide6.QtWidgets import QPushButton
+        return next(
+            b for b in form.findChildren(QPushButton)
+            if b.text() == "رجوع للقائمة"
+        )
+
+    def _draft_db_state(self):
+        tables = (
+            "purchase_invoices", "stock_lots",
+            "stock_movements", "cost_layers",
+            "journal_entries", "journal_lines",
+        )
+        return {
+            t: self.con.execute(
+                f"SELECT * FROM {t} ORDER BY rowid"
+            ).fetchall()
+            for t in tables
+        }
+
+    def test_draft_back_declined(self):
+        from unittest.mock import patch
+
+        f = self.dialog()
+        self.add_row(f, self.tire, 4, "1000", "2324")
+        f.inv_no.setText("QA-100")
+        f.notes.setText("ملاحظة تجريبية")
+
+        before = self._draft_db_state()
+        key = f._request_key
+
+        with patch("morv.ui.modal.ask", return_value=False) as confirm:
+            self._draft_back_button(f).click()
+
+        self.assertIs(f.stack.currentWidget(), f)
+        self.assertEqual(f._request_key, key)
+        self.assertEqual(f._supplier_id, self.sup)
+        self.assertEqual(f.inv_no.text(), "QA-100")
+        self.assertEqual(f.notes.text(), "ملاحظة تجريبية")
+        self.assertEqual(len(f._rows), 1)
+        self.assertEqual(f._rows[0]["qty_spin"].value(), 4)
+        self.assertEqual(f._rows[0]["cost_edit"].text(), "1000")
+        self.assertEqual(f._rows[0]["dot_edit"].text(), "2324")
+        self.assertEqual(self._draft_db_state(), before)
+        confirm.assert_called_once()
+
+    def test_draft_back_confirmed(self):
+        from unittest.mock import patch
+
+        f = self.dialog()
+        self.add_row(f, self.battery, 2, "500")
+        f.inv_no.setText("QA-200")
+        stack = f.stack
+        before = self._draft_db_state()
+
+        with patch("morv.ui.modal.ask", return_value=True) as confirm:
+            self._draft_back_button(f).click()
+            self.assertIs(stack.currentWidget(), stack.list_page)
+            stack.open_form()
+
+        self.assertEqual(stack.form_page._rows, [])
+        self.assertEqual(stack.form_page.inv_no.text(), "")
+        self.assertIsNone(stack.form_page.posted)
+        self.assertEqual(self._draft_db_state(), before)
+        confirm.assert_called_once()
+
+    def test_draft_empty_back_without_confirmation(self):
+        from unittest.mock import patch
+
+        stack = self.page()
+        stack.open_form()
+        f = stack.form_page
+
+        with patch("morv.ui.modal.ask", return_value=False) as confirm:
+            self._draft_back_button(f).click()
+
+        self.assertIs(stack.currentWidget(), stack.list_page)
+        confirm.assert_not_called()
+
+    def test_draft_replacement_declined(self):
+        from unittest.mock import patch
+
+        f = self.dialog()
+        self.add_row(f, self.battery, 3, "500")
+        stack = f.stack
+        before = self._draft_db_state()
+        key = f._request_key
+
+        with patch("morv.ui.modal.ask", return_value=False) as confirm:
+            stack.open_form()
+
+        self.assertIs(stack.form_page, f)
+        self.assertIs(stack.currentWidget(), f)
+        self.assertEqual(f._request_key, key)
+        self.assertEqual(len(f._rows), 1)
+        self.assertEqual(self._draft_db_state(), before)
+        confirm.assert_called_once()
+
+    def test_draft_notes_only_are_protected(self):
+        from unittest.mock import patch
+
+        stack = self.page()
+        stack.open_form()
+        f = stack.form_page
+        f.notes.setText("ملاحظة تجريبية")
+
+        with patch("morv.ui.modal.ask", return_value=False) as confirm:
+            self._draft_back_button(f).click()
+
+        self.assertIs(stack.currentWidget(), f)
+        self.assertEqual(f.notes.text(), "ملاحظة تجريبية")
+        confirm.assert_called_once()
+
     # ---------- Full-page navigation (no modal) ----------
     def test_add_opens_full_page_and_post_returns_to_list(self):
         stack = self.page()

@@ -264,6 +264,8 @@ QPushButton#quickChip {{ min-height:30px; padding:0 10px; border-color:{t['borde
 QToolButton#stepBtn {{ background:{t['surface']}; border:1px solid {t['border_strong']}; border-radius:8px;
                        min-width:34px; min-height:36px; }}
 QFrame#totalBox {{ background:{t['primary_soft']}; border:0; border-radius:10px; }}
+QPushButton#totalBox {{ background:{t['primary_soft']}; border:1px solid transparent; border-radius:10px; padding:0; }}
+QPushButton#totalBox:enabled:hover, QPushButton#totalBox:enabled:focus {{ border-color:{t['primary']}; }}
 QLabel#totalLabel {{ color:{t['primary']}; font-size:{t['fs']+2}px; font-weight:700; }}
 QLabel#totalValue {{ color:{t['primary']}; font-size:{t['fs']+3}px; font-weight:700; }}
 QFrame#payBox {{ background:{t['surface2']}; border:1px solid {t['border']}; border-radius:10px; }}

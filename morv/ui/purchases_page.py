@@ -20,7 +20,7 @@ from morv.ui.inventory_page import ItemDialog
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
-from morv.ui.widgets import (DateEdit, deferred_button, field, field_label, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
+from morv.ui.widgets import (DateEdit, confirm_discard_invoice, deferred_button, field, field_label, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
 
 ITEM_CHOICES = 50
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
@@ -37,14 +37,33 @@ class PurchasesPage(QStackedWidget):
 
     def open_form(self) -> None:
         if self.form_page is not None:
-            self.removeWidget(self.form_page)
-            self.form_page.deleteLater()
+            old = self.form_page
+            if not confirm_discard_invoice(
+                    old, dirty=old.has_draft(), busy=old._busy):
+                if not old._busy:
+                    self.setCurrentWidget(old)
+                return
+            self.removeWidget(old)
+            old.deleteLater()
         self.form_page = PurchaseForm(self.session, self)
         self.addWidget(self.form_page)
         self.setCurrentWidget(self.form_page)
 
     def back_to_list(self, keep_id: int | None = None) -> None:
+        form = self.form_page
+        posted = (
+            form is not None and form.posted is not None
+            and keep_id == form.posted.id
+        )
+        if form is not None and not posted:
+            if not confirm_discard_invoice(
+                    form, dirty=form.has_draft(), busy=form._busy):
+                return
         self.setCurrentWidget(self.list_page)
+        if form is not None and not posted:
+            self.removeWidget(form)
+            self.form_page = None
+            form.deleteLater()
         self.list_page.reload(keep_id=keep_id)
 
 
@@ -842,6 +861,16 @@ class PurchaseForm(QWidget):
             elif obj is self.item_search:
                 QTimer.singleShot(150, self._item_popup.hide)
         return super().eventFilter(obj, event)
+
+    def has_draft(self) -> bool:
+        return self.posted is None and bool(
+            self._rows
+            or self._supplier_id is not None
+            or self.sup_search.text().strip()
+            or self.inv_no.text().strip()
+            or self.notes.text().strip()
+            or self.inv_date.text() != self._received_date
+        )
 
     # ---------- Posting ----------
     def post(self) -> None:
