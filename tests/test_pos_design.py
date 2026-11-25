@@ -73,7 +73,11 @@ class PosDesignV1Test(unittest.TestCase):
         picks straight into a row with inline qty/price/discount, no combo-box step."""
         self.assertNotIn("self.item_combo", SOURCE)
         self.assertNotIn("الصنف المختار", SOURCE)
-        self.assertIn("_ItemPopup", SOURCE)
+        self.assertIn("self.item_search = ItemSearch(", SOURCE)
+        shared = (ROOT / "morv/ui/item_search.py").read_text(encoding="utf-8")
+        self.assertIn("class _ItemPopup(QFrame)", shared)
+        self.assertIn("self.popup = _ItemPopup(self)", shared)
+        self.assertIn("self.form._add_row(", shared)
         self.assertIn("_add_row", SOURCE)
 
     def test_delete_line_is_an_icon_not_a_text_button(self):

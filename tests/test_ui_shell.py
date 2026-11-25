@@ -2,6 +2,7 @@
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from tests.qt_app import get_app, require_qt
@@ -11,21 +12,30 @@ from tests.qt_app import get_app, require_qt
 class ShellTest(unittest.TestCase):
     def setUp(self):
         import os
+        import sys
+        import traceback
+
+        errors = []
+        original_hook = sys.excepthook
+
+        def capture(kind, value, tb):
+            errors.append("".join(traceback.format_exception(kind, value, tb)))
+            original_hook(kind, value, tb)
+
+        self.enterContext(patch.object(sys, "excepthook", capture))
+        self.addCleanup(self.assertEqual, errors, [])
         from morv.infra import users
         from morv.infra.db.bootstrap import open_main_db
         from morv.ui.session import Session
         self.tmp = Path(tempfile.mkdtemp())
-        os.environ["MORV_DATA_DIR"] = str(self.tmp)
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.enterContext(
+            patch.dict(os.environ, {"MORV_DATA_DIR": str(self.tmp)}))
         self.con = open_main_db(self.tmp / "morv_tires.db")
+        self.addCleanup(self.con.close)
         self.user = users.create_user(self.con, None, "admin", "المدير", "Admin12345", "manager")
         self.session = Session(self.con, self.user)
         self.app = get_app()
-
-    def tearDown(self):
-        import os
-        self.con.close()
-        os.environ.pop("MORV_DATA_DIR", None)
-        shutil.rmtree(self.tmp, ignore_errors=True)
 
     def window(self):
         from morv.ui.shell import MainWindow
@@ -58,6 +68,25 @@ class ShellTest(unittest.TestCase):
         w.show()
         self.app.processEvents()
         self.assertEqual(w.nav.verticalScrollBar().maximum(), 0, "an entry would need scrolling")
+
+    def test_hidden_dashboard_does_not_reload_until_shown_again(self):
+        from morv.ui import dashboard_page
+        from morv.ui.widgets import dispose
+
+        page = dashboard_page.DashboardPage(self.session)
+        self.addCleanup(dispose, page, self.app)
+
+        with patch.object(dashboard_page, "run_async",
+                          wraps=dashboard_page.run_async) as fetch:
+            page.show()
+            page.hide()
+            self.app.processEvents()
+            fetch.assert_not_called()
+
+            page.show()
+            self.app.processEvents()
+            fetch.assert_called_once()
+            page.hide()
 
     def test_live_window_exits_cleanly(self):
         import os

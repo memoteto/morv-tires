@@ -35,6 +35,9 @@ class DashboardPage(QWidget):
         self.kpi_values: dict[str, tuple] = {}
         self.period_buttons: dict[str, QPushButton] = {}
         self._fetch_gen = 0
+        self._show_timer = QTimer(self)
+        self._show_timer.setSingleShot(True)
+        self._show_timer.timeout.connect(self.reload)
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -319,7 +322,11 @@ class DashboardPage(QWidget):
         super().showEvent(event)
         # Defer reload until after Qt finishes painting the frame, so the window is
         # responsive before the DB queries run. singleShot(0) posts to the event loop.
-        QTimer.singleShot(0, self.reload)
+        self._show_timer.start(0)
+
+    def hideEvent(self, event) -> None:
+        self._show_timer.stop()
+        super().hideEvent(event)
 
     @staticmethod
     def _clear(layout) -> None:

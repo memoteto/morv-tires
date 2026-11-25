@@ -4,6 +4,7 @@ import re
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from tests.qt_app import get_app, require_qt
@@ -34,6 +35,8 @@ class PrintedSheetTest(unittest.TestCase):
         self.app = get_app()
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.enterContext(
+            patch.dict(os.environ, {"MORV_DATA_DIR": str(self.tmp)}))
 
     def html(self, shop=None, shape_key="a4") -> str:
         from morv.ui.print_doc import SHAPES, document_html
@@ -116,6 +119,32 @@ class PrintedSheetTest(unittest.TestCase):
         self.assertIn(square, self.html(), "no logo file, so the design's blue square stands in")
         self.assertIn(">م</td>", self.html().split(square)[1][:120], "the square carries the initial")
         self.assertNotIn(square, self.html(_shop(show_logo=False)))
+
+    def test_uploaded_logo_is_rendered_and_can_be_hidden(self):
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QColor, QImage, QTextDocument
+        from morv.infra.shop import LOGO_FILE
+        from morv.ui.print_doc import BLUE, LOGO_URL, SHAPES, render
+
+        image = QImage(24, 24, QImage.Format.Format_RGB32)
+        image.fill(QColor("#123456"))
+        self.assertTrue(image.save(str(self.tmp / LOGO_FILE)))
+
+        square = f"bgcolor='{BLUE}'><tr><td align='center'"
+        html = self.html()
+        self.assertIn(f"src='{LOGO_URL}'", html)
+        self.assertNotIn(square, html)
+
+        text = render(_shop(), _doc(), SHAPES["a4"])
+        held = text.resource(
+            QTextDocument.ResourceType.ImageResource, QUrl(LOGO_URL))
+        self.assertIsNotNone(held)
+        self.assertFalse(held.isNull())
+        self.assertEqual(held.pixelColor(0, 0), QColor("#123456"))
+
+        hidden = self.html(_shop(show_logo=False))
+        self.assertNotIn(f"src='{LOGO_URL}'", hidden)
+        self.assertNotIn(square, hidden)
 
     def test_every_picture_is_a_resource_the_renderer_holds(self):
         from PySide6.QtCore import QUrl
@@ -238,6 +267,8 @@ class PrintedPaperTest(unittest.TestCase):
         self.app = get_app()
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.enterContext(
+            patch.dict(os.environ, {"MORV_DATA_DIR": str(self.tmp)}))
 
     def test_every_shape_writes_a_pdf_with_content(self):
         from morv.ui.print_doc import SHAPES, write_pdf
@@ -272,10 +303,10 @@ class ShopPrintFieldsTest(unittest.TestCase):
         from morv.infra.db.bootstrap import open_main_db
         from morv.ui.session import Session
         self.tmp = Path(tempfile.mkdtemp())
-        os.environ["MORV_DATA_DIR"] = str(self.tmp)
-        self.con = open_main_db(self.tmp / "morv_tires.db")
         self.addCleanup(shutil.rmtree, self.tmp, True)
-        self.addCleanup(os.environ.pop, "MORV_DATA_DIR", None)
+        self.enterContext(
+            patch.dict(os.environ, {"MORV_DATA_DIR": str(self.tmp)}))
+        self.con = open_main_db(self.tmp / "morv_tires.db")
         self.addCleanup(self.con.close)
         self.admin = users.create_user(self.con, None, "admin", "المدير", "Admin12345", "manager")
         self.session = Session(self.con, self.admin)

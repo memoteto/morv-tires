@@ -315,6 +315,7 @@ class DateEdit(QDateEdit):
     def __init__(self, optional: bool = False, allow_future: bool = False):
         super().__init__()
         self.setObjectName("dateEdit")
+        self.setLocale(QLocale.c())
         self.optional = optional
         self._raw: str | None = None
         self.setCalendarPopup(True)

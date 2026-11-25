@@ -33,6 +33,25 @@ class DateEditTest(unittest.TestCase):
                 self.assertEqual(QDateEdit.text(w), "2026-11-05")      # what the box shows
                 self.assertEqual(w.text(), "2026-11-05")               # the ISO value
 
+    def test_date_digits_are_independent_of_default_locale(self):
+        from PySide6.QtCore import QLocale, Qt
+        from PySide6.QtWidgets import QDateEdit
+
+        self.addCleanup(QLocale.setDefault, QLocale())
+        self.addCleanup(self.app.setLayoutDirection,
+                        self.app.layoutDirection())
+
+        for locale in ("ar_SA", "en_US"):
+            QLocale.setDefault(QLocale(locale))
+            for direction in (Qt.LayoutDirection.RightToLeft,
+                              Qt.LayoutDirection.LeftToRight):
+                with self.subTest(locale=locale, direction=direction):
+                    self.app.setLayoutDirection(direction)
+                    w = self.make()
+                    w.setText("2026-11-05")
+                    self.assertEqual(QDateEdit.text(w), "2026-11-05")
+                    self.assertEqual(w.text(), "2026-11-05")
+
     def test_set_and_read_back_iso(self):
         w = self.make()
         seen = []
