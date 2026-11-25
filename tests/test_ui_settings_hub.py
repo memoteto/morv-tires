@@ -54,6 +54,7 @@ class SettingsHubTest(unittest.TestCase):
         for key in page.destinations:
             self.assertTrue(page.open_page(key))
             self.assertEqual(page.current_key, key)
+            self.assertIs(page.stack.currentWidget(), page.destinations[key])
             self.assertFalse(page.back.isHidden())
             self.assertEqual(page.title.text(), page.title_for(key))
             page.show_hub()
@@ -102,6 +103,8 @@ class SettingsHubTest(unittest.TestCase):
             self.settle()
             self.assertEqual(area.columns, expected)
             self.assertEqual(tuple(cards), area.cards)
+            for index, box in enumerate(cards):
+                self.assertIs(area.grid.itemAtPosition(index // expected, index % expected).widget(), box)
             self.assertIs(area.focusWidget(), buttons[0])
             self.assertFalse(area.horizontalScrollBar().isVisible())
             for a, b in combinations(cards, 2):

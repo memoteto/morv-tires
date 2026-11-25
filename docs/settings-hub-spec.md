@@ -408,3 +408,7 @@ PR #146 مسودة، CI 45394449322 للرأس 6d6f16a41eedb6a814a69634151855441
 ### S5 — pane swap diagnostic (2026-11-25)
 - Owner Linux measurements on main `61c407f` and branch `1869a90`: both standalone tabs clamp requested 700px to 1032px; compact threshold is 1032px. Removing the standalone host layout constraint in the diagnostic permits actual 700px and compact mode on both versions; returning to 1500px restores both panes. Physical RTL coordinates confirm the requested swap (table x=0, detail x=1080 at 1500px on branch).
 - Correct the regression fixture to simulate the constrained host width and explicitly assert actual tab and split widths before the existing compact/navigation assertions. No production code changes. Actual shell behavior at narrow widths is not established by this standalone diagnostic. Rerun pending.
+
+### S10 — owner-approved cleanup (2026-11-25)
+- Main `c17459e6`; owner terminal reference scan confirms `stack_order` has no callers and `_views` duplicates `destinations`. Remove only those paths; preserve `form()` and the existing user/password dialogs per owner decision. Central theme and adaptive components retained; no visual, engine, permission or database changes.
+- Strengthen existing route identity and grid order assertions without weakening prior checks. CI and owner review pending; no merge.
