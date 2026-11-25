@@ -99,6 +99,7 @@ QPushButton#primary {{ background:{t['primary']}; color:{t['on_primary']}; borde
 QPushButton#primary:disabled {{ background:{t['border']}; color:{t['muted']}; }}
 QPushButton#segment {{ min-height:34px; padding:0 12px; border-color:{t['border']}; color:{t['muted']}; }}
 QPushButton#segment:checked {{ background:{t['primary_soft']}; color:{t['primary']}; border-color:{t['primary']}; font-weight:600; }}
+QPushButton#itemResult:checked {{ background:{t['primary_soft']}; border:1px solid {t['primary']}; }}
 QPushButton#choice {{ text-align:left; padding:0 16px; }}
 QPushButton#choice:checked {{ background:{t['primary_soft']}; border:2px solid {t['primary']}; color:{t['text']}; font-weight:600; }}
 QPushButton#kpiTile {{ text-align:right; min-height:70px; border-radius:14px; padding:10px 14px; }}

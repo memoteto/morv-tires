@@ -2,9 +2,9 @@
 import uuid
 from datetime import date, datetime
 
-from PySide6.QtCore import QEvent, Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QFrame, QGridLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QComboBox, QCompleter, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox,
                                QVBoxLayout, QWidget)
 
@@ -14,11 +14,9 @@ from morv.core.text import ltr
 from morv.infra import customer_receipts, customers, items, sale_view, sales, users
 from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons, tokens
-from morv.ui.inventory_page import ItemDialog
-from morv.ui.purchases_page import _ItemPopup
+from morv.ui.item_search import ItemSearch, KIND_ICON
 from morv.ui.widgets import (InvoiceTotal, confirm_discard_invoice, chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
 
-ITEM_CHOICES = 50
 TIER_ATTR = {"retail": "price_retail", "wholesale": "price_wholesale", "super": "price_super"}
 TIER_LABELS = {"retail": "قطاعي (تجزئة)", "wholesale": "جملة", "super": "جملة الجملة"}
 TIER_SHORT = {"retail": "قطاعي", "wholesale": "جملة", "super": "جملة الجملة"}
@@ -28,7 +26,6 @@ PAYMENT_HINTS = {"cash": "استلام نقدية وحساب الباقي", "car
                  "wallet": "يلزم رقم المرجع", "credit": "على حساب العميل",
                  "installment": "يُفتح العقد بعد الاعتماد"}
 KIND_TABS = (("الكل", None), ("إطارات", "tire"), ("بطاريات", "battery"), ("خدمات", "service"))
-KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
 
 
 class PosPage(QWidget):
@@ -219,19 +216,11 @@ class PosPage(QWidget):
 
         top = QHBoxLayout()
         top.setSpacing(10)
-        self.item_search = QLineEdit()
-        self.item_search.setPlaceholderText("اسم الصنف، الكود، المقاس (205/55R16) أو امسح الباركود")
-        self.item_search.addAction(icons.icon("search", ICON_MUTED, 18), QLineEdit.ActionPosition.LeadingPosition)
-        trail_icon(self.item_search, "barcode")
-        # Live popup search, same component as the purchase-invoice screen:
-        # picking a result adds the line straight away, no dropdown list step.
-        self.item_search.textChanged.connect(self._on_item_query)
-        self.item_search.installEventFilter(self)
-        self._item_timer = QTimer(self)
-        self._item_timer.setSingleShot(True)
-        self._item_timer.timeout.connect(self._do_item_search)
-        self._item_popup = _ItemPopup(self)
-        self._item_popup.hide()
+        self.item_search = ItemSearch(
+            self, lambda: (self._kind,) if self._kind else
+            ("tire", "battery", "service"), icon_size=18)
+        self._item_popup = self.item_search.popup
+        self._do_item_search = self.item_search.search
         top.addWidget(self.item_search, 1)
         top.addWidget(kbd("F2"))
         seg = QFrame()
@@ -587,44 +576,6 @@ class PosPage(QWidget):
         self.cust_kind.style().polish(self.cust_kind)
         self._set_tier(level or "retail")
         self._refresh_credit()
-
-    def _on_item_query(self, _text: str) -> None:
-        self._item_timer.start(200)
-
-    def _do_item_search(self) -> None:
-        q = self.item_search.text().strip()
-        if not q:
-            self._item_popup.hide()
-            return
-        rows = []
-        for kind in ((self._kind,) if self._kind else ("tire", "battery", "service")):
-            rows += items.search(self.session.con, q, kind=kind, limit=ITEM_CHOICES)
-        rows = rows[:8]
-        self._item_popup.show_results(rows, on_pick=self._pick_item, on_new=self._open_new_item_dialog, query=q)
-        pos = self.item_search.mapToGlobal(self.item_search.rect().bottomLeft())
-        self._item_popup.move(pos)
-        self._item_popup.resize(self.item_search.width(), self._item_popup.sizeHint().height())
-        self._item_popup.show()
-
-    def _pick_item(self, item_id: int, kind: str, name: str) -> None:
-        self.item_search.clear()
-        self._item_popup.hide()
-        self._add_row(item_id, kind, name)
-
-    def _open_new_item_dialog(self) -> None:
-        self._item_popup.hide()
-        dlg = ItemDialog(self.session, None, parent=self)
-        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.saved:
-            self.item_search.clear()
-            self._add_row(dlg.saved.id, dlg.saved.kind, dlg.saved.name)
-
-    def eventFilter(self, obj, event) -> bool:
-        # The popup is a non-activating tool window (see _ItemPopup) so typing
-        # keeps working; close it shortly after the field loses focus so a
-        # click on one of its buttons still registers first.
-        if event.type() == QEvent.Type.FocusOut and obj is self.item_search:
-            QTimer.singleShot(150, self._item_popup.hide)
-        return super().eventFilter(obj, event)
 
     # ---------- Lines: one self-contained row per item, added on pick ----------
     def _add_row(self, item_id: int, kind: str, name: str) -> None:

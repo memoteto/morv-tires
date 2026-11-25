@@ -3,6 +3,7 @@ import uuid
 from datetime import date
 
 from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy,
@@ -12,18 +13,16 @@ from PySide6.QtWidgets import (
 from morv.core import dot as dotmod
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
-from morv.infra import items, purchase_view, purchasing, suppliers
+from morv.infra import purchase_view, purchasing, suppliers
 from morv.infra.purchasing import PurchaseError, PurchaseLine
 from morv.infra import suppliers as sup_infra
 from morv.ui import icons
-from morv.ui.inventory_page import ItemDialog
+from morv.ui.item_search import ItemSearch, KIND_ICON
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
 from morv.ui.widgets import (DateEdit, confirm_discard_invoice, deferred_button, field, field_label, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
 
-ITEM_CHOICES = 50
-KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
 
 
 class PurchasesPage(QStackedWidget):
@@ -210,53 +209,6 @@ class _SupplierPopup(QFrame):
 # Item search popup
 # ---------------------------------------------------------------------------
 
-class _ItemPopup(QFrame):
-    """Floating list that appears under the item search field."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setObjectName("card")
-        self.setWindowFlags(Qt.WindowType.ToolTip)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
-        self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(6, 6, 6, 6)
-        self._layout.setSpacing(2)
-
-    def show_results(self, rows, on_pick, on_new, query: str) -> None:
-        while self._layout.count():
-            item = self._layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        for row in rows[:8]:
-            item_id, kind, _code, name = row[0], row[1], row[2], row[3]
-            spec = row[4] if len(row) > 4 else ""
-            btn = QPushButton()
-            btn.setFlat(True)
-            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            btn.setFixedHeight(50)
-            inner = QHBoxLayout(btn)
-            inner.setContentsMargins(8, 4, 8, 4)
-            ic = QLabel()
-            ic.setPixmap(icons.icon(KIND_ICON.get(kind, "inventory"), ICON_MUTED, 18).pixmap(18, 18))
-            name_lbl = QLabel(name)
-            name_lbl.setObjectName("cardTitle")
-            spec_lbl = muted(ltr(spec) if spec else "")
-            inner.addWidget(ic)
-            inner.addWidget(name_lbl)
-            inner.addWidget(spec_lbl)
-            inner.addStretch(1)
-            btn.clicked.connect(lambda _, iid=item_id, ik=kind, iname=name: on_pick(iid, ik, iname))
-            self._layout.addWidget(btn)
-        new_btn = QPushButton(f"+ صنف جديد سريع: {query}" if query else "+ صنف جديد سريع")
-        new_btn.setObjectName("primary")
-        new_btn.setFlat(True)
-        new_btn.setFixedHeight(38)
-        new_btn.clicked.connect(on_new)
-        self._layout.addWidget(new_btn)
-        self.adjustSize()
-
-
-# ---------------------------------------------------------------------------
 # "New supplier" inline dialog
 # ---------------------------------------------------------------------------
 
@@ -433,23 +385,12 @@ class PurchaseForm(QWidget):
         # Item search — picking a result adds it straight to the lines below
         item_search_row = QHBoxLayout()
         item_search_row.setSpacing(8)
-        self.item_search = QLineEdit()
-        self.item_search.setPlaceholderText("اسم الصنف، الكود، المقاس أو امسح الباركود")
-        self.item_search.addAction(icons.icon("search", ICON_MUTED, 16),
-                                   QLineEdit.ActionPosition.LeadingPosition)
-        self.item_search.addAction(icons.icon("barcode", ICON_MUTED, 16),
-                                   QLineEdit.ActionPosition.TrailingPosition)
-        self.item_search.textChanged.connect(self._on_item_query)
-        self.item_search.installEventFilter(self)
-        self._item_timer = QTimer(self)
-        self._item_timer.setSingleShot(True)
-        self._item_timer.timeout.connect(self._do_item_search)
-
-        self._item_popup = _ItemPopup(self)
-        self._item_popup.hide()
+        self.item_search = ItemSearch(self, lambda: ("tire", "battery"))
+        self._item_popup = self.item_search.popup
+        self._do_item_search = self.item_search.search
 
         new_item_btn = QPushButton("صنف جديد")
-        new_item_btn.clicked.connect(self._open_new_item_dialog)
+        new_item_btn.clicked.connect(self.item_search.new_item)
         item_search_row.addWidget(self.item_search, 1)
         item_search_row.addWidget(new_item_btn)
         ibody.addLayout(item_search_row)
@@ -534,6 +475,9 @@ class PurchaseForm(QWidget):
         # Main action
         self.post_btn = primary_button("اعتماد الاستلام وتحديث المخزون ⌨ F9")
         self.post_btn.clicked.connect(self.post)
+        QShortcut(QKeySequence("F2"), self,
+                  activated=self.item_search.setFocus)
+        QShortcut(QKeySequence("F9"), self, activated=self.post)
         sbody.addWidget(self.post_btn)
 
         # Deferred actions
@@ -625,41 +569,6 @@ class PurchaseForm(QWidget):
             self._pick_supplier(dlg.created.id, dlg.created.name, dlg.created.mobile)
 
     # ---------- Item search ----------
-    def _on_item_query(self, text: str) -> None:
-        self._item_timer.start(200)
-
-    def _do_item_search(self) -> None:
-        q = self.item_search.text().strip()
-        if not q:
-            self._item_popup.hide()
-            return
-        rows = []
-        for kind in ("tire", "battery"):
-            rows += items.search(self.session.con, q, kind=kind, limit=ITEM_CHOICES)
-        rows = rows[:8]
-        self._item_popup.show_results(
-            rows,
-            on_pick=self._pick_item,
-            on_new=self._open_new_item_dialog,
-            query=q,
-        )
-        pos = self.item_search.mapToGlobal(self.item_search.rect().bottomLeft())
-        self._item_popup.move(pos)
-        self._item_popup.resize(self.item_search.width(), self._item_popup.sizeHint().height())
-        self._item_popup.show()
-
-    def _pick_item(self, item_id: int, kind: str, name: str) -> None:
-        self.item_search.clear()
-        self._item_popup.hide()
-        self._add_row(item_id, kind, name)
-
-    def _open_new_item_dialog(self) -> None:
-        self._item_popup.hide()
-        dlg = ItemDialog(self.session, None, parent=self)
-        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.saved:
-            self.item_search.clear()
-            self._add_row(dlg.saved.id, dlg.saved.kind, dlg.saved.name)
-
     # ---------- Lines: one self-contained row per item, added on pick ----------
     def _add_row(self, item_id: int, kind: str, name: str) -> None:
         row_w = QWidget()
@@ -858,8 +767,6 @@ class PurchaseForm(QWidget):
         if event.type() == QEvent.Type.FocusOut:
             if obj is self.sup_search:
                 QTimer.singleShot(150, self._sup_popup.hide)
-            elif obj is self.item_search:
-                QTimer.singleShot(150, self._item_popup.hide)
         return super().eventFilter(obj, event)
 
     def has_draft(self) -> bool:

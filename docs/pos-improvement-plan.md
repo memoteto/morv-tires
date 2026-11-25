@@ -20,3 +20,17 @@ Added 14 tests in tests/test_ui_pos_payment_safety.py (commit 3d9982c4d59574165b
 Owner baseline on 4fbd8071c087197b738e8e2b3f4fc0a98a61a163: 14 tests, 13 expected failures, one pass, no errors (8.783 s). Hidden split actually posted card 6000 and cash 4000 instead of cash 10000; non-cash received was refused by the engine; missing credit UI accounts for five failures. Owner then authorized implementation and replacing the exact-amount chip with a click on the final total.
 
 Implemented guarded cancellation, cash default after reset, clearing collapsed split, per-method cash/reference data, full and partial credit with existing limit/deposit/debt preview, no instalment as secondary method, and native clickable total using central QSS. For split payments the total fills only the cash share; non-cash and invalid splits do not fill. The rounded cash shortcuts remain. Shortened payment labels; no new payment-reference requirement or credit permission rule. Existing cancellation test now confirms the dialog while preserving its previous assertions. The original 14 diagnostic tests are unchanged; seven additional tests cover the exact total click, incomplete split, secondary reference and credit summary. Application changes only in POS and central theme. Post-fix CI, local tests, inventory regression and actual visual approval remain pending. No merge.
+
+## POS-1 completion
+
+Merged in PR #158 after successful local and CI tests and owner approval.
+
+## POS-2 local approval
+
+Shared invoice item search, unique barcode lookup and keyboard navigation.
+All 97 selected local tests passed. Application code grew by 35 lines.
+Owner approved local trial before upload. No schema or accounting changes.
+
+POS-3 also covers supplier fields; POS-4 also covers the purchase summary.
+POS-5: hide DOT for battery rows, preserve alignment and historical data,
+and keep DOT mandatory for tyres.
