@@ -15,13 +15,17 @@ class PosPaymentSafetyTest(_Fixture, unittest.TestCase):
         p._add_row(item, "service", "خدمة وهمية")
         p._rows[0]["qty_spin"].setValue(100)
         if customer is not None:
-            for index in range(p.customer.count()):
-                if p.customer.itemData(index)[0] == customer:
-                    p.customer.setCurrentIndex(index)
-                    break
-            self.assertEqual(p.customer.currentData()[0], customer)
+            self.select_customer(p, customer)
+            self.assertEqual(p._customer[0], customer)
         self.assertEqual(p.total_minor(), 10000)
         return p
+
+    def select_customer(self, p, customer):
+        from morv.infra import customers
+        c = customers.get(self.con, customer)
+        p.customer.setText(c.mobile)
+        p.customer.accept_query()
+        self.assertEqual(p._customer[0], customer)
 
     def customer(self, mobile, limit):
         return self.con.execute(
@@ -258,10 +262,7 @@ class PosPaymentSafetyTest(_Fixture, unittest.TestCase):
         self.assert_credit_balance(customer, 10000, 0)
         self.assertFalse(p.credit_hint.isVisibleTo(p))
         self.assertEqual(p.pay1_method.currentData(), "cash")
-        for index in range(p.customer.count()):
-            if p.customer.itemData(index)[0] == customer:
-                p.customer.setCurrentIndex(index)
-                break
+        self.select_customer(p, customer)
         self.method(p.pay1_method, "credit")
         for value in ("150.00", "100.00", "50.00"):
             self.assertIn(value, p.credit_hint.text())

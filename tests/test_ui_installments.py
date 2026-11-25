@@ -205,7 +205,9 @@ class PosToContractTest(unittest.TestCase):
         p = self.pos()
         seen = []
         p.contract_needed.connect(seen.append)
-        p.customer.setCurrentIndex(1)
+        p.customer.setText("01000000011")
+        p.customer.accept_query()
+        self.assertIsNotNone(p._customer[0])
         p._add_row(self._service_item_id(), "service", "خدمة")
         p.pay1_method.setCurrentIndex(p.pay1_method.findData("installment"))
         p.post()

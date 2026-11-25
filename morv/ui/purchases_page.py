@@ -2,11 +2,11 @@
 import uuid
 from datetime import date
 
-from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy,
+    QLabel, QLineEdit, QPushButton,
     QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
@@ -17,11 +17,13 @@ from morv.infra import purchase_view, purchasing, suppliers
 from morv.infra.purchasing import PurchaseError, PurchaseLine
 from morv.infra import suppliers as sup_infra
 from morv.ui import icons
+from morv.ui.adaptive_layout import AdaptiveCards, HeaderPlacement
 from morv.ui.item_search import ItemSearch, KIND_ICON
+from morv.ui.party_search import (FoldableDetails, PartyInfoStrip, PartySearch,
+                                  QuickPartyDialog, party_field, phone_query)
 from morv.ui.listpage import ListPage
-from morv.ui.modal import Modal
 from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
-from morv.ui.widgets import (DateEdit, confirm_discard_invoice, deferred_button, field, field_label, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
+from morv.ui.widgets import (DateEdit, chip, confirm_discard_invoice, deferred_button, field, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
 
 
 
@@ -157,112 +159,27 @@ class PurchasesListPage(ListPage):
 # Supplier search popup (live search, shown below the supplier field)
 # ---------------------------------------------------------------------------
 
-class _SupplierPopup(QFrame):
-    """Floating list that appears under the supplier search field."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setObjectName("card")
-        # Qt.WindowType.Popup grabs the keyboard on show, which stole focus from
-        # the search field and swallowed the next keystroke. A non-activating
-        # tool window lets typing continue; see PurchaseForm.eventFilter for the
-        # focus-out close.
-        self.setWindowFlags(Qt.WindowType.ToolTip)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
-        self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(6, 6, 6, 6)
-        self._layout.setSpacing(2)
-
-    def show_results(self, rows, on_pick, on_new, query: str) -> None:
-        # Clear previous buttons
-        while self._layout.count():
-            item = self._layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        for row in rows[:8]:
-            sup_id, name, mobile = row[0], row[1], row[2]
-            btn = QPushButton()
-            btn.setFlat(True)
-            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            btn.setFixedHeight(44)
-            inner = QHBoxLayout(btn)
-            inner.setContentsMargins(8, 4, 8, 4)
-            name_lbl = QLabel(name)
-            name_lbl.setObjectName("cardTitle")
-            mob_lbl = muted(ltr(mobile))
-            inner.addWidget(name_lbl)
-            inner.addWidget(mob_lbl)
-            inner.addStretch(1)
-            btn.clicked.connect(lambda _, sid=sup_id, sname=name, smob=mobile: on_pick(sid, sname, smob))
-            self._layout.addWidget(btn)
-        # "New supplier" option
-        new_btn = QPushButton(f"+ مورد جديد: {query}" if query else "+ مورد جديد")
-        new_btn.setObjectName("primary")
-        new_btn.setFlat(True)
-        new_btn.setFixedHeight(38)
-        new_btn.clicked.connect(on_new)
-        self._layout.addWidget(new_btn)
-        self.adjustSize()
-
-
-# ---------------------------------------------------------------------------
-# Item search popup
-# ---------------------------------------------------------------------------
-
-# "New supplier" inline dialog
-# ---------------------------------------------------------------------------
-
-class _NewSupplierDialog(Modal):
-    """The shared app modal (morv/ui/modal.py), filled in for a quick supplier add."""
-
+class _NewSupplierDialog(QuickPartyDialog):
     def __init__(self, name_hint: str, mobile_hint: str, session, parent=None):
-        super().__init__("مورد جديد", parent, width=560)
-        self.session = session
-        self.created = None
+        super().__init__(session, "المورد", name_hint, mobile_hint, sup_infra.SupplierError,
+                         optional=True, parent=parent)
 
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(12)
-        self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("اسم المورد")
-        self.name_edit.setText(name_hint)
-        self.mobile_edit = ltr_edit("01xxxxxxxxx")
-        self.mobile_edit.setText(mobile_hint)
-        self.addr_edit = QLineEdit()
-        self.addr_edit.setPlaceholderText("العنوان")
-        self.notes_edit = QLineEdit()
-        self.notes_edit.setPlaceholderText("ملاحظات")
-        grid.addWidget(field("اسم المورد *", self.name_edit), 0, 0, 1, 2)
-        grid.addWidget(field("رقم الموبايل *", self.mobile_edit), 1, 0)
-        grid.addWidget(field("العنوان", self.addr_edit), 1, 1)
-        grid.addWidget(field("ملاحظات", self.notes_edit), 2, 0, 1, 2)
-        self.body.addLayout(grid)
-        self.body.addWidget(muted("باقي بيانات المورد تُكمل لاحقًا من شاشة الموردين."))
-        self.add_footer("حفظ واختيار المورد", self._save)
+    def _create_party(self, name, mobile):
+        return sup_infra.create(self.session.con, self.session.user,
+                                sup_infra.Supplier(id=None, name=name, mobile=mobile,
+                                                   address=self.addr_edit.text().strip(),
+                                                   notes=self.notes_edit.text().strip()))
 
-    def _save(self) -> None:
-        name = self.name_edit.text().strip()
-        mobile = self.mobile_edit.text().strip()
-        if not name:
-            self.notice.show_message("اسم المورد مطلوب.")
-            return
-        if not mobile:
-            self.notice.show_message("رقم الموبايل مطلوب.")
-            return
-        try:
-            s = sup_infra.Supplier(id=None, name=name, mobile=mobile,
-                                   address=self.addr_edit.text().strip(),
-                                   notes=self.notes_edit.text().strip())
-            self.created = sup_infra.create(self.session.con, self.session.user, s)
-        except sup_infra.SupplierError as e:
-            self.notice.show_message(str(e))
-            return
-        self.accept()
+    def _save(self):
+        self.save()
 
 
 # ---------------------------------------------------------------------------
 # Full-page purchase form
 # ---------------------------------------------------------------------------
+
+NO_SUPPLIERS_NOTICE = "لا يوجد موردون نشطون؛ أضف مورّدًا من شاشة الموردين أولًا."
+
 
 class PurchaseForm(QWidget):
     def __init__(self, session, stack, parent=None):
@@ -276,89 +193,43 @@ class PurchaseForm(QWidget):
         self._supplier_name: str = ""
         self._supplier_mobile: str = ""
 
-        # Scroll area wrapping all content
-        scroll = QScrollArea(self)
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        inner = QWidget()
-        scroll.setWidget(inner)
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-        outer_layout.addWidget(scroll)
-
-        root = QVBoxLayout(inner)
+        root = QVBoxLayout(self)
         root.setContentsMargins(20, 14, 20, 14)
         root.setSpacing(12)
 
         self.notice = Notice()
-        root.addWidget(self._header())
+        header = self._header()
+        root.addWidget(header)
+        self.header_placement = HeaderPlacement(header, root)
         root.addWidget(self.notice)
 
-        # Two-column layout: mainCol + sumCol
-        cols = QHBoxLayout()
-        cols.setSpacing(14)
-
-        main_col = QVBoxLayout()
+        # Shared adaptive invoice columns
+        primary = QWidget()
+        main_col = QVBoxLayout(primary)
+        main_col.setContentsMargins(0, 0, 0, 0)
         main_col.setSpacing(14)
 
         # ---- Card 1: Supplier & invoice header ----
-        box, body, _head = section_card("المورد والفاتورة", "suppliers")
+        box, body, head = section_card("المورد والفاتورة", "suppliers")
 
-        # Supplier search field
-        self.sup_search = QLineEdit()
-        self.sup_search.setPlaceholderText("اسم المورد أو رقم الموبايل")
-        self.sup_search.addAction(icons.icon("search", ICON_MUTED, 16),
-                                  QLineEdit.ActionPosition.LeadingPosition)
-        self.sup_search.textChanged.connect(self._on_sup_query)
-        self.sup_search.installEventFilter(self)
-        self._sup_timer = QTimer(self)
-        self._sup_timer.setSingleShot(True)
-        self._sup_timer.timeout.connect(self._do_sup_search)
+        self.sup_search = PartySearch(
+            self, label="المورد",
+            lookup=lambda q, limit: suppliers.search(self.session.con, q, limit=limit),
+            pick=lambda row: self._pick_supplier(*row[:3]),
+            new=self._open_new_supplier_dialog,
+            can_new=lambda: self.session.can("suppliers.manage"),
+        )
 
-        self._sup_popup = _SupplierPopup(self)
-        self._sup_popup.hide()
-
-        # Supplier strip (shown after selection)
-        self._sup_strip = QFrame()
-        self._sup_strip.setObjectName("pillWarn")
-        sup_strip_layout = QHBoxLayout(self._sup_strip)
-        sup_strip_layout.setContentsMargins(12, 8, 12, 8)
-        sup_strip_layout.setSpacing(10)
-        self._sup_strip_name = QLabel()
-        self._sup_strip_name.setObjectName("cardTitle")
-        self._sup_strip_mobile = muted("")
-        change_btn = QPushButton("تغيير")
-        change_btn.setObjectName("dangerLink")
-        change_btn.clicked.connect(self._clear_supplier)
-        sup_strip_layout.addWidget(self._sup_strip_name)
-        sup_strip_layout.addWidget(self._sup_strip_mobile)
-        sup_strip_layout.addStretch(1)
-        sup_strip_layout.addWidget(change_btn)
-        self._sup_strip.hide()
-
-        sup_field_w = QWidget()
-        sup_field_v = QVBoxLayout(sup_field_w)
-        sup_field_v.setContentsMargins(0, 0, 0, 0)
-        sup_field_v.setSpacing(6)
-        sup_field_v.addWidget(field_label("المورد *"))
-        sup_field_v.addWidget(self.sup_search)
-        sup_field_v.addWidget(self._sup_strip)
-
-        # Invoice header fields grid
-        hdr_grid = QGridLayout()
-        hdr_grid.setHorizontalSpacing(12)
-        hdr_grid.setVerticalSpacing(12)
-        for c in range(4):
-            hdr_grid.setColumnStretch(c, 1)
+        body.addWidget(party_field(self.sup_search))
 
         self._received_date = date.today().isoformat()
         entry_no_preview = purchasing.next_number_preview(self.session.con)
-        self.entry_no = ltr_edit("")
-        self.entry_no.setText(entry_no_preview)
-        self.entry_no.setReadOnly(True)
-        self.recv_date = ltr_edit("")
-        self.recv_date.setText(self._received_date)
-        self.recv_date.setReadOnly(True)
+        self.entry_no = chip(entry_no_preview)
+        self.entry_no.setToolTip("رقم الإدخال")
+        self.recv_date = chip(ltr(self._received_date))
+        self.recv_date.setToolTip("تاريخ الاستلام")
+        head.addWidget(self.entry_no)
+        head.addWidget(self.recv_date)
 
         self.inv_no = ltr_edit("كما في فاتورته")
         self.inv_date = DateEdit()
@@ -366,13 +237,16 @@ class PurchaseForm(QWidget):
         self.notes = QLineEdit()
         self.notes.setPlaceholderText("اختياري")
 
-        hdr_grid.addWidget(field("رقم الإدخال", self.entry_no), 0, 0)
-        hdr_grid.addWidget(sup_field_w, 0, 1, 1, 2)
-        hdr_grid.addWidget(field("تاريخ الاستلام", self.recv_date), 0, 3)
-        hdr_grid.addWidget(field("رقم فاتورة المورد", self.inv_no), 1, 0)
-        hdr_grid.addWidget(field("تاريخ فاتورة المورد", self.inv_date), 1, 1)
-        hdr_grid.addWidget(field("ملاحظة", self.notes), 1, 2, 1, 2)
-        body.addLayout(hdr_grid)
+        self.extra_box = FoldableDetails(
+            [("رقم فاتورة المورد", self.inv_no), ("تاريخ فاتورة المورد", self.inv_date),
+             ("ملاحظة", self.notes)],
+            "تفاصيل الفاتورة والملاحظة", self._extra_summary_text, stretches=(2, 2, 3))
+        self.extra_toggle = self.extra_box.toggle
+        self.extra_summary = self.extra_box.summary
+        self.party_info = PartyInfoStrip(self.extra_box)
+        self.party_info.set_info("اختر المورد")
+        body.addWidget(self.extra_box)
+        body.addWidget(self.party_info)
         main_col.addWidget(box)
 
         # ---- Card 2: Invoice lines ----
@@ -419,10 +293,11 @@ class PurchaseForm(QWidget):
         self._rows_container.addStretch(1)
 
         main_col.addWidget(ibox, 1)
-        cols.addLayout(main_col, 3)
 
         # ---- sumCol: summary card ----
-        sum_col = QVBoxLayout()
+        summary = QWidget()
+        sum_col = QVBoxLayout(summary)
+        sum_col.setContentsMargins(0, 0, 0, 0)
         sum_col.setSpacing(14)
 
         sbox, sbody, _shead = section_card("ملخص فاتورة الشراء", "purchases")
@@ -487,12 +362,14 @@ class PurchaseForm(QWidget):
         sbody.addStretch(1)
 
         sum_col.addWidget(sbox)
-        cols.addLayout(sum_col, 1)
-        root.addLayout(cols, 1)
+        self.invoice_layout = AdaptiveCards(
+            (primary, summary), minimum_width=0, column_weights=(3, 1),
+            fill_height=True, spacing=14)
+        root.addWidget(self.invoice_layout, 1)
 
         self._refresh_summary()
         if not suppliers.count(session.con):
-            self.notice.show_message("لا يوجد موردون نشطون؛ أضف مورّدًا من شاشة الموردين أولًا.", "warn")
+            self.notice.show_message(NO_SUPPLIERS_NOTICE, "warn")
 
     # ---------- Header ----------
     def _header(self) -> QFrame:
@@ -503,10 +380,10 @@ class PurchaseForm(QWidget):
         title = QLabel("فاتورة شراء / استلام بضاعة")
         title.setObjectName("pageTitle")
         h.addWidget(title)
-        subtitle = QLabel("المشتريات · الاستلام في: المخزن الرئيسي")
+        subtitle = QLabel("المخزن الرئيسي")
         subtitle.setObjectName("muted")
         h.addWidget(subtitle)
-        draft_badge = QLabel("مسودة — لم تُرحَّل بعد")
+        draft_badge = QLabel("مسودة")
         draft_badge.setObjectName("pillWarn")
         h.addWidget(draft_badge)
         h.addStretch(1)
@@ -517,56 +394,40 @@ class PurchaseForm(QWidget):
         return w
 
     # ---------- Builder helpers ----------
-    def _on_sup_query(self, text: str) -> None:
-        if self._supplier_id is not None:
-            return
-        self._sup_timer.start(200)
-
-    def _do_sup_search(self) -> None:
-        q = self.sup_search.text().strip()
-        rows = suppliers.search(self.session.con, q, limit=8)
-        if not rows and not q:
-            self._sup_popup.hide()
-            return
-        self._sup_popup.show_results(
-            rows,
-            on_pick=self._pick_supplier,
-            on_new=self._open_new_supplier_dialog,
-            query=q,
-        )
-        # Position below the search field
-        pos = self.sup_search.mapToGlobal(self.sup_search.rect().bottomLeft())
-        self._sup_popup.move(pos)
-        self._sup_popup.resize(self.sup_search.width(), self._sup_popup.sizeHint().height())
-        self._sup_popup.show()
-
     def _pick_supplier(self, sup_id: int, name: str, mobile: str) -> None:
         self._supplier_id = sup_id
         self._supplier_name = name
         self._supplier_mobile = mobile
-        self.sup_search.hide()
-        self._sup_strip_name.setText(name)
-        self._sup_strip_mobile.setText(ltr(mobile))
-        self._sup_strip.show()
-        self._sup_popup.hide()
+        self.sup_search.commit_text(name)
+        self.party_info.set_info("مورد مسجّل", registered=True, mobile=mobile)
+        if self.notice.text() == NO_SUPPLIERS_NOTICE:
+            self.notice.show_message("")
 
-    def _clear_supplier(self) -> None:
-        self._supplier_id = None
-        self._supplier_name = ""
-        self._supplier_mobile = ""
-        self.sup_search.clear()
-        self.sup_search.show()
-        self._sup_strip.hide()
+    def _extra_summary_text(self):
+        parts = []
+        if self.inv_no.text().strip():
+            parts.append(f"رقم {ltr(self.inv_no.text().strip())}")
+        if self.inv_date.text() != self._received_date:
+            parts.append(ltr(self.inv_date.text()))
+        if self.notes.text().strip():
+            parts.append("ملاحظة")
+        return " · ".join(parts)
 
-    def _open_new_supplier_dialog(self) -> None:
-        self._sup_popup.hide()
-        q = self.sup_search.text().strip()
-        name_hint = q if not q.replace(" ", "").isdigit() else ""
-        mobile_hint = q if q.replace(" ", "").isdigit() else ""
+    def _open_new_supplier_dialog(self, query=None) -> None:
+        self.sup_search.close_results()
+        if not self.session.can("suppliers.manage"):
+            return
+        q = self.sup_search.text().strip() if query is None else query
+        digits = phone_query(q)
+        name_hint = "" if digits.isdigit() else q
+        mobile_hint = digits if digits.isdigit() else ""
         dlg = _NewSupplierDialog(name_hint=name_hint, mobile_hint=mobile_hint,
                                  session=self.session, parent=self)
-        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.created:
-            self._pick_supplier(dlg.created.id, dlg.created.name, dlg.created.mobile)
+        try:
+            if dlg.exec() == QDialog.DialogCode.Accepted and dlg.created:
+                self._pick_supplier(dlg.created.id, dlg.created.name, dlg.created.mobile)
+        finally:
+            dlg.deleteLater()
 
     # ---------- Item search ----------
     # ---------- Lines: one self-contained row per item, added on pick ----------
@@ -760,15 +621,6 @@ class PurchaseForm(QWidget):
         return False
 
 
-    def eventFilter(self, obj, event) -> bool:
-        # Live-search popups must not steal keyboard focus from the field (see
-        # _SupplierPopup/_ItemPopup window flags); close them shortly after the
-        # field loses focus so a click on a popup button still registers first.
-        if event.type() == QEvent.Type.FocusOut:
-            if obj is self.sup_search:
-                QTimer.singleShot(150, self._sup_popup.hide)
-        return super().eventFilter(obj, event)
-
     def has_draft(self) -> bool:
         return self.posted is None and bool(
             self._rows
@@ -783,7 +635,7 @@ class PurchaseForm(QWidget):
     def post(self) -> None:
         if self._busy:
             return
-        if self._supplier_id is None:
+        if self._supplier_id is None or self.sup_search.pending:
             self._fail("اختر المورد.")
             return
         # Supplier invoice number is optional: when left blank, this invoice's

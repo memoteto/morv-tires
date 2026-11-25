@@ -175,7 +175,7 @@ class MainWindow(QMainWindow):
         self._topbar_layout = lay
         self._header_timer = QTimer(self)
         self._header_timer.setSingleShot(True)
-        self._header_timer.timeout.connect(self._sync_settings_header)
+        self._header_timer.timeout.connect(self._sync_page_header)
         bar.installEventFilter(self)
         self._detail_host = QWidget(bar)
         self._detail_layout = QHBoxLayout(self._detail_host)
@@ -247,13 +247,16 @@ class MainWindow(QMainWindow):
             if key == "pos":
                 page.contract_needed.connect(self.open_contract)
             elif key == "settings":
-                page.header_changed.connect(self._sync_settings_header)
+                page.header_changed.connect(self._sync_page_header)
+            elif key == "purchases":
+                page.currentChanged.connect(
+                    lambda _index: self._sync_page_header())
         self.stack.setCurrentIndex(row)
         self.title.setText(NAV[row][1])
         # Other screens may have changed the data since this one was last shown; home refreshes itself.
         if not first_visit and hasattr(self.pages[key], "refresh"):
             self.pages[key].refresh()
-        self._sync_settings_header()
+        self._sync_page_header()
         if key == "settings" and hasattr(self, "health_pill"):
             self.refresh_health()
 
@@ -275,10 +278,15 @@ class MainWindow(QMainWindow):
         return QSize(max(0, available.width() - reserved - len(widgets) * layout.spacing()),
                      available.height())
 
-    def _sync_settings_header(self):
-        page = self.pages.get("settings")
-        detail = (page if isinstance(page, SettingsPage)
-                  and self.stack.currentWidget() is page and page.current_key is not None else None)
+    def _sync_page_header(self):
+        page = self.stack.currentWidget()
+        detail = None
+        if isinstance(page, PosPage):
+            detail = page.header_placement
+        elif isinstance(page, SettingsPage) and page.current_key is not None:
+            detail = page.header_placement
+        elif isinstance(page, PurchasesPage) and page.form_page is page.currentWidget():
+            detail = page.form_page.header_placement
         room = self._detail_available_size() if detail is not None else QSize()
         active = detail if detail is not None and detail.header_fits(room.width(), room.height()) else None
         if active is self._external_header_page:

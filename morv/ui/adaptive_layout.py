@@ -19,7 +19,8 @@ def scroll_content(content: QWidget) -> QScrollArea:
 
 
 class AdaptiveCards(QScrollArea):
-    def __init__(self, cards, *, minimum_width, max_columns=2, column_weights=None, fill_height=False):
+    def __init__(self, cards, *, minimum_width, max_columns=2, column_weights=None, fill_height=False,
+                 spacing=None, content_margins=(0, 0, 0, 0)):
         super().__init__()
         self.cards = tuple(cards)
         self.minimum_width = minimum_width
@@ -33,8 +34,8 @@ class AdaptiveCards(QScrollArea):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.content = QWidget()
         self.grid = QGridLayout(self.content)
-        self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setSpacing(LAYOUT["pane_gap"])
+        self.grid.setContentsMargins(*content_margins)
+        self.grid.setSpacing(LAYOUT["pane_gap"] if spacing is None else spacing)
         if not fill_height:
             self.grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.grid.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
@@ -56,10 +57,11 @@ class AdaptiveCards(QScrollArea):
         return super().eventFilter(watched, event)
 
     def _reflow(self):
-        gap = LAYOUT["pane_gap"]
+        gap = self.grid.horizontalSpacing()
         minimum = max((max(self.minimum_width, c.minimumWidth(), c.minimumSizeHint().width())
                        for c in self.cards), default=self.minimum_width)
-        width = self.viewport().width()
+        margins = self.grid.contentsMargins()
+        width = max(0, self.viewport().width() - margins.left() - margins.right())
         if self.column_weights is None:
             columns = max(1, min(self.max_columns, len(self.cards), (width + gap) // (minimum + gap)))
         else:
@@ -305,13 +307,42 @@ class FormBody(QWidget):
         root.addWidget(self.footer)
 
 
+class HeaderPlacement:
+    def __init__(self, header, root):
+        self.header = header
+        self._root = root
+        self._header_host = None
+
+    def header_fits(self, width: int, height: int) -> bool:
+        layout = self.header.layout()
+        minimum = layout.minimumSize().expandedTo(self.header.minimumSize())
+        if width < minimum.width() or height < minimum.height():
+            return False
+        needed = layout.totalHeightForWidth(width)
+        return max(minimum.height(), needed) <= height
+
+    def set_header_host(self, host=None):
+        """Move the same header between the page and an optional shell layout."""
+        if host is self._header_host:
+            return
+        if self._header_host is None:
+            self._root.removeWidget(self.header)
+        else:
+            self._header_host.removeWidget(self.header)
+        self._header_host = host
+        if host is None:
+            self._root.insertWidget(0, self.header)
+        else:
+            host.addWidget(self.header)
+        self.header.show()
+
+
 class PageFrame(QWidget):
     header_changed = Signal()
 
     def __init__(self, back_text, back_icon):
         super().__init__()
         root = self._root = QVBoxLayout(self)
-        self._header_host = None
         root.setContentsMargins(LAYOUT["page_margin"], LAYOUT["page_margin_y"],
                                 LAYOUT["page_margin"], LAYOUT["page_margin_y"])
         root.setSpacing(LAYOUT["pane_gap"])
@@ -338,6 +369,7 @@ class PageFrame(QWidget):
         titles.addWidget(self.description)
         head.addLayout(titles, 1)
         root.addWidget(self.header)
+        self.header_placement = HeaderPlacement(self.header, root)
         self.body = QVBoxLayout()
         self.body.setContentsMargins(0, 0, 0, 0)
         root.addLayout(self.body, 1)
@@ -349,27 +381,10 @@ class PageFrame(QWidget):
         self.footer.hide()
 
     def header_fits(self, width: int, height: int) -> bool:
-        layout = self.header.layout()
-        minimum = layout.minimumSize().expandedTo(self.header.minimumSize())
-        if width < minimum.width() or height < minimum.height():
-            return False
-        needed = layout.totalHeightForWidth(width)
-        return max(minimum.height(), needed) <= height
+        return self.header_placement.header_fits(width, height)
 
     def set_header_host(self, host=None):
-        """Move the same header between the page and an optional shell layout."""
-        if host is self._header_host:
-            return
-        if self._header_host is None:
-            self._root.removeWidget(self.header)
-        else:
-            self._header_host.removeWidget(self.header)
-        self._header_host = host
-        if host is None:
-            self._root.insertWidget(0, self.header)
-        else:
-            host.addWidget(self.header)
-        self.header.show()
+        self.header_placement.set_header_host(host)
 
     def set_header(self, title, description="", *, back=False):
         self.title.setText(title)
