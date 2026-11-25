@@ -34,3 +34,9 @@ Owner approved local trial before upload. No schema or accounting changes.
 POS-3 also covers supplier fields; POS-4 also covers the purchase summary.
 POS-5: hide DOT for battery rows, preserve alignment and historical data,
 and keep DOT mandatory for tyres.
+
+## POS-2 completion and POS-3 local implementation
+
+POS-2 merged in PR #159 after 1033 local tests, manual verification and successful CI.
+POS-3: four baseline tests exposed six failures; simplified invoice headers and mobile lookup. 1061 local tests passed; Ruff and test discovery passed.
+Owner design approval and eight long-text screenshots reviewed; CI pending.

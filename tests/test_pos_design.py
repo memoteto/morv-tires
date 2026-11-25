@@ -8,7 +8,7 @@ SOURCE = (ROOT / "morv" / "ui" / "pos_page.py").read_text(encoding="utf-8")
 # Each entry is a label the current approved point-of-sale screen shows.
 SECTIONS = ["بيانات الفاتورة والعميل", "الأصناف والخدمات", "ملخص الفاتورة", "الدفع"]
 
-HEADER = ["فاتورة بيع جديدة", "مسودة", "نقطة البيع · المخزن الرئيسي · الكاشير:",
+HEADER = ["فاتورة بيع جديدة", "مسودة", "المخزن الرئيسي",
           "تعليق الفاتورة", "معاينة الطباعة", "إلغاء"]
 
 INVOICE = ["رقم الفاتورة", "التاريخ والوقت", "فئة السعر",
@@ -86,7 +86,10 @@ class PosDesignV1Test(unittest.TestCase):
 
     def test_no_horizontal_scrollbar(self):
         """Owner feedback: the screen was too wide and needed scrolling sideways."""
-        self.assertIn("ScrollBarAlwaysOff", SOURCE)
+        self.assertIn("self.invoice_layout = AdaptiveCards(", SOURCE)
+        shared = (ROOT / "morv" / "ui" / "adaptive_layout.py").read_text(encoding="utf-8")
+        cards = shared[shared.index("class AdaptiveCards("):shared.index("class AdaptiveSplit(")]
+        self.assertIn("ScrollBarAsNeeded", cards)
 
 
 if __name__ == "__main__":

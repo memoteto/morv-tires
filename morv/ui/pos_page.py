@@ -2,10 +2,10 @@
 import uuid
 from datetime import date, datetime
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QComboBox, QCompleter, QFrame, QGridLayout, QHBoxLayout,
-                               QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox,
+from PySide6.QtWidgets import (QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout,
+                               QLabel, QLineEdit, QPushButton, QSpinBox,
                                QVBoxLayout, QWidget)
 
 from morv.core import sales_rules
@@ -14,7 +14,10 @@ from morv.core.text import ltr
 from morv.infra import customer_receipts, customers, items, sale_view, sales, users
 from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons, tokens
+from morv.ui.adaptive_layout import AdaptiveCards, HeaderPlacement
 from morv.ui.item_search import ItemSearch, KIND_ICON
+from morv.ui.party_search import (FoldableDetails, PartyInfoStrip, PartySearch,
+                                  QuickPartyDialog, party_field, phone_query)
 from morv.ui.widgets import (InvoiceTotal, confirm_discard_invoice, chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
 
 TIER_ATTR = {"retail": "price_retail", "wholesale": "price_wholesale", "super": "price_super"}
@@ -26,6 +29,20 @@ PAYMENT_HINTS = {"cash": "استلام نقدية وحساب الباقي", "car
                  "wallet": "يلزم رقم المرجع", "credit": "على حساب العميل",
                  "installment": "يُفتح العقد بعد الاعتماد"}
 KIND_TABS = (("الكل", None), ("إطارات", "tire"), ("بطاريات", "battery"), ("خدمات", "service"))
+
+
+CASH_CUSTOMER = (None, "عميل نقدي", "", "retail", "individual", "", 1)
+
+
+class QuickCustomerDialog(QuickPartyDialog):
+    def __init__(self, session, query, parent=None):
+        digits = phone_query(query)
+        super().__init__(session, "العميل", "" if digits.isdigit() else query,
+                         digits if digits.isdigit() else "", customers.CustomerError, parent=parent)
+
+    def _create_party(self, name, mobile):
+        return customers.create(self.session.con, self.session.user,
+                                customers.Customer(None, name, mobile))
 
 
 class PosPage(QWidget):
@@ -44,24 +61,22 @@ class PosPage(QWidget):
         root.setContentsMargins(20, 14, 20, 8)
         root.setSpacing(12)
         self.notice = Notice()
-        root.addWidget(self._build_header())
+        header = self._build_header()
+        root.addWidget(header)
+        self.header_placement = HeaderPlacement(header, root)
         root.addWidget(self.notice)
-        main = QHBoxLayout()
-        main.setSpacing(16)
-        main.addLayout(self._build_right_column(), 3)
-        main.addLayout(self._build_left_column(), 1)
-        content = QWidget()
-        content.setLayout(main)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        # The old per-column QTableView forced its own width (ResizeToContents
-        # columns) wider than the viewport, which showed as a horizontal
-        # scrollbar under the whole screen. Rows are self-built, stretch-based
-        # widgets now, so they compress to fit; this policy is a hard backstop.
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setWidget(content)
-        root.addWidget(scroll, 1)
+        primary = QWidget()
+        primary_layout = self._build_right_column()
+        primary_layout.setContentsMargins(0, 0, 0, 0)
+        primary.setLayout(primary_layout)
+        summary = QWidget()
+        summary_layout = self._build_left_column()
+        summary_layout.setContentsMargins(0, 0, 0, 0)
+        summary.setLayout(summary_layout)
+        self.invoice_layout = AdaptiveCards(
+            (primary, summary), minimum_width=0, column_weights=(3, 1),
+            fill_height=True, spacing=16, content_margins=(9, 9, 9, 9))
+        root.addWidget(self.invoice_layout, 1)
         self._shortcuts()
 
         self._stamp()
@@ -79,10 +94,7 @@ class PosPage(QWidget):
         title = QLabel("فاتورة بيع جديدة")
         title.setObjectName("pageTitle")
         h.addWidget(title)
-        user = getattr(self.session.user, "display_name", "") or ""
-        # A plain, non-wrapping label: muted() turns word-wrap on, which broke
-        # this long line onto two lines instead of letting it truncate.
-        subtitle = QLabel(f"نقطة البيع · المخزن الرئيسي · الكاشير: {user}")
+        subtitle = QLabel("المخزن الرئيسي")
         subtitle.setObjectName("muted")
         h.addWidget(subtitle)
         draft = QLabel("مسودة")
@@ -127,84 +139,37 @@ class PosPage(QWidget):
         self.tier_combo.setEnabled(users.is_active_manager(self.session.con, self.session.user))
         self.odometer = ltr_edit("مثال: 84500")
 
-        self.customer = QComboBox()
-        self.customer.addItem("عميل نقدي", ("", "retail", "", ""))
-        for row in customers.search(self.session.con, "", limit=300):
-            self.customer.addItem(row[1], (row[0], row[3], row[2] or "", (row[5] or "").strip()))
-        self.customer.setEditable(True)        # Typing the customer name searches, as the design asks
-        self.customer.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self.customer.completer().setFilterMode(Qt.MatchFlag.MatchContains)
-        self.customer.completer().setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
-        self.customer.lineEdit().setPlaceholderText("اكتب اسم العميل للبحث")
-        self.customer.lineEdit().addAction(icons.icon("user", ICON_MUTED, 18), QLineEdit.ActionPosition.LeadingPosition)
-        self.customer.lineEdit().editingFinished.connect(self._on_customer_typed)
-        # The list preloads only the first 300 customers, so typing also looks the rest up
-        self._customer_lookup = QTimer(self)
-        self._customer_lookup.setSingleShot(True)
-        self._customer_lookup.setInterval(250)
-        self._customer_lookup.timeout.connect(lambda: self._load_customer_matches(self.customer.lineEdit().text()))
-        self.customer.lineEdit().textEdited.connect(lambda _t: self._customer_lookup.start())
-        self.customer.currentIndexChanged.connect(self._on_customer_changed)
-        self.mobile = ltr_edit("ابحث برقم الموبايل")
-        trail_icon(self.mobile, "phone")
-        self.mobile.editingFinished.connect(self._on_mobile_typed)
+        self._customer = CASH_CUSTOMER
+        self.customer = PartySearch(
+            self, label="العميل",
+            lookup=lambda q, limit: customers.search(self.session.con, q, limit=limit),
+            pick=self._pick_customer, new=self._open_new_customer_dialog,
+            can_new=lambda: self.session.can("customers.manage"),
+            cash=lambda: self._pick_customer(CASH_CUSTOMER),
+            unresolved=self._unresolved_customer,
+        )
+        self.customer.setToolTip("تغيير العميل (F4) — البحث بالاسم أو رقم الموبايل")
+        self.customer.commit_text(CASH_CUSTOMER[1])
         self.plate = ltr_edit("رقم اللوحة")
         trail_icon(self.plate, "car")
-        cust_row = QHBoxLayout()
-        cust_row.setSpacing(6)
-        cust_row.addWidget(self.customer, 1)
-        cust_row.addWidget(kbd("F4"))
-        cust_box = QWidget()
-        cust_box.setLayout(cust_row)
-        cust_row.setContentsMargins(0, 0, 0, 0)
-        grid.addWidget(field("العميل *", cust_box), 0, 0)
-        grid.addWidget(field("رقم الموبايل", self.mobile), 0, 1)
+        grid.addWidget(party_field(self.customer, "F4"), 0, 0, 1, 2)
         grid.addWidget(field("فئة السعر", self.tier_combo, locked=True), 0, 2)
         body.addLayout(grid)
 
         # Vehicle and note are occasional, so they stay folded and leave the room to the item rows
         self.note = QLineEdit()
         self.note.setPlaceholderText("اختياري — تظهر في الطباعة")
-        self.extra_box = QWidget()
-        extra = QGridLayout(self.extra_box)
-        extra.setContentsMargins(0, 0, 0, 0)
-        extra.setHorizontalSpacing(12)
-        for c, stretch in enumerate((3, 2, 2)):
-            extra.setColumnStretch(c, stretch)
-        extra.addWidget(field("ملاحظة على الفاتورة", self.note), 0, 0)
-        extra.addWidget(field("عداد الكيلومترات", self.odometer), 0, 1)
-        extra.addWidget(field("المركبة / اللوحة", self.plate), 0, 2)
-        self.extra_box.setVisible(False)
+        self.extra_box = FoldableDetails(
+            [("ملاحظة على الفاتورة", self.note), ("عداد الكيلومترات", self.odometer),
+             ("المركبة / اللوحة", self.plate)],
+            "تفاصيل المركبة والملاحظة", self._extra_summary_text)
+        self.extra_summary = self.extra_box.summary
+        self.extra_toggle = self.extra_box.toggle
+        self.party_info = PartyInfoStrip(self.extra_box)
+        self.cust_kind = self.party_info.kind
+        self.cust_stats = self.party_info.stats
         body.addWidget(self.extra_box)
-
-        strip = QFrame()
-        strip.setObjectName("infoStrip")
-        s = QHBoxLayout(strip)
-        s.setContentsMargins(12, 8, 12, 8)
-        s.setSpacing(8)
-        self.cust_kind = QLabel()
-        self.cust_tier_chip = chip("")
-        self.cust_stats = muted("")
-        self.cust_stats.setWordWrap(False)
-        change = QPushButton("تغيير العميل")
-        change.setObjectName("link")
-        change.clicked.connect(self._focus_customer)
-        self.extra_summary = muted("")
-        self.extra_summary.setWordWrap(False)
-        self.extra_toggle = QPushButton("تفاصيل المركبة والملاحظة")
-        self.extra_toggle.setObjectName("link")
-        self.extra_toggle.setCheckable(True)
-        self.extra_toggle.toggled.connect(self.extra_box.setVisible)
-        for edit in (self.odometer, self.plate, self.note):
-            edit.textChanged.connect(self._refresh_extra_summary)
-        s.addWidget(self.cust_kind)
-        s.addWidget(self.cust_tier_chip)
-        s.addWidget(self.cust_stats)
-        s.addStretch(1)
-        s.addWidget(self.extra_summary)
-        s.addWidget(self.extra_toggle)
-        s.addWidget(change)
-        body.addWidget(strip)
+        body.addWidget(self.party_info)
         return box
 
     def _items_card(self) -> QFrame:
@@ -415,8 +380,7 @@ class PosPage(QWidget):
         self.tier_combo.blockSignals(True)
         self.tier_combo.setCurrentIndex(max(self.tier_combo.findData(self.tier), 0))
         self.tier_combo.blockSignals(False)
-        for label in (self.tier_chip, self.cust_tier_chip):
-            label.setText(f"فئة السعر: {TIER_SHORT[self.tier]}")
+        self.tier_chip.setText(f"فئة السعر: {TIER_SHORT[self.tier]}")
 
     def _set_kind(self, kind) -> None:
         self._kind = kind
@@ -449,15 +413,14 @@ class PosPage(QWidget):
             sc.activated.connect(slot)
 
     def _focus_customer(self) -> None:
-        self.customer.setFocus()
-        self.customer.showPopup()
+        self.customer.open_search()
 
     def _stamp(self) -> str:
         now = datetime.now()
         self.sale_date.setText(ltr(now.strftime("%Y-%m-%d %H:%M")))
         return date.today().isoformat()
 
-    def _refresh_extra_summary(self, *_args) -> None:
+    def _extra_summary_text(self) -> str:
         parts = []
         if self.odometer.text().strip():
             parts.append(f"العداد {ltr(self.odometer.text().strip())}")
@@ -465,7 +428,7 @@ class PosPage(QWidget):
             parts.append(f"اللوحة {ltr(self.plate.text().strip())}")
         if self.note.text().strip():
             parts.append("ملاحظة")
-        self.extra_summary.setText(" · ".join(parts))
+        return " · ".join(parts)
 
     def _selected_methods(self) -> tuple:
         first = self.pay1_method.currentData()
@@ -512,68 +475,39 @@ class PosPage(QWidget):
         self._refresh_change()
 
     # ---------- Customer and items ----------
-    def _load_customer_matches(self, text: str) -> int:
-        """Adds registered customers beyond the preloaded first 300; returns how many were added."""
-        text = text.strip()
-        if len(text) < 2:
-            return 0
-        known = {self.customer.itemData(i)[0] for i in range(self.customer.count())}
-        added = 0
-        for row in customers.search(self.session.con, text, limit=30):
-            if row[0] not in known:
-                self.customer.addItem(row[1], (row[0], row[3], row[2] or "", (row[5] or "").strip()))
-                added += 1
-        return added
+    def _pick_customer(self, row):
+        self._customer = row
+        self.customer.commit_text(row[1])
+        self._on_customer_changed()
+        self.notice.show_message("")
 
-    def _on_customer_typed(self) -> None:
-        """A typed name picks that customer; anything else falls back to the chosen one."""
-        text = self.customer.lineEdit().text().strip()
-        idx = self.customer.findText(text, Qt.MatchFlag.MatchFixedString)
-        if idx < 0 and text:
-            self._load_customer_matches(text)
-            idx = self.customer.findText(text, Qt.MatchFlag.MatchFixedString)
-        if idx >= 0:
-            self.customer.setCurrentIndex(idx)
+    def _unresolved_customer(self, query, has_matches):
+        message = ("اختر العميل من نتائج البحث." if has_matches else
+                   f"لا يوجد عميل مسجّل يطابق «{query}».")
+        self.notice.show_message(message, "warn")
+
+    def _open_new_customer_dialog(self, query):
+        if not self.session.can("customers.manage"):
             return
-        if text:
-            self.notice.show_message(f"لا يوجد عميل مسجّل باسم «{text}»؛ أضفه من شاشة العملاء.", "warn")
-        self.customer.lineEdit().setText(self.customer.itemText(self.customer.currentIndex()))
-
-    def _on_mobile_typed(self) -> None:
-        """A typed mobile picks the customer registered with it, if any."""
-        digits = "".join(ch for ch in self.mobile.text() if ch.isdigit())
-        current = (self.customer.currentData() or ("", "", "", ""))[2]
-        if not digits or digits == current:
-            return
-        if not self._select_by_mobile(digits):
-            self._load_customer_matches(digits)
-            if self._select_by_mobile(digits):
-                return
-            self.notice.show_message(f"لا يوجد عميل مسجّل بالرقم {ltr(digits)}.", "warn")
-
-    def _select_by_mobile(self, digits: str) -> bool:
-        for i in range(1, self.customer.count()):
-            if self.customer.itemData(i)[2] == digits:
-                self.customer.setCurrentIndex(i)
-                self.notice.show_message("")
-                return True
-        return False
+        dlg = QuickCustomerDialog(self.session, query, parent=self)
+        try:
+            if dlg.exec() == QDialog.DialogCode.Accepted and dlg.created:
+                c = dlg.created
+                self._pick_customer((c.id, c.name, c.mobile, c.price_level,
+                                     c.customer_type, "", c.active))
+        finally:
+            dlg.deleteLater()
 
     def _on_customer_changed(self, *_args) -> None:
-        cid, level, mobile, vehicle = self.customer.currentData() or ("", "retail", "", "")
-        self.mobile.setText(mobile or "")
+        cid, _name, mobile, level, _kind, vehicle, _active = self._customer
+        vehicle = (vehicle or "").strip()
         self.plate.setPlaceholderText(f"{vehicle} · رقم اللوحة" if vehicle else "رقم اللوحة")
         if cid:
             n, last = sale_view.customer_stats(self.session.con, cid)
-            self.cust_kind.setText("عميل مسجّل")
-            self.cust_kind.setObjectName("pillOk")
-            self.cust_stats.setText(f"{ltr(str(n))} فواتير سابقة" + (f" · آخر زيارة {ltr(last)}" if last else ""))
+            history = f"{ltr(str(n))} فواتير سابقة" + (f" · آخر زيارة {ltr(last)}" if last else "")
+            self.party_info.set_info("عميل مسجّل", registered=True, mobile=mobile, description=history)
         else:
-            self.cust_kind.setText("عميل نقدي")
-            self.cust_kind.setObjectName("chip")
-            self.cust_stats.setText("بيع نقدي بدون حساب عميل")
-        self.cust_kind.style().unpolish(self.cust_kind)
-        self.cust_kind.style().polish(self.cust_kind)
+            self.party_info.set_info("عميل نقدي", description="بيع نقدي بدون حساب عميل")
         self._set_tier(level or "retail")
         self._refresh_credit()
 
@@ -781,7 +715,7 @@ class PosPage(QWidget):
         self.credit_hint.setVisible(credit)
         if not credit:
             return
-        cid = (self.customer.currentData() or ("",))[0]
+        cid = self._customer[0]
         if not cid:
             self.credit_hint.setText("البيع الآجل يحتاج عميلًا مسجلًا")
             return
@@ -846,6 +780,9 @@ class PosPage(QWidget):
         """Posts through the engine; any refusal is shown and nothing is written."""
         if self._busy:
             return
+        if self.customer.pending:
+            self._fail("اختر العميل من نتائج البحث أو اختر عميل نقدي قبل الاعتماد.")
+            return
         lines, err = self._validate_lines()
         if err:
             self._fail(err)
@@ -858,7 +795,7 @@ class PosPage(QWidget):
         except (MoneyError, ValueError, sales_rules.SaleRuleError) as e:
             self._fail(f"تحقق من المدخلات: {e}")
             return
-        customer = self.customer.currentData()
+        customer = self._customer
         self._busy = True
         self.post_btn.setEnabled(False)
         try:
@@ -918,9 +855,7 @@ class PosPage(QWidget):
         self.pay2_amount.clear()
         self.split_btn.setChecked(False)
         self.pay1_method.setCurrentIndex(self.pay1_method.findData("cash"))
-        self.customer.setCurrentIndex(0)
-        self.customer.setEditText(self.customer.itemText(0))
-        self._on_customer_changed()
+        self._pick_customer(CASH_CUSTOMER)
         self.number_edit.setText(sales.next_number_preview(self.session.con))
         self._stamp()
         self._on_row_changed()
@@ -928,13 +863,13 @@ class PosPage(QWidget):
     def has_draft(self) -> bool:
         return bool(
             self._rows
-            or self.customer.currentIndex() != 0
-            or self.customer.currentText() != self.customer.itemText(0)
+            or self._customer[0] is not None
+            or self.customer.pending
             or self.tier != "retail"
             or self.pay1_method.currentData() != "cash"
             or self.split_btn.isChecked()
             or any(widget.text().strip() for widget in (
-                self.mobile, self.note, self.plate, self.odometer,
+                self.note, self.plate, self.odometer,
                 self.invoice_disc, self.pay1_received,
                 self.pay1_amount, self.pay2_amount,
                 self.pay1_ref, self.pay2_ref,

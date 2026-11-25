@@ -50,32 +50,42 @@ class PosCustomerLookupBeyond300Test(PosFixture):
         self.con.execute("INSERT INTO customers (name, name_norm, mobile, credit_limit) "
                          "VALUES ('ياسر الأخير','ياسر الاخير','01099999999',0)")
 
-    def test_preload_stops_at_300_but_a_typed_mobile_still_finds_the_customer(self):
-        p = self.page()
-        self.assertEqual(p.customer.count(), 301)              # cash customer plus the first 300
-        self.assertEqual(p.customer.findText("ياسر الأخير"), -1)
-        p.mobile.setText("01099999999")
-        p._on_mobile_typed()
-        self.assertEqual(p.customer.currentText(), "ياسر الأخير")
+    def test_live_lookup_does_not_preload_and_finds_customer_beyond_300(self):
+        from unittest.mock import patch
+        from morv.infra import customers
+        with patch.object(customers, "search", wraps=customers.search) as lookup:
+            p = self.page()
+            lookup.assert_not_called()
+        self.assertEqual(customers.count(self.con), 321)
+        p.customer.setText("01099999999")
+        p.customer.accept_query()
+        self.assertEqual(p.customer.text(), "ياسر الأخير")
         self.assertEqual(p.notice.text(), "")
 
     def test_a_typed_name_beyond_the_preload_is_found(self):
         p = self.page()
-        p.customer.lineEdit().setText("ياسر الأخير")
-        p._on_customer_typed()
-        self.assertEqual(p.customer.currentText(), "ياسر الأخير")
-        self.assertEqual(p.customer.currentData()[2], "01099999999")
+        p.customer.setText("ياسر الأخير")
+        p.customer.accept_query()
+        self.assertEqual(p.customer.text(), "ياسر الأخير")
+        self.assertEqual(p._customer[2], "01099999999")
 
-    def test_typing_loads_matches_so_the_completer_can_offer_them(self):
+    def test_typing_loads_visible_matches_beyond_300(self):
         p = self.page()
-        p.customer.lineEdit().setText("ياسر")
-        p._load_customer_matches("ياسر")
-        self.assertGreaterEqual(p.customer.findText("ياسر الأخير"), 0)
+        p.customer.setText("ياسر")
+        from PySide6.QtTest import QTest
+        from PySide6.QtWidgets import QLabel
+        QTest.qWait(400)
+        self.assertTrue(p.customer.popup.isVisible())
+        self.assertTrue(any("ياسر الأخير" == label.text()
+                            for label in p.customer.popup.findChildren(QLabel)))
 
     def test_an_unknown_mobile_still_warns_and_does_not_duplicate_items(self):
         p = self.page()
-        before = p.customer.count()
-        p.mobile.setText("01011112222")
-        p._on_mobile_typed()
+        before = self.con.execute("SELECT count(*) FROM customers").fetchone()[0]
+        p.customer.setText("01011112222")
+        p.customer.accept_query()
         self.assertIn("لا يوجد عميل مسجّل", p.notice.text())
-        self.assertEqual(p.customer.count(), before)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM customers").fetchone()[0], before)
+        self.assertIsNone(p._customer[0])
+        self.assertTrue(p.customer.pending)
+        self.assertEqual(len(p.customer.popup.buttons), 2)
