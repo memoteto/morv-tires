@@ -1,0 +1,105 @@
+name: POS-3 Windows layout diagnostic
+on:
+  pull_request:
+    branches: [pos/phase-3-invoice-header]
+    paths: ['.github/workflows/pos3-windows-diagnostic.yml']
+permissions:
+  contents: read
+jobs:
+  geometry:
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      MORV_REQUIRE_QT: "1"
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements.txt
+      - name: Measure the original assertion without changing its result
+        shell: bash
+        run: |
+          export MORV_DATA_DIR="$RUNNER_TEMP/morv_diag"
+          cat > "$RUNNER_TEMP/pos3_diag.py" <<'PY'
+          import os
+          import sys
+          import unittest
+          from pathlib import Path
+          sys.path.insert(0, str(Path.cwd()))
+          from tests.test_ui_pos_compact import PosCompactTest
+
+          original_window = PosCompactTest.window_on_pos
+          original_assert = PosCompactTest.assertLessEqual
+
+          def snapshot(case, label):
+              from PySide6.QtCore import QPoint
+              from PySide6.QtWidgets import QWidget
+              from PySide6.QtGui import QFontInfo
+              win, pos = case._diag_window
+              area = pos.invoice_layout
+              margins = area.grid.contentsMargins()
+              needed = sum(max(area.minimum_width, c.minimumWidth(), c.minimumSizeHint().width())
+                           for c in area.cards) + area.grid.horizontalSpacing()
+              available = area.viewport().width() - margins.left() - margins.right()
+              print("GEOMETRY", label, "window", win.size(), "page", pos.size(),
+                    "viewport", area.viewport().size(), "content", area.content.size(),
+                    "columns", area.columns, "available", available, "needed", needed,
+                    "timer_active", area._timer.isActive(),
+                    "scroll", area.verticalScrollBar().value(), area.verticalScrollBar().maximum(),
+                    "button_bottom", pos.post_btn.mapTo(pos, QPoint()).y() + pos.post_btn.height(),
+                    "font", QFontInfo(pos.font()).family(), QFontInfo(pos.font()).pixelSize(),
+                    "direction", pos.layoutDirection(), flush=True)
+              for index, card in enumerate(area.cards):
+                  print("CARD", index, "geometry", card.geometry(), "hint", card.sizeHint(),
+                        "min_hint", card.minimumSizeHint(), "min", card.minimumSize(), flush=True)
+                  children = [w for w in card.findChildren(QWidget) if w.isVisibleTo(card)]
+                  for w in sorted(children, key=lambda w: w.minimumSizeHint().width(), reverse=True)[:12]:
+                      print("WIDGET", index, type(w).__name__, w.objectName(),
+                            "geometry", w.geometry(), "min_hint", w.minimumSizeHint(),
+                            "min", w.minimumSize(), flush=True)
+              folder = Path("diagnostic-ui")
+              folder.mkdir(exist_ok=True)
+              win.grab().save(str(folder / (label + ".png")))
+
+          def capture_window(self):
+              win, pos = original_window(self)
+              self._diag_window = (win, pos)
+              return win, pos
+
+          def capture_assert(self, first, second, msg=None):
+              if msg == "approval needs scrolling at 1366x768":
+                  from PySide6.QtTest import QTest
+                  print("ORIGINAL_ASSERTION", first, second, flush=True)
+                  snapshot(self, "at-assertion")
+                  QTest.qWait(150)
+                  self.app.processEvents()
+                  snapshot(self, "after-150ms")
+                  QTest.qWait(350)
+                  self.app.processEvents()
+                  snapshot(self, "after-500ms")
+              return original_assert(self, first, second, msg)
+
+          PosCompactTest.window_on_pos = capture_window
+          PosCompactTest.assertLessEqual = capture_assert
+          if "--full" in sys.argv:
+              suite = unittest.defaultTestLoader.discover("tests", top_level_dir=".")
+          else:
+              suite = unittest.defaultTestLoader.loadTestsFromName(
+                  "tests.test_ui_pos_compact.PosCompactTest."
+                  "test_approve_button_is_normal_size_and_visible_at_1366_without_scrolling")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.stdout.flush()
+          sys.stderr.flush()
+          os._exit(0 if result.wasSuccessful() else 1)
+          PY
+          python "$RUNNER_TEMP/pos3_diag.py"
+          # If the isolated test passes, reproduce the original full-suite context.
+          python "$RUNNER_TEMP/pos3_diag.py" --full
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pos3-windows-geometry
+          path: diagnostic-ui/
+          if-no-files-found: warn
