@@ -1,4 +1,6 @@
 """Egyptian tyre catalogue and non-binding category suggestions."""
+import re
+
 from morv.core.text import norm_ar
 
 CATEGORIES = (
@@ -33,7 +35,10 @@ SIZES = tuple(sorted(DEFAULT_CATEGORY))
 
 
 def size_search_key(value: str) -> str:
-    return norm_ar(value).replace(" ", "").replace("/", "").replace("×", "x")
+    key = norm_ar(value).replace("×", "x")
+    key = re.sub(r"^(\d{3})[ /]+(\d{2})[ /]+(\d{2}(?:\.5)?)$", r"\1/\2r\3", key)
+    key = re.sub(r"^(\d{1,2})\.(\d{2})(?=[r-]|$)", r"\1\2", key)
+    return key.replace(" ", "").replace("/", "")
 
 
 def suggested_category(size: str, counts: dict[str, int]) -> str:
