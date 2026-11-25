@@ -300,10 +300,13 @@ def get(con, item_id: int) -> Item:
                 bool(r["active"]), attrs)
 
 
-def by_barcode(con, code: str) -> Item | None:
+def by_barcode(con, code: str, *, unique: bool = False) -> Item | None:
     c = scanner_fix(validate.to_latin((code or "").strip()))
-    r = con.execute("SELECT id FROM items WHERE active=1 AND (barcode=? OR code=? COLLATE NOCASE)", (c, c)).fetchone()
-    return get(con, r[0]) if r else None
+    rows = con.execute(
+        "SELECT id FROM items WHERE active=1 AND (barcode=? OR code=? COLLATE NOCASE)",
+        (c, c),
+    ).fetchmany(2 if unique else 1)
+    return get(con, rows[0][0]) if len(rows) == 1 else None
 
 
 def next_seq(con, kind: str) -> int:
