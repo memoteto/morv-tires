@@ -323,7 +323,6 @@ class PosPage(QWidget):
         t.addWidget(self.total_label)
         for label in (lbl, self.total_label):
             label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-            label.installEventFilter(self)
         body.addWidget(total)
         self._payment_section(body)
         return box
@@ -402,7 +401,7 @@ class PosPage(QWidget):
         self.split = QFrame()
         sp = QGridLayout(self.split)
         sp.setContentsMargins(0, 0, 0, 0)
-        self.pay1_amount = ltr_edit("فارغ = كامل الإجمالي")
+        self.pay1_amount = ltr_edit("فارغ = المتبقي")
         self.pay2_method = self._method_combo(first_blank=True)
         self.pay2_amount = ltr_edit("فارغ = المتبقي")
         self.pay1_amount.textChanged.connect(self._refresh_change)
@@ -532,6 +531,7 @@ class PosPage(QWidget):
         self.instalment_hint.setVisible(on_instalments)
         self.post_btn.setText("اعتماد البيع الآجل" if first == "credit" and second is None
                               else "اعتماد وتحصيل")
+        self._refresh_credit()
         self._refresh_change()
 
     # ---------- Customer and items ----------
@@ -598,7 +598,7 @@ class PosPage(QWidget):
         self.cust_kind.style().unpolish(self.cust_kind)
         self.cust_kind.style().polish(self.cust_kind)
         self._set_tier(level or "retail")
-        self._refresh_change()
+        self._refresh_credit()
 
     def _on_item_query(self, _text: str) -> None:
         self._item_timer.start(200)
@@ -631,10 +631,6 @@ class PosPage(QWidget):
             self._add_row(dlg.saved.id, dlg.saved.kind, dlg.saved.name)
 
     def eventFilter(self, obj, event) -> bool:
-        if (obj is getattr(self, "total_label", None) and event.type() == QEvent.Type.MouseButtonRelease
-                and event.button() == Qt.MouseButton.LeftButton):
-            self._fill_exact_cash()
-            return True
         # The popup is a non-activating tool window (see _ItemPopup) so typing
         # keeps working; close it shortly after the field loses focus so a
         # click on one of its buttons still registers first.
@@ -861,7 +857,8 @@ class PosPage(QWidget):
             return
         debt = customer_receipts.customer_balance(con, cid)
         deposit = max(0, customer_receipts.deposit_balance(con, cid))
-        available = max(0, customer.credit_limit + deposit - debt)
+        room = customer.credit_limit + deposit
+        available = max(0, room - debt) if room > 0 else 0
         self.credit_hint.setText(f"حد الائتمان: {ltr(fmt(customer.credit_limit))} · المديونية: {ltr(fmt(debt))}"
                                  f"\nالمتاح: {ltr(fmt(available))} ج.م")
 
@@ -870,6 +867,7 @@ class PosPage(QWidget):
             due = self._cash_due()
         except (MoneyError, sales_rules.SaleRuleError):
             due = 0
+        self.total_box.setEnabled(due > 0)
         self.total_box.setCursor(Qt.CursorShape.PointingHandCursor if due > 0 else Qt.CursorShape.ArrowCursor)
         self.total_box.setToolTip("اضغط لتعبئة النقد المطلوب" if due > 0 else "")
         amounts = []
@@ -888,7 +886,6 @@ class PosPage(QWidget):
             self.change_label.setText(ltr(fmt(max(received - due, 0))) if due > 0 else ltr(fmt(0)))
         except MoneyError:
             self.change_label.setText("—")
-        self._refresh_credit()
 
     def _fail(self, text: str) -> bool:
         self.notice.show_message(text)
