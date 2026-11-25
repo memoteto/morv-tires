@@ -192,7 +192,8 @@ class PosPaymentSafetyTest(_Fixture, unittest.TestCase):
     def click_total(self, p):
         from PySide6.QtCore import Qt
         from PySide6.QtTest import QTest
-        QTest.mouseClick(p.total_label, Qt.MouseButton.LeftButton)
+        QTest.mouseClick(p.total_label.parentWidget(), Qt.MouseButton.LeftButton,
+                         pos=p.total_label.geometry().center())
 
     def test_click_total_fills_exact_cash_without_extra_chip(self):
         p = self.page()
@@ -224,3 +225,43 @@ class PosPaymentSafetyTest(_Fixture, unittest.TestCase):
         self.method(p.pay2_method, "cash")
         self.click_total(p)
         self.assertEqual(p.pay1_received.text(), "60.00")
+
+    def test_split_without_second_method_cannot_post(self):
+        p = self.page()
+        p.split_btn.setChecked(True)
+        p.pay1_received.setText("100.00")
+        before = self.state()
+        p.post()
+        self.assertIsNone(p.posted)
+        self.assertEqual(self.state(), before)
+
+    def test_second_card_reference_is_saved_without_cash_received(self):
+        p = self.page()
+        p.split_btn.setChecked(True)
+        p.pay1_amount.setText("40.00")
+        self.method(p.pay2_method, "card")
+        p.pay2_ref.setText("TEST-SECOND")
+        p.pay1_received.setText("40.00")
+        p.post()
+        self.assertEqual(self.payment_rows(p), [("card", 6000, None), ("cash", 4000, 4000)])
+        self.assertEqual(self.con.execute(
+            "SELECT reference FROM sale_payments WHERE method='card'").fetchone()[0], "TEST-SECOND")
+
+    def test_credit_summary_shows_limit_debt_and_available(self):
+        customer = self.customer("01000000025", 15000)
+        p = self.page(customer)
+        self.method(p.pay1_method, "credit")
+        self.assertTrue(p.credit_hint.isVisibleTo(p))
+        for value in ("150.00", "0.00"):
+            self.assertIn(value, p.credit_hint.text())
+        p.post()
+        self.assert_credit_balance(customer, 10000, 0)
+        self.assertFalse(p.credit_hint.isVisibleTo(p))
+        self.assertEqual(p.pay1_method.currentData(), "cash")
+        for index in range(p.customer.count()):
+            if p.customer.itemData(index)[0] == customer:
+                p.customer.setCurrentIndex(index)
+                break
+        self.method(p.pay1_method, "credit")
+        for value in ("150.00", "100.00", "50.00"):
+            self.assertIn(value, p.credit_hint.text())
