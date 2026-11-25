@@ -28,6 +28,7 @@ class AdaptiveCards(QScrollArea):
         self.column_weights = column_weights
         self.fill_height = fill_height
         self.columns = 0
+        self._reflowing = False
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -51,12 +52,28 @@ class AdaptiveCards(QScrollArea):
         self._reflow()
 
     def eventFilter(self, watched, event):
-        if event.type() in (QEvent.Type.Resize, QEvent.Type.LayoutRequest,
-                            QEvent.Type.FontChange, QEvent.Type.StyleChange):
+        kind = event.type()
+        if kind in (QEvent.Type.Resize, QEvent.Type.LayoutRequest, QEvent.Type.Show,
+                    QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            # A deferred pass catches secondary changes caused by scrollbars and style updates.
             self._timer.start(0)
+            if self.isVisible() and (
+                (watched is self.viewport() and kind in (QEvent.Type.Resize, QEvent.Type.Show))
+                or (watched is self.content and kind == QEvent.Type.LayoutRequest)
+            ):
+                self._reflow()
         return super().eventFilter(watched, event)
 
     def _reflow(self):
+        if self._reflowing:
+            return
+        self._reflowing = True
+        try:
+            self._apply_columns()
+        finally:
+            self._reflowing = False
+
+    def _apply_columns(self):
         gap = self.grid.horizontalSpacing()
         minimum = max((max(self.minimum_width, c.minimumWidth(), c.minimumSizeHint().width())
                        for c in self.cards), default=self.minimum_width)
@@ -83,6 +100,7 @@ class AdaptiveCards(QScrollArea):
             self.grid.addWidget(card, index // columns, index % columns)
         self.columns = columns
         self.grid.invalidate()
+        self.grid.activate()
 
 
 class AdaptiveSplit(QWidget):
