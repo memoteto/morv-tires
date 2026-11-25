@@ -1,6 +1,6 @@
 """Settings hub and the existing settings pages."""
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
                                QPushButton, QSizePolicy, QSpinBox, QStackedWidget, QTableView,
@@ -9,17 +9,28 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 from morv.core import security
 from morv.core.text import ltr
 from morv.infra import backup, settings, users, vault
-from morv.ui import tokens
+from morv.ui import theme, tokens
 from morv.ui.adaptive_layout import AdaptiveCards, AdaptiveFields, AdaptiveTableColumns, PageFrame
+from morv.ui.listpage import TupleModel
 from morv.ui.modal import Modal
 from morv.ui.models import AuditModel, BackupsModel
 from morv.ui.shop_settings import PrintingTab, ShopTab
 from morv.ui.widgets import (Notice, PasswordEdit, action_row, ask, card, danger_button, field, form, info, ltr_edit, muted,
-                             primary_button, section_card, icon_button)
+                             primary_button, section_card, icon_button, kbd)
 
-SHORTCUTS = [("F2", "التركيز على مربع البحث في شاشات القوائم"), ("Ctrl+N", "إضافة جديد في شاشة القوائم المفتوحة"),
-             ("Ctrl+B", "طي الشريط الجانبي أو فتحه"), ("Ctrl+D", "التبديل بين الوضع الفاتح والداكن"),
-             ("Ctrl+L", "تسجيل الخروج"), ("Ctrl+Q", "إغلاق البرنامج")]
+SHORTCUTS = [
+    ("F2", "البحث في القوائم أو البحث عن صنف في نقطة البيع"),
+    ("Ctrl+N", "إضافة جديد في القوائم عند توفر الصلاحية"),
+    ("Esc", "إغلاق النافذة أو إخفاء ملخص القائمة"),
+    ("Ctrl+S", "تنفيذ الإجراء الرئيسي في النوافذ التي تدعمه"),
+    ("F4", "اختيار العميل في نقطة البيع"),
+    ("F8", "التركيز على طريقة الدفع في نقطة البيع"),
+    ("F9", "اعتماد فاتورة البيع في نقطة البيع"),
+    ("Ctrl+B", "طي الشريط الجانبي أو فتحه"),
+    ("Ctrl+D", "التبديل بين الوضع الفاتح والداكن"),
+    ("Ctrl+L", "تسجيل الخروج"),
+    ("Ctrl+Q", "إغلاق البرنامج"),
+]
 
 
 def _table(model) -> QTableView:
@@ -164,36 +175,83 @@ class AppearanceTab(QWidget):
         super().__init__()
         self.session = session
         lay = QVBoxLayout(self)
-        box, inner = card("الخط")
-        inner.addWidget(muted("الخطان IBM Plex Sans Arabic وCairo مضمّنان مع البرنامج ولا يعتمدان على Windows."))
-        f = form()
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(tokens.LAYOUT["pane_gap"])
+        self.options = QWidget()
+        options = QVBoxLayout(self.options)
+        options.setContentsMargins(0, 0, 0, 0)
+        options.setSpacing(tokens.LAYOUT["pane_gap"])
+        box, inner = card("إعدادات الخط", compact=True)
         self.family = QComboBox()
-        from morv.ui import theme
-        for name in theme.available_fonts():
-            self.family.addItem(name)
+        self.family.addItems(theme.available_fonts())
         self.family.setCurrentText(settings.get(session.con, "ui.font_family", theme.DEFAULT_FONT))
         self.size = QComboBox()
-        for s in theme.FONT_SIZES:
-            self.size.addItem(ltr(str(s)), s)
-        self.size.setCurrentIndex(list(theme.FONT_SIZES).index(
-            int(settings.get(session.con, "ui.font_size", str(theme.DEFAULT_SIZE)))))
-        f.addRow("الخط", self.family)
-        f.addRow("حجم الخط", self.size)
-        inner.addLayout(f)
-        self.sample = QLabel("نموذج: إطار ميشلان Primacy 4 مقاس " + ltr("205/55R16") + " بسعر " + ltr("6,450.00"))
+        for size in theme.FONT_SIZES:
+            self.size.addItem(ltr(str(size)), size)
+        saved_size = int(settings.get(session.con, "ui.font_size", str(theme.DEFAULT_SIZE)))
+        self.size.setCurrentIndex(list(theme.FONT_SIZES).index(saved_size))
+        inner.addWidget(field("نوع الخط", self.family))
+        inner.addWidget(field("حجم الخط", self.size))
+        self.apply_btn = primary_button("تطبيق", "font")
+        self.apply_btn.clicked.connect(self.apply)
+        inner.addLayout(action_row(self.apply_btn))
+        options.addWidget(box)
+        appearance, body = card("المظهر", compact=True)
+        body.addWidget(muted("الوضع الفاتح والداكن من زر الشمس أو القمر في الشريط العلوي."))
+        body.addWidget(kbd("Ctrl+D"), 0, Qt.AlignmentFlag.AlignLeading)
+        options.addWidget(appearance)
+        options.addStretch(1)
+
+        self.preview, body = card("المعاينة المباشرة", compact=True)
+        body.addWidget(muted("نموذج تجريبي فقط — لا تُحفظ بيانات منه."))
+        self.sample = QLabel("إطار ميشلان Primacy 4 مقاس " + ltr("205/55R16") + " بسعر " + ltr("6,450.00"))
         self.sample.setWordWrap(True)
-        inner.addWidget(self.sample)
-        apply_btn = primary_button("تطبيق", "font")
-        apply_btn.clicked.connect(self.apply)
-        inner.addWidget(apply_btn, 0, Qt.AlignmentFlag.AlignLeading)
-        lay.addWidget(box)
-        lay.addWidget(muted("الوضع الفاتح/الداكن من زر الشمس/القمر في الشريط العلوي (Ctrl+D)."))
-        lay.addStretch(1)
+        body.addWidget(self.sample)
+        body.addWidget(QLabel("اسم العميل"))
+        self.sample_input = QLineEdit("عميل تجريبي")
+        self.sample_input.setReadOnly(True)
+        body.addWidget(self.sample_input)
+        self.sample_model = TupleModel([("الصنف", lambda row: row[0]), ("السعر", lambda row: ltr(row[1]))])
+        self.sample_model.reset_rows([("إطار سيارة", "6,450.00"), ("بطارية", "3,200.00")])
+        self.sample_table = _table(self.sample_model)
+        self.sample_columns = AdaptiveTableColumns(self.sample_table, {0: 3, 1: 2}, {})
+        self.sample_table.setFixedHeight(4 * tokens.LAYOUT["summary_table_row_height"])
+        body.addWidget(self.sample_table)
+        body.addLayout(action_row(primary_button("حفظ", "save"), QPushButton("إلغاء")))
+        self.preview.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        for widget in self.preview.findChildren(QWidget):
+            widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        # RTL puts settings on the physical right, with settings first when stacked.
+        self.panes = AdaptiveCards([self.options, self.preview], minimum_width=tokens.LAYOUT["settings_card_min"],
+                                   column_weights=(2, 3))
+        lay.addWidget(self.panes, 1)
+        self.preview_timer = QTimer(self)
+        self.preview_timer.setSingleShot(True)
+        self.preview_timer.timeout.connect(self.update_preview)
+        self.family.currentIndexChanged.connect(self.update_preview)
+        self.size.currentIndexChanged.connect(self.update_preview)
+        self.update_preview()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if hasattr(self, "preview_timer") and event.type() in (
+                QEvent.Type.StyleChange, QEvent.Type.ApplicationFontChange):
+            # Reapply the draft after the global stylesheet has finished repolishing widgets.
+            self.preview_timer.start(0)
+
+    def update_preview(self) -> None:
+        font = theme.pick_font(self.size.currentData(), self.family.currentText())
+        self.preview.setFont(font)
+        for widget in self.preview.findChildren(QWidget):
+            widget.setFont(font)
+        self.sample_columns.schedule()
 
     def apply(self) -> None:
         win = self.window()
         if hasattr(win, "set_font"):
             win.set_font(self.family.currentText(), self.size.currentData())
+            self.update_preview()
 
 
 class UsersTab(QWidget):
@@ -470,19 +528,33 @@ class ShortcutsTab(QWidget):
     def __init__(self):
         super().__init__()
         lay = QVBoxLayout(self)
-        box, inner = card("اختصارات لوحة المفاتيح")
-        for key, desc in SHORTCUTS:
-            row = QHBoxLayout()
-            k = QLabel(ltr(key))
-            k.setObjectName("pillOk")
-            k.setFixedWidth(90)
-            k.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            row.addWidget(k)
-            row.addWidget(QLabel(desc), 1)
-            inner.addLayout(row)
-        inner.addWidget(muted("اختصارات البيع والفواتير تُضاف مع شاشاتها في مراحلها."))
-        lay.addWidget(box)
-        lay.addStretch(1)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(tokens.LAYOUT["pane_gap"])
+        cards = []
+        self.keys = {}
+        descriptions = dict(SHORTCUTS)
+        for title, keys in (("القوائم والنوافذ", ("F2", "Ctrl+N", "Esc", "Ctrl+S")),
+                            ("نقطة البيع", ("F4", "F8", "F9")),
+                            ("إدارة البرنامج", ("Ctrl+B", "Ctrl+D", "Ctrl+L", "Ctrl+Q"))):
+            box, inner = card(title, compact=True)
+            for key in keys:
+                row = QWidget()
+                row.setMinimumHeight(tokens.LAYOUT["settings_link_min"])
+                line = QHBoxLayout(row)
+                line.setContentsMargins(0, 0, 0, 0)
+                key_label = kbd(key)
+                key_label.setFixedWidth(90)
+                key_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.keys[key] = key_label
+                desc = QLabel(descriptions[key])
+                desc.setWordWrap(True)
+                line.addWidget(key_label)
+                line.addWidget(desc, 1)
+                inner.addWidget(row)
+            cards.append(box)
+        self.cards = AdaptiveCards(cards, minimum_width=tokens.LAYOUT["settings_card_min"], max_columns=3)
+        lay.addWidget(self.cards, 1)
+        lay.addWidget(muted("تعمل الاختصارات بحسب الشاشة المفتوحة والصلاحيات والوظائف المتاحة."))
 
 
 class BackupTab(QWidget):
