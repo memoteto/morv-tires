@@ -163,6 +163,62 @@ class InventoryPageTest(_Base):
         dlg3.save()
         self.assertEqual(dlg3.saved.code, "SV-001")
 
+    def test_tyre_search_and_category_override(self):
+        from morv.core import tire_catalog
+        from morv.infra import items
+        from morv.ui.inventory_page import ItemDialog
+        dlg = self.destroy_on_cleanup(ItemDialog(self.session, None))
+        size, category = dlg.widgets["size"], dlg.widgets["cat"]
+        completer = size.completer()
+
+        def matches(completion, prefix):
+            completion.setCompletionPrefix(prefix)
+            model = completion.completionModel()
+            return {model.index(i, 0).data() for i in range(model.rowCount())}
+
+        self.assertEqual(matches(completer, "٢"), {s for s in tire_catalog.SIZES if "2" in s})
+        self.assertIn("205/55R16", matches(completer, "205 55 16"))
+        self.assertIn("7.50R16", matches(completer, "750"))
+        self.assertEqual(matches(category.completer(), "نقل"), {"ربع نقل", "نصف نقل", "نقل متوسط"})
+        self.assertEqual(matches(category.completer(), "اتوبيس"), {"أتوبيس"})
+        self.assertTrue(all(category.findText(c) == -1 for c in tire_catalog.LEGACY_CATEGORIES))
+        size.setText("205/55R16")
+        size.textEdited.emit(size.text())
+        self.assertEqual(category.currentText(), "ملاكي")
+        size.setText("7.50R16")
+        size.completer().activated[str].emit(size.text())
+        self.assertEqual(category.currentText(), "جامبو")
+        category.setCurrentText("نصف نقل")
+        category.activated.emit(category.findText("نصف نقل"))
+        size.setText("195/80R16")
+        size.textEdited.emit(size.text())
+        self.assertEqual(category.currentText(), "نصف نقل")
+        dlg.widgets["brand"].setText("Test")
+        dlg.widgets["li"].setText("91")
+        dlg.widgets["si"].setCurrentText("V")
+        dlg.widgets["cons"].setCurrentText("Radial")
+        dlg.widgets["price_retail"].setText("100")
+        dlg.save()
+        self.assertEqual(dlg.saved.attrs["cat"], "نصف نقل")
+        next_dlg = self.destroy_on_cleanup(ItemDialog(self.session, None))
+        next_size = next_dlg.widgets["size"]
+        self.assertIn("195/80R16", matches(next_size.completer(), "195/80"))
+        next_size.setText("195/80R16")
+        next_size.textEdited.emit(next_size.text())
+        self.assertEqual(next_dlg.widgets["cat"].currentText(), "نصف نقل")
+        next_size.setText("199/80R16")
+        next_size.textEdited.emit(next_size.text())
+        self.assertEqual(next_dlg.widgets["cat"].currentText(), "")
+        self.con.execute("UPDATE item_attrs SET value='نقل خفيف' WHERE item_id=? AND field_key='cat'",
+                         (dlg.saved.id,))
+        old = self.destroy_on_cleanup(ItemDialog(self.session, items.get(self.con, dlg.saved.id)))
+        self.assertEqual(old.widgets["cat"].currentText(), "نقل خفيف")
+        old.widgets["size"].setText("205/55R16")
+        old.widgets["size"].textEdited.emit("205/55R16")
+        self.assertEqual(old.widgets["cat"].currentText(), "نقل خفيف")
+        old.save()
+        self.assertEqual(old.saved.attrs["cat"], "نقل خفيف")
+
     def test_scan_enter_opens_preview(self):
         from morv.infra import items
         from morv.infra.items import Item
