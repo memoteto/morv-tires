@@ -76,7 +76,6 @@ class SettingsPage(PageFrame):
         self.destinations = {}
         self.links = {}
         self._routes = {}
-        self._views = {}
         self.current_key = None
         self.stack = QStackedWidget()
         self.stack.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
@@ -94,7 +93,6 @@ class SettingsPage(PageFrame):
                 widget = self._build(key)
                 self.destinations[key] = widget
                 self._routes[key] = (label, permission)
-                self._views[key] = widget
                 self.stack.addWidget(widget)
                 button = icon_button(label, icon)
                 button.setMinimumHeight(tokens.LAYOUT["settings_link_min"])
@@ -155,7 +153,7 @@ class SettingsPage(PageFrame):
             return False
         self.current_key = key
         self.set_header(title, "", back=True)
-        self.stack.setCurrentWidget(self._views[key])
+        self.stack.setCurrentWidget(self.destinations[key])
         return True
 
     def show_hub(self):
