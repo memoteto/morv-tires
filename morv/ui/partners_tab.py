@@ -105,7 +105,8 @@ class PartnersTab(QWidget):
         self.detail_scroll.setVisible(self.share_row is not None)
         if self.share_row is None:
             detail_layout.addStretch(1)
-        self.split = AdaptiveSplit(table_panel, detail, detail_max=LAYOUT["settings_partner_preview_max"])
+        self.split = AdaptiveSplit(table_panel, detail, detail_max=LAYOUT["settings_partner_preview_max"],
+                                   detail_first=True)
         lay.addWidget(self.split, 1)
         self.split.mode_changed.connect(self._sync_mode)
         self.details_btn.clicked.connect(self.split.show_detail)

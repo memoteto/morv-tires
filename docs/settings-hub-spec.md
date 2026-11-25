@@ -55,7 +55,7 @@
 قائمة يمين 320×508، بيانات يسار 742×142 وصلاحيات 742×354، عنصر مستخدم ≥44، إجراءات ثابتة. مجموعات الصلاحيات عمودان ثم واحد، تفاصيل كاملة عند ضيق العرض. اسم ودور وحالة واسم دخول (قراءة فقط حيث لا يوجد تعديل)، مدير/كاشير فقط، جميع 25 صلاحية من security.PERMISSIONS دون نسخ قائمة مستقلة، حد الخصم 0–100، إضافة مستخدم (اسم/دخول/كلمة مؤقتة/دور، Modal 460)، إعادة تعيين كلمة مرور (420)، إيقاف/تفعيل. حفظ فوري للدور والصلاحيات؛ لا تحديد الكل أو حفظ جماعي. حماية آخر مدير والحساب الحالي وصلاحيات المدير، تغيير كلمة المرور المؤقتة أول دخول. يُحذف النص «كل عملية حساسة تُسجَّل باسم المستخدم ووقتها في سجل العمليات.» من الواجهة فقط مع استمرار التدقيق. عنوان القسم «الصلاحيات» دون العبارة «المدير يملكها كلها دائمًا»؛ تبقى جميع صلاحيات المدير فعالة ومحمية من التعديل، مع عرض واضح غير قابل للتحرير. يظهر حد خصم المدير «غير محدود» بدلاً من صفر.
 
 ### D05 — الشركاء (treasury.manage)
-جدول يمين 682×568، ملخص يسار 380: تفاصيل 230، حصص 158، احتياطي 156. اسم ورقم حساب ورصيد وحالة، إضافة (Modal 420)، إيقاف/تفعيل؛ زر الحالة في الملخص إلزامي ولو غاب من الرسم السابق. حصص الأرباح والاحتياطي فقط مع profit.manage. ShareSetDialog عرض 520: مجموع 100% لجميع النشطين، تاريخ السريان ومرجع الاعتماد؛ لا تعديل منفرد ولا افتراض نسبة ملكية. حقل الاحتياطي ≤120 وحفظ مستقل. عرض ملخص مستقل عند الضيق.
+جدول يسار 682×568، ملخص يمين 380: تفاصيل 230، حصص 158، احتياطي 156. اسم ورقم حساب ورصيد وحالة، إضافة (Modal 420)، إيقاف/تفعيل؛ زر الحالة في الملخص إلزامي ولو غاب من الرسم السابق. حصص الأرباح والاحتياطي فقط مع profit.manage. ShareSetDialog عرض 520: مجموع 100% لجميع النشطين، تاريخ السريان ومرجع الاعتماد؛ لا تعديل منفرد ولا افتراض نسبة ملكية. حقل الاحتياطي ≤120 وحفظ مستقل. عرض ملخص مستقل عند الضيق.
 
 ### D06 — الأرصدة الافتتاحية (opening.post)
 حالة 1074×128 (مستند ساري ورقمه وتاريخه وعدد السطور)، بطاقتان 531×222: إدخال يمين وعكس يسار، شرح توازن 84. تتكدس عند الضيق. Modal إدخال 700 وعكس 520 الحاليان. أنواع نقدية/بنك/أصل/التزام، عميل، مورد، رأس مال/جاري شريك، أرباح مرحلة، مخزون؛ الحساب/الطرف، مبلغ، كمية وتكلفة وDOT، تاريخ بدء التشغيل وملاحظة. إضافة/حذف آخر سطر، معاينة ثم اعتماد بعد التوازن، عكس بسبب إلزامي حسب القواعد الحالية. لا تغيير request_key أو الترحيل.
@@ -366,6 +366,9 @@ PR #146 مسودة، CI 45394449322 للرأس 6d6f16a41eedb6a814a69634151855441
 ### S5 — correct invalid regression fixture (2026-11-24)
 - Owner local run on `258e260`: 58 tests, 57 passed, one error in the new test because ledger.valid_date rejects future share effective dates. Confirmed from source; this is a fixture error, not a change request to accounting.
 - Test now approves yesterday's 50/50 shares, checks the displayed value, approves today's 60/40 shares, explicitly asserts rejection of tomorrow's shares, then retains both current-share and fixed-action assertions. Only test and this log changed. Re-run pending; no product or accounting change.
+
+### S5 — owner-requested pane swap (2026-11-25)
+- Main `ae4d60b`: partner table moves to physical left, complete detail pane to physical right. Preserve existing width weights and detail cap, selection, compact navigation and profit permissions. Shared split gains opt-in pane ordering; other callers retain their original default. Added RTL geometry and compact navigation regression test. CI and actual-screen review pending.
 
 ### S6 — baseline and approved implementation (2026-11-24)
 - Main `1f9989b`: owner's report 21/21 existing tests, 96 geometry cases, no measured horizontal overflow or bad buttons. All 12 cash-dialog cases showed irrelevant stock fields. Dialogs measured on a single offscreen screen, only empty main-page state; populated and actual-screen verification still required.
