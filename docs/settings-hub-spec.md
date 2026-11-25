@@ -389,3 +389,18 @@ PR #146 مسودة، CI 45394449322 للرأس 6d6f16a41eedb6a814a69634151855441
 ### S8 — approved audit log presentation (2026-11-24)
 - Main `1a9e230`: S7 merged after all six CI jobs passed; owner approved full-width page, modal screenshots not reviewed. S8 inspection confirms AuditModel reads newest 200, loads older via strict ID cursor, existing partial action translation and ResizeToContents table. Owner approved display-only refinement.
 - S8: central compact card, measured weighted columns, wrapped details and original-value tooltips, fixed refresh/load actions with count and end-of-list feedback; expanded exact action translations from inspected call sites with unknown-code fallback. No changes to audit writes, queries, permissions, schema or other screens. Tests cover 425 synthetic events, refresh, raw equality, long rows and fixed buttons. New tests and visual review pending.
+
+### S9 — approved appearance and shortcuts (2026-11-25)
+- Main `ae4d60b`; owner corrected physical placement: settings on screen left, preview on screen right, settings above preview when stacked. Existing font persistence and shortcut bindings inspected; this supersedes D09 horizontal placement only.
+- Implemented shared adaptive cards with opt-in stack order, central fields and theme font picker for inert sample controls, existing set_font apply, three shortcut cards retaining the six documented keys. Tests cover physical RTL geometry, reflow, unsaved preview, apply and theme switch. No changes to font persistence, actual shortcuts, accounting or data schema. CI and actual-screen verification pending; no merge.
+
+### S9 — preview font regression (2026-11-25)
+- Owner Linux test run on `c00c31f`: 4/5 passed; test_apply_and_theme_keep_preview failed (sample 16px instead of pending 18px after theme toggle). Source confirms MainWindow reapplies application font and QSS from saved settings, but AppearanceTab previously refreshed the local preview only on combo changes and apply.
+- Narrow fix: queue preview refresh on style/application font changes after global repolish using a widget-owned single-shot timer. Existing persistence and theme application untouched. Retain original failing assertion and extend it to pending family, both theme transitions, sample controls and unchanged stored preferences. New run and visual review pending.
+
+### S9 — final placement refinement (2026-11-25)
+- Owner Linux run on `084238a`: all five targeted tests passed, including theme switching with a draft font. Owner requests swapping both panels and removing the bundled-font explanatory sentence.
+- Settings now physically right, preview physically left, with the original 2:3 width ratio and settings first when stacked. Removed only the specified sentence; geometry and text-removal assertions updated, other tests unchanged. New verification pending; no merge.
+
+### S9 — shortcut guide completion (2026-11-25)
+- Owner requests missing shortcuts in the guide. Inspected UI bindings across the UI package: shell, ListPage, Modal and POS register the custom shortcuts. Add F4/F8/F9 (POS), Esc (modal reject/list preview) and Ctrl+S (modal primary action); F2 includes POS item search. Three adaptive cards retained with context-specific descriptions and existing six keys. Explicit expected 11-key assertion added; actual key bindings and permissions unchanged. Verification pending.

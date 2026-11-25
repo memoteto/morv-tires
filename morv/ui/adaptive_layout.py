@@ -19,13 +19,15 @@ def scroll_content(content: QWidget) -> QScrollArea:
 
 
 class AdaptiveCards(QScrollArea):
-    def __init__(self, cards, *, minimum_width, max_columns=2, column_weights=None, fill_height=False):
+    def __init__(self, cards, *, minimum_width, max_columns=2, column_weights=None, fill_height=False,
+                 stack_order=None):
         super().__init__()
         self.cards = tuple(cards)
         self.minimum_width = minimum_width
         self.max_columns = max_columns
         self.column_weights = column_weights
         self.fill_height = fill_height
+        self.stack_order = stack_order
         self.columns = 0
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
@@ -77,7 +79,10 @@ class AdaptiveCards(QScrollArea):
         if self.fill_height:
             for row in range(len(self.cards)):
                 self.grid.setRowStretch(row, int(row == (len(self.cards) - 1) // columns))
-        for index, card in enumerate(self.cards):
+        ordered = self.cards
+        if columns == 1 and self.stack_order is not None:
+            ordered = tuple(self.cards[i] for i in self.stack_order)
+        for index, card in enumerate(ordered):
             self.grid.addWidget(card, index // columns, index % columns)
         self.columns = columns
         self.grid.invalidate()
