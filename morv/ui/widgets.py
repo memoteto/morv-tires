@@ -1,7 +1,7 @@
 """Small shared UI pieces, so screens stay consistent."""
 from PySide6.QtCore import QDate, QEvent, QLocale, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPalette, QTextCharFormat
-from PySide6.QtWidgets import (QCalendarWidget, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtGui import QColor, QIcon, QPalette, QStandardItem, QStandardItemModel, QTextCharFormat
+from PySide6.QtWidgets import (QCalendarWidget, QCompleter, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QMenu, QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
 from morv.core.text import ltr
@@ -182,6 +182,47 @@ def ltr_edit(placeholder: str = "") -> QLineEdit:
     # The value is Latin so the field alone runs LTR: field content, not layout
     e.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignAbsolute)
     return e
+
+
+class _ContainsCompleter(QCompleter):
+    def __init__(self, values, normalize, parent):
+        model = QStandardItemModel(parent)
+        for value in values:
+            item = QStandardItem(value)
+            item.setData(normalize(value), Qt.ItemDataRole.UserRole)
+            model.appendRow(item)
+        super().__init__(model, parent)
+        self._normalize = normalize
+        self.setCompletionRole(Qt.ItemDataRole.UserRole)
+        self.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.setMaxVisibleItems(10)
+
+    def splitPath(self, path):
+        return [self._normalize(path)]
+
+    def pathFromIndex(self, index):
+        return index.data(Qt.ItemDataRole.DisplayRole) or ""
+
+
+def search_completer(parent, values, normalize):
+    return _ContainsCompleter(values, normalize, parent)
+
+
+def searchable_edit(values, normalize, placeholder="") -> QLineEdit:
+    edit = ltr_edit(placeholder)
+    completer = search_completer(edit, values, normalize)
+    edit.setCompleter(completer)
+    action = edit.addAction(icons.icon("search", ICON_MUTED, 18), QLineEdit.ActionPosition.TrailingPosition)
+
+    def show_all():
+        edit.setFocus()
+        completer.setCompletionPrefix("")
+        completer.complete()
+
+    action.triggered.connect(show_all)
+    return edit
 
 
 def arabic_latin_locale() -> QLocale:
