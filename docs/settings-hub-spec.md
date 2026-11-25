@@ -394,3 +394,7 @@ PR #146 مسودة، CI 45394449322 للرأس 6d6f16a41eedb6a814a69634151855441
 ### S9 — preview font regression (2026-11-25)
 - Owner Linux test run on `c00c31f`: 4/5 passed; test_apply_and_theme_keep_preview failed (sample 16px instead of pending 18px after theme toggle). Source confirms MainWindow reapplies application font and QSS from saved settings, but AppearanceTab previously refreshed the local preview only on combo changes and apply.
 - Narrow fix: queue preview refresh on style/application font changes after global repolish using a widget-owned single-shot timer. Existing persistence and theme application untouched. Retain original failing assertion and extend it to pending family, both theme transitions, sample controls and unchanged stored preferences. New run and visual review pending.
+
+### S9 — final placement refinement (2026-11-25)
+- Owner Linux run on `084238a`: all five targeted tests passed, including theme switching with a draft font. Owner requests swapping both panels and removing the bundled-font explanatory sentence.
+- Settings now physically right, preview physically left, with the original 2:3 width ratio and settings first when stacked. Removed only the specified sentence; geometry and text-removal assertions updated, other tests unchanged. New verification pending; no merge.

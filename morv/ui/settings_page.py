@@ -182,7 +182,6 @@ class AppearanceTab(QWidget):
         self.size.setCurrentIndex(list(theme.FONT_SIZES).index(saved_size))
         inner.addWidget(field("نوع الخط", self.family))
         inner.addWidget(field("حجم الخط", self.size))
-        inner.addWidget(muted("الخطان IBM Plex Sans Arabic وCairo مضمّنان مع البرنامج."))
         self.apply_btn = primary_button("تطبيق", "font")
         self.apply_btn.clicked.connect(self.apply)
         inner.addLayout(action_row(self.apply_btn))
@@ -213,9 +212,9 @@ class AppearanceTab(QWidget):
         for widget in self.preview.findChildren(QWidget):
             widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        # In RTL the first grid cell is physically on the right; stack settings first at narrow widths.
-        self.panes = AdaptiveCards([self.preview, self.options], minimum_width=tokens.LAYOUT["settings_card_min"],
-                                   column_weights=(3, 2), stack_order=(1, 0))
+        # RTL puts settings on the physical right, with settings first when stacked.
+        self.panes = AdaptiveCards([self.options, self.preview], minimum_width=tokens.LAYOUT["settings_card_min"],
+                                   column_weights=(2, 3))
         lay.addWidget(self.panes, 1)
         self.preview_timer = QTimer(self)
         self.preview_timer.setSingleShot(True)

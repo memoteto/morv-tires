@@ -20,6 +20,7 @@ class AppearanceLayoutTest(unittest.TestCase):
 
     def test_preview_layout_and_unsaved_font(self):
         from PySide6.QtCore import QPoint
+        from PySide6.QtWidgets import QLabel
         from morv.infra import settings
         from morv.ui import theme
         from morv.ui.settings_page import AppearanceTab
@@ -29,6 +30,7 @@ class AppearanceLayoutTest(unittest.TestCase):
         tab = AppearanceTab(self.session)
         self.addCleanup(dispose, tab, self.app)
         tab.show()
+        self.assertFalse(any(label.text().startswith("الخطان") for label in tab.findChildren(QLabel)))
         for width, columns in ((1074, 2), (600, 1), (1628, 2)):
             tab.resize(width, 550)
             self.settle()
@@ -36,7 +38,7 @@ class AppearanceLayoutTest(unittest.TestCase):
             options = tab.options.mapTo(tab, QPoint())
             preview = tab.preview.mapTo(tab, QPoint())
             if columns == 2:
-                self.assertLess(options.x(), preview.x())
+                self.assertGreaterEqual(options.x(), preview.x() + tab.preview.width())
             else:
                 self.assertLess(options.y(), preview.y())
             self.assertEqual(tab.panes.horizontalScrollBar().maximum(), 0)
