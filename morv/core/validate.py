@@ -6,9 +6,12 @@ from morv.core.money import to_latin
 
 _MOBILE = re.compile(r"^01[0-9]{9}$")
 _NID = re.compile(r"^[23][0-9]{13}$")
-# Metric size like 205/55R16 or 205/55ZR16, and inch size like 7.50R16
-_SIZE_METRIC = re.compile(r"^(\d{3})/(\d{2})Z?R(\d{2}(?:\.5)?)$")
-_SIZE_INCH = re.compile(r"^(\d{1,2}\.\d{2})R(\d{2}(?:\.5)?)$")
+# Metric, commercial, inch and flotation markings; keep construction and suffixes distinct.
+_SIZE_METRIC = re.compile(r"^(\d{2,3})/(\d{2,3})(?:Z?R|B|-)(\d{2}(?:\.5)?)(?:C|LT)?$")
+_SIZE_COMMERCIAL = re.compile(r"^(\d{3})R(\d{2}(?:\.5)?)(?:C|LT)?$")
+_SIZE_INCH = re.compile(r"^(\d{1,2}(?:\.\d{2})?)[R-](\d{2}(?:\.5)?)(?:C|LT)?$")
+_SIZE_COMPACT = re.compile(r"^([5-9]\d{2}|1[0-9]\d{2})([R-]\d{2}(?:\.5)?(?:C|LT)?)$")
+_SIZE_FLOTATION = re.compile(r"^(\d{2})X(\d{1,2}\.\d{2})R(\d{2}(?:\.5)?)(?:LT)?$")
 
 # Egyptian governorates in the national id, digits 8 and 9
 _GOVERNORATES = {
@@ -57,13 +60,21 @@ def mask_national_id(nid: str) -> str:
 
 def tire_size(text: str) -> dict:
     s = to_latin(text or "").upper().replace(" ", "")
-    m = _SIZE_METRIC.match(s)
+    s = s.replace("×", "X")
+    compact = _SIZE_COMPACT.fullmatch(s)
+    if compact:
+        digits = compact.group(1)
+        s = digits[:-2] + "." + digits[-2:] + compact.group(2)
+    m = _SIZE_METRIC.fullmatch(s)
     if m:
         return {"size": s, "width": m.group(1), "aspect": m.group(2), "rim": m.group(3)}
-    m = _SIZE_INCH.match(s)
+    m = _SIZE_INCH.fullmatch(s) or _SIZE_COMMERCIAL.fullmatch(s)
     if m:
         return {"size": s, "width": m.group(1), "aspect": "", "rim": m.group(2)}
-    raise ValidationError("اكتب المقاس مثل 205/55R16 أو 7.50R16")
+    m = _SIZE_FLOTATION.fullmatch(s)
+    if m:
+        return {"size": s, "width": m.group(2), "aspect": "", "rim": m.group(3)}
+    raise ValidationError("اكتب المقاس مثل 205/55R16 أو 195R14C أو 7.50R16")
 
 
 def suggest_item_name(kind: str, brand: str, model: str, attrs: dict) -> str:
