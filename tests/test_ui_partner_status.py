@@ -5,6 +5,7 @@ from tests.test_ui_phase1 import _Base
 class PartnerStatusTest(_Base):
     def test_swapped_panes_keep_selection_and_compact_navigation(self):
         from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QLayout
         from morv.infra import treasury
         from morv.ui.partners_tab import PartnersTab
         from morv.ui.tokens import LAYOUT
@@ -27,9 +28,15 @@ class PartnerStatusTest(_Base):
         self.assertGreater(tab.split.primary.width(), tab.split.detail.width())
         self.assertEqual(tab.split.detail.maximumWidth(), LAYOUT["settings_partner_preview_max"])
         self.assertEqual(tab.name_label.text(), partner.name)
+        # A standalone top-level widget is clamped to its layout minimum by Qt.
+        # Simulate the constrained host width without changing production layout.
+        tab.layout().setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        tab.setMinimumWidth(0)
         tab.resize(700, 650)
         for _ in range(8):
             self.app.processEvents()
+        self.assertEqual(tab.width(), 700)
+        self.assertEqual(tab.split.width(), 700)
         self.assertTrue(tab.split.compact)
         tab.split.show_primary()
         self.assertTrue(tab.table.isVisible())
