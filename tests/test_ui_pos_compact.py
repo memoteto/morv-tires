@@ -19,6 +19,38 @@ class PosCompactTest(PosFixture):
         self.app.processEvents()
         return win, win.pages["pos"]
 
+    def test_total_box_fits_its_labels(self):
+        from PySide6.QtWidgets import QLabel
+        _win, pos = self.window_on_pos()
+        box = pos.total_box
+        self.app.processEvents()
+        self.assertGreaterEqual(
+            box.height(), box.layout().minimumSize().height(),
+            "TOTAL_CONTENT_CLIPPED")
+        for label in box.findChildren(QLabel):
+            self.assertGreaterEqual(
+                label.height(), label.sizeHint().height(),
+                label.objectName())
+
+    def test_notes_only_draft_is_protected(self):
+        from unittest.mock import patch
+        p = self.page()
+        p.note.setText("ملاحظة تجريبية")
+        key = p._request_key
+
+        with patch("morv.ui.modal.ask", return_value=False) as confirm:
+            p.cancel_invoice()
+
+        self.assertEqual(p.note.text(), "ملاحظة تجريبية")
+        self.assertEqual(p._request_key, key)
+        confirm.assert_called_once()
+
+        with patch("morv.ui.modal.ask", return_value=True):
+            p.cancel_invoice()
+
+        self.assertEqual(p.note.text(), "")
+        self.assertNotEqual(p._request_key, key)
+
     def test_shortcuts_fire_while_focus_is_outside_the_page(self):
         from PySide6.QtCore import Qt
         from PySide6.QtGui import QShortcut

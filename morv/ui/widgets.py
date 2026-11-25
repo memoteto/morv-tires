@@ -32,6 +32,54 @@ ICON_MUTED = tokens.ICON_MUTED
 ICON_PRIMARY = tokens.ICON_PRIMARY
 
 
+class InvoiceTotal(QPushButton):
+    """Invoice total whose size follows its content rather than button text."""
+
+    def __init__(self, caption, on_click=None):
+        super().__init__()
+        self.setObjectName("totalBox")
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        label = QLabel(caption)
+        label.setObjectName("totalLabel")
+
+        self.value = QLabel()
+        self.value.setObjectName("totalValue")
+
+        layout.addWidget(label)
+        layout.addStretch(1)
+        layout.addWidget(self.value)
+
+        for child in (label, self.value):
+            child.setAttribute(
+                Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+        if on_click is None:
+            self.setEnabled(False)
+        else:
+            self.clicked.connect(on_click)
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        layout = self.layout()
+        return hint.expandedTo(layout.sizeHint()) if layout else hint
+
+    def minimumSizeHint(self):
+        hint = super().minimumSizeHint()
+        layout = self.layout()
+        return hint.expandedTo(layout.minimumSize()) if layout else hint
+
+    def event(self, event):
+        result = super().event(event)
+        if event.type() in (
+                QEvent.Type.LayoutRequest,
+                QEvent.Type.FontChange,
+                QEvent.Type.StyleChange):
+            self.updateGeometry()
+        return result
+
+
 def section_card(title: str, icon_name: str) -> tuple:
     """Card with an icon header row; returns (card, body layout, header layout) for invoice screens."""
     box = QFrame()
@@ -452,6 +500,20 @@ def action_row(*buttons: QPushButton) -> QHBoxLayout:
 def ask(parent, title: str, text: str, danger: bool = False) -> bool:
     from morv.ui.modal import ask as _ask
     return _ask(parent, title, text, danger)
+
+
+def confirm_discard_invoice(parent, *, dirty: bool, busy: bool) -> bool:
+    """Protect unposted invoice data using the shared confirmation dialog."""
+    if busy:
+        return False
+    if not dirty:
+        return True
+    return ask(
+        parent,
+        "إلغاء الفاتورة",
+        "توجد بيانات غير مرحلة. هل تريد إلغاء الفاتورة والتخلص من مدخلاتها؟",
+        danger=True,
+    )
 
 
 def info(parent, title: str, text: str, error: bool = False) -> None:

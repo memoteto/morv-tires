@@ -16,7 +16,7 @@ from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons, tokens
 from morv.ui.inventory_page import ItemDialog
 from morv.ui.purchases_page import _ItemPopup
-from morv.ui.widgets import (ask, chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
+from morv.ui.widgets import (InvoiceTotal, confirm_discard_invoice, chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
 
 ITEM_CHOICES = 50
 TIER_ATTR = {"retail": "price_retail", "wholesale": "price_wholesale", "super": "price_super"}
@@ -307,23 +307,11 @@ class PosPage(QWidget):
         for label, w in (("الإجمالي قبل الخصم", self.subtotal_label),
                           ("خصم على الفاتورة", self.invoice_disc)):
             body.addWidget(kv_row(label, w))
-        total = QPushButton()
-        self.total_box = total
-        total.setObjectName("totalBox")
-        total.setAccessibleName("تعبئة المبلغ النقدي المطلوب")
-        total.clicked.connect(self._fill_exact_cash)
-        t = QHBoxLayout(total)
-        t.setContentsMargins(16, 16, 16, 16)
-        lbl = QLabel("الإجمالي النهائي")
-        lbl.setObjectName("totalLabel")
-        self.total_label = QLabel()
-        self.total_label.setObjectName("totalValue")
-        t.addWidget(lbl)
-        t.addStretch(1)
-        t.addWidget(self.total_label)
-        for label in (lbl, self.total_label):
-            label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        body.addWidget(total)
+        self.total_box = InvoiceTotal(
+            "الإجمالي النهائي", self._fill_exact_cash)
+        self.total_box.setAccessibleName("تعبئة المبلغ النقدي المطلوب")
+        self.total_label = self.total_box.value
+        body.addWidget(self.total_box)
         self._payment_section(body)
         return box
 
@@ -980,14 +968,31 @@ class PosPage(QWidget):
         self.split_btn.setChecked(False)
         self.pay1_method.setCurrentIndex(self.pay1_method.findData("cash"))
         self.customer.setCurrentIndex(0)
+        self.customer.setEditText(self.customer.itemText(0))
+        self._on_customer_changed()
         self.number_edit.setText(sales.next_number_preview(self.session.con))
         self._stamp()
         self._on_row_changed()
 
+    def has_draft(self) -> bool:
+        return bool(
+            self._rows
+            or self.customer.currentIndex() != 0
+            or self.customer.currentText() != self.customer.itemText(0)
+            or self.tier != "retail"
+            or self.pay1_method.currentData() != "cash"
+            or self.split_btn.isChecked()
+            or any(widget.text().strip() for widget in (
+                self.mobile, self.note, self.plate, self.odometer,
+                self.invoice_disc, self.pay1_received,
+                self.pay1_amount, self.pay2_amount,
+                self.pay1_ref, self.pay2_ref,
+            ))
+        )
+
     def cancel_invoice(self) -> None:
-        if self._busy:
-            return
-        if self._rows and not ask(self, "إلغاء الفاتورة", "هل تريد إلغاء الفاتورة الحالية؟", danger=True):
+        if not confirm_discard_invoice(
+                self, dirty=self.has_draft(), busy=self._busy):
             return
         self._reset_after_post()
         self.notice.show_message("")
