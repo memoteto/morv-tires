@@ -398,3 +398,6 @@ PR #146 مسودة، CI 45394449322 للرأس 6d6f16a41eedb6a814a69634151855441
 ### S9 — final placement refinement (2026-11-25)
 - Owner Linux run on `084238a`: all five targeted tests passed, including theme switching with a draft font. Owner requests swapping both panels and removing the bundled-font explanatory sentence.
 - Settings now physically right, preview physically left, with the original 2:3 width ratio and settings first when stacked. Removed only the specified sentence; geometry and text-removal assertions updated, other tests unchanged. New verification pending; no merge.
+
+### S9 — shortcut guide completion (2026-11-25)
+- Owner requests missing shortcuts in the guide. Inspected UI bindings across the UI package: shell, ListPage, Modal and POS register the custom shortcuts. Add F4/F8/F9 (POS), Esc (modal reject/list preview) and Ctrl+S (modal primary action); F2 includes POS item search. Three adaptive cards retained with context-specific descriptions and existing six keys. Explicit expected 11-key assertion added; actual key bindings and permissions unchanged. Verification pending.

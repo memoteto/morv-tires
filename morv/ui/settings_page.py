@@ -18,9 +18,19 @@ from morv.ui.shop_settings import PrintingTab, ShopTab
 from morv.ui.widgets import (Notice, PasswordEdit, action_row, ask, card, danger_button, field, form, info, ltr_edit, muted,
                              primary_button, section_card, icon_button, kbd)
 
-SHORTCUTS = [("F2", "التركيز على مربع البحث في شاشات القوائم"), ("Ctrl+N", "إضافة جديد في شاشة القوائم المفتوحة"),
-             ("Ctrl+B", "طي الشريط الجانبي أو فتحه"), ("Ctrl+D", "التبديل بين الوضع الفاتح والداكن"),
-             ("Ctrl+L", "تسجيل الخروج"), ("Ctrl+Q", "إغلاق البرنامج")]
+SHORTCUTS = [
+    ("F2", "البحث في القوائم أو البحث عن صنف في نقطة البيع"),
+    ("Ctrl+N", "إضافة جديد في القوائم عند توفر الصلاحية"),
+    ("Esc", "إغلاق النافذة أو إخفاء ملخص القائمة"),
+    ("Ctrl+S", "تنفيذ الإجراء الرئيسي في النوافذ التي تدعمه"),
+    ("F4", "اختيار العميل في نقطة البيع"),
+    ("F8", "التركيز على طريقة الدفع في نقطة البيع"),
+    ("F9", "اعتماد فاتورة البيع في نقطة البيع"),
+    ("Ctrl+B", "طي الشريط الجانبي أو فتحه"),
+    ("Ctrl+D", "التبديل بين الوضع الفاتح والداكن"),
+    ("Ctrl+L", "تسجيل الخروج"),
+    ("Ctrl+Q", "إغلاق البرنامج"),
+]
 
 
 def _table(model) -> QTableView:
@@ -523,9 +533,9 @@ class ShortcutsTab(QWidget):
         cards = []
         self.keys = {}
         descriptions = dict(SHORTCUTS)
-        for title, keys in (("البحث والإضافة", ("F2", "Ctrl+N")),
-                            ("المظهر والتنقل", ("Ctrl+B", "Ctrl+D")),
-                            ("جلسة العمل", ("Ctrl+L", "Ctrl+Q"))):
+        for title, keys in (("القوائم والنوافذ", ("F2", "Ctrl+N", "Esc", "Ctrl+S")),
+                            ("نقطة البيع", ("F4", "F8", "F9")),
+                            ("إدارة البرنامج", ("Ctrl+B", "Ctrl+D", "Ctrl+L", "Ctrl+Q"))):
             box, inner = card(title, compact=True)
             for key in keys:
                 row = QWidget()
@@ -544,7 +554,7 @@ class ShortcutsTab(QWidget):
             cards.append(box)
         self.cards = AdaptiveCards(cards, minimum_width=tokens.LAYOUT["settings_card_min"], max_columns=3)
         lay.addWidget(self.cards, 1)
-        lay.addWidget(muted("هذه بعض الاختصارات العامة؛ لكل شاشة اختصاراتها حسب الوظائف المتاحة."))
+        lay.addWidget(muted("تعمل الاختصارات بحسب الشاشة المفتوحة والصلاحيات والوظائف المتاحة."))
 
 
 class BackupTab(QWidget):

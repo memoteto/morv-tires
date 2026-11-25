@@ -103,3 +103,6 @@ class AppearanceLayoutTest(unittest.TestCase):
             self.assertEqual(tab.cards.columns, columns)
             self.assertEqual(tab.cards.horizontalScrollBar().maximum(), 0)
             self.assertEqual(set(tab.keys), {key for key, _ in SHORTCUTS})
+            self.assertEqual(set(tab.keys), {"F2", "F4", "F8", "F9", "Esc", "Ctrl+N",
+                                             "Ctrl+S", "Ctrl+B", "Ctrl+D", "Ctrl+L", "Ctrl+Q"})
+            self.assertEqual(len(SHORTCUTS), 11)
