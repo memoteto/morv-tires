@@ -3,9 +3,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QLineEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget,
                                QVBoxLayout, QWidget)
 
-from morv.core import validate
+from morv.core import tire_catalog, validate
 from morv.core.money import MoneyError, fmt, parse_money
-from morv.core.text import ltr
+from morv.core.text import ltr, norm_ar
 from morv.infra import inventory, items
 from morv.infra.items import Item
 from morv.ui import tokens
@@ -13,7 +13,8 @@ from morv.ui.adaptive_layout import AdaptiveTableColumns
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.stock_pages import LotsPage, StockPage
-from morv.ui.widgets import Notice, ask, danger_button, field, form, ltr_edit, muted, muted_icon, primary_button
+from morv.ui.widgets import (Notice, ask, danger_button, field, form, ltr_edit, muted, muted_icon, primary_button,
+                             search_completer, searchable_edit)
 
 
 class InventoryPage(QWidget):
@@ -196,6 +197,8 @@ class ItemDialog(Modal):
         f = form()
         self.widgets = {}
         it = self.it
+        self._category_manual = it is not None
+        self._tyre_catalog = items.tyre_catalog(self.session.con) if kind == "tire" else {}
         price_ok = self.session.can("items.prices")
         for fld in self._ordered_fields(kind):
             label = fld.label + (" *" if fld.required else "")
@@ -205,13 +208,30 @@ class ItemDialog(Modal):
                 if fld.key.startswith("price_"):
                     current = fmt(current) if current else ""
                 current = "" if current is None else str(current)
-            if fld.ftype == "sel":
+            if kind == "tire" and fld.key == "size":
+                w = searchable_edit(sorted(self._tyre_catalog), tire_catalog.size_search_key, fld.example)
+                w.setText(current)
+                w.textChanged.connect(self._suggest)
+                w.textEdited.connect(self._suggest_category)
+                w.completer().activated[str].connect(self._suggest_category)
+            elif fld.ftype == "sel":
                 w = QComboBox()
+                options = list(fld.options)
+                if kind == "tire" and fld.key == "cat" and current in tire_catalog.LEGACY_CATEGORIES:
+                    options.append(current)
                 w.addItem("")
-                w.addItems(fld.options)
-                if current in fld.options:
+                w.addItems(options)
+                if kind == "tire" and fld.key == "cat":
+                    w.setEditable(True)
+                    w.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+                    completer = search_completer(w, options, norm_ar)
+                    w.setCompleter(completer)
+                    w.lineEdit().textEdited.connect(self._category_edited)
+                    w.activated.connect(self._category_edited)
+                    completer.activated[str].connect(self._category_edited)
+                if current in options:
                     w.setCurrentText(current)
-                w.currentIndexChanged.connect(self._suggest)
+                w.currentTextChanged.connect(self._suggest)
             elif fld.ftype == "bool":
                 w = QCheckBox("نعم")
                 w.setChecked(current == "1")
@@ -238,6 +258,21 @@ class ItemDialog(Modal):
         old.hide()
         old.deleteLater()
         self._suggest()
+
+    def _category_edited(self, *_args) -> None:
+        self._category_manual = True
+
+    def _suggest_category(self, value: str) -> None:
+        category = self.widgets.get("cat")
+        if self._category_manual or category is None:
+            return
+        try:
+            size = validate.tire_size(value)["size"]
+        except validate.ValidationError:
+            category.setCurrentText("")
+            return
+        suggestion = tire_catalog.suggested_category(size, self._tyre_catalog.get(size, {}))
+        category.setCurrentText(suggestion)
 
     def _value(self, key: str) -> str:
         w = self.widgets.get(key)
