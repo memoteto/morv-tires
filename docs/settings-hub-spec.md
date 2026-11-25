@@ -390,3 +390,7 @@ PR #146 مسودة، CI 45394449322 للرأس 6d6f16a41eedb6a814a69634151855441
 ### S9 — approved appearance and shortcuts (2026-11-25)
 - Main `ae4d60b`; owner corrected physical placement: settings on screen left, preview on screen right, settings above preview when stacked. Existing font persistence and shortcut bindings inspected; this supersedes D09 horizontal placement only.
 - Implemented shared adaptive cards with opt-in stack order, central fields and theme font picker for inert sample controls, existing set_font apply, three shortcut cards retaining the six documented keys. Tests cover physical RTL geometry, reflow, unsaved preview, apply and theme switch. No changes to font persistence, actual shortcuts, accounting or data schema. CI and actual-screen verification pending; no merge.
+
+### S9 — preview font regression (2026-11-25)
+- Owner Linux test run on `c00c31f`: 4/5 passed; test_apply_and_theme_keep_preview failed (sample 16px instead of pending 18px after theme toggle). Source confirms MainWindow reapplies application font and QSS from saved settings, but AppearanceTab previously refreshed the local preview only on combo changes and apply.
+- Narrow fix: queue preview refresh on style/application font changes after global repolish using a widget-owned single-shot timer. Existing persistence and theme application untouched. Retain original failing assertion and extend it to pending family, both theme transitions, sample controls and unchanged stored preferences. New run and visual review pending.

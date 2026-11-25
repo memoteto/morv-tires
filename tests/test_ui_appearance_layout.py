@@ -71,12 +71,22 @@ class AppearanceLayoutTest(unittest.TestCase):
         self.assertEqual(settings.get(self.con, "ui.font_family"), "Cairo")
         self.assertEqual(settings.get(self.con, "ui.font_size"), "16")
         self.assertEqual(self.app.font().pixelSize(), 16)
+        tab.family.setCurrentText("IBM Plex Sans Arabic")
         tab.size.setCurrentIndex(tab.size.findData(18))
-        win.toggle_theme()
         self.settle()
         self.assertEqual(tab.sample.font().pixelSize(), 18)
-        self.assertEqual(self.app.font().pixelSize(), 16)
-        self.assertEqual(settings.get(self.con, "ui.font_size"), "16")
+        for _ in range(2):
+            win.toggle_theme()
+            self.settle()
+            self.assertEqual(tab.family.currentText(), "IBM Plex Sans Arabic")
+            self.assertEqual(tab.size.currentData(), 18)
+            for widget in (tab.sample, tab.sample_input, tab.sample_table):
+                self.assertEqual(widget.font().pixelSize(), 18)
+                self.assertEqual(widget.font().family(), "IBM Plex Sans Arabic")
+            self.assertEqual(self.app.font().pixelSize(), 16)
+            self.assertEqual(self.app.font().family(), "Cairo")
+            self.assertEqual(settings.get(self.con, "ui.font_size"), "16")
+            self.assertEqual(settings.get(self.con, "ui.font_family"), "Cairo")
 
     def test_shortcuts_reflow_without_changing_keys(self):
         from morv.ui.settings_page import SHORTCUTS, ShortcutsTab

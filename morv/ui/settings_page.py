@@ -1,6 +1,6 @@
 """Settings hub and the existing settings pages."""
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
                                QPushButton, QSizePolicy, QSpinBox, QStackedWidget, QTableView,
@@ -217,9 +217,19 @@ class AppearanceTab(QWidget):
         self.panes = AdaptiveCards([self.preview, self.options], minimum_width=tokens.LAYOUT["settings_card_min"],
                                    column_weights=(3, 2), stack_order=(1, 0))
         lay.addWidget(self.panes, 1)
+        self.preview_timer = QTimer(self)
+        self.preview_timer.setSingleShot(True)
+        self.preview_timer.timeout.connect(self.update_preview)
         self.family.currentIndexChanged.connect(self.update_preview)
         self.size.currentIndexChanged.connect(self.update_preview)
         self.update_preview()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if hasattr(self, "preview_timer") and event.type() in (
+                QEvent.Type.StyleChange, QEvent.Type.ApplicationFontChange):
+            # Reapply the draft after the global stylesheet has finished repolishing widgets.
+            self.preview_timer.start(0)
 
     def update_preview(self) -> None:
         font = theme.pick_font(self.size.currentData(), self.family.currentText())
