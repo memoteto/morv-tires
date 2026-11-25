@@ -3,6 +3,58 @@ from tests.test_ui_phase1 import _Base
 
 
 class PartnerStatusTest(_Base):
+    def test_swapped_panes_keep_selection_and_compact_navigation(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QLayout
+        from morv.infra import treasury
+        from morv.ui.partners_tab import PartnersTab
+        from morv.ui.tokens import LAYOUT
+        from morv.ui.widgets import dispose
+
+        self.make_admin()
+        partner = treasury.add_partner(self.con, self.admin, "Test partner")
+        self.addCleanup(self.app.setLayoutDirection, self.app.layoutDirection())
+        self.app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        tab = PartnersTab(self.session())
+        self.addCleanup(dispose, tab, self.app)
+        tab.resize(1500, 650)
+        tab.show()
+        for _ in range(8):
+            self.app.processEvents()
+        self.assertFalse(tab.split.compact)
+        self.assertTrue(tab.split.primary.isVisible())
+        self.assertTrue(tab.split.detail.isVisible())
+        self.assertGreater(tab.split.detail.x(), tab.split.primary.x())
+        self.assertGreater(tab.split.primary.width(), tab.split.detail.width())
+        self.assertEqual(tab.split.detail.maximumWidth(), LAYOUT["settings_partner_preview_max"])
+        self.assertEqual(tab.name_label.text(), partner.name)
+        # A standalone top-level widget is clamped to its layout minimum by Qt.
+        # Simulate the constrained host width without changing production layout.
+        tab.layout().setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        tab.setMinimumWidth(0)
+        tab.resize(700, 650)
+        for _ in range(8):
+            self.app.processEvents()
+        self.assertEqual(tab.width(), 700)
+        self.assertEqual(tab.split.width(), 700)
+        self.assertTrue(tab.split.compact)
+        tab.split.show_primary()
+        self.assertTrue(tab.table.isVisible())
+        self.assertFalse(tab.split.detail.isVisible())
+        tab.details_btn.click()
+        self.assertTrue(tab.split.detail.isVisible())
+        self.assertFalse(tab.table.isVisible())
+        self.assertEqual(tab.name_label.text(), partner.name)
+        tab.back_btn.click()
+        self.assertTrue(tab.table.isVisible())
+        self.assertFalse(tab.split.detail.isVisible())
+        tab.resize(1500, 650)
+        for _ in range(8):
+            self.app.processEvents()
+        self.assertFalse(tab.split.compact)
+        self.assertGreater(tab.split.detail.x(), tab.split.primary.x())
+        self.assertEqual(tab._current()[0], partner.id)
+
     def test_stopped_partner_action_describes_activation(self):
         from morv.infra import treasury
         from morv.ui.partners_tab import PartnersTab

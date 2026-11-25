@@ -93,7 +93,7 @@ class AdaptiveSplit(QWidget):
 
     mode_changed = Signal(bool)
 
-    def __init__(self, primary, detail, *, detail_max=None):
+    def __init__(self, primary, detail, *, detail_max=None, detail_first=False):
         super().__init__()
         self.primary, self.detail = primary, detail
         self.detail_max = LAYOUT["preview_max"] if detail_max is None else detail_max
@@ -104,8 +104,9 @@ class AdaptiveSplit(QWidget):
         self.row.setContentsMargins(0, 0, 0, 0)
         self.row.setSpacing(LAYOUT["pane_gap"])
         self.row.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
-        self.row.addWidget(primary, 3)
-        self.row.addWidget(detail, 2)
+        panes = ((detail, 2), (primary, 3)) if detail_first else ((primary, 3), (detail, 2))
+        for pane, stretch in panes:
+            self.row.addWidget(pane, stretch)
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._reflow)
