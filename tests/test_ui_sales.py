@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tests.qt_app import get_app, require_qt
 
@@ -86,7 +87,8 @@ class SalesUiTest(_Fixture, unittest.TestCase):
         self.assertIn("20.00", dlg.total_label.text())
         dlg.pay1_received.setText("50.00")
         self.assertIn("30.00", dlg.change_label.text())
-        dlg.cancel_invoice()
+        with patch("morv.ui.modal.ask", return_value=True):
+            dlg.cancel_invoice()
         self.assertEqual(dlg._rows, [])
         self.assertIsNone(dlg.posted)
 
