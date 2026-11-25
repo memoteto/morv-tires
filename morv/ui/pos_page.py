@@ -11,21 +11,22 @@ from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QFrame, QGridLayo
 from morv.core import sales_rules
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
-from morv.infra import customers, items, sale_view, sales, users
+from morv.infra import customer_receipts, customers, items, sale_view, sales, users
 from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons, tokens
 from morv.ui.inventory_page import ItemDialog
 from morv.ui.purchases_page import _ItemPopup
-from morv.ui.widgets import (chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
+from morv.ui.widgets import (ask, chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
 
 ITEM_CHOICES = 50
 TIER_ATTR = {"retail": "price_retail", "wholesale": "price_wholesale", "super": "price_super"}
 TIER_LABELS = {"retail": "قطاعي (تجزئة)", "wholesale": "جملة", "super": "جملة الجملة"}
 TIER_SHORT = {"retail": "قطاعي", "wholesale": "جملة", "super": "جملة الجملة"}
 PAYMENT_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
-                  "installment": "تقسيط"}
+                  "credit": "آجل", "installment": "تقسيط"}
 PAYMENT_HINTS = {"cash": "استلام نقدية وحساب الباقي", "card": "يلزم رقم الإيصال", "transfer": "يلزم رقم المرجع",
-                 "wallet": "يلزم رقم المرجع", "installment": "يُفتح العقد بعد الاعتماد"}
+                 "wallet": "يلزم رقم المرجع", "credit": "على حساب العميل",
+                 "installment": "يُفتح العقد بعد الاعتماد"}
 KIND_TABS = (("الكل", None), ("إطارات", "tire"), ("بطاريات", "battery"), ("خدمات", "service"))
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
 
@@ -306,8 +307,11 @@ class PosPage(QWidget):
         for label, w in (("الإجمالي قبل الخصم", self.subtotal_label),
                           ("خصم على الفاتورة", self.invoice_disc)):
             body.addWidget(kv_row(label, w))
-        total = QFrame()
+        total = QPushButton()
+        self.total_box = total
         total.setObjectName("totalBox")
+        total.setAccessibleName("تعبئة المبلغ النقدي المطلوب")
+        total.clicked.connect(self._fill_exact_cash)
         t = QHBoxLayout(total)
         t.setContentsMargins(16, 16, 16, 16)
         lbl = QLabel("الإجمالي النهائي")
@@ -317,6 +321,9 @@ class PosPage(QWidget):
         t.addWidget(lbl)
         t.addStretch(1)
         t.addWidget(self.total_label)
+        for label in (lbl, self.total_label):
+            label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            label.installEventFilter(self)
         body.addWidget(total)
         self._payment_section(body)
         return box
@@ -340,37 +347,33 @@ class PosPage(QWidget):
         method_row.addWidget(self.pay1_method, 1)
         method_row.addWidget(kbd("F8"))
         body.addLayout(method_row)
-        # The design offers credit beside the cash methods; the engine posts it but the screen
-        # does not expose it yet. Instalments are a method of their own above.
-        deferred_row = QHBoxLayout()
-        deferred_row.addWidget(deferred_button("آجل", "customers"), 1)
-        body.addLayout(deferred_row)
-
         pbox = QFrame()
         self.pay_box = pbox
         pbox.setObjectName("payBox")
         pb = QVBoxLayout(pbox)
         pb.setContentsMargins(12, 12, 12, 12)
         pb.setSpacing(10)
+        self.cash_box = QWidget()
+        cash_layout = QVBoxLayout(self.cash_box)
+        cash_layout.setContentsMargins(0, 0, 0, 0)
+        cash_layout.setSpacing(10)
         rec = QHBoxLayout()
         self.pay1_received = ltr_edit("0.00")
         self.pay1_received.textChanged.connect(self._refresh_change)
         rec.addWidget(muted("المبلغ المستلم"))
         rec.addStretch(1)
         rec.addWidget(self.pay1_received, 2)
-        pb.addLayout(rec)
+        cash_layout.addLayout(rec)
         chips = QHBoxLayout()
         chips.setSpacing(6)
         self.amount_chips = []
-        for _ in range(3):
+        for _ in range(2):
             b = QPushButton()
             b.setObjectName("quickChip")
             b.clicked.connect(lambda _c=False, btn=b: self.pay1_received.setText(btn.property("amount") or ""))
             self.amount_chips.append(b)
             chips.addWidget(b, 1)
-        pb.addLayout(chips)
-        self.pay1_ref = ltr_edit("رقم الإيصال / المرجع")
-        pb.addWidget(self.pay1_ref)
+        cash_layout.addLayout(chips)
         change = QFrame()
         change.setObjectName("changeBox")
         c = QHBoxLayout(change)
@@ -382,8 +385,16 @@ class PosPage(QWidget):
         c.addWidget(cl)
         c.addStretch(1)
         c.addWidget(self.change_label)
-        pb.addWidget(change)
+        cash_layout.addWidget(change)
+        pb.addWidget(self.cash_box)
+        self.pay1_ref = ltr_edit("رقم الإيصال / المرجع")
+        pb.addWidget(self.pay1_ref)
+        self.pay2_ref = ltr_edit("مرجع الوسيلة الثانية")
+        pb.addWidget(self.pay2_ref)
         body.addWidget(pbox)
+        self.credit_hint = muted("")
+        self.credit_hint.setVisible(False)
+        body.addWidget(self.credit_hint)
         self.instalment_hint = muted("يُرحَّل كامل المبلغ على حساب التقسيط، ثم يُعتمد العقد ويُحصَّل المقدم.")
         self.instalment_hint.setVisible(False)
         body.addWidget(self.instalment_hint)
@@ -395,11 +406,13 @@ class PosPage(QWidget):
         self.pay2_method = self._method_combo(first_blank=True)
         self.pay2_amount = ltr_edit("فارغ = المتبقي")
         self.pay1_amount.textChanged.connect(self._refresh_change)
+        self.pay2_amount.textChanged.connect(self._refresh_change)
+        self.pay2_method.currentIndexChanged.connect(self._on_method_changed)
         sp.addWidget(field("مبلغ الوسيلة الأولى", self.pay1_amount), 0, 0, 1, 2)
         sp.addWidget(field("الوسيلة الثانية", self.pay2_method), 1, 0)
         sp.addWidget(field("مبلغها", self.pay2_amount), 1, 1)
         self.split.setVisible(False)
-        self.split_btn.toggled.connect(self.split.setVisible)
+        self.split_btn.toggled.connect(self._on_split_toggled)
         body.addWidget(self.split)
 
         self.post_btn = QPushButton("اعتماد وتحصيل")
@@ -443,8 +456,10 @@ class PosPage(QWidget):
         if first_blank:
             c.addItem("— لا —", None)
         for key, label in PAYMENT_LABELS.items():
-            text = label if first_blank else f"{label}  —  {PAYMENT_HINTS[key]}"
-            c.addItem(icons.icon("cash", ICON_PRIMARY, 20), text, key)
+            if first_blank and key == "installment":
+                continue
+            c.addItem(icons.icon("cash", ICON_PRIMARY, 20), label, key)
+            c.setItemData(c.count() - 1, PAYMENT_HINTS[key], Qt.ItemDataRole.ToolTipRole)
         return c
 
     def _shortcuts(self) -> None:
@@ -476,15 +491,47 @@ class PosPage(QWidget):
             parts.append("ملاحظة")
         self.extra_summary.setText(" · ".join(parts))
 
+    def _selected_methods(self) -> tuple:
+        first = self.pay1_method.currentData()
+        second = self.pay2_method.currentData() if self.split_btn.isChecked() else None
+        return first, second if first != "installment" else None
+
+    def _on_split_toggled(self, enabled: bool) -> None:
+        self.split.setVisible(enabled)
+        if not enabled:
+            self.pay2_method.blockSignals(True)
+            self.pay2_method.setCurrentIndex(0)
+            self.pay2_method.blockSignals(False)
+            self.pay1_amount.clear()
+            self.pay2_amount.clear()
+            self.pay2_ref.clear()
+        self._on_method_changed()
+
     def _on_method_changed(self, *_args) -> None:
-        on_instalments = self.pay1_method.currentData() == "installment"
-        self.pay1_ref.setVisible(not on_instalments and self.pay1_method.currentData() != "cash")
-        # A contract covers the whole invoice, so there is nothing received and nothing to split
-        self.pay_box.setVisible(not on_instalments)
-        self.split_btn.setVisible(not on_instalments)
-        if on_instalments:
+        first, second = self._selected_methods()
+        on_instalments = first == "installment"
+        if on_instalments and self.split_btn.isChecked():
             self.split_btn.setChecked(False)
+            return
+        previous = getattr(self, "_previous_methods", (None, None))
+        self._previous_methods = first, second
+        if previous[0] != first:
+            self.pay1_ref.clear()
+        if previous[1] != second:
+            self.pay2_ref.clear()
+        if ("cash" in previous) != ("cash" in (first, second)):
+            self.pay1_received.clear()
+        cash = "cash" in (first, second)
+        reference_methods = ("card", "transfer", "wallet")
+        ref1, ref2 = first in reference_methods, second in reference_methods
+        self.cash_box.setVisible(cash)
+        self.pay1_ref.setVisible(ref1)
+        self.pay2_ref.setVisible(ref2)
+        self.pay_box.setVisible(cash or ref1 or ref2)
+        self.split_btn.setVisible(not on_instalments)
         self.instalment_hint.setVisible(on_instalments)
+        self.post_btn.setText("اعتماد البيع الآجل" if first == "credit" and second is None
+                              else "اعتماد وتحصيل")
         self._refresh_change()
 
     # ---------- Customer and items ----------
@@ -551,6 +598,7 @@ class PosPage(QWidget):
         self.cust_kind.style().unpolish(self.cust_kind)
         self.cust_kind.style().polish(self.cust_kind)
         self._set_tier(level or "retail")
+        self._refresh_change()
 
     def _on_item_query(self, _text: str) -> None:
         self._item_timer.start(200)
@@ -583,6 +631,10 @@ class PosPage(QWidget):
             self._add_row(dlg.saved.id, dlg.saved.kind, dlg.saved.name)
 
     def eventFilter(self, obj, event) -> bool:
+        if (obj is getattr(self, "total_label", None) and event.type() == QEvent.Type.MouseButtonRelease
+                and event.button() == Qt.MouseButton.LeftButton):
+            self._fill_exact_cash()
+            return True
         # The popup is a non-activating tool window (see _ItemPopup) so typing
         # keeps working; close it shortly after the field loses focus so a
         # click on one of its buttons still registers first.
@@ -756,29 +808,87 @@ class PosPage(QWidget):
         total = self.total_minor()
         self.subtotal_label.setText(ltr(fmt(self.subtotal_minor())))
         self.total_label.setText(f"{ltr(fmt(total))} ج.م")
-        labels = ["المبلغ بالضبط"]
-        amounts = [total]
-        for step in (10000, 50000):                 # round up to the nearest 100 and 500
-            up = -(-total // step) * step if total > 0 else 0
-            if up not in amounts:
-                labels.append(fmt(up))
-                amounts.append(up)
-        for i, b in enumerate(self.amount_chips):
-            b.setVisible(i < len(amounts) and total > 0)
-            if i < len(amounts):
-                b.setText(ltr(labels[i]))
-                b.setProperty("amount", f"{amounts[i] // 100}.{amounts[i] % 100:02d}")
         self._refresh_change()
 
-    def _refresh_change(self, *_args) -> None:
-        """Change = cash received minus what the first method owes, never below zero."""
+    def _payment_parts(self, total: int) -> list[tuple]:
+        first, second = self._selected_methods()
+        if first == "installment" or not self.split_btn.isChecked():
+            return [(first, total)]
+        if second is None:
+            raise sales_rules.SaleRuleError("اختر وسيلة الدفع الثانية أو ألغِ تقسيم الدفع")
+        if first == second:
+            raise sales_rules.SaleRuleError("لا تتكرر الوسيلة في الفاتورة الواحدة")
+        first_text, second_text = self.pay1_amount.text().strip(), self.pay2_amount.text().strip()
+        if first_text:
+            amount = parse_money(first_text)
+        elif second_text:
+            amount = total - parse_money(second_text)
+        else:
+            raise sales_rules.SaleRuleError("حدد مبلغ إحدى وسيلتي الدفع")
+        rest = parse_money(second_text) if second_text else total - amount
+        if amount <= 0 or rest <= 0 or amount + rest != total:
+            raise sales_rules.SaleRuleError("مبالغ الدفع يجب أن تكون موجبة ومجموعها يساوي الإجمالي")
+        return [(first, amount), (second, rest)]
+
+    def _cash_due(self) -> int:
+        return sum(amount for method, amount in self._payment_parts(self.total_minor()) if method == "cash")
+
+    def _fill_exact_cash(self, *_args) -> None:
         try:
-            due = parse_money(self.pay1_amount.text()) if self.pay1_amount.text().strip() else self.total_minor()
+            due = self._cash_due()
+        except (MoneyError, sales_rules.SaleRuleError):
+            return
+        if due > 0:
+            self.pay1_received.setText(f"{due // 100}.{due % 100:02d}")
+
+    def _refresh_credit(self) -> None:
+        credit = "credit" in self._selected_methods()
+        self.credit_hint.setVisible(credit)
+        if not credit:
+            return
+        cid = (self.customer.currentData() or ("",))[0]
+        if not cid:
+            self.credit_hint.setText("البيع الآجل يحتاج عميلًا مسجلًا")
+            return
+        con = self.session.con
+        try:
+            customer = customers.get(con, cid)
+        except customers.CustomerError as e:
+            self.credit_hint.setText(str(e))
+            return
+        if not customer.active:
+            self.credit_hint.setText("العميل موقوف")
+            return
+        debt = customer_receipts.customer_balance(con, cid)
+        deposit = max(0, customer_receipts.deposit_balance(con, cid))
+        available = max(0, customer.credit_limit + deposit - debt)
+        self.credit_hint.setText(f"حد الائتمان: {ltr(fmt(customer.credit_limit))} · المديونية: {ltr(fmt(debt))}"
+                                 f"\nالمتاح: {ltr(fmt(available))} ج.م")
+
+    def _refresh_change(self, *_args) -> None:
+        try:
+            due = self._cash_due()
+        except (MoneyError, sales_rules.SaleRuleError):
+            due = 0
+        self.total_box.setCursor(Qt.CursorShape.PointingHandCursor if due > 0 else Qt.CursorShape.ArrowCursor)
+        self.total_box.setToolTip("اضغط لتعبئة النقد المطلوب" if due > 0 else "")
+        amounts = []
+        if due > 0:
+            for step in (10000, 50000):
+                up = -(-due // step) * step
+                if up != due and up not in amounts:
+                    amounts.append(up)
+        for i, b in enumerate(self.amount_chips):
+            b.setVisible(i < len(amounts))
+            if i < len(amounts):
+                b.setText(ltr(fmt(amounts[i])))
+                b.setProperty("amount", f"{amounts[i] // 100}.{amounts[i] % 100:02d}")
+        try:
             received = parse_money(self.pay1_received.text()) if self.pay1_received.text().strip() else due
+            self.change_label.setText(ltr(fmt(max(received - due, 0))) if due > 0 else ltr(fmt(0)))
         except MoneyError:
             self.change_label.setText("—")
-            return
-        self.change_label.setText(ltr(fmt(max(received - due, 0))))
+        self._refresh_credit()
 
     def _fail(self, text: str) -> bool:
         self.notice.show_message(text)
@@ -786,18 +896,14 @@ class PosPage(QWidget):
 
     # ---------- Payment and posting ----------
     def _payments(self, total: int) -> list:
-        if self.pay1_method.currentData() == "installment":
-            return [sales_rules.Payment(method="installment", amount=total)]
-        first = sales_rules.Payment(
-            method=self.pay1_method.currentData(),
-            amount=parse_money(self.pay1_amount.text()) if self.pay1_amount.text().strip() else total,
-            received=parse_money(self.pay1_received.text()) if self.pay1_received.text().strip() else None,
-            reference=self.pay1_ref.text().strip() or None)
-        out = [first]
-        if self.pay2_method.currentData() is not None:
-            rest = total - first.amount
-            amount = parse_money(self.pay2_amount.text()) if self.pay2_amount.text().strip() else rest
-            out.append(sales_rules.Payment(method=self.pay2_method.currentData(), amount=amount))
+        out = []
+        for index, (method, amount) in enumerate(self._payment_parts(total)):
+            received = None
+            if method == "cash" and self.pay1_received.text().strip():
+                received = parse_money(self.pay1_received.text())
+            ref = self.pay1_ref if index == 0 else self.pay2_ref
+            reference = (ref.text().strip() or None) if method in ("card", "transfer", "wallet") else None
+            out.append(sales_rules.Payment(method=method, amount=amount, received=received, reference=reference))
         return out
 
     def post(self, and_print: bool = False) -> None:
@@ -871,9 +977,11 @@ class PosPage(QWidget):
         self.pay1_amount.clear()
         self.pay1_received.clear()
         self.pay1_ref.clear()
+        self.pay2_ref.clear()
         self.pay2_method.setCurrentIndex(0)
         self.pay2_amount.clear()
         self.split_btn.setChecked(False)
+        self.pay1_method.setCurrentIndex(self.pay1_method.findData("cash"))
         self.customer.setCurrentIndex(0)
         self.number_edit.setText(sales.next_number_preview(self.session.con))
         self._stamp()
@@ -881,6 +989,8 @@ class PosPage(QWidget):
 
     def cancel_invoice(self) -> None:
         if self._busy:
+            return
+        if self._rows and not ask(self, "إلغاء الفاتورة", "هل تريد إلغاء الفاتورة الحالية؟", danger=True):
             return
         self._reset_after_post()
         self.notice.show_message("")
