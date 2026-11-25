@@ -2,7 +2,7 @@
 import sqlite3
 from dataclasses import dataclass, field
 
-from morv.core import validate
+from morv.core import tire_catalog, validate
 from morv.core.text import norm_ar, scanner_fix
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, require
@@ -57,8 +57,30 @@ def fields(con, kind: str) -> list[Field]:
         "SELECT kind, key, label, example, ftype, options, show, required, print, filter, builtin, sort_order "
         "FROM item_fields WHERE kind IN ('common', ?) ORDER BY CASE kind WHEN 'common' THEN 0 ELSE 1 END, sort_order",
         (kind,)).fetchall()
-    return [Field(r[0], r[1], r[2], r[3] or "", r[4], (r[5] or "").split("|") if r[5] else [],
-                  bool(r[6]), bool(r[7]), bool(r[8]), bool(r[9]), bool(r[10]), r[11]) for r in rows]
+    result = [Field(r[0], r[1], r[2], r[3] or "", r[4], (r[5] or "").split("|") if r[5] else [],
+                    bool(r[6]), bool(r[7]), bool(r[8]), bool(r[9]), bool(r[10]), r[11]) for r in rows]
+    for f in result:
+        if (f.kind, f.key) == ("tire", "cat"):
+            f.options = list(tire_catalog.CATEGORIES)
+    return result
+
+
+def tyre_catalog(con) -> dict[str, dict[str, int]]:
+    result: dict[str, dict[str, int]] = {size: {} for size in tire_catalog.SIZES}
+    rows = con.execute(
+        "SELECT s.value, c.value, count(*) FROM items i "
+        "JOIN item_attrs s ON s.item_id=i.id AND s.field_key='size' "
+        "LEFT JOIN item_attrs c ON c.item_id=i.id AND c.field_key='cat' "
+        "WHERE i.kind='tire' GROUP BY s.value, c.value").fetchall()
+    for raw, category, count in rows:
+        try:
+            size = validate.tire_size(raw)["size"]
+        except validate.ValidationError:
+            continue
+        counts = result.setdefault(size, {})
+        if category in tire_catalog.CATEGORIES:
+            counts[category] = counts.get(category, 0) + count
+    return result
 
 
 # Shared fields that mean nothing for a service: no stock, no brand
@@ -127,7 +149,7 @@ def add_custom_field(con, by, kind: str, label: str, ftype: str, options: list |
 
 # ---------- Items ----------
 
-def _clean(con, it: Item) -> Item:
+def _clean(con, it: Item, previous_category: str = "") -> Item:
     if it.kind not in KINDS:
         raise ItemError("نوع الصنف غير معروف")
     it.name = (it.name or "").strip()
@@ -168,7 +190,10 @@ def _clean(con, it: Item) -> Item:
             except ValueError as e:
                 raise ItemError(f"«{f.label}» يجب أن يكون رقمًا") from e
         if f.ftype == "sel" and val and val not in f.options:
-            raise ItemError(f"قيمة «{f.label}» ليست من الاختيارات")
+            legacy = ((f.kind, f.key) == ("tire", "cat") and val == previous_category
+                      and val in tire_catalog.LEGACY_CATEGORIES)
+            if not legacy:
+                raise ItemError(f"قيمة «{f.label}» ليست من الاختيارات")
         if f.ftype == "bool":
             val = "1" if val in ("1", "true", "True", "نعم") else ""
         if f.required and not val:
@@ -217,11 +242,11 @@ def create(con, by, it: Item) -> Item:
 
 def update(con, by, it: Item) -> Item:
     require(con, by, "items.manage", ItemError)
-    _clean(con, it)
-    _unique_errors(con, it)
     with transaction(con):
-        # Kind is read after the write lock, not before, so no decision rests on a stale read
+        # Kind and legacy category must be read under the same write lock as the update.
         old = get(con, it.id)
+        _clean(con, it, old.attrs.get("cat", "") if old.kind == "tire" else "")
+        _unique_errors(con, it)
         if old.kind != it.kind and has_documents(con, it.id):
             raise ItemError("لا يمكن تغيير نوع صنف له حركات؛ أنشئ صنفًا جديدًا")
         if ((old.price_retail, old.price_wholesale, old.price_super) != (it.price_retail, it.price_wholesale, it.price_super)):
