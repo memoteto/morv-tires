@@ -156,6 +156,7 @@ def _capture_item_search(form, app, out, name, expected, report):
             raise RuntimeError(f"audit: cannot save {name}")
         info = _measure(popup)
         info["search_width"] = search.width()
+        info["minimum_popup_width"] = min(search.width(), search.screen().availableGeometry().width())
         info["fits_screen"] = popup.screen().availableGeometry().contains(popup.frameGeometry())
         info["search_labels"] = []
         for index in range(expected):
@@ -317,7 +318,7 @@ def summary(report: dict) -> str:
                 lines.append(f"CLIPPED {name}: window {r['window']}: button '{b['text']}' at ({b['x']},{b['y']}) "
                              f"{b['w']}x{b['h']} - {where}")
             if "search_labels" in r:
-                if r["window"][0] != r["search_width"] or not r["fits_screen"]:
+                if r["window"][0] < r["minimum_popup_width"] or not r["fits_screen"]:
                     lines.append(f"SEARCH-BOUNDS {name}: popup {r['window']}, input {r['search_width']}px, "
                                  f"fits screen: {r['fits_screen']}")
                 for label in r["search_labels"]:

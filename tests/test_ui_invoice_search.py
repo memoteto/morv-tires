@@ -266,3 +266,52 @@ class InvoiceSearchTest(PosFixture):
         self.assertEqual(len(stock_reads), 1, "SEARCH_BATCHED_STOCK")
         self.assertFalse(any("select * from items where id" in sql.lower()
                              for sql in statements), "SEARCH_PRICE_N_PLUS_ONE")
+
+    def test_search_popup_expands_and_preserves_long_names(self):
+        from PySide6.QtWidgets import QLabel
+
+        name = "إطار تجريبي Continental PremiumContact 6 205/60R16 95V"
+        self.set_tire_spec(name)
+        for purchase in (False, True):
+            with self.subTest(purchase=purchase):
+                form = self.invoice(purchase)
+                search = form.item_search
+                search.setFixedWidth(292)
+                self.result_labels(form, "TR-QA")
+                popup = form._item_popup
+                self.assertEqual(search.width(), 292)
+                self.assertGreater(popup.width(), search.width(), "SEARCH_POPUP_EXPANSION")
+                self.assertTrue(search.screen().availableGeometry().contains(popup.frameGeometry()),
+                                "SEARCH_POPUP_SCREEN_BOUNDS")
+                button = popup._layout.itemAt(0).widget()
+                label = next(x for x in button.findChildren(QLabel) if x.text() == name)
+                self.assertGreater(label.width(), 0, "SEARCH_NAME_WIDTH")
+                self.assertGreaterEqual(label.height(), label.heightForWidth(label.width()),
+                                        "SEARCH_NAME_HEIGHT")
+                self.assertTrue(button.rect().contains(label.geometry()), "SEARCH_NAME_GEOMETRY")
+
+    def test_search_popup_keeps_all_eight_results_keyboard_reachable(self):
+        from PySide6.QtWidgets import QLabel
+
+        for index in range(8):
+            name = f"إطار اختبار {index} Continental PremiumContact 6 205/60R16"
+            self.con.execute(
+                "INSERT INTO items (kind,code,name,name_norm,price_retail,price_wholesale,price_super) "
+                "VALUES ('tire',?,?,?,130000,130000,130000)",
+                (f"POPUP-{index}", name, norm_ar(name)))
+        form = self.invoice(False)
+        self.query(form, "POPUP-")
+        form._do_item_search()
+        self.app.processEvents()
+        popup = form._item_popup
+        self.assertEqual(popup._layout.count(), 9)
+        self.assertTrue(form.item_search.screen().availableGeometry().contains(popup.frameGeometry()),
+                        "SEARCH_EIGHT_SCREEN_BOUNDS")
+        self.key(form.item_search, "Up")
+        button = popup._layout.itemAt(7).widget()
+        self.assertTrue(button.isChecked(), "SEARCH_LAST_SELECTED")
+        self.assertTrue(any("7" in label.text() for label in button.findChildren(QLabel)
+                            if label.objectName() == "cardTitle"))
+        self.key(form.item_search, "Return")
+        self.assertEqual(len(form._rows), 1)
+        self.assertFalse(popup.isVisible())

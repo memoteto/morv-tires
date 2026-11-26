@@ -1,10 +1,10 @@
 """Shared invoice item lookup and keyboard selection."""
 import re
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QPoint, Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QSizePolicy, QVBoxLayout,
+    QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from morv.core.money import fmt
@@ -34,7 +34,17 @@ class _ItemPopup(QFrame):
         self.setObjectName("card")
         self.setWindowFlags(Qt.WindowType.ToolTip)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
-        self._layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._content = QWidget()
+        self._layout = QVBoxLayout(self._content)
+        self._scroll.setWidget(self._content)
+        outer.addWidget(self._scroll)
         self._layout.setContentsMargins(6, 6, 6, 6)
         self._layout.setSpacing(2)
 
@@ -59,13 +69,14 @@ class _ItemPopup(QFrame):
             ic.setPixmap(icons.icon(KIND_ICON.get(kind, "inventory"), ICON_MUTED, 18).pixmap(18, 18))
             name_lbl = wrapping_line_label(name)
             name_lbl.setObjectName("cardTitle")
+            name_lbl.setTextFormat(Qt.TextFormat.PlainText)
             name_lbl.setToolTip(name)
-            inner.addWidget(ic)
+            inner.addWidget(ic, 0, Qt.AlignmentFlag.AlignVCenter)
             inner.addWidget(name_lbl, 1)
             if spec:
                 spec_lbl = muted(ltr(spec))
                 spec_lbl.setWordWrap(False)
-                inner.addWidget(spec_lbl)
+                inner.addWidget(spec_lbl, 0, Qt.AlignmentFlag.AlignVCenter)
             if sale_price is not None:
                 price = chip(f"{ltr(fmt(sale_price(*row[5:8])))} ج.م")
                 price.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -79,8 +90,8 @@ class _ItemPopup(QFrame):
                                         "pillWarn" if qty < row[8] else "pillOk")
                     stock.setToolTip("الرصيد الفعلي قبل اعتماد الفاتورة")
                 stock_labels.append(stock)
-                inner.addWidget(stock)
-                inner.addWidget(price)
+                inner.addWidget(stock, 0, Qt.AlignmentFlag.AlignVCenter)
+                inner.addWidget(price, 0, Qt.AlignmentFlag.AlignVCenter)
             btn.clicked.connect(lambda _, iid=item_id, ik=kind, iname=name: on_pick(iid, ik, iname))
             self._layout.addWidget(btn)
         for labels in (price_labels, stock_labels):
@@ -95,8 +106,59 @@ class _ItemPopup(QFrame):
         new_btn.setFixedHeight(38)
         new_btn.clicked.connect(on_new)
         self._layout.addWidget(new_btn)
-        self.adjustSize()
         self.selected = -1
+
+    def _row_metrics(self, button):
+        inner = button.layout()
+        name = inner.itemAt(1).widget()
+        margins = inner.contentsMargins()
+        others = [inner.itemAt(i).widget() for i in range(inner.count()) if i != 1]
+        for widget in (name, *others):
+            widget.ensurePolished()
+        reserved = (margins.left() + margins.right()
+                    + max(0, inner.spacing()) * (inner.count() - 1)
+                    + sum(max(w.minimumWidth(), w.sizeHint().width()) for w in others))
+        natural = name.fontMetrics().horizontalAdvance(name.text()) + 4
+        return name, reserved, natural, margins.top() + margins.bottom()
+
+    def _size_rows(self, metrics, row_width):
+        for button, (name, reserved, _, padding) in metrics:
+            name_width = max(1, row_width - reserved - 4)
+            button.setFixedHeight(max(50, name.heightForWidth(name_width) + padding + 4))
+        self._layout.invalidate()
+        return self._layout.sizeHint().height()
+
+    def place_below_or_above(self, field):
+        screen = field.screen().availableGeometry()
+        anchor = field.mapToGlobal(QPoint(0, 0))
+        margins = self._layout.contentsMargins()
+        frame = self.contentsMargins()
+        inset = margins.left() + margins.right() + frame.left() + frame.right() + 4
+        metrics = [(self._layout.itemAt(i).widget(),
+                    self._row_metrics(self._layout.itemAt(i).widget()))
+                   for i in range(self._layout.count() - 1)]
+        wanted = max((reserved + natural for _, (_, reserved, natural, _) in metrics), default=0)
+        width = min(max(field.width(), wanted + inset), screen.width())
+        height = self._size_rows(metrics, width - inset)
+        vertical_inset = frame.top() + frame.bottom() + 4
+        top = max(screen.top(), min(anchor.y(), screen.bottom() + 1))
+        bottom = max(screen.top(), min(anchor.y() + field.height(), screen.bottom() + 1))
+        above, below = top - screen.top(), screen.bottom() + 1 - bottom
+        use_below = height + vertical_inset <= below or below >= above
+        available = max(1, below if use_below else above)
+        if height + vertical_inset > available:
+            bar_width = self._scroll.verticalScrollBar().sizeHint().width()
+            width = min(max(width, wanted + inset + bar_width), screen.width())
+            height = self._size_rows(metrics, width - inset - bar_width)
+        self._content.setMinimumHeight(height)
+        popup_height = min(height + vertical_inset, available)
+        x = max(screen.left(), min(anchor.x() + field.width() - width,
+                                   screen.right() + 1 - width))
+        y = bottom if use_below else top - popup_height
+        self.resize(width, popup_height)
+        self.move(x, y)
+        self.show()
+        self._scroll.verticalScrollBar().setValue(0)
 
     def move_selection(self, step):
         count = self._layout.count() - 1
@@ -109,6 +171,7 @@ class _ItemPopup(QFrame):
         for index in range(count):
             self._layout.itemAt(index).widget().setChecked(
                 index == self.selected)
+        self._scroll.ensureWidgetVisible(self._layout.itemAt(self.selected).widget(), 0, 0)
 
     def choose(self):
         if self.selected < 0:
@@ -162,9 +225,7 @@ class ItemSearch(QLineEdit):
                     if self.sale_price is not None else {})
         self.popup.show_results(rows, self.pick, self.new_item, query,
                                 sale_price=self.sale_price, balances=balances)
-        self.popup.move(self.mapToGlobal(self.rect().bottomLeft()))
-        self.popup.resize(self.width(), self.popup.sizeHint().height())
-        self.popup.show()
+        self.popup.place_below_or_above(self)
 
     def pick(self, item_id, kind, name):
         self.clear()
