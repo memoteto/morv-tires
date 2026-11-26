@@ -23,7 +23,7 @@ from morv.ui.party_search import (FoldableDetails, PartyInfoStrip, PartySearch,
                                   QuickPartyDialog, party_field, phone_query)
 from morv.ui.listpage import ListPage
 from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
-from morv.ui.widgets import (DateEdit, InvoiceTotal, card, chip, confirm_discard_invoice, deferred_button, field, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
+from morv.ui.widgets import (DateEdit, InvoiceFooter, InvoiceTotal, chip, confirm_discard_invoice, deferred_button, field, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
 
 
 
@@ -323,7 +323,8 @@ class PurchaseForm(QWidget):
         hint.setWordWrap(True)
         sbody.addWidget(hint)
 
-        self.summary_footer, footer = card(compact=True)
+        self.summary_footer = InvoiceFooter()
+        footer = self.summary_footer.layout()
         self.total_box = InvoiceTotal("إجمالي الفاتورة", compact=True)
         self._total_lbl = self.total_box.value
         footer.addWidget(self.total_box)
@@ -354,11 +355,11 @@ class PurchaseForm(QWidget):
         QShortcut(QKeySequence("F2"), self,
                   activated=self.item_search.setFocus)
         QShortcut(QKeySequence("F9"), self, activated=self.post)
-        footer.addWidget(self.post_btn)
+        self.summary_footer.add_action(self.post_btn)
 
         # Deferred actions
-        footer.addWidget(deferred_button("حفظ كمسودة"))
-        footer.addWidget(deferred_button("طباعة إذن الاستلام"))
+        self.summary_footer.add_action(deferred_button("حفظ كمسودة"))
+        self.summary_footer.add_action(deferred_button("طباعة إذن الاستلام"))
 
         sbody.addStretch(1)
 

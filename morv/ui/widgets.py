@@ -1,7 +1,7 @@
 """Small shared UI pieces, so screens stay consistent."""
-from PySide6.QtCore import QDate, QEvent, QLocale, Qt, Signal
+from PySide6.QtCore import QDate, QEvent, QLocale, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPalette, QStandardItem, QStandardItemModel, QTextCharFormat
-from PySide6.QtWidgets import (QCalendarWidget, QCompleter, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QBoxLayout, QCalendarWidget, QCompleter, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
                                QMenu, QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
 from morv.core.text import ltr
@@ -80,6 +80,50 @@ class InvoiceTotal(QPushButton):
                 QEvent.Type.StyleChange):
             self.updateGeometry()
         return result
+
+
+class InvoiceFooter(QFrame):
+    """Compact fixed controls with a measured horizontal option for narrow invoices."""
+
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("invoiceFooter")
+        row = QBoxLayout(QBoxLayout.Direction.TopToBottom, self)
+        x = tokens.LAYOUT["compact_card_padding_x"]
+        y = tokens.LAYOUT["compact_card_padding_y"]
+        row.setContentsMargins(x, y, x, y)
+        row.setSpacing(tokens.LAYOUT["compact_card_spacing"])
+        row.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+
+    def add_action(self, button):
+        button.setProperty("invoiceAction", True)
+        self.layout().addWidget(button)
+
+    def _control_widths(self):
+        widths = []
+        for i in range(self.layout().count()):
+            widget = self.layout().itemAt(i).widget()
+            if widget is not None and not widget.isHidden():
+                widths.append(max(widget.minimumWidth(), widget.minimumSizeHint().width(),
+                                  widget.sizeHint().width()))
+        return widths
+
+    def minimumSizeHint(self):
+        margins = self.layout().contentsMargins()
+        width = max(self._control_widths(), default=0) + margins.left() + margins.right()
+        return QSize(width, self.layout().minimumSize().height())
+
+    def set_row_width(self, available):
+        layout = self.layout()
+        margins = layout.contentsMargins()
+        widths = self._control_widths()
+        needed = sum(widths) + max(0, len(widths) - 1) * layout.spacing() + margins.left() + margins.right()
+        direction = (QBoxLayout.Direction.LeftToRight if available >= needed and len(widths) > 1
+                     else QBoxLayout.Direction.TopToBottom)
+        if layout.direction() != direction:
+            layout.setDirection(direction)
+            layout.invalidate()
+            self.updateGeometry()
 
 
 def section_card(title: str, icon_name: str, *, compact=False) -> tuple:

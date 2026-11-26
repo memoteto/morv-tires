@@ -109,6 +109,7 @@ class InvoiceWorkspace(QWidget):
     def __init__(self, primary, summary, footer, *, spacing, content_margins=(0, 0, 0, 0)):
         super().__init__()
         self.primary, self.summary, self.footer = primary, summary, footer
+        self.summary.setObjectName("invoiceSummaryBody")
         self.columns = 0
         self._reflowing = False
         self.grid = QGridLayout(self)
@@ -129,6 +130,13 @@ class InvoiceWorkspace(QWidget):
         self.primary_area = scroll_content(self._main_host)
         self.summary_area = scroll_content(self._summary_host)
         self.areas = (self.primary_area, self.summary_area)
+        self._summary_panel = QFrame()
+        self._summary_panel.setObjectName("invoiceSummaryPane")
+        self._panel_layout = QVBoxLayout(self._summary_panel)
+        self._panel_layout.setContentsMargins(0, 0, 0, 0)
+        self._panel_layout.setSpacing(LAYOUT["compact_card_spacing"])
+        self._panel_layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        self._panel_layout.addWidget(self.summary_area, 1)
         self._timer = QTimer(self, singleShot=True)
         self._timer.timeout.connect(self._reflow)
         for widget in (primary, summary, footer, self._main_host, self._summary_host):
@@ -181,20 +189,23 @@ class InvoiceWorkspace(QWidget):
             restore_focus = focus is not None and self.summary.isAncestorOf(focus)
             self._main_layout.removeWidget(self.summary)
             self._summary_layout.removeWidget(self.summary)
-            for widget in (*self.areas, self.footer):
+            for widget in (self.primary_area, self._summary_panel, self.footer):
                 self.grid.removeWidget(widget)
+            self._panel_layout.removeWidget(self.footer)
             self.columns = columns
             if columns == 2:
                 self._summary_layout.insertWidget(0, self.summary)
-                self.grid.addWidget(self.primary_area, 0, 0, 2, 1)
-                self.grid.addWidget(self.summary_area, 0, 1)
-                self.grid.addWidget(self.footer, 1, 1)
+                self.grid.addWidget(self.primary_area, 0, 0)
+                self.grid.addWidget(self._summary_panel, 0, 1, Qt.AlignmentFlag.AlignTop)
+                self._panel_layout.addWidget(self.footer)
+                self._summary_panel.show()
                 self.summary_area.show()
             else:
-                self.summary_area.hide()
+                self._summary_panel.hide()
                 self._main_layout.addWidget(self.summary)
                 self.grid.addWidget(self.primary_area, 0, 0)
                 self.grid.addWidget(self.footer, 1, 0)
+            self.footer.show()
             self.summary.show()
             self.grid.setColumnStretch(0, 3 if columns == 2 else 1)
             self.grid.setColumnStretch(1, 1 if columns == 2 else 0)
@@ -202,6 +213,15 @@ class InvoiceWorkspace(QWidget):
             self.grid.setRowStretch(1, 0)
             if restore_focus:
                 focus.setFocus()
+        self.footer.set_row_width(available if columns == 1 else 0)
+        if columns == 2:
+            # Use only the height needed by the summary, while reserving the footer on short screens.
+            height = self.height() - margins.top() - margins.bottom()
+            footer_height = self.footer.sizeHint().height()
+            natural = self._summary_host.sizeHint().height() + footer_height + self._panel_layout.spacing()
+            target = max(footer_height + self._panel_layout.spacing(), min(height, natural))
+            if self._summary_panel.minimumHeight() != target:
+                self._summary_panel.setFixedHeight(target)
         self.grid.setColumnMinimumWidth(0, left if columns == 2 else 0)
         self.grid.setColumnMinimumWidth(1, right if columns == 2 else 0)
         self.grid.activate()

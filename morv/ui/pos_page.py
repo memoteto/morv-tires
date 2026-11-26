@@ -18,7 +18,7 @@ from morv.ui.adaptive_layout import HeaderPlacement, InvoiceWorkspace
 from morv.ui.item_search import ItemSearch, KIND_ICON
 from morv.ui.party_search import (FoldableDetails, PartyInfoStrip, PartySearch,
                                   QuickPartyDialog, party_field, phone_query)
-from morv.ui.widgets import (InvoiceTotal, card, confirm_discard_invoice, chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
+from morv.ui.widgets import (InvoiceFooter, InvoiceTotal, confirm_discard_invoice, chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
 
 TIER_ATTR = {"retail": "price_retail", "wholesale": "price_wholesale", "super": "price_super"}
 TIER_LABELS = {"retail": "قطاعي (تجزئة)", "wholesale": "جملة", "super": "جملة الجملة"}
@@ -259,16 +259,17 @@ class PosPage(QWidget):
         for label, w in (("الإجمالي قبل الخصم", self.subtotal_label),
                           ("خصم على الفاتورة", self.invoice_disc)):
             body.addWidget(kv_row(label, w))
-        self.summary_footer, footer = card(compact=True)
+        self.summary_footer = InvoiceFooter()
+        footer = self.summary_footer.layout()
         self.total_box = InvoiceTotal(
             "الإجمالي النهائي", self._fill_exact_cash, compact=True)
         self.total_box.setAccessibleName("تعبئة المبلغ النقدي المطلوب")
         self.total_label = self.total_box.value
         footer.addWidget(self.total_box)
-        self._payment_section(body, footer)
+        self._payment_section(body)
         return box
 
-    def _payment_section(self, body: QVBoxLayout, footer: QVBoxLayout) -> None:
+    def _payment_section(self, body: QVBoxLayout) -> None:
         self.split_btn = QPushButton("تقسيم الدفع على وسيلتين")
         self.split_btn.setObjectName("link")
         self.split_btn.setCheckable(True)
@@ -358,19 +359,18 @@ class PosPage(QWidget):
         self.post_btn = QPushButton("اعتماد وتحصيل")
         self.post_btn.setObjectName("primary")
         self.post_btn.setIcon(icons.icon("check", tokens.ICON_ON_PRIMARY, 18))
+        self.post_btn.setProperty("shortcutBadge", True)
         inner = QHBoxLayout(self.post_btn)
         inner.setContentsMargins(16, 0, 16, 0)
         inner.addStretch(1)
         inner.addWidget(kbd("F9", on_primary=True))
         self.post_btn.clicked.connect(self.post)
-        footer.addWidget(self.post_btn)
-        row = QHBoxLayout()
-        row.addWidget(deferred_button("حفظ كمسودة"), 1)
+        self.summary_footer.add_action(self.post_btn)
+        self.summary_footer.add_action(deferred_button("حفظ كمسودة"))
         self.post_print_btn = QPushButton("اعتماد وطباعة")
         self.post_print_btn.setIcon(icons.icon("printer", tokens.ICON_MUTED, 16))
         self.post_print_btn.clicked.connect(lambda: self.post(and_print=True))
-        row.addWidget(self.post_print_btn, 1)
-        footer.addLayout(row)
+        self.summary_footer.add_action(self.post_print_btn)
         self._on_method_changed()
 
     # ---------- Builders ----------

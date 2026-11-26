@@ -62,6 +62,7 @@ def palette(t: dict) -> QPalette:
             p.setColor(group, role, QColor(t[key]))
     p.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(t["muted"]))
     p.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor(t["muted"]))
+    p.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.PlaceholderText, QColor(t["muted"]))
     return p
 
 
@@ -267,8 +268,19 @@ QToolButton#stepBtn {{ background:{t['surface']}; border:1px solid {t['border_st
 QFrame#totalBox {{ background:{t['primary_soft']}; border:0; border-radius:10px; }}
 QPushButton#totalBox {{ background:{t['primary_soft']}; border:1px solid transparent; border-radius:10px; padding:0; }}
 QPushButton#totalBox:enabled:hover, QPushButton#totalBox:enabled:focus {{ border-color:{t['primary']}; }}
-QLabel#totalLabel {{ color:{t['primary']}; font-size:{t['fs']+2}px; font-weight:700; }}
-QLabel#totalValue {{ color:{t['primary']}; font-size:{t['fs']+3}px; font-weight:700; }}
+QLabel#totalLabel {{ color:{t['total_text']}; font-size:{t['fs']+2}px; font-weight:700; }}
+QLabel#totalValue {{ color:{t['total_text']}; font-size:{t['fs']+3}px; font-weight:700; }}
+QFrame#invoiceSummaryPane, QFrame#invoiceFooter {{
+    background:{t['surface']}; border:1px solid {t['border']}; border-radius:12px;
+}}
+QFrame#invoiceSummaryPane QFrame#card, QFrame#invoiceSummaryPane QFrame#invoiceFooter {{
+    background:transparent; border:0;
+}}
+QFrame#invoiceFooter QPushButton[invoiceAction="true"] {{ min-height:34px; padding:0 10px; }}
+QFrame#invoiceFooter QPushButton#primary[shortcutBadge="true"] {{ padding-left:48px; }}
+QWidget#invoiceSummaryBody QLineEdit:disabled {{
+    color:{t['muted']}; placeholder-text-color:{t['muted']};
+}}
 QFrame#payBox {{ background:{t['surface2']}; border:1px solid {t['border']}; border-radius:10px; }}
 QFrame#changeBox {{ background:{t['success_soft']}; border:0; border-radius:8px; }}
 QLabel#changeLabel {{ color:{t['success']}; font-size:{t['fs']+1}px; font-weight:700; }}
