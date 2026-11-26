@@ -42,3 +42,6 @@ POS-3: four baseline tests exposed six failures; simplified invoice headers and 
 Owner design approval, 1061 tests on both platforms and CI passed; POS-3 merged in PR #160 (452e07d).
 POS-4: four baseline tests failed for scrolling totals/actions; owner approved compact fixed summary, shared layout and deferred toast. Implementation verification pending.
 POS-4 local: 1065 tests and Ruff passed; visual review identified gap, oversized controls and contrast defects. Seven added checks reproduced all seven defects. Owner approved refinement; repeat all eleven diagnostic tests and visual/CI verification.
+
+POS-5 baseline: 10 tests, nine failing with 128 subtest failures; tyre DOT validation passed. Long names overflowed by 221/203 px and displaced the medium-width summary.
+POS-5 implementation: shared invoice columns, wrapped names and battery DOT hidden; owner approved preserving alignment and name space. Local regression and visual verification pending.
