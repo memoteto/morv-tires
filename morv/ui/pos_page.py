@@ -183,7 +183,7 @@ class PosPage(QWidget):
         top.setSpacing(10)
         self.item_search = ItemSearch(
             self, lambda: (self._kind,) if self._kind else
-            ("tire", "battery", "service"), icon_size=18)
+            ("tire", "battery", "service"), icon_size=18, sale_price=self._tier_price)
         self._item_popup = self.item_search.popup
         self._do_item_search = self.item_search.search
         top.addWidget(self.item_search, 1)
@@ -370,6 +370,8 @@ class PosPage(QWidget):
         self.tier_combo.setCurrentIndex(max(self.tier_combo.findData(self.tier), 0))
         self.tier_combo.blockSignals(False)
         self.tier_chip.setText(f"فئة السعر: {TIER_SHORT[self.tier]}")
+        if hasattr(self, "item_search") and self.item_search.popup.isVisible():
+            self.item_search.search()
 
     def _set_kind(self, kind) -> None:
         self._kind = kind
@@ -575,12 +577,16 @@ class PosPage(QWidget):
         self._renumber()
         self._on_row_changed()
 
+    def _tier_price(self, retail, wholesale, super_price):
+        prices = {"price_retail": retail, "price_wholesale": wholesale, "price_super": super_price}
+        return prices[TIER_ATTR[self.tier]] or retail
+
     def _tier_price_text(self, item_id: int) -> str:
         try:
             it = items.get(self.session.con, item_id)
         except items.ItemError:
             return "0.00"
-        cents = getattr(it, TIER_ATTR[self.tier], 0) or it.price_retail
+        cents = self._tier_price(it.price_retail, it.price_wholesale, it.price_super)
         return f"{cents // 100}.{cents % 100:02d}"
 
     def _remove_row(self, row: dict) -> None:

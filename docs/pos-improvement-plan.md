@@ -45,3 +45,6 @@ POS-4 local: 1065 tests and Ruff passed; visual review identified gap, oversized
 
 POS-5 baseline: 10 tests, nine failing with 128 subtest failures; tyre DOT validation passed. Long names overflowed by 221/203 px and displaced the medium-width summary.
 POS-5 implementation: shared invoice columns, wrapped names and battery DOT hidden; owner approved preserving alignment and name space. Local regression and visual verification pending.
+
+POS search details: owner approved design 3 and removal of repeated specifications; Ubuntu baseline 1093 tests with 11 expected subtest failures.
+Implemented sale tier price and batched physical stock with existing status pills; shared spec deduplication, no purchase sale prices. CI and visual review pending.

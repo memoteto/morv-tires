@@ -1,17 +1,29 @@
 """Shared invoice item lookup and keyboard selection."""
+import re
+
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QSizePolicy, QVBoxLayout,
 )
 
-from morv.core.text import ltr
-from morv.infra import items
+from morv.core.money import fmt
+from morv.core.text import ltr, norm_ar
+from morv.infra import inventory, items
 from morv.ui import icons
 from morv.ui.inventory_page import ItemDialog
-from morv.ui.widgets import ICON_MUTED, muted, trail_icon
+from morv.ui.invoice_lines import wrapping_line_label
+from morv.ui.widgets import ICON_MUTED, chip, muted, trail_icon
 
 KIND_ICON = {"tire": "tire", "battery": "battery", "service": "service"}
+
+
+def _extra_spec(name, spec):
+    if not spec:
+        return ""
+    # A full token match tolerates spaces, digit variants and letter case.
+    pattern = r"\s*".join(re.escape(ch) for ch in norm_ar(spec) if not ch.isspace())
+    return "" if re.search(r"(?<![a-z0-9])" + pattern + r"(?![a-z0-9])", norm_ar(name)) else spec
 
 
 class _ItemPopup(QFrame):
@@ -26,14 +38,15 @@ class _ItemPopup(QFrame):
         self._layout.setContentsMargins(6, 6, 6, 6)
         self._layout.setSpacing(2)
 
-    def show_results(self, rows, on_pick, on_new, query: str) -> None:
+    def show_results(self, rows, on_pick, on_new, query: str, *, sale_price=None, balances=None) -> None:
         while self._layout.count():
             item = self._layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+        price_labels, stock_labels = [], []
         for row in rows[:8]:
             item_id, kind, _code, name = row[0], row[1], row[2], row[3]
-            spec = row[4] if len(row) > 4 else ""
+            spec = _extra_spec(name, row[4])
             btn = QPushButton()
             btn.setFlat(True)
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -44,15 +57,38 @@ class _ItemPopup(QFrame):
             inner.setContentsMargins(8, 4, 8, 4)
             ic = QLabel()
             ic.setPixmap(icons.icon(KIND_ICON.get(kind, "inventory"), ICON_MUTED, 18).pixmap(18, 18))
-            name_lbl = QLabel(name)
+            name_lbl = wrapping_line_label(name)
             name_lbl.setObjectName("cardTitle")
-            spec_lbl = muted(ltr(spec) if spec else "")
+            name_lbl.setToolTip(name)
             inner.addWidget(ic)
-            inner.addWidget(name_lbl)
-            inner.addWidget(spec_lbl)
-            inner.addStretch(1)
+            inner.addWidget(name_lbl, 1)
+            if spec:
+                spec_lbl = muted(ltr(spec))
+                spec_lbl.setWordWrap(False)
+                inner.addWidget(spec_lbl)
+            if sale_price is not None:
+                price = chip(f"{ltr(fmt(sale_price(*row[5:8])))} ج.م")
+                price.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                price_labels.append(price)
+                stock = QLabel()
+                stock.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                if kind in ("tire", "battery"):
+                    qty = balances.get(item_id, 0)
+                    stock.setText(f"متوفر: {ltr(qty)}")
+                    stock.setObjectName("pillDanger" if qty <= 0 else
+                                        "pillWarn" if qty < row[8] else "pillOk")
+                    stock.setToolTip("الرصيد الفعلي قبل اعتماد الفاتورة")
+                stock_labels.append(stock)
+                inner.addWidget(stock)
+                inner.addWidget(price)
             btn.clicked.connect(lambda _, iid=item_id, ik=kind, iname=name: on_pick(iid, ik, iname))
             self._layout.addWidget(btn)
+        for labels in (price_labels, stock_labels):
+            for label in labels:
+                label.ensurePolished()
+            width = max((label.sizeHint().width() for label in labels), default=0)
+            for label in labels:
+                label.setFixedWidth(width)
         new_btn = QPushButton(f"+ صنف جديد سريع: {query}" if query else "+ صنف جديد سريع")
         new_btn.setObjectName("primary")
         new_btn.setFlat(True)
@@ -82,10 +118,11 @@ class _ItemPopup(QFrame):
 
 
 class ItemSearch(QLineEdit):
-    def __init__(self, form, kinds, icon_size=16):
+    def __init__(self, form, kinds, icon_size=16, *, sale_price=None):
         super().__init__(form)
         self.form = form
         self.kinds = kinds
+        self.sale_price = sale_price
         self.setPlaceholderText("اسم الصنف، الكود، المقاس أو امسح الباركود")
         self.addAction(icons.icon("search", ICON_MUTED, icon_size),
                        QLineEdit.ActionPosition.LeadingPosition)
@@ -120,7 +157,11 @@ class ItemSearch(QLineEdit):
                                      kind=kind, limit=8 - len(rows)))
             if len(rows) == 8:
                 break
-        self.popup.show_results(rows, self.pick, self.new_item, query)
+        balances = (inventory.on_hand_many(self.form.session.con,
+                                           (row[0] for row in rows if row[1] in ("tire", "battery")))
+                    if self.sale_price is not None else {})
+        self.popup.show_results(rows, self.pick, self.new_item, query,
+                                sale_price=self.sale_price, balances=balances)
         self.popup.move(self.mapToGlobal(self.rect().bottomLeft()))
         self.popup.resize(self.width(), self.popup.sizeHint().height())
         self.popup.show()
