@@ -1,4 +1,4 @@
-"""Returns of purchased stock to the supplier at invoice cost, with a mirrored reversal document."""
+"""Returns of purchased stock to the supplier at book value, with a mirrored reversal document."""
 import hashlib
 import json
 import sqlite3
