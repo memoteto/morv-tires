@@ -126,7 +126,6 @@ class InvoiceWorkspace(QWidget):
         self._summary_layout = QVBoxLayout(self._summary_host)
         self._summary_layout.setContentsMargins(0, 0, 0, 0)
         self._summary_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        self._summary_layout.addStretch(1)
         self.primary_area = scroll_content(self._main_host)
         self.summary_area = scroll_content(self._summary_host)
         self.areas = (self.primary_area, self.summary_area)
@@ -218,8 +217,12 @@ class InvoiceWorkspace(QWidget):
             # Use only the height needed by the summary, while reserving the footer on short screens.
             height = self.height() - margins.top() - margins.bottom()
             footer_height = self.footer.sizeHint().height()
-            natural = self._summary_host.sizeHint().height() + footer_height + self._panel_layout.spacing()
-            target = max(footer_height + self._panel_layout.spacing(), min(height, natural))
+            frame = self._summary_panel.contentsMargins()
+            frame_height = frame.top() + frame.bottom()
+            natural = (self._summary_host.sizeHint().height() + footer_height
+                       + self._panel_layout.spacing() + frame_height)
+            target = max(footer_height + self._panel_layout.spacing() + frame_height,
+                         min(height, natural))
             if self._summary_panel.minimumHeight() != target:
                 self._summary_panel.setFixedHeight(target)
         self.grid.setColumnMinimumWidth(0, left if columns == 2 else 0)
