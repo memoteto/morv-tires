@@ -32,7 +32,7 @@ class _ItemPopup(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("card")
-        self.setWindowFlags(Qt.WindowType.ToolTip)
+        self.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
