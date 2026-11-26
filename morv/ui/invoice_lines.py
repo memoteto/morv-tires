@@ -68,8 +68,9 @@ class InvoiceLineTable(QWidget):
         widths[0] = max(widths[0], self._text_width(self.headers[0], "999") + 2)
         inset = LAYOUT["invoice_line_edit_inset"]
         for column in (3, 4):
-            sample = "9999" if self.purchase and column == 4 else "999,999.99"
-            widths[column] = max(widths[column], self._text_width(self.headers[column], sample) + inset)
+            samples = ("9999", "WWYY") if self.purchase and column == 4 else ("999,999.99",)
+            widths[column] = max(widths[column], max(self._text_width(self.headers[column], sample)
+                                                     for sample in samples) + inset)
         widths[5] = max(widths[5], self._text_width(self.headers[5], "999,999.99") + 4)
         widths[6] = LAYOUT["invoice_line_delete_width"]
 
@@ -79,10 +80,12 @@ class InvoiceLineTable(QWidget):
             for column in (3, 4):
                 cell = cells[column]
                 editor = cell.layout().itemAt(0).widget() if self.purchase and column == 3 else cell
-                # Keep normal amounts readable without letting arbitrary invalid input widen the invoice.
-                value = editor.text()[:17]
-                widths[column] = max(widths[column], editor.minimumSizeHint().width(),
-                                     self._text_width(editor, value) + inset)
+                # A generic line edit's minimum hint reserves room for unrelated longer text.
+                # Use its own font, placeholder, normal value and themed horizontal inset instead.
+                samples = ("9999", "WWYY") if self.purchase and column == 4 else ("999,999.99",)
+                values = (*samples, editor.placeholderText(), editor.text()[:17])
+                widths[column] = max(widths[column], max(self._text_width(editor, value)
+                                                         for value in values) + inset)
             widths[5] = max(widths[5], self._text_width(cells[5], cells[5].text()) + 4)
 
         name_min = max(widths[1], max(widths[2:6]) + LAYOUT["invoice_line_name_icon_space"])
@@ -93,6 +96,12 @@ class InvoiceLineTable(QWidget):
                         cell.setMinimumWidth(name_min)
                 elif cell.minimumWidth() != widths[column] or cell.maximumWidth() != widths[column]:
                     cell.setFixedWidth(widths[column])
+        if self.purchase:
+            for cells in cells_by_row[1:]:
+                # The cost editor sits inside a vertical cell; override its generic hint as well.
+                editor = cells[3].layout().itemAt(0).widget()
+                if editor.minimumWidth() != widths[3] or editor.maximumWidth() != widths[3]:
+                    editor.setFixedWidth(widths[3])
 
     def changeEvent(self, event):
         super().changeEvent(event)
