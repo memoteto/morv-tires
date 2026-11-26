@@ -54,3 +54,5 @@ Visual audit b054d69 confirmed all 12 captures, but clipped names at 1366/1093 a
 Owner approved content-driven popup width, adaptive row height and screen-constrained scrolling with right alignment; new geometry/keyboard tests and CI pending.
 CI geometry logs confirmed 2px native frame margins on both platforms; removing the native frame passed geometry tests but violated the UI architecture guard.
 Restored tooltip flags and account for measured native frame margins in sizing and positioning; unchanged geometry assertions and all CI checks pending.
+POS search completed: PR #164 merged at ebf5efc after 1095 tests per platform and 12 successful popup captures; owner explicitly approved merge, no device screenshot supplied.
+POS-6A: added three mixed-stock UI integration cases for split discounts/DOT/FIFO, atomic short-stock retry and partial credit; CI verification pending, no application changes.
