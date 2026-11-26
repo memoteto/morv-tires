@@ -15,6 +15,7 @@ from morv.infra import customer_receipts, customers, items, sale_view, sales, us
 from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons, tokens
 from morv.ui.adaptive_layout import HeaderPlacement, InvoiceWorkspace
+from morv.ui.invoice_lines import InvoiceLineTable, wrapping_line_label
 from morv.ui.item_search import ItemSearch, KIND_ICON
 from morv.ui.party_search import (FoldableDetails, PartyInfoStrip, PartySearch,
                                   QuickPartyDialog, party_field, phone_query)
@@ -215,22 +216,11 @@ class PosPage(QWidget):
         quick.addStretch(1)
         body.addLayout(quick)
 
-        # Lines header row (column titles, once)
         self._rows: list[dict] = []
-        lines_head = QHBoxLayout()
-        lines_head.setContentsMargins(4, 0, 4, 0)
-        lines_head.setSpacing(10)
-        for text, stretch in (("#", 0), ("الصنف / الخدمة", 3), ("الكمية", 1),
-                              ("السعر", 1), ("الخصم", 1), ("الإجمالي", 1), ("", 0)):
-            h_lbl = muted(text)
-            h_lbl.setWordWrap(False)
-            lines_head.addWidget(h_lbl, stretch)
-        body.addLayout(lines_head)
-
-        # Line rows: each row is self-contained (inline qty/price/discount + delete icon)
-        self._rows_container = QVBoxLayout()
-        self._rows_container.setSpacing(4)
-        body.addLayout(self._rows_container, 1)
+        self._line_table = InvoiceLineTable(
+            ("#", "الصنف / الخدمة", "الكمية", "السعر", "الخصم", "الإجمالي", ""))
+        self._rows_container = self._line_table.rows
+        body.addWidget(self._line_table, 1)
 
         self.empty_label = muted("الفاتورة فارغة. ابحث عن صنف أو امسح الباركود للبدء.")
         self._rows_container.addWidget(self.empty_label)
@@ -513,9 +503,7 @@ class PosPage(QWidget):
     # ---------- Lines: one self-contained row per item, added on pick ----------
     def _add_row(self, item_id: int, kind: str, name: str) -> None:
         row_w = QWidget()
-        h = QHBoxLayout(row_w)
-        h.setContentsMargins(4, 2, 4, 2)
-        h.setSpacing(10)
+        h = self._line_table.row_layout(row_w)
 
         num_lbl = muted("")
         num_lbl.setWordWrap(False)
@@ -527,10 +515,10 @@ class PosPage(QWidget):
         iw.setSpacing(6)
         ic = QLabel()
         ic.setPixmap(icons.icon(KIND_ICON.get(kind, "inventory"), ICON_MUTED, 16).pixmap(16, 16))
-        name_lbl = QLabel(name)
+        name_lbl = wrapping_line_label(name)
         iw.addWidget(ic)
         iw.addWidget(name_lbl, 1)
-        h.addWidget(item_w, 3, Qt.AlignmentFlag.AlignTop)
+        h.addWidget(item_w, 1, Qt.AlignmentFlag.AlignTop)
 
         qty_spin = QSpinBox()
         qty_spin.setRange(1, 100000)
@@ -619,6 +607,7 @@ class PosPage(QWidget):
             except MoneyError:
                 disc = 0
             row["total_lbl"].setText(ltr(fmt(max(row["qty_spin"].value() * price - disc, 0))))
+        self._line_table.sync_columns()
         pieces = sum(row["qty_spin"].value() for row in self._rows)
         self.count_chip.setText(f"{ltr(str(len(self._rows)))} سطر · {ltr(str(pieces))} قطعة")
         self._refresh_total()

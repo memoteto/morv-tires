@@ -18,6 +18,7 @@ from morv.infra.purchasing import PurchaseError, PurchaseLine
 from morv.infra import suppliers as sup_infra
 from morv.ui import icons
 from morv.ui.adaptive_layout import HeaderPlacement, InvoiceWorkspace
+from morv.ui.invoice_lines import InvoiceLineTable, wrapping_line_label
 from morv.ui.item_search import ItemSearch, KIND_ICON
 from morv.ui.party_search import (FoldableDetails, PartyInfoStrip, PartySearch,
                                   QuickPartyDialog, party_field, phone_query)
@@ -269,22 +270,12 @@ class PurchaseForm(QWidget):
         item_search_row.addWidget(new_item_btn)
         ibody.addLayout(item_search_row)
 
-        # Lines header row (column titles, once)
         self._rows: list[dict] = []
-        lines_head = QHBoxLayout()
-        lines_head.setContentsMargins(4, 0, 4, 0)
-        lines_head.setSpacing(10)
-        for text, stretch in (("#", 0), ("الصنف", 3), ("الكمية", 1),
-                              ("تكلفة الوحدة", 1), ("DOT", 1), ("الإجمالي", 1), ("", 0)):
-            h_lbl = muted(text)
-            h_lbl.setWordWrap(False)
-            lines_head.addWidget(h_lbl, stretch)
-        ibody.addLayout(lines_head)
-
-        # Line rows: each row is self-contained (inline qty/cost/DOT + delete icon)
-        self._rows_container = QVBoxLayout()
-        self._rows_container.setSpacing(4)
-        ibody.addLayout(self._rows_container, 1)
+        self._line_table = InvoiceLineTable(
+            ("#", "الصنف", "الكمية", "تكلفة الوحدة", "DOT", "الإجمالي", ""),
+            purchase=True)
+        self._rows_container = self._line_table.rows
+        ibody.addWidget(self._line_table, 1)
 
         self._empty_lbl = muted("لا توجد أصناف بعد. ابحث عن صنف أو امسح الباركود، أو أضف صنفًا جديدًا.")
         self._rows_container.addWidget(self._empty_lbl)
@@ -434,9 +425,7 @@ class PurchaseForm(QWidget):
     # ---------- Lines: one self-contained row per item, added on pick ----------
     def _add_row(self, item_id: int, kind: str, name: str) -> None:
         row_w = QWidget()
-        h = QHBoxLayout(row_w)
-        h.setContentsMargins(4, 2, 4, 2)
-        h.setSpacing(10)
+        h = self._line_table.row_layout(row_w)
 
         num_lbl = muted("")
         num_lbl.setWordWrap(False)
@@ -448,10 +437,10 @@ class PurchaseForm(QWidget):
         iw.setSpacing(6)
         ic = QLabel()
         ic.setPixmap(icons.icon(KIND_ICON.get(kind, "inventory"), ICON_MUTED, 16).pixmap(16, 16))
-        name_lbl = QLabel(name)
+        name_lbl = wrapping_line_label(name)
         iw.addWidget(ic)
         iw.addWidget(name_lbl, 1)
-        h.addWidget(item_w, 3, Qt.AlignmentFlag.AlignTop)
+        h.addWidget(item_w, 1, Qt.AlignmentFlag.AlignTop)
 
         # Quantity stepper: explicit −/+ buttons instead of the spin box's
         # own tiny native arrows.
@@ -485,8 +474,7 @@ class PurchaseForm(QWidget):
         cw.setContentsMargins(0, 0, 0, 0)
         cw.setSpacing(2)
         cost_edit = ltr_edit("0.00")
-        cost_note = QLabel("")
-        cost_note.setWordWrap(False)
+        cost_note = wrapping_line_label()
         # Hidden (not just empty) so the cell is single-line height like its
         # row-mates; it only grows the row when there is a note to show,
         # instead of always reserving a second line that pushed cost_edit
@@ -497,6 +485,11 @@ class PurchaseForm(QWidget):
         h.addWidget(cost_w, 1, Qt.AlignmentFlag.AlignTop)
 
         dot_edit = ltr_edit("WWYY")
+        if kind == "battery":
+            policy = dot_edit.sizePolicy()
+            policy.setRetainSizeWhenHidden(True)
+            dot_edit.setSizePolicy(policy)
+            dot_edit.hide()
         h.addWidget(dot_edit, 1, Qt.AlignmentFlag.AlignTop)
 
         total_lbl = QLabel(ltr(fmt(0)))
@@ -548,6 +541,7 @@ class PurchaseForm(QWidget):
                 cost = 0
             row["total_lbl"].setText(ltr(fmt(row["qty_spin"].value() * cost)))
             self._update_cost_note(row, cost)
+        self._line_table.sync_columns()
         self._line_count_lbl.setText(f"{len(self._rows)} سطر")
         self._refresh_summary()
 
