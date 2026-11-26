@@ -11,10 +11,10 @@ def contrast(foreground, background):
     bg = (background.redF(), background.greenF(), background.blueF())
     fg = (foreground.redF(), foreground.greenF(), foreground.blueF())
     alpha = foreground.alphaF()
-    fg = tuple(a * alpha + b * (1 - alpha) for a, b in zip(fg, bg))
+    fg = tuple(a * alpha + b * (1 - alpha) for a, b in zip(fg, bg, strict=True))
 
     def luminance(rgb):
-        return sum(linear(c) * w for c, w in zip(rgb, (.2126, .7152, .0722)))
+        return sum(linear(c) * w for c, w in zip(rgb, (.2126, .7152, .0722), strict=True))
 
     light, dark = sorted((luminance(fg), luminance(bg)), reverse=True)
     return (light + .05) / (dark + .05)
