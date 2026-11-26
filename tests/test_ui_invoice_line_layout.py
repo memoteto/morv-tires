@@ -167,3 +167,59 @@ class InvoiceLineLayoutTest(PosFixture):
         self.assertIsNone(error)
         self.assertEqual([line.dot for line in lines], ["2324", None, "2324"])
         self.assertIsNone(page.posted)
+
+    def check_vertical_alignment(self, purchase, *, cost_note=False):
+        from PySide6.QtCore import QPoint
+        from PySide6.QtWidgets import QLabel
+
+        win, page = self.invoice(purchase)
+        if cost_note:
+            page._rows[0]["last_cost"] = 1000000
+            page._on_row_changed()
+            self.settle()
+            self.assertTrue(page._rows[0]["cost_note"].isVisibleTo(page),
+                            "SETUP: cost comparison must be visible")
+
+        def center_y(widget):
+            rect = widget.contentsRect()
+            return widget.mapTo(page, QPoint(0, rect.y())).y() + (rect.height() - 1) / 2
+
+        for dark in (False, True):
+            if win.dark != dark:
+                win.toggle_theme()
+            for width, height in ((1024, 640), (1366, 768), (1920, 1080)):
+                win.resize(width, height)
+                self.settle()
+                for row in page._rows:
+                    editor = row["cost_edit" if purchase else "price_edit"]
+                    name = self.name_label(page, row)
+                    icons = [label for label in name.parentWidget().findChildren(QLabel)
+                             if label is not name and label.pixmap() is not None
+                             and not label.pixmap().isNull()]
+                    self.assertEqual(len(icons), 1, "SETUP: item icon")
+                    for key in ("num_lbl", "total_lbl", "qty_spin",
+                                "dot_edit" if purchase else "disc_edit"):
+                        cell = row[key]
+                        if not cell.isVisibleTo(page):
+                            continue
+                        with self.subTest(dark=dark, width=width, name=row["name"], cell=key):
+                            self.assertLessEqual(abs(center_y(cell) - center_y(editor)), 1,
+                                                 "POS5_VERTICAL_FIELD_ALIGNMENT")
+                    with self.subTest(dark=dark, width=width, name=row["name"], cell="item_icon"):
+                        self.assertLessEqual(abs(center_y(icons[0]) - center_y(name)), 1,
+                                             "POS5_NAME_ICON_ALIGNMENT")
+                    if name.heightForWidth(name.width()) <= name.fontMetrics().height() + 2:
+                        with self.subTest(dark=dark, width=width, name=row["name"], cell="single_line_name"):
+                            self.assertLessEqual(abs(center_y(name) - center_y(editor)), 1,
+                                                 "POS5_SINGLE_LINE_NAME_ALIGNMENT")
+                self.fits(page.invoice_layout, "POS5_VERTICAL_NO_CLIP")
+        self.assertIsNone(page.posted)
+
+    def test_sale_vertical_alignment(self):
+        self.check_vertical_alignment(False)
+
+    def test_purchase_vertical_alignment(self):
+        self.check_vertical_alignment(True)
+
+    def test_purchase_vertical_alignment_with_cost_note(self):
+        self.check_vertical_alignment(True, cost_note=True)
