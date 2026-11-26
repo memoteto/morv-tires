@@ -56,6 +56,19 @@ class InvoiceLineTable(QWidget):
     def _text_width(widget, text):
         return widget.fontMetrics().horizontalAdvance(text)
 
+    def _align_row_height(self, cells):
+        reference = cells[3].layout().itemAt(0).widget() if self.purchase else cells[3]
+        reference.ensurePolished()
+        height = max(reference.minimumHeight(), reference.minimumSizeHint().height(),
+                     reference.sizeHint().height())
+        # Keep single-line labels centered on the first input, even in taller rows.
+        for label in (cells[0], cells[5]):
+            if label.minimumHeight() != height or label.maximumHeight() != height:
+                label.setFixedHeight(height)
+        # A wrapped name may grow naturally; its icon remains centered beside it.
+        if cells[1].minimumHeight() != height:
+            cells[1].setMinimumHeight(height)
+
     def sync_columns(self):
         cells_by_row = [self.headers]
         for index in range(self.rows.count()):
@@ -96,6 +109,8 @@ class InvoiceLineTable(QWidget):
                         cell.setMinimumWidth(name_min)
                 elif cell.minimumWidth() != widths[column] or cell.maximumWidth() != widths[column]:
                     cell.setFixedWidth(widths[column])
+        for cells in cells_by_row[1:]:
+            self._align_row_height(cells)
         if self.purchase:
             for cells in cells_by_row[1:]:
                 # The cost editor sits inside a vertical cell; override its generic hint as well.
