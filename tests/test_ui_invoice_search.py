@@ -267,6 +267,27 @@ class InvoiceSearchTest(PosFixture):
         self.assertFalse(any("select * from items where id" in sql.lower()
                              for sql in statements), "SEARCH_PRICE_N_PLUS_ONE")
 
+    def assert_popup_on_screen(self, search, marker):
+        from PySide6.QtCore import QPoint
+
+        popup = search.popup
+        screen = search.screen().availableGeometry()
+        frame = popup.frameGeometry()
+        handle = popup.windowHandle()
+        margins = handle.frameMargins() if handle else None
+        diagnostic = (
+            f"{marker}: platform={self.app.platformName()} screen={screen.getRect()} "
+            f"field_origin={search.mapToGlobal(QPoint(0, 0))} field_size={search.size()} "
+            f"popup_geometry={popup.geometry().getRect()} popup_frame={frame.getRect()} "
+            f"frame_margins={margins} popup_minimum={popup.minimumSize()} "
+            f"popup_minimum_hint={popup.minimumSizeHint()} "
+            f"content_minimum={popup._content.minimumSize()} "
+            f"scroll_viewport={popup._scroll.viewport().size()} "
+            f"scroll_range={popup._scroll.verticalScrollBar().maximum()} "
+            f"direction={search.layoutDirection()}"
+        )
+        self.assertTrue(screen.contains(frame), diagnostic)
+
     def test_search_popup_expands_and_preserves_long_names(self):
         from PySide6.QtWidgets import QLabel
 
@@ -281,8 +302,7 @@ class InvoiceSearchTest(PosFixture):
                 popup = form._item_popup
                 self.assertEqual(search.width(), 292)
                 self.assertGreater(popup.width(), search.width(), "SEARCH_POPUP_EXPANSION")
-                self.assertTrue(search.screen().availableGeometry().contains(popup.frameGeometry()),
-                                "SEARCH_POPUP_SCREEN_BOUNDS")
+                self.assert_popup_on_screen(search, "SEARCH_POPUP_SCREEN_BOUNDS")
                 button = popup._layout.itemAt(0).widget()
                 label = next(x for x in button.findChildren(QLabel) if x.text() == name)
                 self.assertGreater(label.width(), 0, "SEARCH_NAME_WIDTH")
@@ -305,8 +325,7 @@ class InvoiceSearchTest(PosFixture):
         self.app.processEvents()
         popup = form._item_popup
         self.assertEqual(popup._layout.count(), 9)
-        self.assertTrue(form.item_search.screen().availableGeometry().contains(popup.frameGeometry()),
-                        "SEARCH_EIGHT_SCREEN_BOUNDS")
+        self.assert_popup_on_screen(form.item_search, "SEARCH_EIGHT_SCREEN_BOUNDS")
         self.key(form.item_search, "Up")
         button = popup._layout.itemAt(7).widget()
         self.assertTrue(button.isChecked(), "SEARCH_LAST_SELECTED")
