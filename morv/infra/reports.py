@@ -471,7 +471,8 @@ def supplier_balances(con, end: str) -> Table:
             "JOIN journal_entries e ON e.id = p.journal_entry_id WHERE e.entry_date <= ? GROUP BY s.id", (end,)):
         per[sid] = [name, total, 0]
     for sid, name, back in con.execute(
-            "SELECT s.id, s.name, sum(CASE r.kind WHEN 'return' THEN r.total ELSE -r.total END) "
+            # settlement_amount, not the inventory book value, is what changed what the supplier is owed
+            "SELECT s.id, s.name, sum(CASE r.kind WHEN 'return' THEN r.settlement_amount ELSE -r.settlement_amount END) "
             "FROM purchase_returns r JOIN suppliers s ON s.id = r.supplier_id "
             "JOIN journal_entries e ON e.id = r.journal_entry_id WHERE e.entry_date <= ? GROUP BY s.id", (end,)):
         per.setdefault(sid, [name, 0, 0])[1] -= back
