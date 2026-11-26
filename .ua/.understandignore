@@ -1,0 +1,9 @@
+/*
+!/morv/
+
+*.ttf
+*.png
+*.ico
+__pycache__/
+morv/ui/fonts/OFL-*.txt
+.ua/

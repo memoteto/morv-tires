@@ -1,10 +1,10 @@
 {
   "version": "1.0.0",
   "gitCommitHash": "b9a1cdc37e5018d39f8079f15323ef24d3b1590d",
-  "generatedAt": "2026-11-26T11:56:19.659Z",
+  "generatedAt": "2026-11-26T12:40:15.665Z",
   "files": {
-    "__init__.py": {
-      "filePath": "__init__.py",
+    "morv/__init__.py": {
+      "filePath": "morv/__init__.py",
       "contentHash": "a92fb2708112cd2b6d5dfb4f46ff4bf9a1155c34ca25c264f6066e16929f2114",
       "functions": [],
       "classes": [],
@@ -13,8 +13,8 @@
       "totalLines": 6,
       "hasStructuralAnalysis": true
     },
-    "app/__init__.py": {
-      "filePath": "app/__init__.py",
+    "morv/app/__init__.py": {
+      "filePath": "morv/app/__init__.py",
       "contentHash": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "functions": [],
       "classes": [],
@@ -23,8 +23,8 @@
       "totalLines": 2,
       "hasStructuralAnalysis": true
     },
-    "app/main.py": {
-      "filePath": "app/main.py",
+    "morv/app/main.py": {
+      "filePath": "morv/app/main.py",
       "contentHash": "8a99ece8fa4ac3b5d8abf98ed35b40f90518b95b89dcdb24f1b9d33d709fea08",
       "functions": [
         {
@@ -94,6 +94,217 @@
           "specifiers": [
             "time"
           ]
+        },
+        {
+          "source": "PySide6.QtWidgets",
+          "specifiers": [
+            "QApplication"
+          ]
+        },
+        {
+          "source": "morv",
+          "specifiers": [
+            "APP_NAME"
+          ]
+        },
+        {
+          "source": "morv.infra",
+          "specifiers": [
+            "setup"
+          ]
+        },
+        {
+          "source": "morv.ui",
+          "specifiers": [
+            "theme"
+          ]
+        },
+        {
+          "source": "morv.ui.login",
+          "specifiers": [
+            "LoginDialog"
+          ]
+        },
+        {
+          "source": "morv.ui.setup_wizard",
+          "specifiers": [
+            "SetupWizard"
+          ]
+        },
+        {
+          "source": "morv.ui.widgets",
+          "specifiers": [
+            "dispose"
+          ]
+        },
+        {
+          "source": "PySide6.QtWidgets",
+          "specifiers": [
+            "QApplication"
+          ]
+        },
+        {
+          "source": "morv.ui",
+          "specifiers": [
+            "widgets"
+          ]
+        },
+        {
+          "source": "sqlite3",
+          "specifiers": [
+            "sqlite3"
+          ]
+        },
+        {
+          "source": "morv.infra",
+          "specifiers": [
+            "paths"
+          ]
+        },
+        {
+          "source": "morv.infra.db.bootstrap",
+          "specifiers": [
+            "open_main_db"
+          ]
+        },
+        {
+          "source": "morv.infra.db.connection",
+          "specifiers": [
+            "UnsafeDatabase"
+          ]
+        },
+        {
+          "source": "morv.infra.db.migrator",
+          "specifiers": [
+            "MigrationError"
+          ]
+        },
+        {
+          "source": "morv.infra.logs",
+          "specifiers": [
+            "log",
+            "setup_logging"
+          ]
+        },
+        {
+          "source": "morv.infra",
+          "specifiers": [
+            "instance_lock"
+          ]
+        },
+        {
+          "source": "PySide6.QtWidgets",
+          "specifiers": [
+            "QApplication"
+          ]
+        },
+        {
+          "source": "morv.ui.widgets",
+          "specifiers": [
+            "info"
+          ]
+        },
+        {
+          "source": "PySide6.QtCore",
+          "specifiers": [
+            "QLocale",
+            "QTimer"
+          ]
+        },
+        {
+          "source": "PySide6.QtGui",
+          "specifiers": [
+            "QIcon"
+          ]
+        },
+        {
+          "source": "PySide6.QtWidgets",
+          "specifiers": [
+            "QApplication",
+            "QDialog"
+          ]
+        },
+        {
+          "source": "morv",
+          "specifiers": [
+            "APP_NAME"
+          ]
+        },
+        {
+          "source": "morv.infra",
+          "specifiers": [
+            "backup",
+            "keystore",
+            "setup",
+            "users",
+            "vault"
+          ]
+        },
+        {
+          "source": "morv.ui",
+          "specifiers": [
+            "theme"
+          ]
+        },
+        {
+          "source": "morv.ui.login",
+          "specifiers": [
+            "LoginDialog"
+          ]
+        },
+        {
+          "source": "morv.ui.session",
+          "specifiers": [
+            "Session"
+          ]
+        },
+        {
+          "source": "morv.ui.setup_wizard",
+          "specifiers": [
+            "SetupWizard"
+          ]
+        },
+        {
+          "source": "morv.ui.shell",
+          "specifiers": [
+            "MainWindow"
+          ]
+        },
+        {
+          "source": "morv.ui.widgets",
+          "specifiers": [
+            "info"
+          ]
+        },
+        {
+          "source": "morv.ui.widgets",
+          "specifiers": [
+            "info"
+          ]
+        },
+        {
+          "source": "morv.ui.widgets",
+          "specifiers": [
+            "info"
+          ]
+        },
+        {
+          "source": "morv.ui.widgets",
+          "specifiers": [
+            "info"
+          ]
+        },
+        {
+          "source": "morv.ui.backup_runner",
+          "specifiers": [
+            "BackupRunner"
+          ]
+        },
+        {
+          "source": "morv.ui.widgets",
+          "specifiers": [
+            "dispose"
+          ]
         }
       ],
       "exports": [
@@ -106,8 +317,8 @@
       "totalLines": 229,
       "hasStructuralAnalysis": true
     },
-    "core/__init__.py": {
-      "filePath": "core/__init__.py",
+    "morv/core/__init__.py": {
+      "filePath": "morv/core/__init__.py",
       "contentHash": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "functions": [],
       "classes": [],
@@ -116,8 +327,8 @@
       "totalLines": 2,
       "hasStructuralAnalysis": true
     },
-    "core/costing.py": {
-      "filePath": "core/costing.py",
+    "morv/core/costing.py": {
+      "filePath": "morv/core/costing.py",
       "contentHash": "34e2678c80bd6cb3a87c1398a72083c1ab84ea63a2f92aecf1f954423d39ae72",
       "functions": [
         {
@@ -183,8 +394,8 @@
       "totalLines": 60,
       "hasStructuralAnalysis": true
     },
-    "core/dot.py": {
-      "filePath": "core/dot.py",
+    "morv/core/dot.py": {
+      "filePath": "morv/core/dot.py",
       "contentHash": "6ede98975987e83f6a6222cd7a7e9d3939d155312b30393822ccb3775ce192bc",
       "functions": [
         {
@@ -244,8 +455,8 @@
       "totalLines": 34,
       "hasStructuralAnalysis": true
     },
-    "core/eir.py": {
-      "filePath": "core/eir.py",
+    "morv/core/eir.py": {
+      "filePath": "morv/core/eir.py",
       "contentHash": "bd5596edf507c867b8d6260dc6da691221438b93e135fd9b5e6508a23c7c4349",
       "functions": [
         {
@@ -386,8 +597,8 @@
       "totalLines": 167,
       "hasStructuralAnalysis": true
     },
-    "core/installments.py": {
-      "filePath": "core/installments.py",
+    "morv/core/installments.py": {
+      "filePath": "morv/core/installments.py",
       "contentHash": "d68f2a50f1d409e288e4126796cd879c14ec0ad752080b0a1ad7ce8caaba2f28",
       "functions": [
         {
@@ -511,8 +722,8 @@
       "totalLines": 94,
       "hasStructuralAnalysis": true
     },
-    "core/money.py": {
-      "filePath": "core/money.py",
+    "morv/core/money.py": {
+      "filePath": "morv/core/money.py",
       "contentHash": "f6046932b430e1b72dc7edb7858a86b1289114f3b452cca7d127238bfe044bbb",
       "functions": [
         {
@@ -589,8 +800,8 @@
       "totalLines": 68,
       "hasStructuralAnalysis": true
     },
-    "core/partial_eir.py": {
-      "filePath": "core/partial_eir.py",
+    "morv/core/partial_eir.py": {
+      "filePath": "morv/core/partial_eir.py",
       "contentHash": "89ba70867a90fc547724def6124ccfcff1da7bc1b92ce6f94d1f6950947ef847",
       "functions": [
         {
@@ -728,8 +939,8 @@
       "totalLines": 140,
       "hasStructuralAnalysis": true
     },
-    "core/profit_rules.py": {
-      "filePath": "core/profit_rules.py",
+    "morv/core/profit_rules.py": {
+      "filePath": "morv/core/profit_rules.py",
       "contentHash": "9dd991f5a10799f6c5392b1bfa35381e32c6812593d44cac2582f1e9c1cdaf73",
       "functions": [
         {
@@ -805,8 +1016,8 @@
       "totalLines": 47,
       "hasStructuralAnalysis": true
     },
-    "core/return_rules.py": {
-      "filePath": "core/return_rules.py",
+    "morv/core/return_rules.py": {
+      "filePath": "morv/core/return_rules.py",
       "contentHash": "ffcb44983c9cb37d816b23a066c272e92a696bc1abda912c7cabe4499636a356",
       "functions": [
         {
@@ -881,8 +1092,8 @@
       "totalLines": 41,
       "hasStructuralAnalysis": true
     },
-    "core/sales_rules.py": {
-      "filePath": "core/sales_rules.py",
+    "morv/core/sales_rules.py": {
+      "filePath": "morv/core/sales_rules.py",
       "contentHash": "c14bf09c0bc492d998e05c423692637601ee8e316ff1c1594bf1c5c1fcb81ddf",
       "functions": [
         {
@@ -944,8 +1155,8 @@
       "totalLines": 56,
       "hasStructuralAnalysis": true
     },
-    "core/security.py": {
-      "filePath": "core/security.py",
+    "morv/core/security.py": {
+      "filePath": "morv/core/security.py",
       "contentHash": "0bd487ee3a7b8a8e36efc9da094a456a9064960dd17a941c80c12440c75dcde2",
       "functions": [
         {
@@ -1044,8 +1255,8 @@
       "totalLines": 116,
       "hasStructuralAnalysis": true
     },
-    "core/text.py": {
-      "filePath": "core/text.py",
+    "morv/core/text.py": {
+      "filePath": "morv/core/text.py",
       "contentHash": "09b93581a538f436d007f88af61de3b97e83e96709bee8f802d021fbd33b6fa5",
       "functions": [
         {
@@ -1099,8 +1310,8 @@
       "totalLines": 40,
       "hasStructuralAnalysis": true
     },
-    "core/tire_catalog.py": {
-      "filePath": "core/tire_catalog.py",
+    "morv/core/tire_catalog.py": {
+      "filePath": "morv/core/tire_catalog.py",
       "contentHash": "cf42f7ff59954c085c87a54567059efc1d107a13946b33629317267e2a09d389",
       "functions": [
         {
@@ -1145,8 +1356,8 @@
       "totalLines": 54,
       "hasStructuralAnalysis": true
     },
-    "core/validate.py": {
-      "filePath": "core/validate.py",
+    "morv/core/validate.py": {
+      "filePath": "morv/core/validate.py",
       "contentHash": "59fdd3ff6aa379db4df594f59a903bb987738ded04a10d0dac7bf8182043aa4f",
       "functions": [
         {
@@ -1252,8 +1463,8 @@
       "totalLines": 102,
       "hasStructuralAnalysis": true
     },
-    "infra/__init__.py": {
-      "filePath": "infra/__init__.py",
+    "morv/infra/__init__.py": {
+      "filePath": "morv/infra/__init__.py",
       "contentHash": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "functions": [],
       "classes": [],
@@ -1262,8 +1473,8 @@
       "totalLines": 2,
       "hasStructuralAnalysis": true
     },
-    "infra/backup.py": {
-      "filePath": "infra/backup.py",
+    "morv/infra/backup.py": {
+      "filePath": "morv/infra/backup.py",
       "contentHash": "73448a0eb5daf2376974544f0daa424a11974f8152ca5bde1a02b9c513fd72a5",
       "functions": [
         {
@@ -1832,8 +2043,8 @@
       "totalLines": 599,
       "hasStructuralAnalysis": true
     },
-    "infra/backup_job.py": {
-      "filePath": "infra/backup_job.py",
+    "morv/infra/backup_job.py": {
+      "filePath": "morv/infra/backup_job.py",
       "contentHash": "72d583187fa74512e1256d69e0659861377b39b9bd8e79f87bda125074eb0741",
       "functions": [
         {
@@ -1868,8 +2079,8 @@
       "totalLines": 12,
       "hasStructuralAnalysis": true
     },
-    "infra/bank_reconciliation.py": {
-      "filePath": "infra/bank_reconciliation.py",
+    "morv/infra/bank_reconciliation.py": {
+      "filePath": "morv/infra/bank_reconciliation.py",
       "contentHash": "62904377bf89620acac6a8b73d5d0420516606001d1cb601e1955a0cca5cbe18",
       "functions": [
         {
@@ -2088,8 +2299,8 @@
       "totalLines": 201,
       "hasStructuralAnalysis": true
     },
-    "infra/cash_closing.py": {
-      "filePath": "infra/cash_closing.py",
+    "morv/infra/cash_closing.py": {
+      "filePath": "morv/infra/cash_closing.py",
       "contentHash": "4dd31c8c71a9bbc27106a8688080393502838c5e8660db5cb6ac9e586bbcbf18",
       "functions": [
         {
@@ -2340,8 +2551,8 @@
       "totalLines": 202,
       "hasStructuralAnalysis": true
     },
-    "infra/customer_deposits.py": {
-      "filePath": "infra/customer_deposits.py",
+    "morv/infra/customer_deposits.py": {
+      "filePath": "morv/infra/customer_deposits.py",
       "contentHash": "5ff35d3edac020ed0acf4529c7b728757b35c3dc00cb1df9e768627af99a253f",
       "functions": [
         {
@@ -2576,8 +2787,8 @@
       "totalLines": 168,
       "hasStructuralAnalysis": true
     },
-    "infra/customer_receipts.py": {
-      "filePath": "infra/customer_receipts.py",
+    "morv/infra/customer_receipts.py": {
+      "filePath": "morv/infra/customer_receipts.py",
       "contentHash": "71ac0aa0a91dd29fda1f462c57cc609ad6f94e2795f2c15a39f924f52d904168",
       "functions": [
         {
@@ -2834,8 +3045,8 @@
       "totalLines": 213,
       "hasStructuralAnalysis": true
     },
-    "infra/customer_statement.py": {
-      "filePath": "infra/customer_statement.py",
+    "morv/infra/customer_statement.py": {
+      "filePath": "morv/infra/customer_statement.py",
       "contentHash": "173a4bb31fafcd1907737d1c6648c42e0801d9cbda96b33e3049ecfd24f315d3",
       "functions": [
         {
@@ -2923,8 +3134,8 @@
       "totalLines": 80,
       "hasStructuralAnalysis": true
     },
-    "infra/customers.py": {
-      "filePath": "infra/customers.py",
+    "morv/infra/customers.py": {
+      "filePath": "morv/infra/customers.py",
       "contentHash": "deeb2ac4ff4c7a60794bd9b09572d6d1f808c9f134ca464e06236863f98992f5",
       "functions": [
         {
@@ -3179,8 +3390,8 @@
       "totalLines": 206,
       "hasStructuralAnalysis": true
     },
-    "infra/dashboard_view.py": {
-      "filePath": "infra/dashboard_view.py",
+    "morv/infra/dashboard_view.py": {
+      "filePath": "morv/infra/dashboard_view.py",
       "contentHash": "47af4f03e9f3410756c9bdb63b7b0d47b489c94d26190a4d8d36868f9c52d9b1",
       "functions": [
         {
@@ -3353,8 +3564,8 @@
       "totalLines": 165,
       "hasStructuralAnalysis": true
     },
-    "infra/db/__init__.py": {
-      "filePath": "infra/db/__init__.py",
+    "morv/infra/db/__init__.py": {
+      "filePath": "morv/infra/db/__init__.py",
       "contentHash": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "functions": [],
       "classes": [],
@@ -3363,8 +3574,8 @@
       "totalLines": 2,
       "hasStructuralAnalysis": true
     },
-    "infra/db/bootstrap.py": {
-      "filePath": "infra/db/bootstrap.py",
+    "morv/infra/db/bootstrap.py": {
+      "filePath": "morv/infra/db/bootstrap.py",
       "contentHash": "8f5550066e3cfdc2626450a5149f647e9e78ac2f767fc144451914a92e65b37d",
       "functions": [
         {
@@ -3429,8 +3640,8 @@
       "totalLines": 30,
       "hasStructuralAnalysis": true
     },
-    "infra/db/connection.py": {
-      "filePath": "infra/db/connection.py",
+    "morv/infra/db/connection.py": {
+      "filePath": "morv/infra/db/connection.py",
       "contentHash": "e7e359505e45c3ad8e0b5b9cd569c3be77f97c311266eef6c1e6e680e963bfc3",
       "functions": [
         {
@@ -3552,8 +3763,8 @@
       "totalLines": 96,
       "hasStructuralAnalysis": true
     },
-    "infra/db/migrations/0001_foundation.sql": {
-      "filePath": "infra/db/migrations/0001_foundation.sql",
+    "morv/infra/db/migrations/0001_foundation.sql": {
+      "filePath": "morv/infra/db/migrations/0001_foundation.sql",
       "contentHash": "ba6fb422eacea02cc0c911c52aa2a02a135324508109e54dbde8bb444281430b",
       "functions": [],
       "classes": [],
@@ -3562,8 +3773,8 @@
       "totalLines": 108,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0002_users_backup.sql": {
-      "filePath": "infra/db/migrations/0002_users_backup.sql",
+    "morv/infra/db/migrations/0002_users_backup.sql": {
+      "filePath": "morv/infra/db/migrations/0002_users_backup.sql",
       "contentHash": "23e29987ac03f3f64f4385eb0701603af4863b9efa4554b75598142d747c0048",
       "functions": [],
       "classes": [],
@@ -3572,8 +3783,8 @@
       "totalLines": 62,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0003_master_data.sql": {
-      "filePath": "infra/db/migrations/0003_master_data.sql",
+    "morv/infra/db/migrations/0003_master_data.sql": {
+      "filePath": "morv/infra/db/migrations/0003_master_data.sql",
       "contentHash": "0c3d84ce7d05953240a7ef7848af35abaf92675b98f3f0d929e55f8a4c7c0ad9",
       "functions": [],
       "classes": [],
@@ -3582,8 +3793,8 @@
       "totalLines": 165,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0004_supplier_terms.sql": {
-      "filePath": "infra/db/migrations/0004_supplier_terms.sql",
+    "morv/infra/db/migrations/0004_supplier_terms.sql": {
+      "filePath": "morv/infra/db/migrations/0004_supplier_terms.sql",
       "contentHash": "f33b5c6bb1a0082d16ad84a5997392abd285f1933180fec8e89bba60d4dd1fe5",
       "functions": [],
       "classes": [],
@@ -3592,8 +3803,8 @@
       "totalLines": 10,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0005_setup_flag.sql": {
-      "filePath": "infra/db/migrations/0005_setup_flag.sql",
+    "morv/infra/db/migrations/0005_setup_flag.sql": {
+      "filePath": "morv/infra/db/migrations/0005_setup_flag.sql",
       "contentHash": "b2737269c4e3929a1b7dd0ba02d0348fb36fc4891f4a98b70ed5d8142f98f079",
       "functions": [],
       "classes": [],
@@ -3602,8 +3813,8 @@
       "totalLines": 9,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0006_purchasing.sql": {
-      "filePath": "infra/db/migrations/0006_purchasing.sql",
+    "morv/infra/db/migrations/0006_purchasing.sql": {
+      "filePath": "morv/infra/db/migrations/0006_purchasing.sql",
       "contentHash": "a6d3207860e8c700d10f3802102ebb65679168656423d9d21d7da0dfc2c49107",
       "functions": [],
       "classes": [],
@@ -3612,8 +3823,8 @@
       "totalLines": 161,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0007_purchasing_hardening.sql": {
-      "filePath": "infra/db/migrations/0007_purchasing_hardening.sql",
+    "morv/infra/db/migrations/0007_purchasing_hardening.sql": {
+      "filePath": "morv/infra/db/migrations/0007_purchasing_hardening.sql",
       "contentHash": "1931cca141314e5c077751aa88b73a3a23f4f661c7e6b145af0ef7ed103d2ce1",
       "functions": [],
       "classes": [],
@@ -3622,8 +3833,8 @@
       "totalLines": 60,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0008_item_identity.sql": {
-      "filePath": "infra/db/migrations/0008_item_identity.sql",
+    "morv/infra/db/migrations/0008_item_identity.sql": {
+      "filePath": "morv/infra/db/migrations/0008_item_identity.sql",
       "contentHash": "9341a3ac8ddd3e1ae898b72745791f7a95ec9682f0c966fba87dd322541fa90b",
       "functions": [],
       "classes": [],
@@ -3632,8 +3843,8 @@
       "totalLines": 11,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0009_sales.sql": {
-      "filePath": "infra/db/migrations/0009_sales.sql",
+    "morv/infra/db/migrations/0009_sales.sql": {
+      "filePath": "morv/infra/db/migrations/0009_sales.sql",
       "contentHash": "c5e606b52e3b5a3ec207b04085e64cda8ae9a67be7314ea0f16f215d34fedf5e",
       "functions": [],
       "classes": [],
@@ -3642,8 +3853,8 @@
       "totalLines": 58,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0010_sale_returns.sql": {
-      "filePath": "infra/db/migrations/0010_sale_returns.sql",
+    "morv/infra/db/migrations/0010_sale_returns.sql": {
+      "filePath": "morv/infra/db/migrations/0010_sale_returns.sql",
       "contentHash": "92bb0900e42ca9b63b6c69879e5cbe4c710a04292f64d824f05084cfb6b1086a",
       "functions": [],
       "classes": [],
@@ -3652,8 +3863,8 @@
       "totalLines": 97,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0011_installments.sql": {
-      "filePath": "infra/db/migrations/0011_installments.sql",
+    "morv/infra/db/migrations/0011_installments.sql": {
+      "filePath": "morv/infra/db/migrations/0011_installments.sql",
       "contentHash": "6bbc3c7fe71f834ef615b7034cb5037e6455f0a85acbc2f1ca65f080a8b6ca0c",
       "functions": [],
       "classes": [],
@@ -3662,8 +3873,8 @@
       "totalLines": 81,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0012_installment_payments.sql": {
-      "filePath": "infra/db/migrations/0012_installment_payments.sql",
+    "morv/infra/db/migrations/0012_installment_payments.sql": {
+      "filePath": "morv/infra/db/migrations/0012_installment_payments.sql",
       "contentHash": "833d2a5b1f8a78521dd62aa45eeeeb4540f46650fbdbd8eef958cdc289167e54",
       "functions": [],
       "classes": [],
@@ -3672,8 +3883,8 @@
       "totalLines": 33,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0013_installment_returns.sql": {
-      "filePath": "infra/db/migrations/0013_installment_returns.sql",
+    "morv/infra/db/migrations/0013_installment_returns.sql": {
+      "filePath": "morv/infra/db/migrations/0013_installment_returns.sql",
       "contentHash": "f52be4a3f33220b3fd689b79149f2782c24427237dcca2081990bf1940f0d41b",
       "functions": [],
       "classes": [],
@@ -3682,8 +3893,8 @@
       "totalLines": 81,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0014_interest_eir.sql": {
-      "filePath": "infra/db/migrations/0014_interest_eir.sql",
+    "morv/infra/db/migrations/0014_interest_eir.sql": {
+      "filePath": "morv/infra/db/migrations/0014_interest_eir.sql",
       "contentHash": "52386d49163ddd54b70896e37dd45dad06d13c633668993f640592af468d8259",
       "functions": [],
       "classes": [],
@@ -3692,8 +3903,8 @@
       "totalLines": 24,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0015_installment_modifications.sql": {
-      "filePath": "infra/db/migrations/0015_installment_modifications.sql",
+    "morv/infra/db/migrations/0015_installment_modifications.sql": {
+      "filePath": "morv/infra/db/migrations/0015_installment_modifications.sql",
       "contentHash": "e653ce8d417fd6cd0841cd678af1c5ef447fe8bdfe3fb819a319265516f7010c",
       "functions": [],
       "classes": [],
@@ -3702,8 +3913,8 @@
       "totalLines": 58,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0016_sale_payments_lookup.sql": {
-      "filePath": "infra/db/migrations/0016_sale_payments_lookup.sql",
+    "morv/infra/db/migrations/0016_sale_payments_lookup.sql": {
+      "filePath": "morv/infra/db/migrations/0016_sale_payments_lookup.sql",
       "contentHash": "95dc1e68d44d18b0392a05642733dc33917dcc5e4b22318e56da97ac359460f2",
       "functions": [],
       "classes": [],
@@ -3712,8 +3923,8 @@
       "totalLines": 4,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0017_treasury_movements.sql": {
-      "filePath": "infra/db/migrations/0017_treasury_movements.sql",
+    "morv/infra/db/migrations/0017_treasury_movements.sql": {
+      "filePath": "morv/infra/db/migrations/0017_treasury_movements.sql",
       "contentHash": "6ac4a59e139cdeaef4bcf3e2d841387b1d80fc0423def6d08ad6c62e46a23d0e",
       "functions": [],
       "classes": [],
@@ -3722,8 +3933,8 @@
       "totalLines": 54,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0018_cash_closings.sql": {
-      "filePath": "infra/db/migrations/0018_cash_closings.sql",
+    "morv/infra/db/migrations/0018_cash_closings.sql": {
+      "filePath": "morv/infra/db/migrations/0018_cash_closings.sql",
       "contentHash": "4bc6332a82939813869bbfcb9d2207fcf2f284192d1f42117d5771a2a5a3c529",
       "functions": [],
       "classes": [],
@@ -3732,8 +3943,8 @@
       "totalLines": 44,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0019_safe_account.sql": {
-      "filePath": "infra/db/migrations/0019_safe_account.sql",
+    "morv/infra/db/migrations/0019_safe_account.sql": {
+      "filePath": "morv/infra/db/migrations/0019_safe_account.sql",
       "contentHash": "c44ed2f177857fe14b54c1bc1ecbc1cab83b8af457524e31bafa7528f5e3f254",
       "functions": [],
       "classes": [],
@@ -3742,8 +3953,8 @@
       "totalLines": 4,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0020_safe_counts.sql": {
-      "filePath": "infra/db/migrations/0020_safe_counts.sql",
+    "morv/infra/db/migrations/0020_safe_counts.sql": {
+      "filePath": "morv/infra/db/migrations/0020_safe_counts.sql",
       "contentHash": "cb81cf917571c5e17a1eab569136ceea4aa899a8a121ee880fada3c974e78ff4",
       "functions": [],
       "classes": [],
@@ -3752,8 +3963,8 @@
       "totalLines": 42,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0021_period_locks.sql": {
-      "filePath": "infra/db/migrations/0021_period_locks.sql",
+    "morv/infra/db/migrations/0021_period_locks.sql": {
+      "filePath": "morv/infra/db/migrations/0021_period_locks.sql",
       "contentHash": "cf036482255445e66f2339c319e7058b2d15015038ac69617c9519ff9cb68c95",
       "functions": [],
       "classes": [],
@@ -3762,8 +3973,8 @@
       "totalLines": 29,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0022_profit_distribution.sql": {
-      "filePath": "infra/db/migrations/0022_profit_distribution.sql",
+    "morv/infra/db/migrations/0022_profit_distribution.sql": {
+      "filePath": "morv/infra/db/migrations/0022_profit_distribution.sql",
       "contentHash": "e8cdbec872b1924ce6b383b6300e8e319cf6e73529345b8cfd77d5d18620bbaa",
       "functions": [],
       "classes": [],
@@ -3772,8 +3983,8 @@
       "totalLines": 72,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0023_customer_receipts.sql": {
-      "filePath": "infra/db/migrations/0023_customer_receipts.sql",
+    "morv/infra/db/migrations/0023_customer_receipts.sql": {
+      "filePath": "morv/infra/db/migrations/0023_customer_receipts.sql",
       "contentHash": "e2349a1d427eac9d92d03227c414bda3baeedcfa7f4f4dacd16c277d351800d9",
       "functions": [],
       "classes": [],
@@ -3782,8 +3993,8 @@
       "totalLines": 28,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0024_bank_reconciliations.sql": {
-      "filePath": "infra/db/migrations/0024_bank_reconciliations.sql",
+    "morv/infra/db/migrations/0024_bank_reconciliations.sql": {
+      "filePath": "morv/infra/db/migrations/0024_bank_reconciliations.sql",
       "contentHash": "d6d53063864e28e6f3af589e51251509d3b16ce611bbb560ba28790ea780cbb3",
       "functions": [],
       "classes": [],
@@ -3792,8 +4003,8 @@
       "totalLines": 37,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0025_return_credit_part.sql": {
-      "filePath": "infra/db/migrations/0025_return_credit_part.sql",
+    "morv/infra/db/migrations/0025_return_credit_part.sql": {
+      "filePath": "morv/infra/db/migrations/0025_return_credit_part.sql",
       "contentHash": "e8bc687c992d93ad99c1159edfeb0924b955ab2bf0fc39302b52ff2cd6da06f0",
       "functions": [],
       "classes": [],
@@ -3802,8 +4013,8 @@
       "totalLines": 5,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0026_customer_deposits.sql": {
-      "filePath": "infra/db/migrations/0026_customer_deposits.sql",
+    "morv/infra/db/migrations/0026_customer_deposits.sql": {
+      "filePath": "morv/infra/db/migrations/0026_customer_deposits.sql",
       "contentHash": "439429879a26aa6cdd4f5001a2ed2ad16fe017f395c119dbcc37b114c94454f2",
       "functions": [],
       "classes": [],
@@ -3812,8 +4023,8 @@
       "totalLines": 33,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0027_purchase_returns.sql": {
-      "filePath": "infra/db/migrations/0027_purchase_returns.sql",
+    "morv/infra/db/migrations/0027_purchase_returns.sql": {
+      "filePath": "morv/infra/db/migrations/0027_purchase_returns.sql",
       "contentHash": "b3745ae4d3b8b1aa46222c11fa29f22fe7830e9a02e8213ae391162ae01fd805",
       "functions": [],
       "classes": [],
@@ -3822,8 +4033,8 @@
       "totalLines": 101,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0028_interest_recognition_reversal.sql": {
-      "filePath": "infra/db/migrations/0028_interest_recognition_reversal.sql",
+    "morv/infra/db/migrations/0028_interest_recognition_reversal.sql": {
+      "filePath": "morv/infra/db/migrations/0028_interest_recognition_reversal.sql",
       "contentHash": "8c22fc3eac20b05dffe22687f5ab12e8c5c9fcc52d65ac667e5cf867be9f927d",
       "functions": [],
       "classes": [],
@@ -3832,8 +4043,8 @@
       "totalLines": 49,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0029_stock_adjustments.sql": {
-      "filePath": "infra/db/migrations/0029_stock_adjustments.sql",
+    "morv/infra/db/migrations/0029_stock_adjustments.sql": {
+      "filePath": "morv/infra/db/migrations/0029_stock_adjustments.sql",
       "contentHash": "5eec026f7781ab576f87d9e173c896718be918ab7a56ca604ac13aad9562ea7a",
       "functions": [],
       "classes": [],
@@ -3842,8 +4053,8 @@
       "totalLines": 175,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0030_opening_balances.sql": {
-      "filePath": "infra/db/migrations/0030_opening_balances.sql",
+    "morv/infra/db/migrations/0030_opening_balances.sql": {
+      "filePath": "morv/infra/db/migrations/0030_opening_balances.sql",
       "contentHash": "0af5ccc5fa4f94a624b8423ae2761b9146050f626a34786cd676d768aa81aada",
       "functions": [],
       "classes": [],
@@ -3852,8 +4063,8 @@
       "totalLines": 56,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrations/0031_opening_inventory.sql": {
-      "filePath": "infra/db/migrations/0031_opening_inventory.sql",
+    "morv/infra/db/migrations/0031_opening_inventory.sql": {
+      "filePath": "morv/infra/db/migrations/0031_opening_inventory.sql",
       "contentHash": "4753930dbcd77f690452c8a1b7dc2d82905c3849a1a739ade7c198daeffb24ba",
       "functions": [],
       "classes": [],
@@ -3862,8 +4073,8 @@
       "totalLines": 198,
       "hasStructuralAnalysis": false
     },
-    "infra/db/migrator.py": {
-      "filePath": "infra/db/migrator.py",
+    "morv/infra/db/migrator.py": {
+      "filePath": "morv/infra/db/migrator.py",
       "contentHash": "dbc2ab37902da27d396ba588cfccf968c1c6118dfb6a0ec9c1069a7978fadbe6",
       "functions": [
         {
@@ -3996,8 +4207,8 @@
       "totalLines": 123,
       "hasStructuralAnalysis": true
     },
-    "infra/income_statement.py": {
-      "filePath": "infra/income_statement.py",
+    "morv/infra/income_statement.py": {
+      "filePath": "morv/infra/income_statement.py",
       "contentHash": "31c58ab869d9a4a7aa408cb537b5e79c4380ee8a26a6d4a95fd7fa22f66959c5",
       "functions": [
         {
@@ -4106,8 +4317,8 @@
       "totalLines": 105,
       "hasStructuralAnalysis": true
     },
-    "infra/installment_view.py": {
-      "filePath": "infra/installment_view.py",
+    "morv/infra/installment_view.py": {
+      "filePath": "morv/infra/installment_view.py",
       "contentHash": "c1b192e02d95ebdeb76ba02a7dea09fbeaefb71aeba46c0b80726288346ea324",
       "functions": [
         {
@@ -4343,8 +4554,8 @@
       "totalLines": 242,
       "hasStructuralAnalysis": true
     },
-    "infra/installments.py": {
-      "filePath": "infra/installments.py",
+    "morv/infra/installments.py": {
+      "filePath": "morv/infra/installments.py",
       "contentHash": "3f418676ad5ac9db582af06ec45bab8bc67a114b450bf7b58508bcea7f519d7a",
       "functions": [
         {
@@ -4566,8 +4777,8 @@
       "totalLines": 222,
       "hasStructuralAnalysis": true
     },
-    "infra/instance_lock.py": {
-      "filePath": "infra/instance_lock.py",
+    "morv/infra/instance_lock.py": {
+      "filePath": "morv/infra/instance_lock.py",
       "contentHash": "757e822ebb9ce2f55ac51055b090a5beee0120495e930f96f64e6abc632def2a",
       "functions": [
         {
@@ -4617,6 +4828,18 @@
           "specifiers": [
             "Path"
           ]
+        },
+        {
+          "source": "msvcrt",
+          "specifiers": [
+            "msvcrt"
+          ]
+        },
+        {
+          "source": "fcntl",
+          "specifiers": [
+            "fcntl"
+          ]
         }
       ],
       "exports": [
@@ -4627,8 +4850,8 @@
       "totalLines": 41,
       "hasStructuralAnalysis": true
     },
-    "infra/interest_recognition.py": {
-      "filePath": "infra/interest_recognition.py",
+    "morv/infra/interest_recognition.py": {
+      "filePath": "morv/infra/interest_recognition.py",
       "contentHash": "473ed3eac68596d259096ca66087d20dc3d41b3364307d717d14a21db130ce9c",
       "functions": [
         {
@@ -4805,8 +5028,8 @@
       "totalLines": 172,
       "hasStructuralAnalysis": true
     },
-    "infra/interest_reversal.py": {
-      "filePath": "infra/interest_reversal.py",
+    "morv/infra/interest_reversal.py": {
+      "filePath": "morv/infra/interest_reversal.py",
       "contentHash": "b3b2f7b22439c95c23b6e6ead0a06b3689de9f80f266bc1a1a91a1b18ae20daf",
       "functions": [
         {
@@ -4919,8 +5142,8 @@
       "totalLines": 90,
       "hasStructuralAnalysis": true
     },
-    "infra/interest_review.py": {
-      "filePath": "infra/interest_review.py",
+    "morv/infra/interest_review.py": {
+      "filePath": "morv/infra/interest_review.py",
       "contentHash": "3757d20802dba286aa45d20d7f5b7e1b17a072f78872d046239d9ad82f4a3982",
       "functions": [
         {
@@ -5067,8 +5290,8 @@
       "totalLines": 107,
       "hasStructuralAnalysis": true
     },
-    "infra/inventory.py": {
-      "filePath": "infra/inventory.py",
+    "morv/infra/inventory.py": {
+      "filePath": "morv/infra/inventory.py",
       "contentHash": "8dbe3076ff1a89f27c1b1407729ffafc8ef7b1b36284259b4571d77a8d70678e",
       "functions": [
         {
@@ -5262,8 +5485,8 @@
       "totalLines": 209,
       "hasStructuralAnalysis": true
     },
-    "infra/items.py": {
-      "filePath": "infra/items.py",
+    "morv/infra/items.py": {
+      "filePath": "morv/infra/items.py",
       "contentHash": "f6cdb47afdc68f5c0376008e9a286749e0b4e61562c6c47901aedc11d5e21365",
       "functions": [
         {
@@ -5596,8 +5819,8 @@
       "totalLines": 340,
       "hasStructuralAnalysis": true
     },
-    "infra/keystore.py": {
-      "filePath": "infra/keystore.py",
+    "morv/infra/keystore.py": {
+      "filePath": "morv/infra/keystore.py",
       "contentHash": "892fc8c8e6b7000358c2a9bde45680d82b9afa390d1020ced714b047db53bf07",
       "functions": [
         {
@@ -5705,8 +5928,8 @@
       "totalLines": 76,
       "hasStructuralAnalysis": true
     },
-    "infra/ledger.py": {
-      "filePath": "infra/ledger.py",
+    "morv/infra/ledger.py": {
+      "filePath": "morv/infra/ledger.py",
       "contentHash": "faa4efa24fa66e0f4c36e5897779c6d6dbfc8d4d6759f5aaba049bb381a7bcf0",
       "functions": [
         {
@@ -5829,8 +6052,8 @@
       "totalLines": 87,
       "hasStructuralAnalysis": true
     },
-    "infra/logs.py": {
-      "filePath": "infra/logs.py",
+    "morv/infra/logs.py": {
+      "filePath": "morv/infra/logs.py",
       "contentHash": "b403317ef88aad8db02ca30e4150132d6bdbe6ff071d8290bfaac7d4fb8fddb3",
       "functions": [
         {
@@ -5874,8 +6097,8 @@
       "totalLines": 27,
       "hasStructuralAnalysis": true
     },
-    "infra/opening_balances.py": {
-      "filePath": "infra/opening_balances.py",
+    "morv/infra/opening_balances.py": {
+      "filePath": "morv/infra/opening_balances.py",
       "contentHash": "b17f56b5ea1e2f5549c0b1aa5ec82f923b9efe54b9d8ceb5f1001bd51a6b729f",
       "functions": [
         {
@@ -6239,8 +6462,8 @@
       "totalLines": 333,
       "hasStructuralAnalysis": true
     },
-    "infra/paths.py": {
-      "filePath": "infra/paths.py",
+    "morv/infra/paths.py": {
+      "filePath": "morv/infra/paths.py",
       "contentHash": "2b00310c879a15a24386ce2f25671b0ff0b2e21758c2aedb46207dade3985c96",
       "functions": [
         {
@@ -6318,8 +6541,8 @@
       "totalLines": 47,
       "hasStructuralAnalysis": true
     },
-    "infra/period_lock.py": {
-      "filePath": "infra/period_lock.py",
+    "morv/infra/period_lock.py": {
+      "filePath": "morv/infra/period_lock.py",
       "contentHash": "a08617579e2acb9a099450de9b2ab45f52727a80fd4f712ac80acee1f4d6d6b1",
       "functions": [
         {
@@ -6515,8 +6738,8 @@
       "totalLines": 160,
       "hasStructuralAnalysis": true
     },
-    "infra/profit.py": {
-      "filePath": "infra/profit.py",
+    "morv/infra/profit.py": {
+      "filePath": "morv/infra/profit.py",
       "contentHash": "0df879b0e8ee71d53e429921a4d3607ca50a62423e8406570cfdf222d54829fa",
       "functions": [
         {
@@ -6757,8 +6980,8 @@
       "totalLines": 274,
       "hasStructuralAnalysis": true
     },
-    "infra/purchase_returns.py": {
-      "filePath": "infra/purchase_returns.py",
+    "morv/infra/purchase_returns.py": {
+      "filePath": "morv/infra/purchase_returns.py",
       "contentHash": "aa94e1b8890ae42070bf9bc3bb279d4a1ae19b117d945df9f2dfedd14add6f5b",
       "functions": [
         {
@@ -6946,8 +7169,8 @@
       "totalLines": 199,
       "hasStructuralAnalysis": true
     },
-    "infra/purchase_view.py": {
-      "filePath": "infra/purchase_view.py",
+    "morv/infra/purchase_view.py": {
+      "filePath": "morv/infra/purchase_view.py",
       "contentHash": "226a2dc47aea68ae525079cd03acd88b9e6be8daa0710507b5e5e6defa69fd25",
       "functions": [
         {
@@ -7053,8 +7276,8 @@
       "totalLines": 72,
       "hasStructuralAnalysis": true
     },
-    "infra/purchasing.py": {
-      "filePath": "infra/purchasing.py",
+    "morv/infra/purchasing.py": {
+      "filePath": "morv/infra/purchasing.py",
       "contentHash": "85b0e5459626b943ea88721c45f6182035386dbb740d3857827bf77ddf5de2cb",
       "functions": [
         {
@@ -7240,8 +7463,8 @@
       "totalLines": 155,
       "hasStructuralAnalysis": true
     },
-    "infra/reports.py": {
-      "filePath": "infra/reports.py",
+    "morv/infra/reports.py": {
+      "filePath": "morv/infra/reports.py",
       "contentHash": "0a31c3b33349c642df8c713385d2754ed918b4fc653c78037b3ed6c4ac8d9030",
       "functions": [
         {
@@ -7701,8 +7924,8 @@
       "totalLines": 807,
       "hasStructuralAnalysis": true
     },
-    "infra/safe_count.py": {
-      "filePath": "infra/safe_count.py",
+    "morv/infra/safe_count.py": {
+      "filePath": "morv/infra/safe_count.py",
       "contentHash": "1795f37937298e828670bb15250a9e9713100edae350ba410bb653f84d4868e4",
       "functions": [
         {
@@ -7878,8 +8101,8 @@
       "totalLines": 155,
       "hasStructuralAnalysis": true
     },
-    "infra/sale_returns.py": {
-      "filePath": "infra/sale_returns.py",
+    "morv/infra/sale_returns.py": {
+      "filePath": "morv/infra/sale_returns.py",
       "contentHash": "f35dfcc598fdf484b693d451473cd693b439590f1b642d5621ec0ad8ddc954aa",
       "functions": [
         {
@@ -8126,8 +8349,8 @@
       "totalLines": 342,
       "hasStructuralAnalysis": true
     },
-    "infra/sale_view.py": {
-      "filePath": "infra/sale_view.py",
+    "morv/infra/sale_view.py": {
+      "filePath": "morv/infra/sale_view.py",
       "contentHash": "31a1a06d7a3a38d590a193303c122c3dcb59fd0d4c08cd5778f4a8bba7d63a1d",
       "functions": [
         {
@@ -8291,8 +8514,8 @@
       "totalLines": 109,
       "hasStructuralAnalysis": true
     },
-    "infra/sales.py": {
-      "filePath": "infra/sales.py",
+    "morv/infra/sales.py": {
+      "filePath": "morv/infra/sales.py",
       "contentHash": "e9744af89ce01529203a57d281368882338610c228e5fba826ac6a2ca124d721",
       "functions": [
         {
@@ -8498,8 +8721,8 @@
       "totalLines": 209,
       "hasStructuralAnalysis": true
     },
-    "infra/settings.py": {
-      "filePath": "infra/settings.py",
+    "morv/infra/settings.py": {
+      "filePath": "morv/infra/settings.py",
       "contentHash": "f8cdee17e460b5474419657a89e3707adcab0eeb98c85ebae20d9e20f5b37b04",
       "functions": [
         {
@@ -8541,8 +8764,8 @@
       "totalLines": 16,
       "hasStructuralAnalysis": true
     },
-    "infra/setup.py": {
-      "filePath": "infra/setup.py",
+    "morv/infra/setup.py": {
+      "filePath": "morv/infra/setup.py",
       "contentHash": "cea7511f6345d205e1c2ef243ca3d352e0494f4a868e1abee48e5fbeef95882c",
       "functions": [
         {
@@ -8625,8 +8848,8 @@
       "totalLines": 48,
       "hasStructuralAnalysis": true
     },
-    "infra/shop.py": {
-      "filePath": "infra/shop.py",
+    "morv/infra/shop.py": {
+      "filePath": "morv/infra/shop.py",
       "contentHash": "27ab5a0b3f815fb433040ad22f3074aeed5325ba85792b36f1b2648e92e7d1bd",
       "functions": [
         {
@@ -8897,8 +9120,8 @@
       "totalLines": 169,
       "hasStructuralAnalysis": true
     },
-    "infra/stock_adjustments.py": {
-      "filePath": "infra/stock_adjustments.py",
+    "morv/infra/stock_adjustments.py": {
+      "filePath": "morv/infra/stock_adjustments.py",
       "contentHash": "4e52366f40e01445b42299283b186f5635ddd3f00cf5638ed3af5be5355cc586",
       "functions": [
         {
@@ -9253,8 +9476,8 @@
       "totalLines": 332,
       "hasStructuralAnalysis": true
     },
-    "infra/stock_view.py": {
-      "filePath": "infra/stock_view.py",
+    "morv/infra/stock_view.py": {
+      "filePath": "morv/infra/stock_view.py",
       "contentHash": "7d5d57d7826bb0ce35c858ef103bd2dd20afa14fc567837d78bbb20c39353fe8",
       "functions": [
         {
@@ -9337,8 +9560,8 @@
       "totalLines": 54,
       "hasStructuralAnalysis": true
     },
-    "infra/suppliers.py": {
-      "filePath": "infra/suppliers.py",
+    "morv/infra/suppliers.py": {
+      "filePath": "morv/infra/suppliers.py",
       "contentHash": "a7304a609451466d95910b1148025e089f7cc4b7a66ee5d0503f6bb901209d69",
       "functions": [
         {
@@ -9537,8 +9760,8 @@
       "totalLines": 146,
       "hasStructuralAnalysis": true
     },
-    "infra/suspended_balances.py": {
-      "filePath": "infra/suspended_balances.py",
+    "morv/infra/suspended_balances.py": {
+      "filePath": "morv/infra/suspended_balances.py",
       "contentHash": "acf0bf0ac4a42c729695b513934358a6a2db500888b75e445e9b7f3873e7aadd",
       "functions": [
         {
@@ -9630,8 +9853,8 @@
       "totalLines": 63,
       "hasStructuralAnalysis": true
     },
-    "infra/treasury.py": {
-      "filePath": "infra/treasury.py",
+    "morv/infra/treasury.py": {
+      "filePath": "morv/infra/treasury.py",
       "contentHash": "4014838d3372a018f739cef207bcd91a97188899d14dea9dabadc6b0979025ab",
       "functions": [
         {
@@ -10004,8 +10227,8 @@
       "totalLines": 346,
       "hasStructuralAnalysis": true
     },
-    "infra/treasury_view.py": {
-      "filePath": "infra/treasury_view.py",
+    "morv/infra/treasury_view.py": {
+      "filePath": "morv/infra/treasury_view.py",
       "contentHash": "1f0638862523da1752ea9b3d54e3409e2ec8386b998b4c94c0f59a44d0b7eb9c",
       "functions": [
         {
@@ -10112,8 +10335,8 @@
       "totalLines": 71,
       "hasStructuralAnalysis": true
     },
-    "infra/users.py": {
-      "filePath": "infra/users.py",
+    "morv/infra/users.py": {
+      "filePath": "morv/infra/users.py",
       "contentHash": "fedea030fb6528a1e61f924cdd41dab31fe6d46abe5ef28c50fb968d7ca796c7",
       "functions": [
         {
@@ -10546,8 +10769,8 @@
       "totalLines": 293,
       "hasStructuralAnalysis": true
     },
-    "infra/vault.py": {
-      "filePath": "infra/vault.py",
+    "morv/infra/vault.py": {
+      "filePath": "morv/infra/vault.py",
       "contentHash": "3ffe6f3893184bb9ba58f9905ae8d2c5324c765c3565909c560924328dcce926",
       "functions": [
         {
@@ -10848,8 +11071,8 @@
       "totalLines": 228,
       "hasStructuralAnalysis": true
     },
-    "ui/__init__.py": {
-      "filePath": "ui/__init__.py",
+    "morv/ui/__init__.py": {
+      "filePath": "morv/ui/__init__.py",
       "contentHash": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "functions": [],
       "classes": [],
@@ -10858,8 +11081,8 @@
       "totalLines": 2,
       "hasStructuralAnalysis": true
     },
-    "ui/adaptive_layout.py": {
-      "filePath": "ui/adaptive_layout.py",
+    "morv/ui/adaptive_layout.py": {
+      "filePath": "morv/ui/adaptive_layout.py",
       "contentHash": "b7ae079a6c67fe2f9df5eb62ab384eed768681c7d61aba13adc195622bf83ff9",
       "functions": [
         {
@@ -11040,8 +11263,8 @@
       "totalLines": 540,
       "hasStructuralAnalysis": true
     },
-    "ui/backup_runner.py": {
-      "filePath": "ui/backup_runner.py",
+    "morv/ui/backup_runner.py": {
+      "filePath": "morv/ui/backup_runner.py",
       "contentHash": "70012968303f720986fae9da2b14b9942aba51b0017de45753abc4c5ad3684d0",
       "functions": [],
       "classes": [
@@ -11077,8 +11300,8 @@
       "totalLines": 21,
       "hasStructuralAnalysis": true
     },
-    "ui/customer_statement_dialog.py": {
-      "filePath": "ui/customer_statement_dialog.py",
+    "morv/ui/customer_statement_dialog.py": {
+      "filePath": "morv/ui/customer_statement_dialog.py",
       "contentHash": "d55e63f27538f60b2dc9f0420e6c4f33c9812ff122c4b17ff1b5309203af775e",
       "functions": [],
       "classes": [
@@ -11184,8 +11407,8 @@
       "totalLines": 237,
       "hasStructuralAnalysis": true
     },
-    "ui/customers_page.py": {
-      "filePath": "ui/customers_page.py",
+    "morv/ui/customers_page.py": {
+      "filePath": "morv/ui/customers_page.py",
       "contentHash": "6edfb694ba26b1f2227ab309d2b99f47b6c027086f53f5753878e3ab7cf8a953",
       "functions": [],
       "classes": [
@@ -11334,8 +11557,8 @@
       "totalLines": 286,
       "hasStructuralAnalysis": true
     },
-    "ui/dashboard_page.py": {
-      "filePath": "ui/dashboard_page.py",
+    "morv/ui/dashboard_page.py": {
+      "filePath": "morv/ui/dashboard_page.py",
       "contentHash": "b30d478de79a56da9c0b74dc1db38dd710f8b61a744ab2c0c336404dfe32ae6e",
       "functions": [],
       "classes": [
@@ -11450,8 +11673,8 @@
       "totalLines": 337,
       "hasStructuralAnalysis": true
     },
-    "ui/deposit_dialogs.py": {
-      "filePath": "ui/deposit_dialogs.py",
+    "morv/ui/deposit_dialogs.py": {
+      "filePath": "morv/ui/deposit_dialogs.py",
       "contentHash": "c9f06a297661e201e4df1195968e9998ad20ce0b47411e486865bfdabba2b613",
       "functions": [],
       "classes": [
@@ -11564,8 +11787,8 @@
       "totalLines": 143,
       "hasStructuralAnalysis": true
     },
-    "ui/icons.py": {
-      "filePath": "ui/icons.py",
+    "morv/ui/icons.py": {
+      "filePath": "morv/ui/icons.py",
       "contentHash": "fc3e11aa529222308247754f1773d2235aaa355e2d51362141a4eafdcdd5d88c",
       "functions": [
         {
@@ -11634,8 +11857,8 @@
       "totalLines": 87,
       "hasStructuralAnalysis": true
     },
-    "ui/installments_page.py": {
-      "filePath": "ui/installments_page.py",
+    "morv/ui/installments_page.py": {
+      "filePath": "morv/ui/installments_page.py",
       "contentHash": "16f3670375aa8698b7e3fc9786d75290392895c8d302e5f2bcf93829913f3e4a",
       "functions": [],
       "classes": [
@@ -11830,8 +12053,8 @@
       "totalLines": 710,
       "hasStructuralAnalysis": true
     },
-    "ui/interest_dialogs.py": {
-      "filePath": "ui/interest_dialogs.py",
+    "morv/ui/interest_dialogs.py": {
+      "filePath": "morv/ui/interest_dialogs.py",
       "contentHash": "35a95e837a3ef9bab8f52f4d40ea61c0ed7da28fca26eb9167e8113615d89e03",
       "functions": [],
       "classes": [
@@ -11921,8 +12144,8 @@
       "totalLines": 72,
       "hasStructuralAnalysis": true
     },
-    "ui/inventory_page.py": {
-      "filePath": "ui/inventory_page.py",
+    "morv/ui/inventory_page.py": {
+      "filePath": "morv/ui/inventory_page.py",
       "contentHash": "c7ccfc04ec4b8f2d56dc7e9c81b2bad241b258f903f2420580f1dd6b45781157",
       "functions": [],
       "classes": [
@@ -12113,8 +12336,8 @@
       "totalLines": 493,
       "hasStructuralAnalysis": true
     },
-    "ui/invoice_lines.py": {
-      "filePath": "ui/invoice_lines.py",
+    "morv/ui/invoice_lines.py": {
+      "filePath": "morv/ui/invoice_lines.py",
       "contentHash": "8283035be97791143d6437d59688425afcfa4010a277490d6e00b885e91b105f",
       "functions": [
         {
@@ -12181,8 +12404,8 @@
       "totalLines": 125,
       "hasStructuralAnalysis": true
     },
-    "ui/item_search.py": {
-      "filePath": "ui/item_search.py",
+    "morv/ui/item_search.py": {
+      "filePath": "morv/ui/item_search.py",
       "contentHash": "c0d7e3e2073c67b9d09e336c57ea2a8638f3c8a78855888c9b14521b618ac6a5",
       "functions": [],
       "classes": [
@@ -12278,8 +12501,8 @@
       "totalLines": 174,
       "hasStructuralAnalysis": true
     },
-    "ui/listpage.py": {
-      "filePath": "ui/listpage.py",
+    "morv/ui/listpage.py": {
+      "filePath": "morv/ui/listpage.py",
       "contentHash": "7e446d3002af35e09d31a793b719c19f6547bfd51fddfc466382bfa8b433a8aa",
       "functions": [
         {
@@ -12461,6 +12684,12 @@
           "specifiers": [
             "run_async"
           ]
+        },
+        {
+          "source": "morv.ui",
+          "specifiers": [
+            "icons"
+          ]
         }
       ],
       "exports": [
@@ -12473,8 +12702,8 @@
       "totalLines": 743,
       "hasStructuralAnalysis": true
     },
-    "ui/login.py": {
-      "filePath": "ui/login.py",
+    "morv/ui/login.py": {
+      "filePath": "morv/ui/login.py",
       "contentHash": "2e64d09403fe9d217363a9407633e3abc1665580d0c13228dd21796109ba587e",
       "functions": [],
       "classes": [
@@ -12568,8 +12797,8 @@
       "totalLines": 124,
       "hasStructuralAnalysis": true
     },
-    "ui/modal.py": {
-      "filePath": "ui/modal.py",
+    "morv/ui/modal.py": {
+      "filePath": "morv/ui/modal.py",
       "contentHash": "65199a3fa74e45a601d7ffdbeff8fab7473cd0623a7d6d1d31fe1c49e112b695",
       "functions": [
         {
@@ -12689,8 +12918,8 @@
       "totalLines": 172,
       "hasStructuralAnalysis": true
     },
-    "ui/models.py": {
-      "filePath": "ui/models.py",
+    "morv/ui/models.py": {
+      "filePath": "morv/ui/models.py",
       "contentHash": "ae5ecb525b894ba530ecdec95b6ce84360e7bbc9e1870931fca5c52ee7d0c955",
       "functions": [],
       "classes": [
@@ -12754,8 +12983,8 @@
       "totalLines": 118,
       "hasStructuralAnalysis": true
     },
-    "ui/opening_dialogs.py": {
-      "filePath": "ui/opening_dialogs.py",
+    "morv/ui/opening_dialogs.py": {
+      "filePath": "morv/ui/opening_dialogs.py",
       "contentHash": "c8180d4b6d507fd682221d77748f19e1782be50cd985fd7cf1582ac946e24aa4",
       "functions": [],
       "classes": [
@@ -12902,8 +13131,8 @@
       "totalLines": 264,
       "hasStructuralAnalysis": true
     },
-    "ui/partners_tab.py": {
-      "filePath": "ui/partners_tab.py",
+    "morv/ui/partners_tab.py": {
+      "filePath": "morv/ui/partners_tab.py",
       "contentHash": "3b454615c8fef9b352e906190bf2f1c5ce9e3450c4930f7103beba7f7aeec028",
       "functions": [],
       "classes": [
@@ -13043,8 +13272,8 @@
       "totalLines": 226,
       "hasStructuralAnalysis": true
     },
-    "ui/party_search.py": {
-      "filePath": "ui/party_search.py",
+    "morv/ui/party_search.py": {
+      "filePath": "morv/ui/party_search.py",
       "contentHash": "37c2bb474de3d1d8feed2a71b500d329c3a2bbaec956a945fb9e5f0f6f6a6d9b",
       "functions": [
         {
@@ -13226,8 +13455,8 @@
       "totalLines": 345,
       "hasStructuralAnalysis": true
     },
-    "ui/period_dialogs.py": {
-      "filePath": "ui/period_dialogs.py",
+    "morv/ui/period_dialogs.py": {
+      "filePath": "morv/ui/period_dialogs.py",
       "contentHash": "f3716e0fbf359793136fb3471d0ff3df9cc9785e165ec85b423a1b82dd6b228e",
       "functions": [],
       "classes": [
@@ -13317,8 +13546,8 @@
       "totalLines": 89,
       "hasStructuralAnalysis": true
     },
-    "ui/pos_page.py": {
-      "filePath": "ui/pos_page.py",
+    "morv/ui/pos_page.py": {
+      "filePath": "morv/ui/pos_page.py",
       "contentHash": "8ebfd540e187cf885d0f20a8c559a27e528004f3501e69467e6129d2cb043096",
       "functions": [],
       "classes": [
@@ -13526,6 +13755,19 @@
             "section_card",
             "trail_icon"
           ]
+        },
+        {
+          "source": "morv.infra",
+          "specifiers": [
+            "sale_view",
+            "shop"
+          ]
+        },
+        {
+          "source": "morv.ui",
+          "specifiers": [
+            "printing"
+          ]
         }
       ],
       "exports": [
@@ -13535,8 +13777,8 @@
       "totalLines": 873,
       "hasStructuralAnalysis": true
     },
-    "ui/print_doc.py": {
-      "filePath": "ui/print_doc.py",
+    "morv/ui/print_doc.py": {
+      "filePath": "morv/ui/print_doc.py",
       "contentHash": "5d0749f9cfeeb849148c3087d3cb863fbca32aac51b5122920bdad25aeb57d8e",
       "functions": [
         {
@@ -13986,8 +14228,8 @@
       "totalLines": 443,
       "hasStructuralAnalysis": true
     },
-    "ui/printing.py": {
-      "filePath": "ui/printing.py",
+    "morv/ui/printing.py": {
+      "filePath": "morv/ui/printing.py",
       "contentHash": "ad4a77b8634754d586eb82bf66e65a05b64c6fa6bfe5349da34173880a3306e1",
       "functions": [
         {
@@ -14109,8 +14351,8 @@
       "totalLines": 97,
       "hasStructuralAnalysis": true
     },
-    "ui/profit_dialogs.py": {
-      "filePath": "ui/profit_dialogs.py",
+    "morv/ui/profit_dialogs.py": {
+      "filePath": "morv/ui/profit_dialogs.py",
       "contentHash": "416d6e6794fdc6c824990ac87f245bdd2c2a20f749293e94e30acef856e480e2",
       "functions": [],
       "classes": [
@@ -14230,8 +14472,8 @@
       "totalLines": 172,
       "hasStructuralAnalysis": true
     },
-    "ui/purchase_return_dialogs.py": {
-      "filePath": "ui/purchase_return_dialogs.py",
+    "morv/ui/purchase_return_dialogs.py": {
+      "filePath": "morv/ui/purchase_return_dialogs.py",
       "contentHash": "e3debd00b2448fc08339e6f424498a2e34ce50cc08cf03f5b68c6f1a1e57a72d",
       "functions": [],
       "classes": [
@@ -14336,8 +14578,8 @@
       "totalLines": 149,
       "hasStructuralAnalysis": true
     },
-    "ui/purchases_page.py": {
-      "filePath": "ui/purchases_page.py",
+    "morv/ui/purchases_page.py": {
+      "filePath": "morv/ui/purchases_page.py",
       "contentHash": "77257f3c47b9b57a4c66bc3ee4c8dd9a6d5ec5858a13701bb86a7ea307a76d1f",
       "functions": [],
       "classes": [
@@ -14570,8 +14812,8 @@
       "totalLines": 666,
       "hasStructuralAnalysis": true
     },
-    "ui/receipt_dialogs.py": {
-      "filePath": "ui/receipt_dialogs.py",
+    "morv/ui/receipt_dialogs.py": {
+      "filePath": "morv/ui/receipt_dialogs.py",
       "contentHash": "898b636d181ad8e9b0a7a653284602a7e3667b74592d7d1de8394c005be4f6e7",
       "functions": [],
       "classes": [
@@ -14660,8 +14902,8 @@
       "totalLines": 82,
       "hasStructuralAnalysis": true
     },
-    "ui/reconciliation_dialogs.py": {
-      "filePath": "ui/reconciliation_dialogs.py",
+    "morv/ui/reconciliation_dialogs.py": {
+      "filePath": "morv/ui/reconciliation_dialogs.py",
       "contentHash": "6f96a8ed8a982ae7c02bf177750b1364b188dbb1f8b4efcb0c6da0382dadb900",
       "functions": [],
       "classes": [
@@ -14770,8 +15012,8 @@
       "totalLines": 148,
       "hasStructuralAnalysis": true
     },
-    "ui/report_export.py": {
-      "filePath": "ui/report_export.py",
+    "morv/ui/report_export.py": {
+      "filePath": "morv/ui/report_export.py",
       "contentHash": "a5a57075b64d120daf16a85c54d5a93dda7b6f3f169169fb7dc055bebb3cc794",
       "functions": [
         {
@@ -14850,8 +15092,8 @@
       "totalLines": 42,
       "hasStructuralAnalysis": true
     },
-    "ui/reports_page.py": {
-      "filePath": "ui/reports_page.py",
+    "morv/ui/reports_page.py": {
+      "filePath": "morv/ui/reports_page.py",
       "contentHash": "212f703704bf1b07b06ce3e7ac1d1147c0722a6dcb34f5fdc22abf00a7dd19bb",
       "functions": [
         {
@@ -14986,8 +15228,8 @@
       "totalLines": 238,
       "hasStructuralAnalysis": true
     },
-    "ui/sale_return_dialog.py": {
-      "filePath": "ui/sale_return_dialog.py",
+    "morv/ui/sale_return_dialog.py": {
+      "filePath": "morv/ui/sale_return_dialog.py",
       "contentHash": "f9c6188552330343ea03c777e1fb3d171501c6a891c80bb79ce115f249677387",
       "functions": [],
       "classes": [
@@ -15100,8 +15342,8 @@
       "totalLines": 248,
       "hasStructuralAnalysis": true
     },
-    "ui/sales_page.py": {
-      "filePath": "ui/sales_page.py",
+    "morv/ui/sales_page.py": {
+      "filePath": "morv/ui/sales_page.py",
       "contentHash": "894814c7e75524dc6be6ebbecb5e3c02f8ee33ba5570c9f001d47380f0740904",
       "functions": [],
       "classes": [
@@ -15163,6 +15405,30 @@
           "specifiers": [
             "SaleReturnDialog"
           ]
+        },
+        {
+          "source": "morv.infra",
+          "specifiers": [
+            "shop"
+          ]
+        },
+        {
+          "source": "morv.ui",
+          "specifiers": [
+            "printing"
+          ]
+        },
+        {
+          "source": "morv.ui.widgets",
+          "specifiers": [
+            "info"
+          ]
+        },
+        {
+          "source": "morv.ui",
+          "specifiers": [
+            "printing"
+          ]
         }
       ],
       "exports": [
@@ -15171,8 +15437,8 @@
       "totalLines": 124,
       "hasStructuralAnalysis": true
     },
-    "ui/session.py": {
-      "filePath": "ui/session.py",
+    "morv/ui/session.py": {
+      "filePath": "morv/ui/session.py",
       "contentHash": "a854fb9f8220c87c386f992469e26e842711399667674d837f53cd46022c9fab",
       "functions": [],
       "classes": [
@@ -15219,8 +15485,8 @@
       "totalLines": 20,
       "hasStructuralAnalysis": true
     },
-    "ui/settings_page.py": {
-      "filePath": "ui/settings_page.py",
+    "morv/ui/settings_page.py": {
+      "filePath": "morv/ui/settings_page.py",
       "contentHash": "80a6d6f5c4bd7b843ffa7ebf2957e84503e7e929240071261234ee075ed54fe8",
       "functions": [
         {
@@ -15488,6 +15754,24 @@
             "icon_button",
             "kbd"
           ]
+        },
+        {
+          "source": "morv.ui.inventory_page",
+          "specifiers": [
+            "ItemFieldsTab"
+          ]
+        },
+        {
+          "source": "morv.ui.partners_tab",
+          "specifiers": [
+            "PartnersTab"
+          ]
+        },
+        {
+          "source": "morv.ui.opening_dialogs",
+          "specifiers": [
+            "OpeningTab"
+          ]
         }
       ],
       "exports": [
@@ -15507,8 +15791,8 @@
       "totalLines": 907,
       "hasStructuralAnalysis": true
     },
-    "ui/setup_wizard.py": {
-      "filePath": "ui/setup_wizard.py",
+    "morv/ui/setup_wizard.py": {
+      "filePath": "morv/ui/setup_wizard.py",
       "contentHash": "2477495b156a08933d69e3ecc18c8c16d41ae30684980073ac883d411b14aebd",
       "functions": [],
       "classes": [
@@ -15614,8 +15898,8 @@
       "totalLines": 401,
       "hasStructuralAnalysis": true
     },
-    "ui/shell.py": {
-      "filePath": "ui/shell.py",
+    "morv/ui/shell.py": {
+      "filePath": "morv/ui/shell.py",
       "contentHash": "945240431b8fb3acbf6b19807a7c5ac01565e9bf671f531ca0876d601bc67895",
       "functions": [],
       "classes": [
@@ -15796,8 +16080,8 @@
       "totalLines": 357,
       "hasStructuralAnalysis": true
     },
-    "ui/shell_placeholder.py": {
-      "filePath": "ui/shell_placeholder.py",
+    "morv/ui/shell_placeholder.py": {
+      "filePath": "morv/ui/shell_placeholder.py",
       "contentHash": "70c45d9e384a17cb0f45c1b84e708a6796d4d738c48e091c9708badff0ec9a7f",
       "functions": [
         {
@@ -15828,8 +16112,8 @@
       "totalLines": 19,
       "hasStructuralAnalysis": true
     },
-    "ui/shop_settings.py": {
-      "filePath": "ui/shop_settings.py",
+    "morv/ui/shop_settings.py": {
+      "filePath": "morv/ui/shop_settings.py",
       "contentHash": "038ff59dacdc676668a773ccda7b76874eb449f620e6dbbf56c58be53c2dfb4c",
       "functions": [],
       "classes": [
@@ -15937,6 +16221,19 @@
             "muted",
             "section_card"
           ]
+        },
+        {
+          "source": "PySide6.QtPrintSupport",
+          "specifiers": [
+            "QPrinterInfo"
+          ]
+        },
+        {
+          "source": "PySide6.QtPrintSupport",
+          "specifiers": [
+            "QPrinter",
+            "QPrinterInfo"
+          ]
         }
       ],
       "exports": [
@@ -15946,8 +16243,8 @@
       "totalLines": 278,
       "hasStructuralAnalysis": true
     },
-    "ui/stock_adjustment_dialogs.py": {
-      "filePath": "ui/stock_adjustment_dialogs.py",
+    "morv/ui/stock_adjustment_dialogs.py": {
+      "filePath": "morv/ui/stock_adjustment_dialogs.py",
       "contentHash": "f4eded3eed9664ab8966204a3888b5075e1423431f5449cb59711b94cc429672",
       "functions": [],
       "classes": [
@@ -16056,8 +16353,8 @@
       "totalLines": 194,
       "hasStructuralAnalysis": true
     },
-    "ui/stock_pages.py": {
-      "filePath": "ui/stock_pages.py",
+    "morv/ui/stock_pages.py": {
+      "filePath": "morv/ui/stock_pages.py",
       "contentHash": "f69beab8e5d0286afb1741bebb25fabe9e521a33528ebdbc4fbcabeaeed6988d",
       "functions": [
         {
@@ -16163,8 +16460,8 @@
       "totalLines": 177,
       "hasStructuralAnalysis": true
     },
-    "ui/suppliers_page.py": {
-      "filePath": "ui/suppliers_page.py",
+    "morv/ui/suppliers_page.py": {
+      "filePath": "morv/ui/suppliers_page.py",
       "contentHash": "af1f66f971740badfdc445c45e68d11312bfe37289fdf085dab4b91364c5fcdd",
       "functions": [],
       "classes": [
@@ -16274,8 +16571,8 @@
       "totalLines": 192,
       "hasStructuralAnalysis": true
     },
-    "ui/theme.py": {
-      "filePath": "ui/theme.py",
+    "morv/ui/theme.py": {
+      "filePath": "morv/ui/theme.py",
       "contentHash": "bdb08f277f892d60cc531498c8813c2b390ed4039b6041f29d73ee0077d56f92",
       "functions": [
         {
@@ -16371,6 +16668,12 @@
             "DARK",
             "LIGHT"
           ]
+        },
+        {
+          "source": "morv.ui",
+          "specifiers": [
+            "icons"
+          ]
         }
       ],
       "exports": [
@@ -16385,8 +16688,8 @@
       "totalLines": 307,
       "hasStructuralAnalysis": true
     },
-    "ui/tokens.py": {
-      "filePath": "ui/tokens.py",
+    "morv/ui/tokens.py": {
+      "filePath": "morv/ui/tokens.py",
       "contentHash": "126afff6ee3131d1c039eab09f099e8c37192e6459ccc71b9bf63049eb20b5fc",
       "functions": [],
       "classes": [],
@@ -16395,8 +16698,8 @@
       "totalLines": 53,
       "hasStructuralAnalysis": true
     },
-    "ui/treasury_dialogs.py": {
-      "filePath": "ui/treasury_dialogs.py",
+    "morv/ui/treasury_dialogs.py": {
+      "filePath": "morv/ui/treasury_dialogs.py",
       "contentHash": "ed06ab191f095a425e51332c7456f41059b342cb06c62bbbceae616128371bb8",
       "functions": [],
       "classes": [
@@ -16561,8 +16864,8 @@
       "totalLines": 392,
       "hasStructuralAnalysis": true
     },
-    "ui/treasury_page.py": {
-      "filePath": "ui/treasury_page.py",
+    "morv/ui/treasury_page.py": {
+      "filePath": "morv/ui/treasury_page.py",
       "contentHash": "9db58815b642c9c5a4f0e23b37bb238a2cc073f52028c40c1e8cf4246dbdc7d5",
       "functions": [],
       "classes": [
@@ -16658,6 +16961,18 @@
             "kpi_tile",
             "muted"
           ]
+        },
+        {
+          "source": "morv.ui.profit_dialogs",
+          "specifiers": [
+            "DistributionDialog"
+          ]
+        },
+        {
+          "source": "morv.ui.period_dialogs",
+          "specifiers": [
+            "PeriodLockDialog"
+          ]
         }
       ],
       "exports": [
@@ -16667,8 +16982,8 @@
       "totalLines": 181,
       "hasStructuralAnalysis": true
     },
-    "ui/widgets.py": {
-      "filePath": "ui/widgets.py",
+    "morv/ui/widgets.py": {
+      "filePath": "morv/ui/widgets.py",
       "contentHash": "877ccf54c93c42dc02f3d3a59c41c5351e6ff31637298e15ef92a72c26f09e67",
       "functions": [
         {
@@ -17093,6 +17408,30 @@
             "DARK",
             "LIGHT"
           ]
+        },
+        {
+          "source": "PySide6.QtCore",
+          "specifiers": [
+            "QEvent"
+          ]
+        },
+        {
+          "source": "morv.ui.workers",
+          "specifiers": [
+            "wait_all"
+          ]
+        },
+        {
+          "source": "morv.ui.modal",
+          "specifiers": [
+            "ask"
+          ]
+        },
+        {
+          "source": "morv.ui.modal",
+          "specifiers": [
+            "info"
+          ]
         }
       ],
       "exports": [
@@ -17134,8 +17473,8 @@
       "totalLines": 582,
       "hasStructuralAnalysis": true
     },
-    "ui/workers.py": {
-      "filePath": "ui/workers.py",
+    "morv/ui/workers.py": {
+      "filePath": "morv/ui/workers.py",
       "contentHash": "aeb73bc7e54a5b388db65b135973c437f1825e494170c850515f49f87802ea45",
       "functions": [
         {

@@ -2,7 +2,7 @@
   "version": 1,
   "generatedAt": "2026-11-26T11:56:11.198141+00:00",
   "files": {
-    "app/main.py": {
+    "morv/app/main.py": {
       "overview": "نقطة دخول التطبيق: تتحقق من الوسائط، وتضبط السجلات، وتحجز قفل النسخة الوحيدة، وتفتح قاعدة البيانات مع تطبيق الترقيات، ثم تعرض معالج الإعداد الأول أو شاشة الدخول فالنافذة الرئيسية. الاستيرادات الثقيلة (PySide6 ووحدات الواجهة) مؤجّلة داخل الدوال لتقليل زمن الإقلاع وقياسه. هذا هو الملف الذي تبدأ منه الجولة في خطوتها الأولى.",
       "sections": [
         {
@@ -88,7 +88,7 @@
         }
       ]
     },
-    "__init__.py": {
+    "morv/__init__.py": {
       "overview": "ملف الحزمة الجذرية `morv`: يعرّف ثلاثة ثوابت مشتركة هي اسم التطبيق ومعرّفه ورقم إصداره. يستوردها `app/main.py` لاسم التطبيق في Qt، و`infra/db/connection.py` يستعمل `APP_ID` للتحقق من أن ملف القاعدة يخص هذا البرنامج.",
       "sections": [
         {
@@ -102,7 +102,7 @@
         }
       ]
     },
-    "core/money.py": {
+    "morv/core/money.py": {
       "overview": "وحدة المال النقية: كل المبالغ أعداد صحيحة بالقرش (piasters)، ولا يُستعمل `float` أبدًا. توفّر تحليل النص المُدخل إلى قروش مع رفض أكثر من خانتين عشريتين، وتنسيق القروش للعرض، وحساب النسب بـ `Decimal` مع تقريب صريح. هي أساس الخطوة الثانية في الجولة، وتعتمد عليها كل الطبقات.",
       "sections": [
         {
@@ -143,7 +143,7 @@
         }
       ]
     },
-    "core/text.py": {
+    "morv/core/text.py": {
       "overview": "أدوات نص عربي نقية بلا Qt ولا SQL: توحيد الحروف العربية للبحث، وتصحيح الباركود الذي يصل بحروف عربية حين تكون لوحة المفاتيح عربية، وعزل القيم اللاتينية بعلامات اتجاه Unicode. ترافق `core/money.py` في الخطوة الثانية من الجولة وتعيد استخدام `to_latin` منه.",
       "sections": [
         {
@@ -175,7 +175,7 @@
         }
       ]
     },
-    "infra/db/connection.py": {
+    "morv/infra/db/connection.py": {
       "overview": "نقطة الفتح الآمنة لقاعدة SQLite والمساعد الوحيد للمعاملات في المشروع. يرفض قاعدة البرنامج القديم بالاسم ويرفض أي ملف لا يحمل علامة `app_id` الخاصة بالبرنامج، ويضبط PRAGMAs الأمان والأداء. أما `transaction()` فهو الطريق الوحيد المسموح لتجميع الكتابات المترابطة، ويمنع تداخل المعاملات؛ وهو محور الخطوة الثالثة في الجولة.",
       "sections": [
         {
@@ -234,7 +234,7 @@
         }
       ]
     },
-    "infra/db/bootstrap.py": {
+    "morv/infra/db/bootstrap.py": {
       "overview": "يفتح القاعدة الحية عند الإقلاع: فتح آمن عبر `open_db`، ثم تطبيق الترقيات المعلّقة عبر `migrate`، مع أخذ نسخة احتياطية قبل الترقية. يستدعيه `app/main.py`، وهو جزء من الخطوة الثالثة في الجولة إلى جانب `connection.py`.",
       "sections": [
         {
@@ -257,7 +257,7 @@
         }
       ]
     },
-    "infra/db/migrator.py": {
+    "morv/infra/db/migrator.py": {
       "overview": "محرك الترقيات: يحمّل ملفات SQL المرقّمة من مجلد `migrations`، ويتحقق من تتابع أرقامها ومن بصمة SHA-256 لكل ملف مطبّق، ويطبّق المعلّق منها كلًّا في معاملة ذرية مع فحص المفاتيح الأجنبية قبل COMMIT. يرفض أي ملف عُدّل بعد تطبيقه وأي قاعدة من إصدار أحدث. هذا محور الخطوة الرابعة في الجولة.",
       "sections": [
         {
@@ -316,7 +316,7 @@
         }
       ]
     },
-    "infra/db/migrations/0001_foundation.sql": {
+    "morv/infra/db/migrations/0001_foundation.sql": {
       "overview": "الترقية الأولى وأساس المخطط: تنشئ علامة البرنامج `app_meta` وجدول الإعدادات ودليل الحسابات الشجري `accounts` مع بياناته الأولية وسجل النسخ الاحتياطي. تقرّر في رأسها أن كل المبالغ في كل الجداول INTEGER بالقرش وأن REAL ممنوع. تشرحها الخطوة الرابعة من الجولة مع محرك الترقيات.",
       "sections": [
         {
@@ -366,7 +366,7 @@
         }
       ]
     },
-    "infra/db/migrations/0006_purchasing.sql": {
+    "morv/infra/db/migrations/0006_purchasing.sql": {
       "overview": "قلب المحاسبة والمخزون: تنشئ رؤوس القيود وأسطرها، وفاتورة الشراء وأسطرها، والدفعات الفعلية `stock_lots` بتاريخ DOT، وطبقات تكلفة FIFO، وعمليات الصرف وحركاته وتخصيصات التكلفة. تفصل بين ما على الرف (الدفعات) والقيمة الدفترية (الطبقات)، ومحفّزاتها تمنع تعديل الجداول الدفترية أو حذفها فيكون التصحيح بحركة عكسية. هذه الخطوة الخامسة في الجولة.",
       "sections": [
         {
@@ -443,7 +443,7 @@
         }
       ]
     },
-    "infra/ledger.py": {
+    "morv/infra/ledger.py": {
       "overview": "دفتر الأستاذ: يرحّل قيودًا متوازنة ويقرأ الأرصدة، دائمًا داخل معاملة المستدعي لا معاملته الخاصة. يتحقق من أن المبالغ أعداد صحيحة بالقرش ضمن الحد ومن التوازن، ويكتب القيد بحالة `open` ثم يرحّله بعد كتابة كل أسطره. تنتهي كل خدمة مالية باستدعائه، وهو محور الخطوة السادسة في الجولة.",
       "sections": [
         {
@@ -484,7 +484,7 @@
         }
       ]
     },
-    "infra/period_lock.py": {
+    "morv/infra/period_lock.py": {
       "overview": "قفل الفترة المالية: يجمّد تواريخ الأستاذ حتى يوم معين بمستندات قفل وفتح غير قابلة للتعديل، حيث يلغي مستند الفتح القفل الأخير بالإشارة إليه لا بحذفه. قبل القفل يفحص العوائق (إقفال الصندوق، فوائد التقسيط، قيود غير مرحّلة) ويعرض تحذيرات لا تمنع القفل. يستعمل `request_key` و`payload_hash` لجعل الطلب idempotent، وهو جزء من الخطوة السادسة في الجولة.",
       "sections": [
         {
@@ -543,7 +543,7 @@
         }
       ]
     },
-    "infra/purchasing.py": {
+    "morv/infra/purchasing.py": {
       "overview": "ترحيل فاتورة الشراء في عملية ذرية واحدة: يكتب الفاتورة وقيدها المحاسبي (مدين المخزون 1410، دائن الموردين 2110) وينشئ لكل سطر دفعة فعلية وحركة استلام وطبقة تكلفة FIFO. يتحقق من الصلاحية والمدخلات والأصناف والمورد، ويجعل الطلب idempotent عبر `request_key` وبصمة المحتوى. يمثل الخطوة السابعة في الجولة، ويعتمد على `core/dot.py` لتحليل DOT.",
       "sections": [
         {
@@ -602,535 +602,535 @@
         }
       ]
     },
-    "core/costing.py": {
+    "morv/core/costing.py": {
       "overview": "حسابات تكلفة FIFO نقية بالقرش: تقسيم تكلفة الشرائح ووضع خطط صرف الدُفعات (lots) دون أي قاعدة بيانات.",
       "sections": []
     },
-    "core/dot.py": {
+    "morv/core/dot.py": {
       "overview": "تحليل كود DOT للإطارات (أسبوع وسنة من أربعة أرقام) وتوليد مفتاح ترتيب حسب تاريخ التصنيع.",
       "sections": []
     },
-    "core/eir.py": {
+    "morv/core/eir.py": {
       "overview": "حسابات معدل الفائدة الفعلي (EIR) بطريقة ACT/365 Fixed لتدفقات الأقساط التعاقدية، وتوزيع الفائدة على الأشهر.",
       "sections": []
     },
-    "core/sales_rules.py": {
+    "morv/core/sales_rules.py": {
       "overview": "قواعد البيع النقية: توزيع الخصم على السطور، خريطة الحسابات، والتحقق من مدفوعات الفاتورة.",
       "sections": []
     },
-    "infra/bank_reconciliation.py": {
+    "morv/infra/bank_reconciliation.py": {
       "overview": "سجلات مطابقة البنك والمحافظ: مقارنة رصيد كشف الحساب برصيد البرنامج في تاريخ معين دون قيد يومية، مع إلغاء ورصد الفجوات.",
       "sections": []
     },
-    "infra/customer_deposits.py": {
+    "morv/infra/customer_deposits.py": {
       "overview": "عرابين العملاء: استلامها أو ردّها أو تطبيقها على دين الآجل، مع مستندات عكس مقابلة وقيود محاسبية.",
       "sections": []
     },
-    "infra/customer_receipts.py": {
+    "morv/infra/customer_receipts.py": {
       "overview": "سندات قبض العملاء: تحصيل ديون البيع الآجل وعكس السند بمستند مقابل، مع حسابات أرصدة الدين والعرابين.",
       "sections": []
     },
-    "infra/customer_statement.py": {
+    "morv/infra/customer_statement.py": {
       "overview": "كشف حساب العميل المقروء من حساب الأستاذ 1310: رصيد افتتاحي وحركات ورصيد ختامي.",
       "sections": []
     },
-    "infra/installments.py": {
+    "morv/infra/installments.py": {
       "overview": "عقود التقسيط: تحصيل المقدم وقيد هامش الربح مقابل الفائدة المؤجلة، وتحصيل الأقساط على الأقدم استحقاقًا.",
       "sections": []
     },
-    "infra/interest_recognition.py": {
+    "morv/infra/interest_recognition.py": {
       "overview": "ترحيل استحقاقات فائدة EIR الشهرية غير القابلة للتعديل للعقود غير المعدّلة والملتزمة بجدولها.",
       "sections": []
     },
-    "infra/interest_reversal.py": {
+    "morv/infra/interest_reversal.py": {
       "overview": "عكس آخر شهر فائدة معترف به لعقد تقسيط ليمكن الاعتراف به من جديد.",
       "sections": []
     },
-    "infra/interest_review.py": {
+    "morv/infra/interest_review.py": {
       "overview": "مراجعة للقراءة فقط لفائدة الأقساط حسب الفترة: غير المعترف بها أو الخارجة عن المحرك أو ذات التاريخ الخاطئ، مع ترحيل الجاهز.",
       "sections": []
     },
-    "infra/inventory.py": {
+    "morv/infra/inventory.py": {
       "overview": "الدُفعات الفعلية وطبقات FIFO: صرف المخزون والقيمة الدفترية ومطابقة المخزون مع الأستاذ.",
       "sections": []
     },
-    "infra/opening_balances.py": {
+    "morv/infra/opening_balances.py": {
       "overview": "الأرصدة الافتتاحية: قيد لكل سطر مقابل الحساب الانتقالي 3500 الذي يجب أن يصفر، مع معاينة وترحيل وعكس.",
       "sections": []
     },
-    "infra/profit.py": {
+    "morv/infra/profit.py": {
       "overview": "حصص أرباح الشركاء وتوزيع أرباح الفترات المقفلة كحركات حقوق ملكية فقط، مع الاحتياطي القانوني والعكس.",
       "sections": []
     },
-    "infra/purchase_returns.py": {
+    "morv/infra/purchase_returns.py": {
       "overview": "مرتجعات المشتريات للمورد بتكلفة الفاتورة، مع مستند عكس يعيد المخزون إلى دفعاته وطبقاته.",
       "sections": []
     },
-    "infra/sale_returns.py": {
+    "morv/infra/sale_returns.py": {
       "overview": "مرتجع المبيعات: مستند عكسي ذري دون المساس بالفاتورة، يشمل فسخ عقد التقسيط ورد المقبوضات الفعلية فقط.",
       "sections": []
     },
-    "infra/sales.py": {
+    "morv/infra/sales.py": {
       "overview": "فاتورة البيع: ترحيل ذري يكتب الفاتورة وقيد الإيراد وصرف FIFO، مع فحص الأسعار والخصومات والعميل.",
       "sections": []
     },
-    "infra/stock_adjustments.py": {
+    "morv/infra/stock_adjustments.py": {
       "overview": "تسويات جرد المخزون: الزيادة تنشئ دفعات وطبقات، والعجز يصرف تكلفة FIFO إلى الحساب 5270، مع معاينة وعكس.",
       "sections": []
     },
-    "infra/users.py": {
+    "morv/infra/users.py": {
       "overview": "المستخدمون وتسجيل الدخول والصلاحيات وسجل المراجعة على مستوى قاعدة البيانات.",
       "sections": []
     },
-    "ui/deposit_dialogs.py": {
+    "morv/ui/deposit_dialogs.py": {
       "overview": "نافذة عربون العميل وقائمة مستندات العميل مع عكس سندات القبض والعرابين.",
       "sections": []
     },
-    "ui/interest_dialogs.py": {
+    "morv/ui/interest_dialogs.py": {
       "overview": "نوافذ ترحيل فائدة الأقساط غير المعترف بها في نهاية الشهر وعكس شهر معترف به.",
       "sections": []
     },
-    "ui/period_dialogs.py": {
+    "morv/ui/period_dialogs.py": {
       "overview": "نوافذ قفل الفترة المالية وفتحها مع عرض العوائق.",
       "sections": []
     },
-    "ui/receipt_dialogs.py": {
+    "morv/ui/receipt_dialogs.py": {
       "overview": "نوافذ سند قبض العميل: تحصيل دين آجل وعكس سند مرحّل.",
       "sections": []
     },
-    "ui/session.py": {
+    "morv/ui/session.py": {
       "overview": "جلسة التشغيل: اتصال قاعدة البيانات والمستخدم المسجّل وطلبات التطبيق العامة كالخروج والاستعادة.",
       "sections": []
     },
-    "core/profit_rules.py": {
+    "morv/core/profit_rules.py": {
       "overview": "قواعد توزيع الأرباح البحتة: تحويل النسب إلى نقاط أساس، وحساب الاحتياطي من صافي الفترة الموجب فقط، وتوزيع المبلغ على الشركاء بدقة بطريقة أكبر باقٍ.",
       "sections": []
     },
-    "core/return_rules.py": {
+    "morv/core/return_rules.py": {
       "overview": "قواعد مرتجعات المبيعات البحتة: التحقق من حالة القطعة وسبب الإرجاع والكمية المتاحة، وحساب حصة القيمة المرتجعة، واختيار حساب المخزون (سليم/معيب).",
       "sections": []
     },
-    "core/tire_catalog.py": {
+    "morv/core/tire_catalog.py": {
       "overview": "كتالوج مقاسات الإطارات المصرية وفئات المركبات، مع مفتاح بحث موحد للمقاس واقتراح فئة غير ملزم بناءً على الاستخدام السابق.",
       "sections": []
     },
-    "core/validate.py": {
+    "morv/core/validate.py": {
       "overview": "تحقق البيانات الأساسية: رقم الموبايل المصري والرقم القومي وإخفاؤه، وتحليل مقاس الإطار بصيغه المتعددة، واقتراح اسم الصنف وكوده.",
       "sections": []
     },
-    "infra/customers.py": {
+    "morv/infra/customers.py": {
       "overview": "طبقة قاعدة بيانات العملاء ومركباتهم: إنشاء وتعديل وتفعيل وحذف مع منع تكرار الموبايل وتسجيل المراجعة داخل معاملة، والبحث بالاسم والموبايل.",
       "sections": []
     },
-    "infra/items.py": {
+    "morv/infra/items.py": {
       "overview": "طبقة قاعدة بيانات الأصناف وخصائصها وإعداد حقول بطاقة الصنف: إدارة الحقول المخصصة، والتحقق من الصنف وتفرّد الكود والباركود، والبحث والإنشاء والتعديل مع الصلاحيات والمراجعة.",
       "sections": []
     },
-    "infra/purchase_view.py": {
+    "morv/infra/purchase_view.py": {
       "overview": "عروض قراءة فقط لفواتير الشراء المرحّلة: القائمة والعدد وتفاصيل الفاتورة بسطورها وإجماليات المورد.",
       "sections": []
     },
-    "infra/sale_view.py": {
+    "morv/infra/sale_view.py": {
       "overview": "عروض قراءة فقط للمبيعات المرحّلة للقائمة والمعاينة: تفاصيل الفاتورة والسطور القابلة للإرجاع وطرق الاسترداد المسموحة.",
       "sections": []
     },
-    "infra/stock_view.py": {
+    "morv/infra/stock_view.py": {
       "overview": "عروض مخزون للقراءة فقط: دفعات DOT، وحركات الدفعة، وملخص الأرصدة وإجمالياتها.",
       "sections": []
     },
-    "infra/suppliers.py": {
+    "morv/infra/suppliers.py": {
       "overview": "طبقة قاعدة بيانات الموردين: موبايل فريد، وإيقاف بدل الحذف عند وجود مستندات، وإنشاء وتعديل وبحث مع المراجعة والصلاحيات.",
       "sections": []
     },
-    "ui/adaptive_layout.py": {
+    "morv/ui/adaptive_layout.py": {
       "overview": "مكونات تخطيط متجاوب مشتركة: بطاقات تعيد التوزيع حسب العرض، ومساحة عمل الفاتورة، وتقسيم بجزأين، وتوزيع أعمدة الجداول بالقياس، وإطار الصفحة ورأسها.",
       "sections": []
     },
-    "ui/customer_statement_dialog.py": {
+    "morv/ui/customer_statement_dialog.py": {
       "overview": "نافذة كشف حساب العميل: اختيار الفترة، والإجماليات، وجدول حركات دفتر الأستاذ للعميل مع التصفية.",
       "sections": []
     },
-    "ui/customers_page.py": {
+    "morv/ui/customers_page.py": {
       "overview": "شاشة العملاء: قائمة قابلة للبحث مع معاينة الصف، ونوافذ إضافة وتعديل العميل ومركباته، وفتح كشف الحساب والتحصيل والعربون.",
       "sections": []
     },
-    "ui/dashboard_page.py": {
+    "morv/ui/dashboard_page.py": {
       "overview": "لوحة البداية: إجراءات سريعة، ومؤشرات الفترة، ورسم المبيعات، والتنبيهات، وآخر الفواتير، والأصناف الأكثر مبيعًا مع تحميل غير متزامن.",
       "sections": []
     },
-    "ui/icons.py": {
+    "morv/ui/icons.py": {
       "overview": "أيقونات الواجهة كرسوم SVG مضمنة تُلوّن حسب السمة، مع كتابتها كملفات لاستخدامها في QSS.",
       "sections": []
     },
-    "ui/inventory_page.py": {
+    "morv/ui/inventory_page.py": {
       "overview": "شاشة المخزون بتبويبات الأصناف والدفعات والجرد، مع نافذة الصنف واقتراحات الاسم والكود والفئة، وإعداد حقول بطاقة الصنف والحقول المخصصة.",
       "sections": []
     },
-    "ui/invoice_lines.py": {
+    "morv/ui/invoice_lines.py": {
       "overview": "جدول سطور الفاتورة المشترك: عمود الاسم وحده يتمدد ويلتف، وبقية الأعمدة بعرض مقاس موحد مع محاذاة ارتفاع الصفوف.",
       "sections": []
     },
-    "ui/item_search.py": {
+    "morv/ui/item_search.py": {
       "overview": "حقل البحث عن الأصناف في الفواتير مع قائمة منبثقة واختيار بلوحة المفاتيح وقراءة الباركود وإضافة صنف جديد.",
       "sections": []
     },
-    "ui/listpage.py": {
+    "morv/ui/listpage.py": {
       "overview": "الهيكل المشترك لشاشات البيانات الأساسية: قائمة بنموذج Model/View وتحميل غير متزامن وصفحات، مع لوحة معاينة وملخصات وفلاتر وأزرار متجاوبة.",
       "sections": []
     },
-    "ui/modal.py": {
+    "morv/ui/modal.py": {
       "overview": "النافذة المنبثقة الوحيدة في التطبيق بلا شريط عنوان النظام، مع قابلية السحب وتذييل الأزرار، ونوافذ التأكيد والرسائل البديلة عن QMessageBox.",
       "sections": []
     },
-    "ui/models.py": {
+    "morv/ui/models.py": {
       "overview": "نماذج جداول Model/View لشاشتي سجل المراجعة والنسخ الاحتياطية، مع تحميل تدريجي لصفوف المراجعة.",
       "sections": []
     },
-    "ui/opening_dialogs.py": {
+    "morv/ui/opening_dialogs.py": {
       "overview": "شاشة الأرصدة الافتتاحية: منشئ سطور مع مراجعة وفحص توازن قبل الترحيل، وتبويب حالة، ونافذة عكس الأرصدة الافتتاحية.",
       "sections": []
     },
-    "ui/partners_tab.py": {
+    "morv/ui/partners_tab.py": {
       "overview": "تبويب الشركاء في الإعدادات: جدول الشركاء مع تفاصيل متكيّفة، وتعديل الحصص، ونسبة الاحتياطي، وإضافة شريك وتفعيله أو إيقافه.",
       "sections": []
     },
-    "ui/party_search.py": {
+    "morv/ui/party_search.py": {
       "overview": "بحث حي مشترك بالاسم ورقم الموبايل عن أطراف الفاتورة (عملاء وموردين)، مع قائمة منبثقة وشريط معلومات الطرف ونافذة إضافة سريعة.",
       "sections": []
     },
-    "ui/pos_page.py": {
+    "morv/ui/pos_page.py": {
       "overview": "شاشة نقطة البيع: الفاتورة كاملة في صفحة واحدة بسطورها وخصوماتها وطرق الدفع المتعددة، وتُرحّل عبر محرك المبيعات ثم تُطبع.",
       "sections": []
     },
-    "ui/print_doc.py": {
+    "morv/ui/print_doc.py": {
       "overview": "يبني كل مستند مطبوع (فاتورة مقاس صفحة أو بكرة حرارية) كـ HTML من التصميم المعتمد، ويرسمه للمعاينة أو الطابعة أو ملف PDF.",
       "sections": []
     },
-    "ui/printing.py": {
+    "morv/ui/printing.py": {
       "overview": "يحوّل مستند البيع المحفوظ إلى صفحة مطبوعة ويرسلها لطابعة المحل، ويوفر نافذة معاينة قبل الطباعة.",
       "sections": []
     },
-    "ui/profit_dialogs.py": {
+    "morv/ui/profit_dialogs.py": {
       "overview": "نوافذ تحديد حصص الشركاء في الأرباح وتوزيع أرباح الفترات المقفلة وعكس آخر توزيع.",
       "sections": []
     },
-    "ui/purchase_return_dialogs.py": {
+    "morv/ui/purchase_return_dialogs.py": {
       "overview": "نوافذ مرتجع المشتريات: إعادة مخزون دفعة للمورد بتكلفة الفاتورة، وعكس مرتجع مُرحّل، وسجل مرتجعات المورد.",
       "sections": []
     },
-    "ui/purchases_page.py": {
+    "morv/ui/purchases_page.py": {
       "overview": "شاشة المشتريات: قائمة الفواتير ونموذج صفحة كاملة لفاتورة شراء بسطور الأصناف ودفعات DOT، يُرحَّل عبر محرك الشراء.",
       "sections": []
     },
-    "ui/sale_return_dialog.py": {
+    "morv/ui/sale_return_dialog.py": {
       "overview": "نافذة مرتجع المبيعات: اختيار سطور من فاتورة مرحّلة بالكميات المتاحة وترحيل المستند العكسي.",
       "sections": []
     },
-    "ui/sales_page.py": {
+    "morv/ui/sales_page.py": {
       "overview": "قائمة فواتير ومرتجعات المبيعات مع المعاينة والطباعة وفتح مرتجع؛ الفواتير الجديدة تأتي من نقطة البيع.",
       "sections": []
     },
-    "ui/settings_page.py": {
+    "morv/ui/settings_page.py": {
       "overview": "مركز الإعدادات وصفحاته: المظهر، المستخدمون والصلاحيات، سجل المراجعة، الاختصارات، والنسخ الاحتياطي والاستعادة والتشفير.",
       "sections": []
     },
-    "ui/shop_settings.py": {
+    "morv/ui/shop_settings.py": {
       "overview": "تبويبا هوية المحل (الاسم والضريبة والشعار) ونماذج الطباعة مع معاينة حية وطباعة تجريبية.",
       "sections": []
     },
-    "ui/stock_adjustment_dialogs.py": {
+    "morv/ui/stock_adjustment_dialogs.py": {
       "overview": "نوافذ تسوية المخزون: بناء السطور ومراجعة القيد ثم الاعتماد، وسجل التسويات مع العكس.",
       "sections": []
     },
-    "ui/stock_pages.py": {
+    "morv/ui/stock_pages.py": {
       "overview": "تبويبات المخزون للقراءة فقط: الدفعات وحركاتها، والجرد مع فتح التسويات وسجلها.",
       "sections": []
     },
-    "ui/suppliers_page.py": {
+    "morv/ui/suppliers_page.py": {
       "overview": "شاشة الموردين: القائمة والمعاينة ونافذة إضافة أو تعديل مورد، مع فتح مرتجعات الشراء.",
       "sections": []
     },
-    "ui/theme.py": {
+    "morv/ui/theme.py": {
       "overview": "يطبّق سمة التطبيق كاملة: تحميل الخطوط المضمّنة، ولوحة الألوان، وملف تنسيق QSS الوحيد للتطبيق.",
       "sections": []
     },
-    "ui/tokens.py": {
+    "morv/ui/tokens.py": {
       "overview": "رموز ألوان نظام التصميم المعتمد v1.0 للوضعين الفاتح والداكن.",
       "sections": []
     },
-    "ui/widgets.py": {
+    "morv/ui/widgets.py": {
       "overview": "عناصر واجهة صغيرة مشتركة (بطاقات، حقول، أزرار، تاريخ، كلمة مرور، تنبيهات) لتبقى الشاشات متّسقة.",
       "sections": []
     },
-    "ui/workers.py": {
+    "morv/ui/workers.py": {
       "overview": "يشغّل عمليات القراءة خارج خيط الواجهة على اتصال قراءة منفصل، ويبقي كل خيط حيًا حتى ينتهي.",
       "sections": []
     },
-    "core/security.py": {
+    "morv/core/security.py": {
       "overview": "قواعد الأمان الصرفة: صلاحيات الأدوار، وقياس قوة كلمة المرور وتجزئتها والتحقق منها، وتوليد مفتاح الاسترداد وتطبيعه، وشروط كلمة مرور النسخ الاحتياطي.",
       "sections": []
     },
-    "infra/backup.py": {
+    "morv/infra/backup.py": {
       "overview": "محرك النسخ الاحتياطي: نسخ مشفّرة بصيغة vault، وسياسة الاحتفاظ والتقليم، والنسخ إلى USB، واختبار الاستعادة والاستعادة الفعلية الآمنة، وإدارة مفتاح الجهاز وحالة صحة النسخ.",
       "sections": []
     },
-    "infra/backup_job.py": {
+    "morv/infra/backup_job.py": {
       "overview": "يشغّل النسخ الاحتياطي المجدول على اتصال قاعدة بيانات خاص به حتى لا يعبر أي اتصال بين الخيوط.",
       "sections": []
     },
-    "infra/instance_lock.py": {
+    "morv/infra/instance_lock.py": {
       "overview": "يضمن تشغيل نسخة واحدة فقط من البرنامج لكل مجلد بيانات عبر قفل ملف على مستوى نظام التشغيل يُحرَّر عند انتهاء العملية.",
       "sections": []
     },
-    "infra/keystore.py": {
+    "morv/infra/keystore.py": {
       "overview": "مخزن مفتاح البيانات على الجهاز (محمي بـ DPAPI على Windows) حتى لا تحتاج النسخ اليومية إلى كلمة مرور.",
       "sections": []
     },
-    "infra/logs.py": {
+    "morv/infra/logs.py": {
       "overview": "يهيّئ سجل التشغيل والأخطاء الدوّار في مجلد السجلات.",
       "sections": []
     },
-    "infra/paths.py": {
+    "morv/infra/paths.py": {
       "overview": "يحدد مواقع ملفات التطبيق على الجهاز: مجلد البيانات وقاعدة البيانات والنسخ والسجلات، ويكشف المجلدات المتزامنة سحابيًا أو الشبكية.",
       "sections": []
     },
-    "infra/settings.py": {
+    "morv/infra/settings.py": {
       "overview": "دالتان بسيطتان لقراءة وكتابة جدول الإعدادات (مفتاح/قيمة).",
       "sections": []
     },
-    "infra/setup.py": {
+    "morv/infra/setup.py": {
       "overview": "الإعداد الأول للبرنامج: بيانات المحل وحساب المدير وتشفير النسخ الاحتياطي في معاملة واحدة كلها أو لا شيء.",
       "sections": []
     },
-    "infra/shop.py": {
+    "morv/infra/shop.py": {
       "overview": "بيانات هوية المحل وأرقام الاتصال والأرقام الضريبية وتفضيلات الطباعة والشعار، مخزّنة في جدول الإعدادات مع التحقق والتنظيف والمراجعة.",
       "sections": []
     },
-    "infra/vault.py": {
+    "morv/infra/vault.py": {
       "overview": "صيغة ملف النسخ المشفّر (.mtb): حلقة مفاتيح تغلّف مفتاح البيانات بكلمة المرور ومفتاح الاسترداد، وتشفير AES-GCM للختم والفتح وقراءة الترويسة.",
       "sections": []
     },
-    "ui/backup_runner.py": {
+    "morv/ui/backup_runner.py": {
       "overview": "خيط عامل (QThread) يأخذ النسخة المجدولة حتى تبقى النافذة مستجيبة أثناء التنفيذ.",
       "sections": []
     },
-    "ui/login.py": {
+    "morv/ui/login.py": {
       "overview": "شاشة الدخول لاختيار المستخدم وكتابة كلمة المرور، ونافذة إلزام المستخدم بتغيير كلمة المرور المؤقتة.",
       "sections": []
     },
-    "ui/setup_wizard.py": {
+    "morv/ui/setup_wizard.py": {
       "overview": "معالج التشغيل الأول متعدد الصفحات: اختيار بداية جديدة أو استعادة، وبيانات المحل، وحساب المدير، والنسخ الاحتياطي ومفتاح الاسترداد، ثم المراجعة والإنهاء.",
       "sections": []
     },
-    "ui/shell.py": {
+    "morv/ui/shell.py": {
       "overview": "هيكل النافذة الرئيسية: شريط جانبي قابل للطي وشريط علوي ومنطقة الصفحات، مع التنقل والاختصارات والسمة وصحة النسخ وتشغيل النسخ عند الإغلاق.",
       "sections": []
     },
-    "ui/shell_placeholder.py": {
+    "morv/ui/shell_placeholder.py": {
       "overview": "صفحة مؤقتة تُعرض للشاشات التي لم تُبنَ بعد.",
       "sections": []
     },
-    "core/installments.py": {
+    "morv/core/installments.py": {
       "overview": "رياضيات التقسيط الخالصة بلا قاعدة بيانات: حساب المبلغ الممول والفائدة الثابتة بالنقاط الأساسية وجدول الأقساط الشهرية بتواريخ استحقاقها.",
       "sections": []
     },
-    "infra/cash_closing.py": {
+    "morv/infra/cash_closing.py": {
       "overview": "تقفيل الخزينة اليومي: مقارنة النقدية المعدودة برصيد الدفتر عند حد سطر قيد، وترحيل قيد الفرق، وإلغاء التقفيل بقيد عكسي، مع صلاحيات وطلبات متكررة آمنة (idempotent).",
       "sections": []
     },
-    "infra/dashboard_view.py": {
+    "morv/infra/dashboard_view.py": {
       "overview": "تجميعات للقراءة فقط للوحة الرئيسية: مؤشرات المبيعات والتحصيلات للفترة، وتنبيهات الأقساط المستحقة والخزنة والنسخ الاحتياطي ودفعات DOT القديمة، وآخر الأنشطة.",
       "sections": []
     },
-    "infra/installment_view.py": {
+    "morv/infra/installment_view.py": {
       "overview": "عروض للقراءة فقط لعقود التقسيط وجداولها: قائمة العقود بالتصنيف والمؤشرات، وشاشة التحصيل، والفواتير الآجلة التي تنتظر عقدًا.",
       "sections": []
     },
-    "infra/safe_count.py": {
+    "morv/infra/safe_count.py": {
       "overview": "جرد الخزنة الدوري (حساب 1130): مقارنة المعدود بالدفتر، وترحيل قيد الفرق، وإلغاء الجرد بقيد عكسي، وحساب الأيام منذ آخر جرد.",
       "sections": []
     },
-    "infra/treasury.py": {
+    "morv/infra/treasury.py": {
       "overview": "حركات الخزينة اليدوية والشركاء: كل حركة تُتحقق وتُرحّل كقيد متوازن من سطرين بمفتاح طلب idempotent، مع تحذيرات تتطلب تأكيدًا، وعكس الحركة، والتقفيل مع التسليم في معاملة واحدة.",
       "sections": []
     },
-    "infra/treasury_view.py": {
+    "morv/infra/treasury_view.py": {
       "overview": "عرض الخزينة للقراءة فقط: أرصدة حسابات النقدية والبنك والمحافظ وحركاتها في الدفتر ومعاينة قيد كامل.",
       "sections": []
     },
-    "ui/installments_page.py": {
+    "morv/ui/installments_page.py": {
       "overview": "شاشة التقسيط: قائمة العقود بالمؤشرات والفلاتر، ونموذج العقد الجديد بحساب الجدول فوريًا، وصفحة تحصيل الأقساط بإعدادات مسبقة للمبلغ.",
       "sections": []
     },
-    "ui/reconciliation_dialogs.py": {
+    "morv/ui/reconciliation_dialogs.py": {
       "overview": "نوافذ مطابقة البنك: تسجيل رصيد كشف الحساب ومقارنته برصيد البرنامج، وإلغاء آخر مطابقة.",
       "sections": []
     },
-    "ui/treasury_dialogs.py": {
+    "morv/ui/treasury_dialogs.py": {
       "overview": "نوافذ الخزينة: تسجيل حركة يدوية وعكسها، وتقفيل اليوم مع التسليم وإلغاؤه، وجرد الخزنة وإلغاؤه، مع طلب تأكيد عند التحذيرات.",
       "sections": []
     },
-    "ui/treasury_page.py": {
+    "morv/ui/treasury_page.py": {
       "overview": "شاشة الخزينة: بطاقات أرصدة النقدية والبنك والمحافظ، وقائمة حركات الدفتر مع معاينة القيد، وأزرار الحركات اليدوية والتقفيل والجرد والمطابقة وقفل الفترة وتوزيع الأرباح.",
       "sections": []
     },
-    "infra/income_statement.py": {
+    "morv/infra/income_statement.py": {
       "overview": "يبني قائمة الدخل للقراءة فقط من القيود المرحّلة: الإيرادات وتكلفة المبيعات والمصروفات وصافي النتيجة، مع تعريف الفترات الجاهزة.",
       "sections": []
     },
-    "infra/reports.py": {
+    "morv/infra/reports.py": {
       "overview": "كتالوج التقارير: كل تقرير (ميزان المراجعة، كشف الحساب، أعمار الديون، تقييم المخزون، المبيعات...) يبني جدول Table موحّدًا للقراءة فقط من بيانات القيود المرحّلة، مع تصدير CSV.",
       "sections": []
     },
-    "infra/suspended_balances.py": {
+    "morv/infra/suspended_balances.py": {
       "overview": "تقرير للقراءة فقط عن فروقات الصندوق والخزنة غير المسوّاة والشركاء المدينين للمحل.",
       "sections": []
     },
-    "ui/report_export.py": {
+    "morv/ui/report_export.py": {
       "overview": "يصدّر جدول تقرير إلى PDF بحجم A4 واتجاه RTL عبر محرك النص الغني في Qt مع إبقاء الأرقام من اليسار لليمين.",
       "sections": []
     },
-    "ui/reports_page.py": {
+    "morv/ui/reports_page.py": {
       "overview": "شاشة التقارير: منتقي التقرير والفترة والحساب والمقارنة، مع عرض الجدول وتصدير CSV أو PDF، مبنية على ListPage.",
       "sections": []
     },
-    "infra/db/migrations/0002_users_backup.sql": {
+    "morv/infra/db/migrations/0002_users_backup.sql": {
       "overview": "تنشئ المستخدمين وصلاحياتهم وسجل المراجعة، وتعيد بناء backup_runs لتوسيع حقوله (المرحلة 1: الدخول والإعداد).",
       "sections": []
     },
-    "infra/db/migrations/0003_master_data.sql": {
+    "morv/infra/db/migrations/0003_master_data.sql": {
       "overview": "البيانات الأساسية: العملاء ومركباتهم والموردون والأصناف وخصائصها الديناميكية وتعريف حقولها مع بذر الحقول المدمجة وصلاحيات المرحلة 2.",
       "sections": []
     },
-    "infra/db/migrations/0004_supplier_terms.sql": {
+    "morv/infra/db/migrations/0004_supplier_terms.sql": {
       "overview": "تضيف إلى جدول الموردين حقول الشروط الناقصة: حد الائتمان بالقرش ومدة السداد وطريقته والسجل التجاري وبيانات البنك.",
       "sections": []
     },
-    "infra/db/migrations/0005_setup_flag.sql": {
+    "morv/infra/db/migrations/0005_setup_flag.sql": {
       "overview": "تضيف إعدادًا صريحًا setup.completed_at يعلن اكتمال الإعداد الأول حتى لا تبقى القاعدة نصف مُعدّة عند انقطاع المعالج.",
       "sections": []
     },
-    "infra/db/migrations/0007_purchasing_hardening.sql": {
+    "morv/infra/db/migrations/0007_purchasing_hardening.sql": {
       "overview": "تحصين المشتريات فوق 0006: حالة القيد وإجماليه وعدد أسطره، ومحفّزات تفرض توازن القيد وختمه بعد الترحيل وربط الصرف بسطره المصدر.",
       "sections": []
     },
-    "infra/db/migrations/0008_item_identity.sql": {
+    "morv/infra/db/migrations/0008_item_identity.sql": {
       "overview": "محفّزات تضمن أن صنف الدفعة وطبقة التكلفة يطابق صنف سطر الشراء الذي نشأتا منه لحظة الإدراج.",
       "sections": []
     },
-    "infra/db/migrations/0009_sales.sql": {
+    "morv/infra/db/migrations/0009_sales.sql": {
       "overview": "فاتورة البيع وأسطرها ووسائل دفعها، مع محفّزات تمنع تعديل الفاتورة المرحّلة أو حذفها؛ التصحيح بمرتجع.",
       "sections": []
     },
-    "infra/db/migrations/0010_sale_returns.sql": {
+    "morv/infra/db/migrations/0010_sale_returns.sql": {
       "overview": "مرتجع البيع كمستند عكسي مستقل وأسطره، وإعادة بناء stock_movements وcost_allocations لدعم إرجاع السليم لدفعته والمعيب لحساب المخزون المعيب.",
       "sections": []
     },
-    "infra/db/migrations/0011_installments.sql": {
+    "morv/infra/db/migrations/0011_installments.sql": {
       "overview": "عقد التقسيط وجدول أقساطه الثابت، وإعادة بناء sale_payments لقبول وسيلة الدفع installment.",
       "sections": []
     },
-    "infra/db/migrations/0012_installment_payments.sql": {
+    "morv/infra/db/migrations/0012_installment_payments.sql": {
       "overview": "مستندات تحصيل الأقساط وأسطر توزيع كل دفعة على الأقساط غير المسددة بالأقدم استحقاقًا.",
       "sections": []
     },
-    "infra/db/migrations/0013_installment_returns.sql": {
+    "morv/infra/db/migrations/0013_installment_returns.sql": {
       "overview": "تسويات مرتجع التقسيط الثابتة: تعديلات العقد وتوزيعات المرتجع والمردودات النقدية، مع إعادة بناء sale_returns لتوسيع قيد CHECK.",
       "sections": []
     },
-    "infra/db/migrations/0014_interest_eir.sql": {
+    "morv/infra/db/migrations/0014_interest_eir.sql": {
       "overview": "سجل ثابت للاعتراف بالفائدة لكل عقد بطريقة معدل الفائدة الفعلي (EIR) على تدفقات ACT/365F التعاقدية.",
       "sections": []
     },
-    "infra/db/migrations/0015_installment_modifications.sql": {
+    "morv/infra/db/migrations/0015_installment_modifications.sql": {
       "overview": "أدلة ثابتة على تعديلات جزئية معتمدة لعقود التقسيط وتدفقاتها النقدية المعدّلة، دون تفعيل الترحيل.",
       "sections": []
     },
-    "infra/db/migrations/0016_sale_payments_lookup.sql": {
+    "morv/infra/db/migrations/0016_sale_payments_lookup.sql": {
       "overview": "فهرس على sale_payments(sale_id, method) لتسريع استعلامات دفعات فواتير التقسيط وتفاصيل البيع.",
       "sections": []
     },
-    "infra/db/migrations/0017_treasury_movements.sql": {
+    "morv/infra/db/migrations/0017_treasury_movements.sql": {
       "overview": "الشركاء وحركات الخزينة اليدوية (تحويل، مصروف، حركات الشركاء، دفع مورد)؛ كل حركة قيد بسطرين وعكسها حركة مرآة.",
       "sections": []
     },
-    "infra/db/migrations/0018_cash_closings.sql": {
+    "morv/infra/db/migrations/0018_cash_closings.sql": {
       "overview": "الإقفال اليومي للصندوق (1110) مع حسابات فروق العد؛ الإقفال ثابت والإلغاء صف ثانٍ، وإقفال حي واحد لكل تاريخ.",
       "sections": []
     },
-    "infra/db/migrations/0019_safe_account.sql": {
+    "morv/infra/db/migrations/0019_safe_account.sql": {
       "overview": "تضيف حساب الخزنة 1130 لحفظ فائض نقدية الصندوق، ولا يُوصل إليه إلا بحركات خزينة يدوية.",
       "sections": []
     },
-    "infra/db/migrations/0020_safe_counts.sql": {
+    "morv/infra/db/migrations/0020_safe_counts.sql": {
       "overview": "جرد دوري للخزنة 1130 بحسابي عجز وزيادة خاصين، بنفس شكل الإقفال: صفوف ثابتة وجرد حي واحد لكل تاريخ.",
       "sections": []
     },
-    "infra/db/migrations/0021_period_locks.sql": {
+    "morv/infra/db/migrations/0021_period_locks.sql": {
       "overview": "قفل الفترة المالية: محفّز يرفض أي قيد بتاريخ يساوي تاريخ القفل أو يسبقه، والفتح صف ثانٍ يلغي القفل.",
       "sections": []
     },
-    "infra/db/migrations/0022_profit_distribution.sql": {
+    "morv/infra/db/migrations/0022_profit_distribution.sql": {
       "overview": "مجموعات حصص الشركاء في الأرباح بإصدارات سارية من تاريخ، ومستندات توزيع الأرباح وأسطرها، مع حساب الاحتياطي القانوني.",
       "sections": []
     },
-    "infra/db/migrations/0023_customer_receipts.sql": {
+    "morv/infra/db/migrations/0023_customer_receipts.sql": {
       "overview": "سندات قبض العملاء لتحصيل ديون البيع الآجل (1310)؛ السند ثابت وعكسه صف ثانٍ، وكلاهما يرحّل قيدًا.",
       "sections": []
     },
-    "infra/db/migrations/0024_bank_reconciliations.sql": {
+    "morv/infra/db/migrations/0024_bank_reconciliations.sql": {
       "overview": "سجلات مطابقة البنوك والمحافظ بلا قيود، مع تجميد رصيد البرنامج لحظة الحفظ وسجل حي واحد لكل تاريخ.",
       "sections": []
     },
-    "infra/db/migrations/0025_return_credit_part.sql": {
+    "morv/infra/db/migrations/0025_return_credit_part.sql": {
       "overview": "تضيف credit_part إلى sale_returns: الجزء المردود على حساب العميل في الفواتير الآجلة أو المختلطة.",
       "sections": []
     },
-    "infra/db/migrations/0026_customer_deposits.sql": {
+    "morv/infra/db/migrations/0026_customer_deposits.sql": {
       "overview": "عرابين العملاء (التزام 2340): إيداع ورد وتطبيق على دين آجل، بمستندات ثابتة وعكس بصف ثانٍ.",
       "sections": []
     },
-    "infra/db/migrations/0027_purchase_returns.sql": {
+    "morv/infra/db/migrations/0027_purchase_returns.sql": {
       "overview": "مرتجعات المشتريات إلى المورد مع مستند عكسي، وإعادة بناء cost_allocations وstock_movements لقبول مصدر purchase_return وrestock.",
       "sections": []
     },
-    "infra/db/migrations/0028_interest_recognition_reversal.sql": {
+    "morv/infra/db/migrations/0028_interest_recognition_reversal.sql": {
       "overview": "عكس الاعتراف بالفائدة مع أجيال للاعتراف المتكرر، وإعادة بناء interest_recognitions وعرض active_interest_recognitions.",
       "sections": []
     },
-    "infra/db/migrations/0029_stock_adjustments.sql": {
+    "morv/infra/db/migrations/0029_stock_adjustments.sql": {
       "overview": "تسوية الجرد (زيادة وعجز) بمحرك مستقل: مستندات التسوية وأسطرها وإعادة بناء جداول الدفعات والطبقات والحركات والتوزيع؛ يتطلب تعطيل فحص العلاقات مؤقتًا.",
       "sections": []
     },
-    "infra/db/migrations/0030_opening_balances.sql": {
+    "morv/infra/db/migrations/0030_opening_balances.sql": {
       "overview": "الأرصدة الافتتاحية للحسابات والشركاء والعملاء والموردين، كل سطر بقيد مستقل مقابل الحساب الانتقالي 3500، مع عرض active_opening_lines.",
       "sections": []
     },
-    "infra/db/migrations/0031_opening_inventory.sql": {
+    "morv/infra/db/migrations/0031_opening_inventory.sql": {
       "overview": "المخزون الافتتاحي: دفعة وطبقة تكلفة بلا سطر شراء ولا تسوية، بإعادة بناء opening_balance_lines وجداول المخزون الأربعة ومحفّزات مطابقة الصنف.",
       "sections": []
     },
-    "app/__init__.py": {
+    "morv/app/__init__.py": {
       "overview": "ملف تهيئة فارغ يعلن مجلد app حزمة Python خاصة بتجميع التطبيق وتشغيله.",
       "sections": []
     },
-    "core/__init__.py": {
+    "morv/core/__init__.py": {
       "overview": "ملف تهيئة فارغ يعلن طبقة core حزمة Python تضم حسابات وقواعد العمل النقية بلا Qt ولا SQL.",
       "sections": []
     },
-    "infra/__init__.py": {
+    "morv/infra/__init__.py": {
       "overview": "ملف تهيئة فارغ يعلن طبقة infra حزمة Python المسؤولة عن قاعدة البيانات والملفات.",
       "sections": []
     },
-    "infra/db/__init__.py": {
+    "morv/infra/db/__init__.py": {
       "overview": "ملف تهيئة فارغ يعلن حزمة infra.db الخاصة باتصال SQLite والمعاملات والترقيات.",
       "sections": []
     },
-    "ui/__init__.py": {
+    "morv/ui/__init__.py": {
       "overview": "ملف تهيئة فارغ يعلن طبقة ui حزمة Python لواجهة PySide6 العربية.",
       "sections": []
     },
-    "core/partial_eir.py": {
+    "morv/core/partial_eir.py": {
       "overview": "يعيد قياس جدول أقساط معدّل ومتفق عليه بمعدل الفائدة الفعلي (EIR) الأصلي بأساس ACT/365 ثابت، ويحسب ربح/خسارة التعديل والمقبوضات الزائدة دون أي ترحيل محاسبي.",
       "sections": []
     }
