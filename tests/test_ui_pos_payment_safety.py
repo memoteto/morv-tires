@@ -193,15 +193,28 @@ class PosPaymentSafetyTest(_Fixture, unittest.TestCase):
         self.assertIsNone(p.posted)
         self.assertEqual(self.state(), before)
 
-    def click_total(self, p):
+    def click_total(self, p, *, expected_enabled):
         from PySide6.QtCore import Qt
-        from PySide6.QtTest import QTest
-        QTest.mouseClick(p.total_label.parentWidget(), Qt.MouseButton.LeftButton,
-                         pos=p.total_label.geometry().center())
+        from PySide6.QtTest import QSignalSpy, QTest
+        # A mouse click requires the actual, settled geometry of a shown page.
+        p.resize(1366, 768)
+        p.show()
+        self.app.processEvents()
+        QTest.qWait(150)
+        self.app.processEvents()
+        button = p.total_label.parentWidget()
+        point = p.total_label.geometry().center()
+        self.assertIs(button, p.total_box)
+        self.assertTrue(button.isVisible())
+        self.assertEqual(button.isEnabled(), expected_enabled)
+        self.assertTrue(button.rect().contains(point))
+        spy = QSignalSpy(button.clicked)
+        QTest.mouseClick(button, Qt.MouseButton.LeftButton, pos=point)
+        self.assertEqual(spy.count(), 1 if expected_enabled else 0)
 
     def test_click_total_fills_exact_cash_without_extra_chip(self):
         p = self.page()
-        self.click_total(p)
+        self.click_total(p, expected_enabled=True)
         self.assertEqual(p.pay1_received.text(), "100.00")
         self.assertIn("0.00", p.change_label.text())
         self.assertNotIn("المبلغ بالضبط", [b.text() for b in p.amount_chips])
@@ -211,14 +224,14 @@ class PosPaymentSafetyTest(_Fixture, unittest.TestCase):
         p.split_btn.setChecked(True)
         p.pay1_amount.setText("40.00")
         self.method(p.pay2_method, "card")
-        self.click_total(p)
+        self.click_total(p, expected_enabled=True)
         self.assertEqual(p.pay1_received.text(), "40.00")
         self.assertIn("0.00", p.change_label.text())
 
     def test_click_total_does_not_fill_non_cash(self):
         p = self.page()
         self.method(p.pay1_method, "card")
-        self.click_total(p)
+        self.click_total(p, expected_enabled=False)
         self.assertEqual(p.pay1_received.text(), "")
 
     def test_click_total_uses_cash_second_share(self):
@@ -227,7 +240,7 @@ class PosPaymentSafetyTest(_Fixture, unittest.TestCase):
         p.split_btn.setChecked(True)
         p.pay1_amount.setText("40.00")
         self.method(p.pay2_method, "cash")
-        self.click_total(p)
+        self.click_total(p, expected_enabled=True)
         self.assertEqual(p.pay1_received.text(), "60.00")
 
     def test_split_without_second_method_cannot_post(self):

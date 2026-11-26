@@ -39,4 +39,6 @@ and keep DOT mandatory for tyres.
 
 POS-2 merged in PR #159 after 1033 local tests, manual verification and successful CI.
 POS-3: four baseline tests exposed six failures; simplified invoice headers and mobile lookup. 1061 local tests passed; Ruff and test discovery passed.
-Owner design approval and eight long-text screenshots reviewed; CI pending.
+Owner design approval, 1061 tests on both platforms and CI passed; POS-3 merged in PR #160 (452e07d).
+POS-4: four baseline tests failed for scrolling totals/actions; owner approved compact fixed summary, shared layout and deferred toast. Implementation verification pending.
+POS-4 local: 1065 tests and Ruff passed; visual review identified gap, oversized controls and contrast defects. Seven added checks reproduced all seven defects. Owner approved refinement; repeat all eleven diagnostic tests and visual/CI verification.

@@ -17,13 +17,13 @@ from morv.infra import purchase_view, purchasing, suppliers
 from morv.infra.purchasing import PurchaseError, PurchaseLine
 from morv.infra import suppliers as sup_infra
 from morv.ui import icons
-from morv.ui.adaptive_layout import AdaptiveCards, HeaderPlacement
+from morv.ui.adaptive_layout import HeaderPlacement, InvoiceWorkspace
 from morv.ui.item_search import ItemSearch, KIND_ICON
 from morv.ui.party_search import (FoldableDetails, PartyInfoStrip, PartySearch,
                                   QuickPartyDialog, party_field, phone_query)
 from morv.ui.listpage import ListPage
 from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
-from morv.ui.widgets import (DateEdit, chip, confirm_discard_invoice, deferred_button, field, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
+from morv.ui.widgets import (DateEdit, InvoiceFooter, InvoiceTotal, chip, confirm_discard_invoice, deferred_button, field, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
 
 
 
@@ -300,7 +300,7 @@ class PurchaseForm(QWidget):
         sum_col.setContentsMargins(0, 0, 0, 0)
         sum_col.setSpacing(14)
 
-        sbox, sbody, _shead = section_card("ملخص فاتورة الشراء", "purchases")
+        sbox, sbody, _shead = section_card("ملخص فاتورة الشراء", "purchases", compact=True)
 
         self._sub_lbl = QLabel(ltr(fmt(0)))
         self._sub_lbl.setObjectName("cardTitle")
@@ -323,9 +323,11 @@ class PurchaseForm(QWidget):
         hint.setWordWrap(True)
         sbody.addWidget(hint)
 
-        self._total_lbl = QLabel()
-        self._total_lbl.setObjectName("pageTitle")
-        sbody.addWidget(self._total_lbl)
+        self.summary_footer = InvoiceFooter()
+        footer = self.summary_footer.layout()
+        self.total_box = InvoiceTotal("إجمالي الفاتورة", compact=True)
+        self._total_lbl = self.total_box.value
+        footer.addWidget(self.total_box)
 
         # Payment row
         pay_grid = QGridLayout()
@@ -353,18 +355,17 @@ class PurchaseForm(QWidget):
         QShortcut(QKeySequence("F2"), self,
                   activated=self.item_search.setFocus)
         QShortcut(QKeySequence("F9"), self, activated=self.post)
-        sbody.addWidget(self.post_btn)
+        self.summary_footer.add_action(self.post_btn)
 
         # Deferred actions
-        sbody.addWidget(deferred_button("حفظ كمسودة"))
-        sbody.addWidget(deferred_button("طباعة إذن الاستلام"))
+        self.summary_footer.add_action(deferred_button("حفظ كمسودة"))
+        self.summary_footer.add_action(deferred_button("طباعة إذن الاستلام"))
 
         sbody.addStretch(1)
 
         sum_col.addWidget(sbox)
-        self.invoice_layout = AdaptiveCards(
-            (primary, summary), minimum_width=0, column_weights=(3, 1),
-            fill_height=True, spacing=14)
+        self.invoice_layout = InvoiceWorkspace(
+            primary, summary, self.summary_footer, spacing=14)
         root.addWidget(self.invoice_layout, 1)
 
         self._refresh_summary()
@@ -613,7 +614,7 @@ class PurchaseForm(QWidget):
         # must equal exactly what gets posted: the raw line subtotal, in full.
         sub = self._sub_total()
         self._sub_lbl.setText(ltr(fmt(sub)))
-        self._total_lbl.setText(f"إجمالي الفاتورة: {ltr(fmt(sub))} ج.م")
+        self._total_lbl.setText(f"{ltr(fmt(sub))} ج.م")
         self._rem_lbl.setText(f"يُضاف بالكامل لرصيد المورد: {ltr(fmt(sub))} ج.م")
 
     def _fail(self, text: str) -> bool:

@@ -1,7 +1,7 @@
 """Small shared UI pieces, so screens stay consistent."""
-from PySide6.QtCore import QDate, QEvent, QLocale, Qt, Signal
+from PySide6.QtCore import QDate, QEvent, QLocale, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPalette, QStandardItem, QStandardItemModel, QTextCharFormat
-from PySide6.QtWidgets import (QCalendarWidget, QCompleter, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QCalendarWidget, QCompleter, QDateEdit, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QLineEdit,
                                QMenu, QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
 from morv.core.text import ltr
@@ -35,11 +35,13 @@ ICON_PRIMARY = tokens.ICON_PRIMARY
 class InvoiceTotal(QPushButton):
     """Invoice total whose size follows its content rather than button text."""
 
-    def __init__(self, caption, on_click=None):
+    def __init__(self, caption, on_click=None, *, compact=False):
         super().__init__()
         self.setObjectName("totalBox")
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
+        x = tokens.LAYOUT["compact_card_padding_x"] if compact else 16
+        y = tokens.LAYOUT["compact_card_padding_y"] if compact else 16
+        layout.setContentsMargins(x, y, x, y)
 
         label = QLabel(caption)
         label.setObjectName("totalLabel")
@@ -80,7 +82,58 @@ class InvoiceTotal(QPushButton):
         return result
 
 
-def section_card(title: str, icon_name: str) -> tuple:
+class InvoiceFooter(QFrame):
+    """Compact fixed controls with a measured horizontal option for narrow invoices."""
+
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("invoiceFooter")
+        row = QGridLayout(self)
+        row.setDefaultPositioning(1, Qt.Orientation.Horizontal)
+        self._horizontal = False
+        x = tokens.LAYOUT["compact_card_padding_x"]
+        y = tokens.LAYOUT["compact_card_padding_y"]
+        row.setContentsMargins(x, y, x, y)
+        row.setSpacing(tokens.LAYOUT["compact_card_spacing"])
+        row.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+
+    def add_action(self, button):
+        button.setProperty("invoiceAction", True)
+        layout = self.layout()
+        layout.addWidget(button, layout.count(), 0)
+
+    def _control_widths(self):
+        widths = []
+        for i in range(self.layout().count()):
+            widget = self.layout().itemAt(i).widget()
+            if widget is not None and not widget.isHidden():
+                widths.append(max(widget.minimumWidth(), widget.minimumSizeHint().width(),
+                                  widget.sizeHint().width()))
+        return widths
+
+    def minimumSizeHint(self):
+        margins = self.layout().contentsMargins()
+        width = max(self._control_widths(), default=0) + margins.left() + margins.right()
+        return QSize(width, self.layout().minimumSize().height())
+
+    def set_row_width(self, available):
+        layout = self.layout()
+        margins = layout.contentsMargins()
+        widths = self._control_widths()
+        needed = sum(widths) + max(0, len(widths) - 1) * layout.spacing() + margins.left() + margins.right()
+        horizontal = available >= needed and len(widths) > 1
+        if self._horizontal != horizontal:
+            widgets = [layout.itemAt(i).widget() for i in range(layout.count())]
+            for widget in widgets:
+                layout.removeWidget(widget)
+            self._horizontal = horizontal
+            for i, widget in enumerate(widgets):
+                layout.addWidget(widget, 0 if horizontal else i, i if horizontal else 0)
+            layout.invalidate()
+            self.updateGeometry()
+
+
+def section_card(title: str, icon_name: str, *, compact=False) -> tuple:
     """Card with an icon header row; returns (card, body layout, header layout) for invoice screens."""
     box = QFrame()
     box.setObjectName("card")
@@ -101,8 +154,14 @@ def section_card(title: str, icon_name: str) -> tuple:
     head.addStretch(1)
     outer.addWidget(head_w)
     body = QVBoxLayout()
-    body.setContentsMargins(18, 14, 18, 16)
-    body.setSpacing(12)
+    if compact:
+        x = tokens.LAYOUT["compact_card_padding_x"]
+        y = tokens.LAYOUT["compact_card_padding_y"]
+        body.setContentsMargins(x, y, x, y)
+        body.setSpacing(tokens.LAYOUT["compact_card_spacing"])
+    else:
+        body.setContentsMargins(18, 14, 18, 16)
+        body.setSpacing(12)
     outer.addLayout(body)
     return box, body, head
 

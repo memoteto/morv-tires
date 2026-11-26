@@ -86,10 +86,13 @@ class PosDesignV1Test(unittest.TestCase):
 
     def test_no_horizontal_scrollbar(self):
         """Owner feedback: the screen was too wide and needed scrolling sideways."""
-        self.assertIn("self.invoice_layout = AdaptiveCards(", SOURCE)
+        self.assertIn("self.invoice_layout = InvoiceWorkspace(", SOURCE)
         shared = (ROOT / "morv" / "ui" / "adaptive_layout.py").read_text(encoding="utf-8")
-        cards = shared[shared.index("class AdaptiveCards("):shared.index("class AdaptiveSplit(")]
-        self.assertIn("ScrollBarAsNeeded", cards)
+        workspace = shared[shared.index("class InvoiceWorkspace("):shared.index("class AdaptiveSplit(")]
+        self.assertIn("scroll_content(self._main_host)", workspace)
+        self.assertIn("scroll_content(self._summary_host)", workspace)
+        scroll = shared[shared.index("def scroll_content("):shared.index("class AdaptiveCards(")]
+        self.assertIn("setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)", scroll)
 
 
 if __name__ == "__main__":
