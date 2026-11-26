@@ -1,0 +1,179 @@
+name: Graphify knowledge map
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'morv/**'
+      - '.github/workflows/graphify.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/graphify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graphify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GRAPHIFY_OUT: graphify-out
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Graphify
+        run: |
+          python -m pip install --disable-pip-version-check 'graphifyy[sql]==0.9.120'
+          python -c 'import tree_sitter_sql; from tree_sitter import Language, Parser; Parser(Language(tree_sitter_sql.language()))'
+          graphify --version
+      - name: Extract and validate code graph without AI
+        shell: bash
+        run: |
+          set -euo pipefail
+          export OUT="$RUNNER_TEMP/graphify-build/graphify-out"
+          test ! -e "$OUT"
+          graphify extract "$GITHUB_WORKSPACE/morv" --code-only --max-workers 2 --out "$RUNNER_TEMP/graphify-build"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          analysis = json.loads((Path(os.environ["OUT"]) / ".graphify_analysis.json").read_text())
+          assert analysis["tokens"] == {"input": 0, "output": 0}, analysis["tokens"]
+          PY
+          graphify cluster-only "$GITHUB_WORKSPACE/morv" --graph "$OUT/graph.json" --no-label
+          python - <<'PY'
+          import importlib.metadata
+          import json
+          import os
+          from collections import Counter
+          from pathlib import Path
+
+          out = Path(os.environ["OUT"])
+          graph = json.loads((out / "graph.json").read_text(encoding="utf-8"))
+          nodes, links = graph["nodes"], graph["links"]
+          assert nodes and links, "Empty graph"
+          ids = {n["id"] for n in nodes}
+          assert len(ids) == len(nodes), "Duplicate node IDs"
+          assert all(e["source"] in ids and e["target"] in ids for e in links), "Dangling links"
+          assert graph["built_at_commit"] == os.environ["GITHUB_SHA"], "Wrong source commit"
+          files = {str(n.get("source_file", "")).replace("\\", "/") for n in nodes}
+          files.discard("")
+          for expected in ("core/costing.py", "infra/inventory.py", "ui/pos_page.py"):
+              assert any(f == expected or f.endswith("/" + expected) for f in files), expected
+          # Every SQL migration must have a real source-file node.
+          root = Path(os.environ["GITHUB_WORKSPACE"]) / "morv"
+          sql_files = {p.relative_to(root).as_posix() for p in root.rglob("*.sql")}
+          assert sql_files, "No SQL sources found"
+          sql_covered = {
+              path for path in sql_files
+              if any(f == path or f.endswith("/" + path) for f in files)
+          }
+          missing = sorted(sql_files - sql_covered)
+          assert not missing, f"SQL sources missing from graph: {missing}"
+          print(f"SQL source coverage: {len(sql_covered)}/{len(sql_files)}")
+          for name in ("graph.json", "graph.html", "GRAPH_REPORT.md"):
+              assert (out / name).is_file() and (out / name).stat().st_size, name
+          version = importlib.metadata.version("graphifyy")
+          assert version == "0.9.120"
+          metadata = {
+              "source_commit": os.environ["GITHUB_SHA"],
+              "source_scope": "morv/",
+              "graphify_version": version,
+              "mode": "code-only / no-label",
+              "llm_tokens": {"input": 0, "output": 0},
+              "nodes": len(nodes),
+              "links": len(links),
+              "source_files": len(files),
+              "sql_files_expected": len(sql_files),
+              "sql_files_covered": len(sql_covered),
+              "relations": dict(sorted(Counter(str(e.get("relation", "unknown")) for e in links).items())),
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "limitations": "Static navigation aid; not proof of complete dependencies or current business semantics."
+          }
+          (out / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(metadata, indent=2))
+          PY
+          git diff --exit-code HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graphify-map
+          path: |
+            ${{ runner.temp }}/graphify-build/graphify-out/graph.json
+            ${{ runner.temp }}/graphify-build/graphify-out/graph.html
+            ${{ runner.temp }}/graphify-build/graphify-out/GRAPH_REPORT.md
+            ${{ runner.temp }}/graphify-build/graphify-out/metadata.json
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: extract
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: graphify-map
+          path: ${{ runner.temp }}/graphify-publish
+      - name: Publish validated files to graphify-maps only
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/graphify-publish"
+          for name in graph.json graph.html GRAPH_REPORT.md metadata.json; do
+            test -s "$out/$name"
+          done
+          python - "$out" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          out = Path(sys.argv[1])
+          meta = json.loads((out / "metadata.json").read_text())
+          graph = json.loads((out / "graph.json").read_text())
+          assert meta["source_commit"] == graph["built_at_commit"] == os.environ["GITHUB_SHA"]
+          assert meta["llm_tokens"] == {"input": 0, "output": 0}
+          assert meta["sql_files_expected"] == meta["sql_files_covered"] > 0
+          PY
+          git fetch --no-tags origin refs/heads/main
+          latest="$(git rev-parse FETCH_HEAD)"
+          if ! git diff --quiet "$GITHUB_SHA" "$latest" -- morv/ .github/workflows/graphify.yml; then
+            echo "Source changed during extraction; a newer run must publish."
+            exit 0
+          fi
+          parent=()
+          if git ls-remote --exit-code --heads origin refs/heads/graphify-maps > /dev/null; then
+            git fetch --no-tags origin refs/heads/graphify-maps
+            old="$(git rev-parse FETCH_HEAD)"
+            git cat-file -e "$old:metadata.json"
+            parent=(-p "$old")
+          else
+            status=$?
+            test "$status" -eq 2 || exit "$status"
+          fi
+          export GIT_INDEX_FILE="$(mktemp -d "$RUNNER_TEMP/graphify-index.XXXXXX")/index"
+          git read-tree --empty
+          git -C "$out" --git-dir="$GITHUB_WORKSPACE/.git" --work-tree="$out" add -f -- graph.json graph.html GRAPH_REPORT.md metadata.json
+          tree="$(git write-tree)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          new="$(git commit-tree "$tree" "${parent[@]}" -m "chore(graphify): $GITHUB_SHA")"
+          git push origin "$new:refs/heads/graphify-maps"
