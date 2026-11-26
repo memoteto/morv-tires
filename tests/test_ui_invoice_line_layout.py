@@ -1,15 +1,15 @@
 """POS-5 regression gates: long names, aligned columns and kind-specific DOT."""
 from tests.qt_app import require_qt
-from tests.test_ui_adaptive_invoices import AdaptiveInvoiceTest
+from tests import test_ui_adaptive_invoices as adaptive
 from tests.test_ui_pos_customer_lookup import PosFixture
 
 
 @require_qt()
 class InvoiceLineLayoutTest(PosFixture):
-    window = AdaptiveInvoiceTest.window
-    settle = AdaptiveInvoiceTest.settle
-    fits = AdaptiveInvoiceTest.fits
-    approval_reachable = AdaptiveInvoiceTest.approval_reachable
+    window = adaptive.AdaptiveInvoiceTest.window
+    settle = adaptive.AdaptiveInvoiceTest.settle
+    fits = adaptive.AdaptiveInvoiceTest.fits
+    approval_reachable = adaptive.AdaptiveInvoiceTest.approval_reachable
 
     def invoice(self, purchase=False):
         from morv.infra import suppliers
