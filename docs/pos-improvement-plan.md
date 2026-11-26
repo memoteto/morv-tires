@@ -48,3 +48,5 @@ POS-5 implementation: shared invoice columns, wrapped names and battery DOT hidd
 
 POS search details: owner approved design 3 and removal of repeated specifications; Ubuntu baseline 1093 tests with 11 expected subtest failures.
 Implemented sale tier price and batched physical stock with existing status pills; shared spec deduplication, no purchase sale prices. CI and visual review pending.
+POS search CI: all 1093 tests passed on both platforms, all six jobs passed for db81f0f.
+Added deterministic sale/purchase popup captures and geometry reporting at the existing three audit sizes and both themes; visual review pending.
