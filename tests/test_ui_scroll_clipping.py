@@ -53,6 +53,7 @@ class ScrollAreaClippingTest(unittest.TestCase):
         return "; ".join(t for _, t in sorted(rows, reverse=True)[:8])
 
     def test_main_pages_do_not_clip_content_at_common_sizes(self):
+        from PySide6.QtTest import QTest
         from morv.infra import settings
         from morv.ui.shell import NAV, MainWindow
         from morv.ui.widgets import dispose
@@ -69,6 +70,9 @@ class ScrollAreaClippingTest(unittest.TestCase):
                 self.app.processEvents()
                 for key, _title, _icon, _phase in NAV:
                     win.go_key(key)
+                    self.app.processEvents()
+                    # Let deferred layout and scrollbar events settle before measuring.
+                    QTest.qWait(0)
                     self.app.processEvents()
                     side = "collapsed" if collapsed == "1" else "open"
                     problems += [f"{key} @{width}x{height} sidebar {side}: {c}" for c in self.clipped(win)]

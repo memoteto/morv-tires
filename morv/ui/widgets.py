@@ -1,7 +1,7 @@
 """Small shared UI pieces, so screens stay consistent."""
 from PySide6.QtCore import QDate, QEvent, QLocale, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPalette, QStandardItem, QStandardItemModel, QTextCharFormat
-from PySide6.QtWidgets import (QBoxLayout, QCalendarWidget, QCompleter, QDateEdit, QFormLayout, QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
+from PySide6.QtWidgets import (QCalendarWidget, QCompleter, QDateEdit, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QLineEdit,
                                QMenu, QPushButton, QTableView, QToolButton, QVBoxLayout, QWidget)
 
 from morv.core.text import ltr
@@ -88,7 +88,9 @@ class InvoiceFooter(QFrame):
     def __init__(self):
         super().__init__()
         self.setObjectName("invoiceFooter")
-        row = QBoxLayout(QBoxLayout.Direction.TopToBottom, self)
+        row = QGridLayout(self)
+        row.setDefaultPositioning(1, Qt.Orientation.Horizontal)
+        self._horizontal = False
         x = tokens.LAYOUT["compact_card_padding_x"]
         y = tokens.LAYOUT["compact_card_padding_y"]
         row.setContentsMargins(x, y, x, y)
@@ -97,7 +99,8 @@ class InvoiceFooter(QFrame):
 
     def add_action(self, button):
         button.setProperty("invoiceAction", True)
-        self.layout().addWidget(button)
+        layout = self.layout()
+        layout.addWidget(button, layout.count(), 0)
 
     def _control_widths(self):
         widths = []
@@ -118,10 +121,14 @@ class InvoiceFooter(QFrame):
         margins = layout.contentsMargins()
         widths = self._control_widths()
         needed = sum(widths) + max(0, len(widths) - 1) * layout.spacing() + margins.left() + margins.right()
-        direction = (QBoxLayout.Direction.LeftToRight if available >= needed and len(widths) > 1
-                     else QBoxLayout.Direction.TopToBottom)
-        if layout.direction() != direction:
-            layout.setDirection(direction)
+        horizontal = available >= needed and len(widths) > 1
+        if self._horizontal != horizontal:
+            widgets = [layout.itemAt(i).widget() for i in range(layout.count())]
+            for widget in widgets:
+                layout.removeWidget(widget)
+            self._horizontal = horizontal
+            for i, widget in enumerate(widgets):
+                layout.addWidget(widget, 0 if horizontal else i, i if horizontal else 0)
             layout.invalidate()
             self.updateGeometry()
 

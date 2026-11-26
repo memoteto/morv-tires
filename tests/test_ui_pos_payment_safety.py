@@ -195,9 +195,21 @@ class PosPaymentSafetyTest(_Fixture, unittest.TestCase):
 
     def click_total(self, p):
         from PySide6.QtCore import Qt
-        from PySide6.QtTest import QTest
-        QTest.mouseClick(p.total_label.parentWidget(), Qt.MouseButton.LeftButton,
-                         pos=p.total_label.geometry().center())
+        from PySide6.QtTest import QSignalSpy, QTest
+        # A mouse click requires the actual, settled geometry of a shown page.
+        p.resize(1366, 768)
+        p.show()
+        self.app.processEvents()
+        QTest.qWait(150)
+        self.app.processEvents()
+        button = p.total_label.parentWidget()
+        point = p.total_label.geometry().center()
+        self.assertIs(button, p.total_box)
+        self.assertTrue(button.isVisible())
+        self.assertTrue(button.rect().contains(point))
+        spy = QSignalSpy(button.clicked)
+        QTest.mouseClick(button, Qt.MouseButton.LeftButton, pos=point)
+        self.assertEqual(spy.count(), 1)
 
     def test_click_total_fills_exact_cash_without_extra_chip(self):
         p = self.page()
