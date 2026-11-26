@@ -101,7 +101,7 @@ class InvoiceLineTable(QWidget):
                                                          for value in values) + inset)
             widths[5] = max(widths[5], self._text_width(cells[5], cells[5].text()) + 4)
 
-        name_min = max(widths[1], max(widths[2:6]) + LAYOUT["invoice_line_name_icon_space"])
+        name_min = max(widths[1], max(widths[3:6]) + LAYOUT["invoice_line_name_icon_space"])
         for cells in cells_by_row:
             for column, cell in enumerate(cells):
                 if column == 1:
