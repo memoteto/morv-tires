@@ -152,3 +152,185 @@ class InvoiceSearchTest(PosFixture):
         self.assertTrue(f.item_search.hasFocus())
         self.key(f.item_search, "F9")
         self.assertIn("اختر المورد", f.notice.text())
+
+    def result_labels(self, form, query):
+        from PySide6.QtWidgets import QLabel
+
+        self.query(form, query)
+        form._do_item_search()
+        self.app.processEvents()
+        layout = form._item_popup._layout
+        self.assertEqual(layout.count(), 2, "SETUP: one matching item and the new-item action")
+        button = layout.itemAt(0).widget()
+        return [(label.objectName(), label.text().replace("\u2066", "").replace("\u2069", ""))
+                for label in button.findChildren(QLabel)]
+
+    def set_tire_spec(self, name):
+        self.con.execute("UPDATE items SET name=?, name_norm=? WHERE id=?",
+                         (name, norm_ar(name), self.ids["tire"]))
+        self.con.execute("INSERT INTO item_attrs (item_id, field_key, value) VALUES (?, 'size', ?)",
+                         (self.ids["tire"], "205/60R16"))
+
+    def receive_stock(self, quantities=(3, 5)):
+        from morv.infra import purchasing, suppliers
+
+        supplier = suppliers.create(self.con, self.session.user,
+                                    suppliers.Supplier(None, "مورد تجريبي", "01012345678"))
+        purchasing.post_invoice(
+            self.con, self.session.user, request_key="search-stock-fixture",
+            supplier_id=supplier.id, supplier_invoice_no="SEARCH-1", invoice_date="2026-11-01",
+            lines=[purchasing.PurchaseLine(self.ids["tire"], qty, 80000, dot)
+                   for qty, dot in zip(quantities, ("2324", "2424"), strict=True)])
+
+    def test_search_does_not_repeat_tire_size_in_name(self):
+        name = "إطار شيلد 205/60R16"
+        self.set_tire_spec(name)
+        for purchase in (False, True):
+            with self.subTest(purchase=purchase):
+                labels = self.result_labels(self.invoice(purchase), "205/60R16")
+                self.assertEqual(sum(text.count("205/60R16") for _, text in labels), 1,
+                                 "SEARCH_DUPLICATE_SIZE")
+                self.assertIn(name, [text for _, text in labels])
+
+    def test_search_keeps_size_when_name_has_no_size(self):
+        self.set_tire_spec("إطار شيلد")
+        for purchase in (False, True):
+            with self.subTest(purchase=purchase):
+                labels = self.result_labels(self.invoice(purchase), "205/60R16")
+                self.assertEqual(sum(text.count("205/60R16") for _, text in labels), 1,
+                                 "SEARCH_MISSING_SIZE")
+
+    def test_sale_search_shows_active_tier_price_matching_invoice(self):
+        from morv.core.money import fmt, parse_money
+
+        self.con.execute("UPDATE items SET price_retail=130000, price_wholesale=110050, "
+                         "price_super=100025 WHERE id=?", (self.ids["tire"],))
+        form = self.invoice(False)
+        for tier, expected in (("retail", 130000), ("wholesale", 110050), ("super", 100025)):
+            with self.subTest(tier=tier):
+                form._set_tier(tier)
+                labels = self.result_labels(form, "TR-QA")
+                self.assertTrue(any(fmt(expected) in text for _, text in labels),
+                                "SEARCH_TIER_PRICE")
+                self.key(form.item_search, "Down")
+                self.key(form.item_search, "Return")
+                row = form._rows[-1]
+                self.assertEqual(parse_money(row["price_edit"].text()), expected)
+                form._remove_row(row)
+
+    def test_sale_search_stock_is_sum_of_lots_and_warns_below_minimum(self):
+        from morv.infra import inventory
+
+        self.receive_stock()
+        self.assertEqual(inventory.on_hand(self.con, self.ids["tire"]), 8)
+        form = self.invoice(False)
+        for minimum, status in ((0, "pillOk"), (8, "pillOk"), (9, "pillWarn")):
+            with self.subTest(minimum=minimum):
+                self.con.execute("UPDATE items SET min_qty=? WHERE id=?", (minimum, self.ids["tire"]))
+                labels = self.result_labels(form, "TR-QA")
+                self.assertTrue(any(obj == status and "8" in text for obj, text in labels),
+                                "SEARCH_STOCK_BALANCE_STATUS")
+        self.assertEqual(inventory.reconcile(self.con), [])
+
+    def test_sale_search_zero_stock_is_explicit(self):
+        labels = self.result_labels(self.invoice(False), "BT-QA")
+        self.assertTrue(any(obj == "pillDanger" and "0" in text for obj, text in labels),
+                        "SEARCH_ZERO_STOCK")
+
+    def test_service_search_shows_price_without_stock(self):
+        labels = self.result_labels(self.invoice(False), "SV-QA")
+        self.assertTrue(any("100.00" in text for _, text in labels), "SEARCH_SERVICE_PRICE")
+        self.assertFalse(any(obj in ("pillOk", "pillWarn", "pillDanger") for obj, _ in labels),
+                         "SEARCH_SERVICE_HAS_STOCK_BADGE")
+
+    def test_purchase_search_does_not_show_sale_price(self):
+        labels = self.result_labels(self.invoice(True), "TR-QA")
+        self.assertFalse(any("100.00" in text for _, text in labels), "SEARCH_PURCHASE_SALE_PRICE")
+
+    def test_sale_search_stock_reads_are_batched(self):
+        form = self.invoice(False)
+        self.receive_stock()
+        self.con.execute("UPDATE items SET name='إطار اختبار', name_norm=? WHERE id=?",
+                         (norm_ar("إطار اختبار"), self.ids["tire"]))
+        self.con.execute("UPDATE items SET name='بطارية اختبار', name_norm=? WHERE id=?",
+                         (norm_ar("بطارية اختبار"), self.ids["battery"]))
+        self.query(form, "اختبار")
+        statements = []
+        self.con.set_trace_callback(statements.append)
+        try:
+            form._do_item_search()
+        finally:
+            self.con.set_trace_callback(None)
+        self.assertEqual(form._item_popup._layout.count(), 3)
+        stock_reads = [sql for sql in statements if "stock_lots" in sql.lower()]
+        self.assertEqual(len(stock_reads), 1, "SEARCH_BATCHED_STOCK")
+        self.assertFalse(any("select * from items where id" in sql.lower()
+                             for sql in statements), "SEARCH_PRICE_N_PLUS_ONE")
+
+    def assert_popup_on_screen(self, search, marker):
+        from PySide6.QtCore import QPoint
+
+        popup = search.popup
+        screen = search.screen().availableGeometry()
+        frame = popup.frameGeometry()
+        handle = popup.windowHandle()
+        margins = handle.frameMargins() if handle else None
+        diagnostic = (
+            f"{marker}: platform={self.app.platformName()} screen={screen.getRect()} "
+            f"field_origin={search.mapToGlobal(QPoint(0, 0))} field_size={search.size()} "
+            f"popup_geometry={popup.geometry().getRect()} popup_frame={frame.getRect()} "
+            f"frame_margins={margins} popup_minimum={popup.minimumSize()} "
+            f"popup_minimum_hint={popup.minimumSizeHint()} "
+            f"content_minimum={popup._content.minimumSize()} "
+            f"scroll_viewport={popup._scroll.viewport().size()} "
+            f"scroll_range={popup._scroll.verticalScrollBar().maximum()} "
+            f"direction={search.layoutDirection()}"
+        )
+        self.assertTrue(screen.contains(frame), diagnostic)
+
+    def test_search_popup_expands_and_preserves_long_names(self):
+        from PySide6.QtWidgets import QLabel
+
+        name = "إطار تجريبي Continental PremiumContact 6 205/60R16 95V"
+        self.set_tire_spec(name)
+        for purchase in (False, True):
+            with self.subTest(purchase=purchase):
+                form = self.invoice(purchase)
+                search = form.item_search
+                search.setFixedWidth(292)
+                self.result_labels(form, "TR-QA")
+                popup = form._item_popup
+                self.assertEqual(search.width(), 292)
+                self.assertGreater(popup.width(), search.width(), "SEARCH_POPUP_EXPANSION")
+                self.assert_popup_on_screen(search, "SEARCH_POPUP_SCREEN_BOUNDS")
+                button = popup._layout.itemAt(0).widget()
+                label = next(x for x in button.findChildren(QLabel) if x.text() == name)
+                self.assertGreater(label.width(), 0, "SEARCH_NAME_WIDTH")
+                self.assertGreaterEqual(label.height(), label.heightForWidth(label.width()),
+                                        "SEARCH_NAME_HEIGHT")
+                self.assertTrue(button.rect().contains(label.geometry()), "SEARCH_NAME_GEOMETRY")
+
+    def test_search_popup_keeps_all_eight_results_keyboard_reachable(self):
+        from PySide6.QtWidgets import QLabel
+
+        for index in range(8):
+            name = f"إطار اختبار {index} Continental PremiumContact 6 205/60R16"
+            self.con.execute(
+                "INSERT INTO items (kind,code,name,name_norm,price_retail,price_wholesale,price_super) "
+                "VALUES ('tire',?,?,?,130000,130000,130000)",
+                (f"POPUP-{index}", name, norm_ar(name)))
+        form = self.invoice(False)
+        self.query(form, "POPUP-")
+        form._do_item_search()
+        self.app.processEvents()
+        popup = form._item_popup
+        self.assertEqual(popup._layout.count(), 9)
+        self.assert_popup_on_screen(form.item_search, "SEARCH_EIGHT_SCREEN_BOUNDS")
+        self.key(form.item_search, "Up")
+        button = popup._layout.itemAt(7).widget()
+        self.assertTrue(button.isChecked(), "SEARCH_LAST_SELECTED")
+        self.assertTrue(any("7" in label.text() for label in button.findChildren(QLabel)
+                            if label.objectName() == "cardTitle"))
+        self.key(form.item_search, "Return")
+        self.assertEqual(len(form._rows), 1)
+        self.assertFalse(popup.isVisible())

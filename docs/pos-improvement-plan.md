@@ -45,3 +45,12 @@ POS-4 local: 1065 tests and Ruff passed; visual review identified gap, oversized
 
 POS-5 baseline: 10 tests, nine failing with 128 subtest failures; tyre DOT validation passed. Long names overflowed by 221/203 px and displaced the medium-width summary.
 POS-5 implementation: shared invoice columns, wrapped names and battery DOT hidden; owner approved preserving alignment and name space. Local regression and visual verification pending.
+
+POS search details: owner approved design 3 and removal of repeated specifications; Ubuntu baseline 1093 tests with 11 expected subtest failures.
+Implemented sale tier price and batched physical stock with existing status pills; shared spec deduplication, no purchase sale prices. CI and visual review pending.
+POS search CI: all 1093 tests passed on both platforms, all six jobs passed for db81f0f.
+Added deterministic sale/purchase popup captures and geometry reporting at the existing three audit sizes and both themes; visual review pending.
+Visual audit b054d69 confirmed all 12 captures, but clipped names at 1366/1093 and off-screen popups at 1093 in both themes.
+Owner approved content-driven popup width, adaptive row height and screen-constrained scrolling with right alignment; new geometry/keyboard tests and CI pending.
+CI geometry logs confirmed 2px native frame margins on both platforms; removing the native frame passed geometry tests but violated the UI architecture guard.
+Restored tooltip flags and account for measured native frame margins in sizing and positioning; unchanged geometry assertions and all CI checks pending.

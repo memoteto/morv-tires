@@ -119,6 +119,17 @@ def on_hand(con, item_id: int) -> int:
     return con.execute("SELECT coalesce(sum(qty_on_hand), 0) FROM stock_lots WHERE item_id=?", (item_id,)).fetchone()[0]
 
 
+def on_hand_many(con, item_ids) -> dict[int, int]:
+    ids = tuple(dict.fromkeys(item_ids))
+    if not ids:
+        return {}
+    placeholders = ",".join("?" for _ in ids)
+    balances = dict(con.execute(
+        f"SELECT item_id, sum(qty_on_hand) FROM stock_lots WHERE item_id IN ({placeholders}) "
+        "GROUP BY item_id", ids).fetchall())
+    return {item_id: balances.get(item_id, 0) for item_id in ids}
+
+
 def book_value(con, item_id: int | None = None) -> int:
     if item_id is None:
         return con.execute("SELECT coalesce(sum(cost_remaining), 0) FROM cost_layers").fetchone()[0]
