@@ -14,11 +14,11 @@ from morv.core.text import ltr
 from morv.infra import customer_receipts, customers, items, sale_view, sales, users
 from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons, tokens
-from morv.ui.adaptive_layout import AdaptiveCards, HeaderPlacement
+from morv.ui.adaptive_layout import HeaderPlacement, InvoiceWorkspace
 from morv.ui.item_search import ItemSearch, KIND_ICON
 from morv.ui.party_search import (FoldableDetails, PartyInfoStrip, PartySearch,
                                   QuickPartyDialog, party_field, phone_query)
-from morv.ui.widgets import (InvoiceTotal, confirm_discard_invoice, chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
+from morv.ui.widgets import (InvoiceTotal, card, confirm_discard_invoice, chip, deferred_button, field, field_label, ICON_MUTED, ICON_PRIMARY, kbd, kv_row, ltr_edit, muted, Notice, section_card, trail_icon)
 
 TIER_ATTR = {"retail": "price_retail", "wholesale": "price_wholesale", "super": "price_super"}
 TIER_LABELS = {"retail": "قطاعي (تجزئة)", "wholesale": "جملة", "super": "جملة الجملة"}
@@ -73,9 +73,8 @@ class PosPage(QWidget):
         summary_layout = self._build_left_column()
         summary_layout.setContentsMargins(0, 0, 0, 0)
         summary.setLayout(summary_layout)
-        self.invoice_layout = AdaptiveCards(
-            (primary, summary), minimum_width=0, column_weights=(3, 1),
-            fill_height=True, spacing=16, content_margins=(9, 9, 9, 9))
+        self.invoice_layout = InvoiceWorkspace(
+            primary, summary, self.summary_footer, spacing=16, content_margins=(9, 9, 9, 9))
         root.addWidget(self.invoice_layout, 1)
         self._shortcuts()
 
@@ -248,8 +247,7 @@ class PosPage(QWidget):
         return col
 
     def _summary_card(self) -> QFrame:
-        """Totals and payment in one card, as in the purchase invoice, so approval is reached unscrolled."""
-        box, body, head = section_card("ملخص الفاتورة والدفع", "sales")
+        box, body, head = section_card("ملخص الفاتورة والدفع", "sales", compact=True)
         # The shop is not tax-registered, so tax is a fixed fact in the header rather than a row
         tax = chip("بدون ضريبة")
         tax.setToolTip("الضريبة: المحل غير مسجّل — بدون ضريبة")
@@ -261,15 +259,16 @@ class PosPage(QWidget):
         for label, w in (("الإجمالي قبل الخصم", self.subtotal_label),
                           ("خصم على الفاتورة", self.invoice_disc)):
             body.addWidget(kv_row(label, w))
+        self.summary_footer, footer = card(compact=True)
         self.total_box = InvoiceTotal(
-            "الإجمالي النهائي", self._fill_exact_cash)
+            "الإجمالي النهائي", self._fill_exact_cash, compact=True)
         self.total_box.setAccessibleName("تعبئة المبلغ النقدي المطلوب")
         self.total_label = self.total_box.value
-        body.addWidget(self.total_box)
-        self._payment_section(body)
+        footer.addWidget(self.total_box)
+        self._payment_section(body, footer)
         return box
 
-    def _payment_section(self, body: QVBoxLayout) -> None:
+    def _payment_section(self, body: QVBoxLayout, footer: QVBoxLayout) -> None:
         self.split_btn = QPushButton("تقسيم الدفع على وسيلتين")
         self.split_btn.setObjectName("link")
         self.split_btn.setCheckable(True)
@@ -364,14 +363,14 @@ class PosPage(QWidget):
         inner.addStretch(1)
         inner.addWidget(kbd("F9", on_primary=True))
         self.post_btn.clicked.connect(self.post)
-        body.addWidget(self.post_btn)
+        footer.addWidget(self.post_btn)
         row = QHBoxLayout()
         row.addWidget(deferred_button("حفظ كمسودة"), 1)
         self.post_print_btn = QPushButton("اعتماد وطباعة")
         self.post_print_btn.setIcon(icons.icon("printer", tokens.ICON_MUTED, 16))
         self.post_print_btn.clicked.connect(lambda: self.post(and_print=True))
         row.addWidget(self.post_print_btn, 1)
-        body.addLayout(row)
+        footer.addLayout(row)
         self._on_method_changed()
 
     # ---------- Builders ----------

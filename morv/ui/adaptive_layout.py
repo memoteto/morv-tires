@@ -103,6 +103,110 @@ class AdaptiveCards(QScrollArea):
         self.grid.activate()
 
 
+class InvoiceWorkspace(QWidget):
+    """Keep approval outside scroll areas; stack the same content when the width is limited."""
+
+    def __init__(self, primary, summary, footer, *, spacing, content_margins=(0, 0, 0, 0)):
+        super().__init__()
+        self.primary, self.summary, self.footer = primary, summary, footer
+        self.columns = 0
+        self._reflowing = False
+        self.grid = QGridLayout(self)
+        self.grid.setContentsMargins(*content_margins)
+        self.grid.setSpacing(spacing)
+        self.grid.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        self._main_host = QWidget()
+        self._main_layout = QVBoxLayout(self._main_host)
+        self._main_layout.setContentsMargins(0, 0, 0, 0)
+        self._main_layout.setSpacing(spacing)
+        self._main_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        self._main_layout.addWidget(primary, 1)
+        self._summary_host = QWidget()
+        self._summary_layout = QVBoxLayout(self._summary_host)
+        self._summary_layout.setContentsMargins(0, 0, 0, 0)
+        self._summary_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        self._summary_layout.addStretch(1)
+        self.primary_area = scroll_content(self._main_host)
+        self.summary_area = scroll_content(self._summary_host)
+        self.areas = (self.primary_area, self.summary_area)
+        self._timer = QTimer(self, singleShot=True)
+        self._timer.timeout.connect(self._reflow)
+        for widget in (primary, summary, footer, self._main_host, self._summary_host):
+            widget.installEventFilter(self)
+        self._reflow()
+
+    def _column_minima(self):
+        primary = max(self.primary.minimumWidth(), self.primary.minimumSizeHint().width())
+        summary = max(self.summary.minimumWidth(), self.summary.minimumSizeHint().width())
+        footer = max(self.footer.minimumWidth(), self.footer.minimumSizeHint().width())
+        return (primary + self.primary_area.verticalScrollBar().sizeHint().width(),
+                max(footer, summary + self.summary_area.verticalScrollBar().sizeHint().width()))
+
+    def minimumSizeHint(self):
+        margins = self.grid.contentsMargins()
+        return QSize(0, self.footer.minimumSizeHint().height() + margins.top()
+                     + margins.bottom() + self.grid.verticalSpacing() + 40)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reflow()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._reflow()
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.LayoutRequest, QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            self._timer.start(0)
+            if self.isVisible():
+                self._reflow()
+        return super().eventFilter(watched, event)
+
+    def _reflow(self):
+        if self._reflowing:
+            return
+        self._reflowing = True
+        try:
+            self._apply_columns()
+        finally:
+            self._reflowing = False
+
+    def _apply_columns(self):
+        left, right = self._column_minima()
+        margins = self.grid.contentsMargins()
+        available = self.width() - margins.left() - margins.right()
+        columns = 2 if available >= left + right + self.grid.horizontalSpacing() else 1
+        if columns != self.columns:
+            focus = self.focusWidget()
+            restore_focus = focus is not None and self.summary.isAncestorOf(focus)
+            self._main_layout.removeWidget(self.summary)
+            self._summary_layout.removeWidget(self.summary)
+            for widget in (*self.areas, self.footer):
+                self.grid.removeWidget(widget)
+            self.columns = columns
+            if columns == 2:
+                self._summary_layout.insertWidget(0, self.summary)
+                self.grid.addWidget(self.primary_area, 0, 0, 2, 1)
+                self.grid.addWidget(self.summary_area, 0, 1)
+                self.grid.addWidget(self.footer, 1, 1)
+                self.summary_area.show()
+            else:
+                self.summary_area.hide()
+                self._main_layout.addWidget(self.summary)
+                self.grid.addWidget(self.primary_area, 0, 0)
+                self.grid.addWidget(self.footer, 1, 0)
+            self.summary.show()
+            self.grid.setColumnStretch(0, 3 if columns == 2 else 1)
+            self.grid.setColumnStretch(1, 1 if columns == 2 else 0)
+            self.grid.setRowStretch(0, 1)
+            self.grid.setRowStretch(1, 0)
+            if restore_focus:
+                focus.setFocus()
+        self.grid.setColumnMinimumWidth(0, left if columns == 2 else 0)
+        self.grid.setColumnMinimumWidth(1, right if columns == 2 else 0)
+        self.grid.activate()
+
+
 class AdaptiveSplit(QWidget):
     """Two panes with a single-pane fallback and preserved widget state."""
 

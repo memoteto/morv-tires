@@ -30,32 +30,35 @@ class AdaptiveInvoiceTest(PosFixture):
         return win
 
     def area(self, page):
-        from PySide6.QtWidgets import QScrollArea
-        return next(a for a in page.findChildren(QScrollArea)
-                    if a.widget() and a.widget().isAncestorOf(page.post_btn))
+        return page.invoice_layout
 
     def fits(self, area, marker):
-        content = area.widget()
-        width = area.viewport().width()
-        self.assertLessEqual(content.width(), width, marker)
-        self.assertLessEqual(content.minimumSizeHint().width(), width, marker)
-        self.assertFalse(area.horizontalScrollBar().isVisible(), marker)
-        self.assertEqual(area.horizontalScrollBar().maximum(), 0, marker)
+        visible = [scroll for scroll in area.areas if scroll.isVisibleTo(area)]
+        self.assertEqual(len(visible), area.columns, marker)
+        for scroll in visible:
+            content = scroll.widget()
+            width = scroll.viewport().width()
+            self.assertLessEqual(content.width(), width, marker)
+            self.assertLessEqual(content.minimumSizeHint().width(), width, marker)
+            self.assertFalse(scroll.horizontalScrollBar().isVisible(), marker)
+            self.assertEqual(scroll.horizontalScrollBar().maximum(), 0, marker)
 
     def approval_reachable(self, page, area):
         from PySide6.QtCore import QPoint
-        area.ensureWidgetVisible(page.post_btn, 0, 0)
+        for scroll in area.areas:
+            self.assertFalse(scroll.isAncestorOf(page.post_btn))
+            scroll.verticalScrollBar().setValue(0)
         self.settle()
-        pt = page.post_btn.mapTo(area.viewport(), QPoint(0, 0))
+        pt = page.post_btn.mapTo(area, QPoint(0, 0))
+        self.assertTrue(page.post_btn.isVisibleTo(page))
         self.assertGreaterEqual(pt.x(), 0)
-        self.assertLessEqual(pt.x() + page.post_btn.width(), area.viewport().width())
+        self.assertLessEqual(pt.x() + page.post_btn.width(), area.width())
         self.assertGreaterEqual(pt.y(), 0)
-        self.assertLessEqual(pt.y() + page.post_btn.height(), area.viewport().height())
-        area.verticalScrollBar().setValue(0)
+        self.assertLessEqual(pt.y() + page.post_btn.height(), area.height())
 
     def test_pos_narrow_reflows_and_draft_survives(self):
         from morv.infra import customers
-        from morv.ui.adaptive_layout import AdaptiveCards
+        from morv.ui.adaptive_layout import InvoiceWorkspace
         customer = customers.create(self.con, self.session.user,
                                     customers.Customer(None, "عميل تجريبي", "01012345678"))
         win = self.window("pos")
@@ -64,7 +67,7 @@ class AdaptiveInvoiceTest(PosFixture):
         self.settle()
         area = self.area(p)
         self.fits(area, "POS_NARROW_CLIP")
-        self.assertIsInstance(area, AdaptiveCards)
+        self.assertIsInstance(area, InvoiceWorkspace)
         self.assertEqual(area.columns, 1)
         p.extra_toggle.setChecked(True)
         p.note.setText("اختبار المسودة")
@@ -85,10 +88,13 @@ class AdaptiveInvoiceTest(PosFixture):
             self.settle()
             self.fits(area, "POS_RELAYOUT_CLIP")
             margins = area.grid.contentsMargins()
-            needed = (sum(max(card.minimumWidth(), card.minimumSizeHint().width())
-                          for card in area.cards) + area.grid.horizontalSpacing()
-                      + margins.left() + margins.right())
-            self.assertEqual(area.columns, 2 if area.viewport().width() >= needed else 1)
+            primary_min = max(area.primary.minimumWidth(), area.primary.minimumSizeHint().width())
+            summary_min = max(area.summary.minimumWidth(), area.summary.minimumSizeHint().width())
+            footer_min = area.footer.minimumSizeHint().width()
+            needed = (primary_min + area.primary_area.verticalScrollBar().sizeHint().width()
+                      + max(footer_min, summary_min + area.summary_area.verticalScrollBar().sizeHint().width())
+                      + area.grid.horizontalSpacing() + margins.left() + margins.right())
+            self.assertEqual(area.columns, 2 if area.width() >= needed else 1)
             if width == 1366:
                 self.assertEqual(area.columns, 2)
             self.assertEqual(p._customer[0], customer.id)
@@ -100,7 +106,7 @@ class AdaptiveInvoiceTest(PosFixture):
 
     def test_purchase_reuses_adaptive_cards_and_preserves_draft(self):
         from morv.infra import suppliers
-        from morv.ui.adaptive_layout import AdaptiveCards
+        from morv.ui.adaptive_layout import InvoiceWorkspace
         s = suppliers.create(self.con, self.session.user,
                              suppliers.Supplier(None, "مورد تجريبي", "01012345678"))
         win = self.window("purchases")
@@ -110,7 +116,7 @@ class AdaptiveInvoiceTest(PosFixture):
         p._pick_supplier(s.id, s.name, s.mobile)
         self.settle()
         area = self.area(p)
-        self.assertIsInstance(area, AdaptiveCards, "PURCHASE_SHARED_LAYOUT")
+        self.assertIsInstance(area, InvoiceWorkspace, "PURCHASE_SHARED_LAYOUT")
         self.fits(area, "PURCHASE_NARROW_CLIP")
         p.extra_toggle.setChecked(True)
         p.inv_no.setText("ADAPT-1")
