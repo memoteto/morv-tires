@@ -3,6 +3,53 @@ from tests.qt_app import require_qt
 from tests.test_ui_pos_customer_lookup import PosFixture
 
 
+def _report_invoice_overflow(content, width, marker):
+    """Report the measured width constraints without changing the layout or assertions."""
+    from morv.ui.invoice_lines import InvoiceLineTable
+
+    def describe(widget):
+        font = widget.font()
+        return (f"{type(widget).__name__}#{widget.objectName()} "
+                f"width={widget.width()} min={widget.minimumWidth()} "
+                f"hint={widget.minimumSizeHint().width()} max={widget.maximumWidth()} "
+                f"font={font.family()}/{font.pixelSize()}px")
+
+    print(f"POS5_WIDTH_DIAG {marker} viewport={width} {describe(content)}", flush=True)
+    for table in content.findChildren(InvoiceLineTable):
+        widget = table
+        while widget is not None:
+            layout = widget.layout()
+            if layout is not None:
+                margins = layout.contentsMargins()
+                print(f"POS5_WIDTH_DIAG ancestor {describe(widget)} "
+                      f"layout_min={layout.minimumSize().width()} "
+                      f"margins={margins.left()}+{margins.right()} "
+                      f"spacing={layout.spacing()}", flush=True)
+            if widget is content:
+                break
+            widget = widget.parentWidget()
+        for index, header in enumerate(table.headers):
+            print(f"POS5_WIDTH_DIAG header[{index}] {header.text()!r} {describe(header)}",
+                  flush=True)
+        for index in range(table.rows.count()):
+            row = table.rows.itemAt(index).widget()
+            if row is None or row.layout() is None or row.layout().count() != len(table.headers):
+                continue
+            for column in range(row.layout().count()):
+                cell = row.layout().itemAt(column).widget()
+                print(f"POS5_WIDTH_DIAG row[{index}][{column}] {describe(cell)}", flush=True)
+                layout = cell.layout()
+                if layout is not None:
+                    for child_index in range(layout.count()):
+                        child = layout.itemAt(child_index).widget()
+                        if child is not None:
+                            print(f"POS5_WIDTH_DIAG child[{child_index}] {describe(child)}",
+                                  flush=True)
+                if hasattr(cell, "text"):
+                    print(f"POS5_WIDTH_DIAG text={cell.text()!r} "
+                          f"advance={cell.fontMetrics().horizontalAdvance(cell.text())}", flush=True)
+
+
 @require_qt()
 class AdaptiveInvoiceTest(PosFixture):
     def settle(self):
@@ -38,6 +85,8 @@ class AdaptiveInvoiceTest(PosFixture):
         for scroll in visible:
             content = scroll.widget()
             width = scroll.viewport().width()
+            if content.width() > width or content.minimumSizeHint().width() > width:
+                _report_invoice_overflow(content, width, marker)
             self.assertLessEqual(content.width(), width, marker)
             self.assertLessEqual(content.minimumSizeHint().width(), width, marker)
             self.assertFalse(scroll.horizontalScrollBar().isVisible(), marker)
