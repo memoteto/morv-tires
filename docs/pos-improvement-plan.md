@@ -52,3 +52,5 @@ POS search CI: all 1093 tests passed on both platforms, all six jobs passed for 
 Added deterministic sale/purchase popup captures and geometry reporting at the existing three audit sizes and both themes; visual review pending.
 Visual audit b054d69 confirmed all 12 captures, but clipped names at 1366/1093 and off-screen popups at 1093 in both themes.
 Owner approved content-driven popup width, adaptive row height and screen-constrained scrolling with right alignment; new geometry/keyboard tests and CI pending.
+CI geometry logs confirmed 2px native frame margins on both platforms; removing the native frame passed geometry tests but violated the UI architecture guard.
+Restored tooltip flags and account for measured native frame margins in sizing and positioning; unchanged geometry assertions and all CI checks pending.

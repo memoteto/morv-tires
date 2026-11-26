@@ -32,7 +32,7 @@ class _ItemPopup(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("card")
-        self.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
+        self.setWindowFlags(Qt.WindowType.ToolTip)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -129,8 +129,22 @@ class _ItemPopup(QFrame):
         return self._layout.sizeHint().height()
 
     def place_below_or_above(self, field):
+        self.winId()
+        native = self.windowHandle().frameMargins()
+        self._place(field, native)
+        self.show()
+        # Some platforms only know the final frame extents after mapping the window.
+        actual = self.windowHandle().frameMargins()
+        if actual != native or not field.screen().availableGeometry().contains(self.frameGeometry()):
+            self._place(field, actual)
+        self._scroll.verticalScrollBar().setValue(0)
+
+    def _place(self, field, native):
         screen = field.screen().availableGeometry()
         anchor = field.mapToGlobal(QPoint(0, 0))
+        native_w = native.left() + native.right()
+        native_h = native.top() + native.bottom()
+        max_width = max(1, screen.width() - native_w)
         margins = self._layout.contentsMargins()
         frame = self.contentsMargins()
         inset = margins.left() + margins.right() + frame.left() + frame.right() + 4
@@ -138,27 +152,28 @@ class _ItemPopup(QFrame):
                     self._row_metrics(self._layout.itemAt(i).widget()))
                    for i in range(self._layout.count() - 1)]
         wanted = max((reserved + natural for _, (_, reserved, natural, _) in metrics), default=0)
-        width = min(max(field.width(), wanted + inset), screen.width())
+        width = min(max(field.width(), wanted + inset), max_width)
         height = self._size_rows(metrics, width - inset)
         vertical_inset = frame.top() + frame.bottom() + 4
         top = max(screen.top(), min(anchor.y(), screen.bottom() + 1))
         bottom = max(screen.top(), min(anchor.y() + field.height(), screen.bottom() + 1))
         above, below = top - screen.top(), screen.bottom() + 1 - bottom
-        use_below = height + vertical_inset <= below or below >= above
-        available = max(1, below if use_below else above)
+        use_below = height + vertical_inset + native_h <= below or below >= above
+        available = max(1, (below if use_below else above) - native_h)
         if height + vertical_inset > available:
             bar_width = self._scroll.verticalScrollBar().sizeHint().width()
-            width = min(max(width, wanted + inset + bar_width), screen.width())
+            width = min(max(width, wanted + inset + bar_width), max_width)
             height = self._size_rows(metrics, width - inset - bar_width)
         self._content.setMinimumHeight(height)
         popup_height = min(height + vertical_inset, available)
-        x = max(screen.left(), min(anchor.x() + field.width() - width,
-                                   screen.right() + 1 - width))
-        y = bottom if use_below else top - popup_height
+        outer_width = width + native_w
+        outer_height = popup_height + native_h
+        x = max(screen.left(), min(anchor.x() + field.width() - outer_width,
+                                   screen.right() + 1 - outer_width))
+        y = bottom if use_below else top - outer_height
+        y = max(screen.top(), min(y, screen.bottom() + 1 - outer_height))
         self.resize(width, popup_height)
         self.move(x, y)
-        self.show()
-        self._scroll.verticalScrollBar().setValue(0)
 
     def move_selection(self, step):
         count = self._layout.count() - 1
