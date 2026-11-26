@@ -34,7 +34,8 @@ jobs:
           python-version: '3.12'
       - name: Install pinned Graphify
         run: |
-          python -m pip install --disable-pip-version-check graphifyy==0.9.120
+          python -m pip install --disable-pip-version-check 'graphifyy[sql]==0.9.120'
+          python -c 'import tree_sitter_sql; from tree_sitter import Language, Parser; Parser(Language(tree_sitter_sql.language()))'
           graphify --version
       - name: Extract and validate code graph without AI
         shell: bash
@@ -71,6 +72,17 @@ jobs:
           files.discard("")
           for expected in ("core/costing.py", "infra/inventory.py", "ui/pos_page.py"):
               assert any(f == expected or f.endswith("/" + expected) for f in files), expected
+          # Every SQL migration must have a real source-file node.
+          root = Path(os.environ["GITHUB_WORKSPACE"]) / "morv"
+          sql_files = {p.relative_to(root).as_posix() for p in root.rglob("*.sql")}
+          assert sql_files, "No SQL sources found"
+          sql_covered = {
+              path for path in sql_files
+              if any(f == path or f.endswith("/" + path) for f in files)
+          }
+          missing = sorted(sql_files - sql_covered)
+          assert not missing, f"SQL sources missing from graph: {missing}"
+          print(f"SQL source coverage: {len(sql_covered)}/{len(sql_files)}")
           for name in ("graph.json", "graph.html", "GRAPH_REPORT.md"):
               assert (out / name).is_file() and (out / name).stat().st_size, name
           version = importlib.metadata.version("graphifyy")
@@ -84,6 +96,8 @@ jobs:
               "nodes": len(nodes),
               "links": len(links),
               "source_files": len(files),
+              "sql_files_expected": len(sql_files),
+              "sql_files_covered": len(sql_covered),
               "relations": dict(sorted(Counter(str(e.get("relation", "unknown")) for e in links).items())),
               "run_id": os.environ["GITHUB_RUN_ID"],
               "limitations": "Static navigation aid; not proof of complete dependencies or current business semantics."
@@ -137,6 +151,7 @@ jobs:
           graph = json.loads((out / "graph.json").read_text())
           assert meta["source_commit"] == graph["built_at_commit"] == os.environ["GITHUB_SHA"]
           assert meta["llm_tokens"] == {"input": 0, "output": 0}
+          assert meta["sql_files_expected"] == meta["sql_files_covered"] > 0
           PY
           git fetch --no-tags origin refs/heads/main
           latest="$(git rev-parse FETCH_HEAD)"

@@ -16,3 +16,12 @@ Use the repository's actual source at the current commit as the authority. Also 
 5. Never merge generated map branches into main or edit their generated files as a substitute for fixing source. Keep existing engineering approval and verification rules.
 
 If Graphify's metadata commit differs from the current commit, inspect relevant source changes before using the map. Graphify does not cover tests or repository-wide documentation. A successful map build is not evidence that the application or its accounting is correct.
+
+## Keep development tooling outside the product
+
+- Never merge `graphify-maps` or `knowledge-maps` into `main`; publish generated files only to their designated branches.
+- Do not add Graphify, Understand Anything, or their dependencies to `requirements.txt` or the application/build dependency list in `requirements-dev.txt`. Install Graphify only in its independent workflow or an isolated development environment.
+- Never ship generated graphs, reports, caches, tools or their dependencies inside the application, EXE, or installer.
+- Do not introduce a runtime integration layer, synchronization service, or adapter between the two tools. Keep integration at the level of shared guidance and targeted queries only.
+- Keep the existing application, CI and packaging paths independent of knowledge-map generation. Do not make product startup, builds or business operations depend on either tool.
+- A map must cover all tracked SQL migrations before publication; coverage means source-file representation, not proof that every SQL statement or relationship was extracted correctly.
