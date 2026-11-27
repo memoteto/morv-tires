@@ -1,4 +1,4 @@
-"""P04-4a: pure rate-resolution and base/tax split, no DB, no Qt."""
+"""P04-4a/4b: pure rate-resolution, inclusive/exclusive split and the purchase-line split, no DB."""
 import unittest
 
 from morv.core import money, tax
@@ -138,6 +138,85 @@ class InclusiveExclusiveConsistencyTest(unittest.TestCase):
                 total = net + amount
                 self.assertEqual(tax.split_inclusive(total, rate), (net, amount),
                                  msg=f"rate={rate} net={net} total={total}")
+
+
+class PurchaseLineSplitTest(unittest.TestCase):
+    """P04-4b: per-line tax base/tax/cost split for a purchase invoice (freight already in
+    net_total per P01). Invariants proven by a 20,000-case randomized stress test before these
+    were written: inclusive mode cost_amount+tax_amount==net_total; exclusive mode
+    cost_amount==net_total and cost_amount+tax_amount==net_total+tax_amount.
+    """
+
+    def test_zero_rate_leaves_everything_in_cost_both_modes(self):
+        for inclusive in (True, False):
+            for taxable in (True, False):
+                base, tax_amount, cost = tax.purchase_line_split(10000, 2000, taxable, 0, inclusive)
+                self.assertEqual(tax_amount, 0)
+                self.assertEqual(cost, 10000)
+                self.assertEqual(base, 10000 if taxable else 8000)
+
+    def test_exclusive_mode_tax_is_additive_cost_unchanged(self):
+        base, tax_amount, cost = tax.purchase_line_split(10000, 0, True, 1400, False)
+        self.assertEqual(base, 10000)
+        self.assertEqual(tax_amount, 1400)
+        self.assertEqual(cost, 10000)
+
+    def test_inclusive_mode_tax_is_carved_out_of_net_total(self):
+        base, tax_amount, cost = tax.purchase_line_split(11400, 0, True, 1400, True)
+        self.assertEqual(tax_amount, 1400)
+        self.assertEqual(cost + tax_amount, 11400)
+
+    def test_freight_not_taxable_excluded_from_base_but_kept_in_cost_exclusive(self):
+        # net_total=10700 includes a 700 freight_share; base for tax is only the 10000 goods part.
+        base, tax_amount, cost = tax.purchase_line_split(10700, 700, False, 1400, False)
+        self.assertEqual(base, 10000)
+        self.assertEqual(tax_amount, 1400)
+        self.assertEqual(cost, 10700)  # freight stays in cost, untaxed
+
+    def test_freight_not_taxable_excluded_from_base_but_kept_in_cost_inclusive(self):
+        base, tax_amount, cost = tax.purchase_line_split(11400, 700, False, 1400, True)
+        net_goods, tax_amount_expected = tax.split_inclusive(11400 - 700, 1400)
+        self.assertEqual(base, net_goods)
+        self.assertEqual(tax_amount, tax_amount_expected)
+        self.assertEqual(cost + tax_amount, 11400)
+
+    def test_freight_taxable_is_included_in_base(self):
+        base, tax_amount, cost = tax.purchase_line_split(10700, 700, True, 1400, False)
+        self.assertEqual(base, 10700)
+        self.assertEqual(tax_amount, tax.tax_on_exclusive(10700, 1400))
+
+    def test_randomized_invariants_hold(self):
+        import random
+        rng = random.Random(4)
+        for _ in range(2000):
+            net_total = rng.randint(0, 5_000_000)
+            freight_share = rng.randint(0, net_total)
+            freight_taxable = rng.choice((True, False))
+            rate_bp = rng.choice((0, 50, 137, 1400, 9999, 15000))
+            for inclusive in (True, False):
+                base, tax_amount, cost = tax.purchase_line_split(
+                    net_total, freight_share, freight_taxable, rate_bp, inclusive)
+                if inclusive:
+                    self.assertEqual(cost + tax_amount, net_total)
+                else:
+                    self.assertEqual(cost, net_total)
+                    self.assertEqual(cost + tax_amount, net_total + tax_amount)
+                self.assertGreaterEqual(tax_amount, 0)
+                self.assertGreaterEqual(cost, 0)
+
+    def test_rejects_negative_and_bad_types(self):
+        with self.assertRaises(money.MoneyError):
+            tax.purchase_line_split(-1, 0, True, 1400, False)
+        with self.assertRaises(money.MoneyError):
+            tax.purchase_line_split(1000, -1, True, 1400, False)
+        with self.assertRaises(money.MoneyError):
+            tax.purchase_line_split(1000, 0, True, -1, False)
+        with self.assertRaises(money.MoneyError):
+            tax.purchase_line_split(1000.0, 0, True, 1400, False)
+
+    def test_rejects_freight_share_larger_than_net_total(self):
+        with self.assertRaises(money.MoneyError):
+            tax.purchase_line_split(1000, 1001, True, 1400, False)
 
 
 if __name__ == "__main__":
