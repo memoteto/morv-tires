@@ -17,6 +17,46 @@ class ResolveRateTest(unittest.TestCase):
     def test_zero_rated_is_zero(self):
         self.assertEqual(tax.resolve_rate("zero", None, 1400), 0)
 
+    def test_rejects_unknown_treatment(self):
+        with self.assertRaises(money.MoneyError):
+            tax.resolve_rate("half", None, 1400)
+
+    def test_rejects_non_int_item_rate(self):
+        for bad in (14.0, "1400", True):
+            with self.assertRaises(money.MoneyError, msg=repr(bad)):
+                tax.resolve_rate("standard", bad, 1400)
+
+    def test_rejects_non_int_general_rate(self):
+        for bad in (14.0, "1400", None):
+            with self.assertRaises(money.MoneyError, msg=repr(bad)):
+                tax.resolve_rate("standard", None, bad)
+
+    def test_rejects_negative_rates(self):
+        with self.assertRaises(money.MoneyError):
+            tax.resolve_rate("standard", -1, 1400)
+        with self.assertRaises(money.MoneyError):
+            tax.resolve_rate("standard", None, -1)
+
+
+class TaxOnExclusiveTest(unittest.TestCase):
+    def test_14pct_of_10000_is_1400(self):
+        self.assertEqual(tax.tax_on_exclusive(10000, 1400), 1400)
+
+    def test_zero_rate_is_zero(self):
+        self.assertEqual(tax.tax_on_exclusive(10000, 0), 0)
+
+    def test_rejects_negative_base(self):
+        with self.assertRaises(money.MoneyError):
+            tax.tax_on_exclusive(-1, 1400)
+
+    def test_rejects_non_int_inputs(self):
+        for bad_base in (10000.0, "10000"):
+            with self.assertRaises(money.MoneyError, msg=repr(bad_base)):
+                tax.tax_on_exclusive(bad_base, 1400)
+        for bad_rate in (1400.0, "1400", None):
+            with self.assertRaises(money.MoneyError, msg=repr(bad_rate)):
+                tax.tax_on_exclusive(10000, bad_rate)
+
 
 class SplitInclusiveTest(unittest.TestCase):
     def test_14pct_reconstructs_exactly(self):
@@ -31,7 +71,15 @@ class SplitInclusiveTest(unittest.TestCase):
         with self.assertRaises(money.MoneyError):
             tax.split_inclusive(-1, 1400)
 
-    def test_always_reconstructs_exactly_across_a_range(self):
+    def test_rejects_non_int_inputs(self):
+        for bad_total in (10000.0, "10000"):
+            with self.assertRaises(money.MoneyError, msg=repr(bad_total)):
+                tax.split_inclusive(bad_total, 1400)
+        for bad_rate in (1400.0, "1400", None):
+            with self.assertRaises(money.MoneyError, msg=repr(bad_rate)):
+                tax.split_inclusive(10000, bad_rate)
+
+    def test_always_reconstructs_the_total_exactly_across_a_range(self):
         for total in range(0, 500):
             for rate in (0, 500, 1400, 2000):
                 net, amount = tax.split_inclusive(total, rate)
@@ -40,16 +88,27 @@ class SplitInclusiveTest(unittest.TestCase):
                 self.assertGreaterEqual(amount, 0)
 
 
-class TaxOnExclusiveTest(unittest.TestCase):
-    def test_14pct_of_10000_is_1400(self):
-        self.assertEqual(tax.tax_on_exclusive(10000, 1400), 1400)
+class InclusiveExclusiveConsistencyTest(unittest.TestCase):
+    """The owner's finding on PR #175: a floor-only split_inclusive disagreed with
+    tax_on_exclusive on the very same sale. net=10, tax=1 (14%) gives total=11; decoding
+    11 back used to yield (9, 2) -- a different tax on the same invoice depending only on
+    which price mode was used. This is the reproduction plus the permanent regression guard.
+    """
 
-    def test_zero_rate_is_zero(self):
-        self.assertEqual(tax.tax_on_exclusive(10000, 0), 0)
+    def test_owners_exact_example_round_trips(self):
+        net, tax_amount = 10, tax.tax_on_exclusive(10, 1400)
+        self.assertEqual(tax_amount, 1)
+        total = net + tax_amount
+        self.assertEqual(total, 11)
+        self.assertEqual(tax.split_inclusive(total, 1400), (net, tax_amount))
 
-    def test_rejects_negative_base(self):
-        with self.assertRaises(money.MoneyError):
-            tax.tax_on_exclusive(-1, 1400)
+    def test_every_rate_and_exclusive_net_round_trips_through_the_inclusive_total(self):
+        for rate in (0, 500, 1400, 1437, 2000, 10000):
+            for net in range(0, 400):
+                amount = tax.tax_on_exclusive(net, rate)
+                total = net + amount
+                self.assertEqual(tax.split_inclusive(total, rate), (net, amount),
+                                 msg=f"rate={rate} net={net} total={total}")
 
 
 if __name__ == "__main__":
