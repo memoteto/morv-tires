@@ -4,12 +4,12 @@
 - cluster-only mode — file stats not available
 
 ## Summary
-- 2664 nodes · 5683 edges · 138 communities (83 shown, 55 thin omitted)
+- 2674 nodes · 5696 edges · 154 communities (85 shown, 69 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 249 edges (avg confidence: 0.94)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2566c647`
+- Built from commit: `278869d1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -44,6 +44,7 @@
 - Community 27
 - Community 28
 - Community 29
+- Community 30
 - Community 31
 - Community 32
 - Community 33
@@ -60,13 +61,13 @@
 - Community 44
 - Community 45
 - Community 46
-- Community 47
-- Community 48
 - Community 49
 - Community 50
 - Community 51
 - Community 52
 - Community 53
+- Community 54
+- Community 55
 - Community 56
 - Community 57
 - Community 58
@@ -94,9 +95,9 @@
 - Community 80
 - Community 81
 - Community 82
+- Community 83
 - Community 84
 - Community 85
-- Community 86
 - Community 87
 - Community 88
 - Community 89
@@ -107,6 +108,7 @@
 - Community 94
 - Community 95
 - Community 96
+- Community 97
 - Community 98
 - Community 99
 - Community 100
@@ -114,7 +116,6 @@
 - Community 102
 - Community 103
 - Community 104
-- Community 105
 - Community 106
 - Community 107
 - Community 108
@@ -131,7 +132,22 @@
 - Community 119
 - Community 120
 - Community 121
+- Community 122
 - Community 123
+- Community 124
+- Community 125
+- Community 126
+- Community 127
+- Community 128
+- Community 129
+- Community 130
+- Community 131
+- Community 132
+- Community 133
+- Community 134
+- Community 135
+- Community 136
+- Community 137
 
 ## God Nodes (most connected - your core abstractions)
 1. `PosPage` - 61 edges
@@ -146,371 +162,379 @@
 10. `ReportsPage` - 27 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `post_sale()` --uses--> `Payment`  [INFERRED]
-  infra/sales.py → core/sales_rules.py
-- `DepositDialog` --uses--> `DepositError`  [INFERRED]
-  ui/deposit_dialogs.py → infra/customer_deposits.py
-- `ReverseDepositDialog` --uses--> `DepositError`  [INFERRED]
-  ui/deposit_dialogs.py → infra/customer_deposits.py
-- `ReverseInterestDialog` --uses--> `ReversalError`  [INFERRED]
-  ui/interest_dialogs.py → infra/interest_reversal.py
+- `PosPage` --uses--> `MoneyError`  [INFERRED]
+  ui/pos_page.py → core/money.py
 - `PosPage` --uses--> `SaleError`  [INFERRED]
   ui/pos_page.py → infra/sales.py
+- `ReversePurchaseReturnDialog` --uses--> `PurchaseReturnError`  [INFERRED]
+  ui/purchase_return_dialogs.py → infra/purchase_returns.py
+- `PurchaseReturnDialog` --uses--> `MoneyError`  [INFERRED]
+  ui/purchase_return_dialogs.py → core/money.py
+- `CustomerStatementDialog` --uses--> `MoneyError`  [INFERRED]
+  ui/customer_statement_dialog.py → core/money.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (138 total, 55 thin omitted)
+## Communities (154 total, 69 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.05
-Nodes (34): _check_backing(), DepositError, _digest(), history(), _key(), _lines(), _post(), post_document() (+26 more)
-
-### Community 1 - "Community 1"
 Cohesion: 0.06
 Nodes (4): SaleLineIn, _ElidedSummary, FoldableDetails, PosPage
 
-### Community 2 - "Community 2"
+### Community 1 - "Community 1"
 Cohesion: 0.07
 Nodes (41): _band(), body_html(), _contact_bar(), content_px(), Document, document_html(), footer_html(), _gap() (+33 more)
 
-### Community 3 - "Community 3"
+### Community 2 - "Community 2"
 Cohesion: 0.05
-Nodes (33): calculate(), EirCashflow, EirError, EirMonth, EirSchedule, _iso(), _month_end(), _next_month() (+25 more)
+Nodes (29): book_snapshot(), cancel_closing(), close_day(), close_in_tx(), Closed, ClosingError, coverage(), Coverage (+21 more)
 
-### Community 4 - "Community 4"
+### Community 3 - "Community 3"
 Cohesion: 0.07
 Nodes (34): account_choices(), account_statement(), _aligned(), _bp_text(), build(), _cell(), collections(), credit_aging() (+26 more)
 
-### Community 5 - "Community 5"
+### Community 4 - "Community 4"
 Cohesion: 0.06
 Nodes (18): _allocate_freight(), _check_items(), compute_allocations(), last_cost(), _legacy_payload_hash(), LineAllocation, next_number_preview(), _payload_hash() (+10 more)
 
-### Community 6 - "Community 6"
+### Community 5 - "Community 5"
 Cohesion: 0.05
 Nodes (58): cost_layers, cost_layers_fixed, cost_layers_no_delete, cost_layers_open, purchase_lines, purchase_lines_item, purchase_lines_no_delete, purchase_lines_no_update (+50 more)
 
+### Community 6 - "Community 6"
+Cohesion: 0.06
+Nodes (28): book_value(), _check_picks(), issue(), issue_in_tx(), IssueResult, _lots(), reconcile(), StockError (+20 more)
+
 ### Community 7 - "Community 7"
 Cohesion: 0.05
-Nodes (9): AdaptiveFields, AdaptiveSplit, FormBody, HeaderPlacement, InvoiceWorkspace, PageFrame, scroll_content(), PrintingTab (+1 more)
+Nodes (22): blockers(), _digest(), _interest_blockers(), latest_lock(), lock_period(), Locked, LockError, _require() (+14 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.06
-Nodes (28): DotError, mfg_key(), parse_dot(), size_search_key(), mobile(), national_id(), suggest_item_code(), tire_size() (+20 more)
-
-### Community 9 - "Community 9"
-Cohesion: 0.06
-Nodes (18): _digest(), history(), _key(), post_return(), PostedReturn, preview_book_total(), PurchaseReturnError, _require() (+10 more)
-
-### Community 10 - "Community 10"
-Cohesion: 0.07
-Nodes (18): _clean(), create(), Customer, CustomerError, delete(), _duplicate(), _from_row(), get() (+10 more)
-
-### Community 11 - "Community 11"
 Cohesion: 0.07
 Nodes (25): _account_ok(), add_partner(), close_and_hand_over(), _digest(), expense_accounts(), _key(), list_partners(), movement_info() (+17 more)
 
-### Community 12 - "Community 12"
-Cohesion: 0.07
-Nodes (27): book_snapshot(), cancel_closing(), close_day(), close_in_tx(), Closed, ClosingError, coverage(), Coverage (+19 more)
-
-### Community 13 - "Community 13"
+### Community 9 - "Community 9"
 Cohesion: 0.10
 Nodes (33): is_complete(), run_first_setup(), SetupError, _active_managers(), audit(), AuthError, change_own_password(), check_new_user() (+25 more)
 
-### Community 14 - "Community 14"
+### Community 10 - "Community 10"
+Cohesion: 0.08
+Nodes (16): _digest(), history(), _key(), post_return(), PostedReturn, preview_book_total(), PurchaseReturnError, _require() (+8 more)
+
+### Community 11 - "Community 11"
 Cohesion: 0.08
 Nodes (14): _installment_settlement(), InstallmentSettlement, _issue_parts(), _payload_hash(), post_return(), PostedReturn, preview_installment_refund(), _refund_method() (+6 more)
 
-### Community 15 - "Community 15"
+### Community 12 - "Community 12"
+Cohesion: 0.09
+Nodes (19): add_custom_field(), all_fields(), by_barcode(), _clean(), create(), delete(), Field, fields() (+11 more)
+
+### Community 13 - "Community 13"
 Cohesion: 0.10
 Nodes (24): _check_key(), choices(), _clearing_zero(), current(), _digest(), _entry(), _header(), opening_of() (+16 more)
 
-### Community 17 - "Community 17"
+### Community 14 - "Community 14"
+Cohesion: 0.10
+Nodes (16): _clean(), create(), Customer, CustomerError, delete(), _duplicate(), _from_row(), get() (+8 more)
+
+### Community 15 - "Community 15"
 Cohesion: 0.11
 Nodes (22): AdjustLine, _digest(), _entry_lines(), _gain_cost(), history(), _new_header(), post_adjustment(), PostedAdjustment (+14 more)
 
-### Community 18 - "Community 18"
+### Community 17 - "Community 17"
 Cohesion: 0.12
 Nodes (15): cancel(), _digest(), drifted(), gaps(), history(), _key(), latest(), program_balance() (+7 more)
 
-### Community 19 - "Community 19"
+### Community 18 - "Community 18"
 Cohesion: 0.11
 Nodes (32): cost_allocations, cost_allocations_issue, cost_allocations_layer, cost_allocations_no_delete, cost_allocations_no_update, journal_entries, journal_entries_no_delete, journal_entries_no_update (+24 more)
 
-### Community 20 - "Community 20"
+### Community 19 - "Community 19"
 Cohesion: 0.13
 Nodes (16): _digest(), distribute(), _key(), latest_distribution(), Posted, preview(), Preview, ProfitError (+8 more)
 
-### Community 21 - "Community 21"
-Cohesion: 0.15
-Nodes (20): hash_password(), _b64(), _check_ring(), _derive(), fingerprint(), matches(), new_keyring(), open_vault() (+12 more)
+### Community 20 - "Community 20"
+Cohesion: 0.17
+Nodes (24): BackupInfo, BackupResult, _checked_device_dek(), copy_to_usb(), create_backup(), device_dek(), device_key_state(), health() (+16 more)
 
-### Community 22 - "Community 22"
+### Community 21 - "Community 21"
 Cohesion: 0.11
 Nodes (3): _cell_text(), ReportsPage, _Rows
 
-### Community 23 - "Community 23"
+### Community 22 - "Community 22"
 Cohesion: 0.14
 Nodes (16): applied_deposits(), cash_refunded(), collected_unrefunded(), customer_balance(), deposit_balance(), _digest(), history(), _key() (+8 more)
 
-### Community 24 - "Community 24"
-Cohesion: 0.15
-Nodes (22): BackupInfo, change_backup_password(), _checked_device_dek(), device_dek(), device_key_state(), health(), _keyring(), list_backups() (+14 more)
+### Community 23 - "Community 23"
+Cohesion: 0.10
+Nodes (3): _like(), lots(), summary()
 
-### Community 27 - "Community 27"
-Cohesion: 0.15
-Nodes (11): _clean(), create(), delete(), _duplicate(), get(), has_documents(), Supplier, SupplierError (+3 more)
-
-### Community 29 - "Community 29"
+### Community 26 - "Community 26"
 Cohesion: 0.12
 Nodes (4): PartyInfoStrip, PartyPopup, PartySearch, phone_query()
 
-### Community 31 - "Community 31"
+### Community 27 - "Community 27"
+Cohesion: 0.12
+Nodes (13): _has_users(), _snapshot(), _apply_pragmas(), db_path(), _is_empty(), NestedTransaction, open_db(), open_reader() (+5 more)
+
+### Community 28 - "Community 28"
 Cohesion: 0.14
 Nodes (23): installment_contracts, installment_contracts_customer, installment_contracts_no_delete, installment_contracts_no_update, installment_rows, installment_rows_due, installment_rows_no_delete, installment_rows_no_update (+15 more)
 
-### Community 32 - "Community 32"
+### Community 29 - "Community 29"
 Cohesion: 0.17
 Nodes (16): check(), clean(), _clean_identity(), _clean_print(), load(), put(), _put_fields(), save() (+8 more)
 
-### Community 34 - "Community 34"
-Cohesion: 0.11
-Nodes (7): ask(), Confirm, info(), Message, Modal, RestoreConfirmDialog, Notice
+### Community 31 - "Community 31"
+Cohesion: 0.13
+Nodes (13): allocate(), check_payments(), Payment, SaleRuleError, _check_customer(), _check_items(), _check_pricing(), next_number_preview() (+5 more)
 
-### Community 35 - "Community 35"
+### Community 32 - "Community 32"
 Cohesion: 0.14
 Nodes (24): cost_allocations, cost_allocations_issue, cost_allocations_layer, cost_allocations_no_delete, cost_allocations_no_update, cost_allocations_return, sale_return_lines, sale_return_lines_no_delete (+16 more)
 
-### Community 36 - "Community 36"
+### Community 33 - "Community 33"
 Cohesion: 0.15
 Nodes (23): cost_allocations, cost_allocations_issue, cost_allocations_layer, cost_allocations_no_delete, cost_allocations_no_update, cost_allocations_purchase_return, cost_allocations_return, purchase_return_lines (+15 more)
 
-### Community 37 - "Community 37"
-Cohesion: 0.13
-Nodes (5): AppearanceTab, AuditTab, SettingsPage, ShortcutsTab, _table()
+### Community 34 - "Community 34"
+Cohesion: 0.11
+Nodes (11): action_row(), ask(), confirm_discard_invoice(), danger_button(), deferred_button(), form(), icon_button(), menu_button() (+3 more)
 
-### Community 38 - "Community 38"
-Cohesion: 0.15
-Nodes (3): BackupTab, SecretDialog, ShowKeyDialog
-
-### Community 39 - "Community 39"
-Cohesion: 0.13
-Nodes (13): _cannot_open(), main(), do_logout(), do_restore(), _scheduled(), _scheduled_done(), show_login(), _mark() (+5 more)
-
-### Community 40 - "Community 40"
+### Community 35 - "Community 35"
 Cohesion: 0.13
 Nodes (3): _extra_spec(), _ItemPopup, ItemSearch
 
-### Community 42 - "Community 42"
+### Community 36 - "Community 36"
+Cohesion: 0.14
+Nodes (13): _cannot_open(), main(), do_logout(), do_restore(), _scheduled(), _scheduled_done(), show_login(), _mark() (+5 more)
+
+### Community 37 - "Community 37"
+Cohesion: 0.19
+Nodes (12): _check_backing(), DepositError, _digest(), history(), _key(), _lines(), _post(), post_document() (+4 more)
+
+### Community 38 - "Community 38"
+Cohesion: 0.10
+Nodes (3): QuickPartyDialog, QuickCustomerDialog, _NewSupplierDialog
+
+### Community 41 - "Community 41"
 Cohesion: 0.13
 Nodes (18): app_meta, backup_runs, backup_runs_time, settings, audit_log, audit_log_time, backup_runs_new, backup_runs_time (+10 more)
 
-### Community 43 - "Community 43"
+### Community 42 - "Community 42"
 Cohesion: 0.17
 Nodes (20): accounts, customer_vehicles, customer_vehicles_customer, customer_vehicles_plate, customers, customers_name_norm, item_attrs, item_attrs_key_value (+12 more)
 
-### Community 44 - "Community 44"
-Cohesion: 0.20
-Nodes (13): add_custom_field(), by_barcode(), _clean(), create(), delete(), get(), has_documents(), Item (+5 more)
-
-### Community 45 - "Community 45"
+### Community 43 - "Community 43"
 Cohesion: 0.11
-Nodes (3): ReverseDialog, _RowsWithBalances, TreasuryPage
+Nodes (6): ask(), Confirm, info(), Message, Modal, ReverseDialog
+
+### Community 44 - "Community 44"
+Cohesion: 0.14
+Nodes (5): AppearanceTab, AuditTab, SettingsPage, ShortcutsTab, _table()
 
 ### Community 46 - "Community 46"
-Cohesion: 0.13
-Nodes (3): DepositDialog, ReceiptDialog, DateEdit
-
-### Community 47 - "Community 47"
-Cohesion: 0.12
-Nodes (3): ContractsPage, _RowsWithKpis, InterestRecognitionDialog
-
-### Community 48 - "Community 48"
-Cohesion: 0.18
-Nodes (9): _apply_pragmas(), db_path(), _is_empty(), NestedTransaction, open_db(), open_reader(), read_app_id(), transaction() (+1 more)
-
-### Community 49 - "Community 49"
 Cohesion: 0.17
 Nodes (14): _category(), collection_view(), CollectionView, CollectRow, ContractView, count(), get_contract(), invoice_for_contract() (+6 more)
 
+### Community 49 - "Community 49"
+Cohesion: 0.22
+Nodes (10): _b64(), _derive(), fingerprint(), matches(), new_keyring(), rewrap_password(), rewrap_recovery(), seal() (+2 more)
+
 ### Community 50 - "Community 50"
 Cohesion: 0.20
-Nodes (11): blockers(), _digest(), _interest_blockers(), latest_lock(), lock_period(), Locked, LockError, _require() (+3 more)
+Nodes (9): calculate(), EirCashflow, EirError, EirMonth, EirSchedule, _iso(), _month_end(), _next_month() (+1 more)
 
 ### Community 51 - "Community 51"
-Cohesion: 0.15
-Nodes (4): _Receiver, run_async(), wait_all(), _Worker
-
-### Community 52 - "Community 52"
 Cohesion: 0.20
 Nodes (10): collect_payment(), ContractError, Guarantor, _hash(), _payment_hash(), post_contract(), PostedContract, PostedPayment (+2 more)
 
 ### Community 53 - "Community 53"
-Cohesion: 0.23
-Nodes (12): BackupError, BackupResult, copy_to_usb(), create_backup(), is_encryption_ready(), _now_s(), _record(), restore_test() (+4 more)
+Cohesion: 0.24
+Nodes (8): _closed_month_end(), evaluate(), _has_generation(), PostedRecognition, recognise_in_tx(), recognise_month(), RecognitionError, _schedule_hash()
 
-### Community 56 - "Community 56"
-Cohesion: 0.12
-Nodes (7): action_row(), danger_button(), deferred_button(), icon_button(), InvoiceTotal, menu_button(), primary_button()
-
-### Community 57 - "Community 57"
+### Community 54 - "Community 54"
 Cohesion: 0.20
 Nodes (8): allocate(), fmt(), MoneyError, parse_money(), percent_of(), to_latin(), norm_ar(), scanner_fix()
 
-### Community 58 - "Community 58"
-Cohesion: 0.14
-Nodes (4): allocate(), check_payments(), Payment, SaleRuleError
-
-### Community 59 - "Community 59"
-Cohesion: 0.16
-Nodes (8): ask(), chip(), confirm_discard_invoice(), form(), kbd(), kpi_tile(), muted(), section_card()
-
-### Community 62 - "Community 62"
+### Community 55 - "Community 55"
 Cohesion: 0.21
-Nodes (6): setup_logging(), backups_dir(), data_dir(), db_path(), logs_dir(), looks_synced_or_network()
+Nodes (8): default_through(), Item, month_end(), _periods(), post_ready(), PostResult, review(), _scheduled()
 
-### Community 63 - "Community 63"
+### Community 58 - "Community 58"
 Cohesion: 0.22
 Nodes (10): count(), customer_stats(), get_sale(), _like(), list_sales(), refund_methods(), returnable_lines(), ReturnableLine (+2 more)
 
-### Community 64 - "Community 64"
-Cohesion: 0.13
-Nodes (4): party_field(), QuickPartyDialog, QuickCustomerDialog, _NewSupplierDialog
-
-### Community 65 - "Community 65"
+### Community 59 - "Community 59"
 Cohesion: 0.20
 Nodes (3): NewUserDialog, TempPasswordDialog, UsersTab
 
-### Community 66 - "Community 66"
+### Community 60 - "Community 60"
 Cohesion: 0.24
 Nodes (6): _dpapi(), forget_dek(), key_path(), KeystoreError, load_dek(), save_dek()
 
-### Community 67 - "Community 67"
+### Community 61 - "Community 61"
 Cohesion: 0.23
 Nodes (8): add_months(), _check_date(), _days_in_month(), Instalment, InstalmentError, markup_of(), Plan, plan()
 
-### Community 68 - "Community 68"
+### Community 62 - "Community 62"
 Cohesion: 0.32
 Nodes (7): _cashflows(), _day(), ModificationError, ModificationValuation, _money(), _present_value(), remeasure()
 
-### Community 69 - "Community 69"
-Cohesion: 0.22
-Nodes (8): account_balance(), incomplete_entries(), LedgerError, locked_through(), open_entries(), post_entry(), unbalanced_entries(), valid_date()
+### Community 63 - "Community 63"
+Cohesion: 0.19
+Nodes (5): size_search_key(), suggest_item_code(), export_pdf(), _rich(), table_html()
 
-### Community 70 - "Community 70"
+### Community 64 - "Community 64"
+Cohesion: 0.33
+Nodes (9): Alert, _collections_in(), DashboardView, _due_alerts(), get(), _old_dot_alert(), _period_start(), _safe_alert() (+1 more)
+
+### Community 65 - "Community 65"
+Cohesion: 0.23
+Nodes (6): setup_logging(), backups_dir(), data_dir(), db_path(), logs_dir(), looks_synced_or_network()
+
+### Community 67 - "Community 67"
+Cohesion: 0.32
+Nodes (8): BackupError, _discard(), _fsync(), _fsync_dir(), _keep_damaged(), restore_file(), _settle_live_db(), _sidecars()
+
+### Community 69 - "Community 69"
 Cohesion: 0.28
 Nodes (12): installment_return_adjustments, installment_return_adjustments_contract, installment_return_adjustments_no_delete, installment_return_adjustments_no_update, installment_return_allocations, installment_return_allocations_no_delete, installment_return_allocations_no_update, installment_return_allocations_row (+4 more)
 
-### Community 71 - "Community 71"
+### Community 70 - "Community 70"
 Cohesion: 0.29
 Nodes (12): profit_distribution_lines, profit_distribution_lines_no_delete, profit_distribution_lines_no_update, profit_distributions, profit_distributions_no_delete, profit_distributions_no_update, profit_share_lines, profit_share_lines_no_delete (+4 more)
+
+### Community 71 - "Community 71"
+Cohesion: 0.32
+Nodes (8): applied(), _checksum(), current_version(), load_migrations(), migrate(), Migration, MigrationError, pending()
 
 ### Community 72 - "Community 72"
 Cohesion: 0.22
 Nodes (6): build(), Line, period_range(), Statement, _sums(), table_rows()
 
 ### Community 75 - "Community 75"
-Cohesion: 0.20
-Nodes (4): parse_percent(), reserve_for(), ShareError, split()
+Cohesion: 0.18
+Nodes (8): chip(), field(), field_label(), kbd(), kpi_tile(), kv_row(), muted(), ro_field()
 
 ### Community 76 - "Community 76"
-Cohesion: 0.35
-Nodes (9): _discard(), _fsync(), _fsync_dir(), _has_users(), _keep_damaged(), restore_file(), _settle_live_db(), _sidecars() (+1 more)
+Cohesion: 0.20
+Nodes (3): get_invoice(), InvoiceLine, InvoiceView
 
 ### Community 77 - "Community 77"
-Cohesion: 0.32
-Nodes (11): active_opening_lines, opening_balance_lines, opening_balance_lines_customer, opening_balance_lines_no_delete, opening_balance_lines_no_update, opening_balance_lines_supplier, opening_balances, opening_balances_no_delete (+3 more)
+Cohesion: 0.23
+Nodes (4): PostedReversal, ReversalError, reverse(), reversible()
 
 ### Community 78 - "Community 78"
-Cohesion: 0.26
-Nodes (7): account_names(), balances(), count(), EntryView, get_entry(), movements(), _where()
+Cohesion: 0.32
+Nodes (11): active_opening_lines, opening_balance_lines, opening_balance_lines_customer, opening_balance_lines_no_delete, opening_balance_lines_no_update, opening_balance_lines_supplier, opening_balances, opening_balances_no_delete (+3 more)
 
 ### Community 79 - "Community 79"
 Cohesion: 0.21
 Nodes (3): CustomerDocumentsDialog, ReverseDepositDialog, ReverseReceiptDialog
 
 ### Community 80 - "Community 80"
+Cohesion: 0.22
+Nodes (4): parse_percent(), reserve_for(), ShareError, split()
+
+### Community 81 - "Community 81"
+Cohesion: 0.35
+Nodes (9): _check_ring(), open_vault(), opens_with(), read_header(), _read_header(), _unb64(), unlock(), _unwrap() (+1 more)
+
+### Community 82 - "Community 82"
 Cohesion: 0.29
 Nodes (7): apply(), available_fonts(), colors(), load_bundled_fonts(), palette(), pick_font(), qss()
 
-### Community 85 - "Community 85"
+### Community 89 - "Community 89"
 Cohesion: 0.27
 Nodes (4): check_condition(), check_reason(), returnable(), ReturnRuleError
 
-### Community 86 - "Community 86"
+### Community 90 - "Community 90"
+Cohesion: 0.22
+Nodes (3): hash_password(), new_recovery_key(), verify_password()
+
+### Community 91 - "Community 91"
+Cohesion: 0.27
+Nodes (4): _int(), resolve_rate(), split_inclusive(), tax_on_exclusive()
+
+### Community 92 - "Community 92"
+Cohesion: 0.27
+Nodes (4): mobile(), national_id(), tire_size(), ValidationError
+
+### Community 93 - "Community 93"
 Cohesion: 0.38
 Nodes (9): sale_lines, sale_lines_no_delete, sale_lines_no_update, sale_payments, sale_payments_no_delete, sale_payments_no_update, sales, sales_no_delete (+1 more)
 
-### Community 87 - "Community 87"
+### Community 94 - "Community 94"
 Cohesion: 0.20
 Nodes (4): _ContainsCompleter, search_completer(), searchable_edit(), trail_icon()
 
-### Community 94 - "Community 94"
+### Community 102 - "Community 102"
 Cohesion: 0.33
 Nodes (5): InsufficientStock, plan_fifo(), plan_lots(), slice_cost(), take_units()
 
-### Community 96 - "Community 96"
+### Community 103 - "Community 103"
+Cohesion: 0.36
+Nodes (8): change_backup_password(), _keyring(), prepare_keyring(), regenerate_recovery_key(), relink_device(), _save_device_key(), setup_encryption(), store_keyring()
+
+### Community 104 - "Community 104"
 Cohesion: 0.44
 Nodes (8): active_interest_recognitions, interest_recognition_reversals, interest_recognition_reversals_no_delete, interest_recognition_reversals_no_update, interest_recognitions, interest_recognitions_no_delete, interest_recognitions_no_update, interest_recognitions_period
 
-### Community 102 - "Community 102"
+### Community 110 - "Community 110"
+Cohesion: 0.36
+Nodes (4): Statement, statement(), StatementRow, unassigned()
+
+### Community 111 - "Community 111"
 Cohesion: 0.46
 Nodes (7): installment_modifications, installment_modifications_contract, installment_modifications_no_delete, installment_modifications_no_update, installment_modified_cashflows, installment_modified_cashflows_no_delete, installment_modified_cashflows_no_update
 
-### Community 103 - "Community 103"
+### Community 112 - "Community 112"
 Cohesion: 0.32
 Nodes (3): acquire(), release_all(), _try_lock()
 
-### Community 104 - "Community 104"
+### Community 113 - "Community 113"
 Cohesion: 0.43
 Nodes (5): build(), Difference, _live_differences(), PartnerDebt, Report
 
-### Community 106 - "Community 106"
-Cohesion: 0.38
-Nodes (3): _like(), lots(), summary()
+### Community 118 - "Community 118"
+Cohesion: 0.47
+Nodes (3): DotError, mfg_key(), parse_dot()
 
-### Community 109 - "Community 109"
-Cohesion: 0.38
-Nodes (4): field(), field_label(), kv_row(), ro_field()
-
-### Community 110 - "Community 110"
+### Community 119 - "Community 119"
 Cohesion: 0.60
 Nodes (5): cash_closings, cash_closings_date, cash_closings_no_delete, cash_closings_no_update, cash_closings_one_per_date
 
-### Community 113 - "Community 113"
+### Community 126 - "Community 126"
 Cohesion: 0.70
 Nodes (4): safe_counts, safe_counts_no_delete, safe_counts_no_update, safe_counts_one_per_date
 
-### Community 114 - "Community 114"
+### Community 127 - "Community 127"
 Cohesion: 0.60
 Nodes (4): journal_entries_period_locked, period_locks, period_locks_no_delete, period_locks_no_update
 
-### Community 115 - "Community 115"
+### Community 128 - "Community 128"
 Cohesion: 0.70
 Nodes (4): customer_deposits, customer_deposits_no_delete, customer_deposits_no_update, idx_customer_deposits_customer
 
-### Community 119 - "Community 119"
-Cohesion: 0.83
-Nodes (4): all_fields(), Field, fields(), visible_fields()
-
 ## Knowledge Gaps
-- **55 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **69 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PosPage` connect `Community 1` to `Community 0`, `Community 34`, `Community 5`, `Community 7`, `Community 40`, `Community 93`, `Community 56`, `Community 25`, `Community 28`, `Community 29`, `Community 57`?**
-  _High betweenness centrality (0.056) - this node is a cross-community bridge._
+- **Why does `Modal` connect `Community 43` to `Community 1`, `Community 130`, `Community 132`, `Community 133`, `Community 134`, `Community 7`, `Community 135`, `Community 6`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 8`, `Community 17`, `Community 19`, `Community 38`, `Community 39`, `Community 45`, `Community 57`, `Community 59`, `Community 79`, `Community 83`, `Community 99`, `Community 106`, `Community 107`, `Community 109`, `Community 114`, `Community 122`, `Community 124`?**
+  _High betweenness centrality (0.054) - this node is a cross-community bridge._
 - **Are the 14 inferred relationships involving `PosPage` (e.g. with `MoneyError` and `SaleError`) actually correct?**
   _`PosPage` has 14 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.050078247261345854 - nodes in this community are weakly interconnected._
-- **Why does `ListPage` connect `Community 41` to `Community 98`, `Community 9`, `Community 10`, `Community 74`, `Community 45`, `Community 14`, `Community 47`, `Community 112`, `Community 82`, `Community 83`, `Community 84`, `Community 54`, `Community 22`, `Community 27`, `Community 92`?**
-  _High betweenness centrality (0.056) - this node is a cross-community bridge._
+  _Cohesion score 0.056692242114237 - nodes in this community are weakly interconnected._
+- **Why does `PosPage` connect `Community 0` to `Community 96`, `Community 97`, `Community 35`, `Community 4`, `Community 101`, `Community 38`, `Community 54`, `Community 25`, `Community 26`, `Community 124`, `Community 125`, `Community 31`?**
+  _High betweenness centrality (0.053) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `Modal` (e.g. with `Notice` and `BackupTab`) actually correct?**
   _`Modal` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.056692242114237 - nodes in this community are weakly interconnected._
-- **Why does `MainWindow` connect `Community 28` to `Community 33`, `Community 1`, `Community 37`, `Community 39`, `Community 9`, `Community 10`, `Community 107`, `Community 45`, `Community 14`, `Community 82`, `Community 22`, `Community 55`, `Community 27`?**
-  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+  _Cohesion score 0.07459505541346974 - nodes in this community are weakly interconnected._
+- **Why does `MainWindow` connect `Community 25` to `Community 0`, `Community 131`, `Community 36`, `Community 6`, `Community 7`, `Community 10`, `Community 11`, `Community 44`, `Community 14`, `Community 48`, `Community 117`, `Community 85`, `Community 21`, `Community 30`?**
+  _High betweenness centrality (0.047) - this node is a cross-community bridge._
