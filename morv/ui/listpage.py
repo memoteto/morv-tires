@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFrame, QGridLayout
 
 from morv.core.text import RLM
 from morv.infra.db.connection import ClosedDatabase
-from morv.ui import icons, tokens
+from morv.ui import icons, placement, tokens
 from morv.ui.tokens import LAYOUT
 from morv.ui.widgets import icon_button, muted, primary_button
 from morv.ui.workers import run_async
@@ -727,6 +727,24 @@ class ListPage(QWidget):
         self.preview_title.setText(text)
         self.preview_subtitle.setText(sub)
         self.preview_subtitle.setVisible(bool(sub))
+
+    def _feature_button(self, feature, slot, text, on_click, icon_name, enabled):
+        cls = type(self)
+        placement.validate_list_action(feature, cls.__module__.rsplit(".", 1)[-1], cls.__name__, slot)
+        button = icon_button(text, icon_name)
+        button.setEnabled(enabled)
+        button.clicked.connect(on_click)
+        return button
+
+    def header_feature_action(self, feature, text, on_click, icon_name, *, enabled=True):
+        """Return a registered secondary header action from extra_actions()."""
+        return self._feature_button(feature, "page_actions", text, on_click, icon_name, enabled)
+
+    def record_feature_action(self, feature, text, on_click, icon_name, *, enabled=True):
+        """Place a registered action in the selected record's existing preview footer."""
+        button = self._feature_button(feature, "record_actions", text, on_click, icon_name, enabled)
+        self.actions(button)
+        return button
 
     def actions(self, *buttons) -> None:
         if not buttons:
