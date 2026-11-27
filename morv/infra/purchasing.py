@@ -156,6 +156,8 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
         # this line's share of the invoice discount -> + its share of freight.
         gross = [ln.qty * ln.unit_cost for ln in clean]
         after_line_discount = [g - ln.line_discount for g, ln in zip(gross, clean, strict=True)]
+        if invoice_discount > sum(after_line_discount):     # a discount, unlike freight, may never exceed the value it reduces
+            raise PurchaseError("خصم الفاتورة أكبر من صافي قيمة الأصناف بعد خصم السطور")
         try:
             invoice_shares = money.allocate(after_line_discount, invoice_discount)
         except money.MoneyError as e:

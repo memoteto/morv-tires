@@ -28,9 +28,14 @@ class AllocateTest(TestCase):
     def test_zero_total_with_zero_amount_is_allowed(self):
         self.assertEqual(money.allocate([0, 0], 0), [0, 0])
 
-    def test_amount_exceeding_the_total_is_refused(self):
+    def test_zero_total_with_a_positive_amount_is_refused(self):
         with self.assertRaises(money.MoneyError):
-            money.allocate([1, 1], 3)
+            money.allocate([0, 0], 3)
+
+    def test_amount_is_not_bounded_by_the_total_unlike_a_discount(self):
+        # a freight charge, for example, has no reason to be <= the quantities or values
+        # it is weighted by; only a caller-enforced rule (e.g. a discount) bounds it.
+        self.assertEqual(money.allocate([1, 1], 101), [51, 50])
 
     def test_negative_amount_is_refused(self):
         with self.assertRaises(money.MoneyError):

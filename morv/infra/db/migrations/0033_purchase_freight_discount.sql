@@ -12,4 +12,8 @@ ALTER TABLE purchase_lines ADD COLUMN line_discount INTEGER NOT NULL DEFAULT 0 C
 ALTER TABLE purchase_lines ADD COLUMN invoice_share INTEGER NOT NULL DEFAULT 0 CHECK (invoice_share >= 0);
 ALTER TABLE purchase_lines ADD COLUMN freight_share INTEGER NOT NULL DEFAULT 0 CHECK (freight_share >= 0);
 ALTER TABLE purchase_lines ADD COLUMN net_total INTEGER NOT NULL DEFAULT 0 CHECK (net_total >= 0);
+
+-- backfill مرحلي فقط؛ يُعاد إنشاء قيد منع التعديل فورًا بنفس تعريفه الأصلي من 0006.
+DROP TRIGGER purchase_lines_no_update;
 UPDATE purchase_lines SET net_total = line_total;
+CREATE TRIGGER purchase_lines_no_update BEFORE UPDATE ON purchase_lines BEGIN SELECT RAISE(ABORT, 'مستند مرحّل: التعديل ممنوع'); END;

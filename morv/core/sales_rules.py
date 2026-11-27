@@ -22,7 +22,9 @@ class Payment:
 
 
 def allocate(bases: list[int], amount: int) -> list[int]:
-    """Thin wrapper over the shared money.allocate, kept for sales' own exception type/message."""
+    """Thin wrapper over the shared money.allocate: a discount may never exceed the bases' total."""
+    if amount > sum(bases):
+        raise SaleRuleError("الخصم أكبر من قيمة السطور")
     try:
         return money.allocate(bases, amount)
     except money.MoneyError as e:

@@ -56,12 +56,20 @@ def fmt(minor: int) -> str:
 
 
 def allocate(bases: list[int], amount: int) -> list[int]:
-    """Split amount across bases by largest-remainder, exactly proportional, summing to amount."""
+    """Split amount across bases by largest-remainder, exactly proportional, summing to amount.
+
+    amount need not be bounded by sum(bases) — it is just the pie being split proportionally
+    (e.g. a freight charge), not necessarily a discount taken out of the bases themselves. A
+    caller for whom the amount really must not exceed the bases' total (a discount) checks
+    that itself before calling, since this function does not assume that relationship.
+    """
     total = sum(bases)
-    if amount < 0 or amount > total:
-        raise MoneyError("المبلغ الموزَّع أكبر من إجمالي الأساس")
-    if total == 0 or amount == 0:
+    if amount < 0:
+        raise MoneyError("المبلغ الموزَّع سالب")
+    if amount == 0:
         return [0] * len(bases)
+    if total == 0:
+        raise MoneyError("لا يمكن التوزيع على أساس مجموعه صفر")
     shares = [b * amount // total for b in bases]
     left = amount - sum(shares)
     by_remainder = sorted(range(len(bases)), key=lambda i: (-(bases[i] * amount % total), i))

@@ -98,6 +98,10 @@ class Base(unittest.TestCase):
     def assertReconciled(self):
         self.assertEqual(inventory.reconcile(self.con), [])
 
+    def net_totals(self, inv_id):
+        return [r[0] for r in self.con.execute(
+            "SELECT net_total FROM purchase_lines WHERE invoice_id=? ORDER BY line_no", (inv_id,))]
+
 
 class MandatoryCaseTest(Base):
     def test_fifo_cost_differs_from_chosen_lot(self):
@@ -778,6 +782,138 @@ class ConcurrencyTest(Base):
         self.assertTrue(all(isinstance(e, StockError) for e in errs), errs)
         self.assertEqual(inventory.on_hand(self.con, self.tire), 7)
         self.assertEqual(ledger.account_balance(self.con, "5110"), 300000)
+        self.assertReconciled()
+
+
+class FreightDiscountTest(Base):
+    """P01/P02: line/invoice discount and freight allocation into net acquisition cost."""
+
+    def test_no_freight_or_discount_behaves_exactly_as_before(self):
+        inv = self.buy(self.tire, 2, 100000)
+        self.assertEqual(self.net_totals(inv.id), [200000])
+        self.assertEqual(inv.total, 200000)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 200000)
+        self.assertReconciled()
+
+    def test_line_discount_reduces_net_cost_and_ledger(self):
+        inv = self.buy(self.tire, 2, 100000, lines=[PurchaseLine(self.tire, 2, 100000, "2324", 5000)])
+        self.assertEqual(self.net_totals(inv.id), [195000])
+        self.assertEqual(inv.total, 195000)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 195000)
+        self.assertEqual(ledger.account_balance(self.con, "2110"), -195000)   # debit-credit; 2110 is credit-normal
+        self.assertReconciled()
+
+    def test_invoice_discount_allocates_by_largest_remainder_across_lines(self):
+        inv = self.buy(self.tire, 1, 100000,
+                       lines=[PurchaseLine(self.tire, 1, 100000, "2324"), PurchaseLine(self.tire2, 1, 100000, "2324"),
+                              PurchaseLine(self.battery, 1, 100000, None)],
+                       invoice_discount=100)
+        nets = self.net_totals(inv.id)
+        self.assertEqual(sum(nets), 299900)
+        self.assertEqual(sorted(nets), [99966, 99967, 99967])   # 100/3 piasters, remainder to the first two lines
+        self.assertReconciled()
+
+    def test_invoice_discount_exceeding_net_lines_is_refused(self):
+        with self.assertRaises(PurchaseError):
+            self.buy(self.tire, 1, 1000, invoice_discount=1001)
+
+    def test_freight_by_quantity_is_the_default_basis(self):
+        inv = self.buy(self.tire, 1, 100000,
+                       lines=[PurchaseLine(self.tire, 3, 10000, "2324"), PurchaseLine(self.tire2, 1, 10000, "2324")],
+                       freight_amount=100)
+        self.assertEqual(self.net_totals(inv.id), [30075, 10025])   # 100 split 3:1 by qty
+        self.assertReconciled()
+
+    def test_freight_by_value_uses_net_after_discount_not_gross(self):
+        # equal gross (100000 each) but line A has a line discount, so by-value freight
+        # must split unevenly once basis='value' — proving it weighs the post-discount net.
+        inv = self.buy(self.tire, 1, 100000,
+                       lines=[PurchaseLine(self.tire, 1, 100000, "2324", 50000),
+                              PurchaseLine(self.tire2, 1, 100000, "2324")],
+                       freight_amount=3000, freight_basis="value")
+        nets = self.net_totals(inv.id)
+        self.assertEqual(nets, [51000, 102000])     # (100000-50000)+1000 and 100000+2000
+        self.assertReconciled()
+
+    def test_freight_by_value_with_zero_basis_is_refused_not_misallocated(self):
+        # both lines fully discounted to zero net value before freight: no value basis to split on.
+        with self.assertRaises(PurchaseError):
+            self.buy(self.tire, 1, 1000,
+                    lines=[PurchaseLine(self.tire, 1, 1000, "2324", 1000),
+                           PurchaseLine(self.tire2, 1, 1000, "2324", 1000)],
+                    freight_amount=500, freight_basis="value")
+
+    def test_manual_freight_must_sum_exactly_to_the_amount(self):
+        with self.assertRaises(PurchaseError):
+            self.buy(self.tire, 1, 1000,
+                    lines=[PurchaseLine(self.tire, 1, 1000, "2324", freight_share=10),
+                           PurchaseLine(self.tire2, 1, 1000, "2324", freight_share=10)],
+                    freight_amount=100, freight_basis="manual")
+
+    def test_manual_freight_exact_sum_is_accepted(self):
+        inv = self.buy(self.tire, 1, 1000,
+                       lines=[PurchaseLine(self.tire, 1, 1000, "2324", freight_share=70),
+                              PurchaseLine(self.tire2, 1, 1000, "2324", freight_share=30)],
+                       freight_amount=100, freight_basis="manual")
+        self.assertEqual(self.net_totals(inv.id), [1070, 1030])
+        self.assertReconciled()
+
+    def test_freight_share_outside_manual_basis_is_refused(self):
+        with self.assertRaises(PurchaseError):
+            self.buy(self.tire, 1, 1000, lines=[PurchaseLine(self.tire, 1, 1000, "2324", freight_share=10)])
+
+    def test_discount_making_net_cost_zero_is_refused(self):
+        with self.assertRaises(PurchaseError):
+            self.buy(self.tire, 1, 1000, lines=[PurchaseLine(self.tire, 1, 1000, "2324", 1000)])
+
+    def test_line_discount_exceeding_line_value_is_refused(self):
+        with self.assertRaises(PurchaseError):
+            self.buy(self.tire, 1, 1000, lines=[PurchaseLine(self.tire, 1, 1000, "2324", 1001)])
+
+    def test_unknown_freight_basis_is_refused(self):
+        with self.assertRaises(PurchaseError):
+            self.buy(self.tire, 1, 1000, freight_basis="air")
+
+    def test_order_of_operations_matches_p02_exactly(self):
+        # line 1000*10=10000, line discount 1000 -> 9000, invoice discount share (of 9000 of 9000
+        # total base) = 900 -> 8100, + freight share (qty basis, sole line) 500 -> 8600.
+        inv = self.buy(self.tire, 10, 1000, lines=[PurchaseLine(self.tire, 10, 1000, "2324", 1000)],
+                       invoice_discount=900, freight_amount=500)
+        self.assertEqual(self.net_totals(inv.id), [8600])
+        self.assertReconciled()
+
+    def test_reports_purchases_still_ties_to_2110_with_discount_and_freight(self):
+        from morv.infra import reports
+        self.buy(self.tire, 2, 100000, lines=[PurchaseLine(self.tire, 2, 100000, "2324", 10000)],
+                freight_amount=5000, invoice_discount=2000)
+        table = reports.purchases(self.con, "2026-11-01", "2026-11-30")
+        self.assertIn("يطابق", table.subtitle)
+
+
+class FreightDiscountAgainstReturnsTest(Base):
+    """Cross-feature: Phase-1 purchase-return settlement logic against a cost_total that
+    already includes freight and is net of discount (P05/P07 integration with P01/P02)."""
+
+    def test_return_of_a_freight_and_discount_adjusted_layer_settles_and_reconciles(self):
+        from morv.infra import purchase_returns, treasury
+        inv = self.buy(self.tire, 4, 100000, lines=[PurchaseLine(self.tire, 4, 100000, "2324", 40000)],
+                       freight_amount=8000)
+        # net_total for the single line: 400000 - 40000 + 8000 = 368000, i.e. 92000/unit
+        net = self.net_totals(inv.id)[0]
+        self.assertEqual(net, 368000)
+        pl_id = self.con.execute("SELECT id FROM purchase_lines WHERE invoice_id=?", (inv.id,)).fetchone()[0]
+        before_owed = treasury.supplier_owed(self.con, self.sup)
+        ret = purchase_returns.post_return(
+            self.con, self.admin, request_key="ret-fd-001", supplier_id=self.sup,
+            lines=[purchase_returns.ReturnLine(pl_id, 1)], reason="فحص الجودة",
+            settlement_amount=90000, settlement_reason="خصم تسوية إضافي اتفق عليه المورد")
+        self.assertEqual(ledger.account_balance(self.con, "1410"), net - net // 4)
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), before_owed - 90000)
+        self.assertReconciled()
+        purchase_returns.reverse_return(self.con, self.admin, request_key="rev-fd-001", return_id=ret.id,
+                                        reason="إلغاء بالاتفاق مع المورد")
+        self.assertEqual(ledger.account_balance(self.con, "1410"), net)
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), before_owed)
         self.assertReconciled()
 
 
