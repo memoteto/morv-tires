@@ -1,15 +1,15 @@
-# Graph Report - morv  (2026-11-26)
+# Graph Report - morv  (2026-11-27)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
 
 ## Summary
-- 2623 nodes · 5592 edges · 147 communities (78 shown, 69 thin omitted)
+- 2624 nodes · 5593 edges · 148 communities (78 shown, 70 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 247 edges (avg confidence: 0.94)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c326baa3`
+- Built from commit: `42d0acc9`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -170,7 +170,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (147 total, 69 thin omitted)
+## Communities (148 total, 70 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.06
@@ -485,22 +485,22 @@ Cohesion: 0.70
 Nodes (4): bank_reconciliations, bank_reconciliations_no_delete, bank_reconciliations_no_update, bank_reconciliations_one_per_date
 
 ## Knowledge Gaps
-- **69 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **70 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Modal` connect `Community 30` to `Community 1`, `Community 4`, `Community 7`, `Community 9`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 17`, `Community 19`, `Community 22`, `Community 28`, `Community 41`, `Community 45`, `Community 61`, `Community 63`, `Community 64`, `Community 77`, `Community 85`, `Community 90`, `Community 97`, `Community 98`, `Community 99`, `Community 105`, `Community 115`, `Community 122`, `Community 125`, `Community 126`, `Community 127`?**
-  _High betweenness centrality (0.075) - this node is a cross-community bridge._
+  _High betweenness centrality (0.076) - this node is a cross-community bridge._
 - **Are the 14 inferred relationships involving `PosPage` (e.g. with `MoneyError` and `SaleError`) actually correct?**
   _`PosPage` has 14 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.056692242114237 - nodes in this community are weakly interconnected._
 - **Why does `MainWindow` connect `Community 29` to `Community 0`, `Community 34`, `Community 35`, `Community 39`, `Community 7`, `Community 9`, `Community 109`, `Community 28`, `Community 15`, `Community 82`, `Community 52`, `Community 54`, `Community 25`, `Community 124`?**
-  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `Modal` (e.g. with `Notice` and `BackupTab`) actually correct?**
   _`Modal` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.07459505541346974 - nodes in this community are weakly interconnected._
 - **Why does `Notice` connect `Community 90` to `Community 0`, `Community 15`, `Community 27`, `Community 30`, `Community 34`, `Community 39`, `Community 41`, `Community 45`, `Community 49`, `Community 53`, `Community 56`, `Community 63`, `Community 74`, `Community 81`, `Community 89`, `Community 98`, `Community 108`, `Community 115`, `Community 116`?**
-  _High betweenness centrality (0.043) - this node is a cross-community bridge._
+  _High betweenness centrality (0.042) - this node is a cross-community bridge._
