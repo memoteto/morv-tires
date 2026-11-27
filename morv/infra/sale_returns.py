@@ -203,7 +203,8 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         raise ReturnError(str(e)) from e
 
     with transaction(con):
-        sale = con.execute("SELECT id, number, sale_date FROM sales WHERE id=?", (sale_id,)).fetchone()
+        sale = con.execute("SELECT id, number, sale_date, journal_entry_id FROM sales WHERE id=?",
+                           (sale_id,)).fetchone()
         if not sale:
             raise ReturnError("الفاتورة غير موجودة")
         if day < sale[2]:
@@ -221,6 +222,12 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
             if old[3] != h:
                 raise ReturnError("مفتاح الطلب سبق استخدامه لمرتجع بمحتوى مختلف")
             return PostedReturn(old[0], old[1], old[2], True)
+        # P04-4D will split returned revenue and VAT from the original snapshot.
+        # Until then never reverse a taxable invoice as if its gross were revenue,
+        # even if the current shop setting has since been turned off.
+        if con.execute("SELECT 1 FROM journal_lines WHERE entry_id=? AND account_code='2350' AND credit>0",
+                       (sale[3],)).fetchone():
+            raise ReturnError("مرتجع الفاتورة الضريبية غير متاح حتى اكتمال معالجة الضريبة")
         if len({ln.sale_line_id for ln in lines}) != len(lines):
             raise ReturnError("سطر الفاتورة مكرر في المرتجع؛ اجمعه في سطر واحد")
 
