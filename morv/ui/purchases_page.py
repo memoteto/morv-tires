@@ -404,7 +404,7 @@ class PurchaseForm(QWidget):
 
         sum_col.addWidget(sbox)
         self.invoice_layout = InvoiceWorkspace(
-            primary, summary, self.summary_footer, spacing=14)
+            primary, summary, self.summary_footer, spacing=14, line_table=self._line_table)
         root.addWidget(self.invoice_layout, 1)
 
         self.disc_edit.textChanged.connect(self._on_row_changed)
@@ -477,7 +477,7 @@ class PurchaseForm(QWidget):
     # ---------- Lines: one self-contained row per item, added on pick ----------
     def _add_row(self, item_id: int, kind: str, name: str) -> None:
         row_w = QWidget()
-        h = self._line_table.row_layout(row_w)
+        h = self._line_table.purchase_row_layout(row_w)
 
         num_lbl = muted("")
         num_lbl.setWordWrap(False)
@@ -566,6 +566,7 @@ class PurchaseForm(QWidget):
         del_btn.setFixedSize(30, 30)
         del_btn.setToolTip("حذف السطر")
         h.addWidget(del_btn, 0, Qt.AlignmentFlag.AlignTop)
+        self._line_table.register_purchase_row(row_w)
 
         row = {"widget": row_w, "item_id": item_id, "kind": kind, "name": name,
               "last_cost": purchasing.last_cost(self.session.con, item_id),

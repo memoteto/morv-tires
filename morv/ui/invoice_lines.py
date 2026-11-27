@@ -23,6 +23,8 @@ class InvoiceLineTable(QWidget):
         super().__init__()
         self.purchase = purchase
         self.total_column = len(headings) - 2
+        self.compact_discount = purchase
+        self._discount_budget = 0
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(LAYOUT["invoice_line_header_gap"])
@@ -53,6 +55,49 @@ class InvoiceLineTable(QWidget):
         layout.setSpacing(LAYOUT["invoice_line_column_gap"])
         return layout
 
+    def purchase_row_layout(self, widget):
+        outer = QVBoxLayout(widget)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        primary = QWidget()
+        secondary = QWidget()
+        widget._invoice_primary = self.row_layout(primary)
+        widget._invoice_secondary = self.row_layout(secondary)
+        widget._invoice_secondary.addWidget(muted("خصم"))
+        widget._invoice_secondary.addStretch(1)
+        outer.addWidget(primary)
+        outer.addWidget(secondary)
+        secondary.hide()
+        return widget._invoice_primary
+
+    def register_purchase_row(self, widget):
+        primary = widget._invoice_primary
+        widget._invoice_cells = tuple(primary.itemAt(i).widget() for i in range(primary.count()))
+        self._place_discount(widget)
+
+    def _place_discount(self, widget):
+        primary, secondary = widget._invoice_primary, widget._invoice_secondary
+        discount = widget._invoice_cells[5]
+        if self.compact_discount == (secondary.indexOf(discount) >= 0):
+            return
+        focus = discount.focusWidget()
+        restore_focus = focus is not None and focus.hasFocus()
+        if self.compact_discount:
+            primary.removeWidget(discount)
+            secondary.insertWidget(1, discount)
+        else:
+            secondary.removeWidget(discount)
+            primary.insertWidget(5, discount, 0, Qt.AlignmentFlag.AlignTop)
+        secondary.parentWidget().setVisible(self.compact_discount)
+        discount.show()
+        if restore_focus:
+            focus.setFocus()
+
+    def set_discount_budget(self, width):
+        if width != self._discount_budget:
+            self._discount_budget = width
+            self.sync_columns()
+
     @staticmethod
     def _text_width(widget, text):
         return widget.fontMetrics().horizontalAdvance(text)
@@ -72,11 +117,17 @@ class InvoiceLineTable(QWidget):
 
     def sync_columns(self):
         cells_by_row = [self.headers]
+        purchase_rows = []
         for index in range(self.rows.count()):
             widget = self.rows.itemAt(index).widget()
-            layout = widget.layout() if widget is not None else None
-            if layout is not None and layout.count() == len(self.headers):
-                cells_by_row.append([layout.itemAt(i).widget() for i in range(layout.count())])
+            if self.purchase:
+                if hasattr(widget, "_invoice_cells"):
+                    purchase_rows.append(widget)
+                    cells_by_row.append(widget._invoice_cells)
+            else:
+                layout = widget.layout() if widget is not None else None
+                if layout is not None and layout.count() == len(self.headers):
+                    cells_by_row.append([layout.itemAt(i).widget() for i in range(layout.count())])
 
         widths = [self._text_width(label, label.text()) + 2 for label in self.headers]
         widths[0] = max(widths[0], self._text_width(self.headers[0], "999") + 2)
@@ -112,6 +163,13 @@ class InvoiceLineTable(QWidget):
 
         name_min = max(widths[1], max(widths[3], widths[4], widths[total])
                        + LAYOUT["invoice_line_name_icon_space"])
+        if self.purchase:
+            wide_min = (sum(widths) - widths[1] + name_min + 2 * LAYOUT["invoice_line_margin"]
+                        + (len(widths) - 1) * LAYOUT["invoice_line_column_gap"])
+            self.compact_discount = wide_min > self._discount_budget
+            self.headers[5].setVisible(not self.compact_discount)
+            for widget in purchase_rows:
+                self._place_discount(widget)
         for cells in cells_by_row:
             for column, cell in enumerate(cells):
                 if column == 1:

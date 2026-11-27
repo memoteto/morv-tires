@@ -140,6 +140,10 @@ class InvoiceLineLayoutTest(PosFixture):
                 for i, (header, cell) in enumerate(zip(headers, cells, strict=True)):
                     if purchase and i == 4 and row["kind"] == "battery":
                         continue
+                    if purchase and i == 5 and page._line_table.compact_discount:
+                        self.assertFalse(header.isVisibleTo(page))
+                        self.assertTrue(cell.isVisibleTo(page))
+                        continue
                     with self.subTest(width=width, name=row["name"], column=headings[i]):
                         delta = max(abs(a - b) for a, b in zip(edges(header), edges(cell), strict=True))
                         self.assertLessEqual(delta, 1, "POS5_COLUMN_ALIGNMENT")
@@ -160,14 +164,24 @@ class InvoiceLineLayoutTest(PosFixture):
         edit, toggle = row["disc_edit"], row["disc_unit_btn"]
         self.assertEqual(toggle.text(), "%")
         self.assertFalse(toggle.isChecked())
-        for width, height in ((1024, 640), (1366, 768), (1920, 1080)):
+        edit.setText("200")
+        for width, height in ((1024, 640), (1366, 768), (1920, 1080), (1024, 640)):
             win.resize(width, height)
             self.settle()
             required = edit.fontMetrics().horizontalAdvance("999,999.99") + LAYOUT["invoice_line_edit_inset"]
             self.assertGreaterEqual(edit.width(), required, "PURCHASE_DISCOUNT_WIDTH")
-            self.assertLess(edit.mapTo(page, QPoint()).x(), row["dot_edit"].mapTo(page, QPoint()).x())
+            self.assertEqual(edit.text(), "200")
+            self.assertFalse(toggle.isChecked())
+            compact = page._line_table.compact_discount
+            if width == 1024:
+                self.assertTrue(compact)
+            elif width == 1920:
+                self.assertFalse(compact)
+            if compact:
+                self.assertGreater(edit.mapTo(page, QPoint()).y(), row["dot_edit"].mapTo(page, QPoint()).y())
+            else:
+                self.assertLess(edit.mapTo(page, QPoint()).x(), row["dot_edit"].mapTo(page, QPoint()).x())
             self.fits(page.invoice_layout, "PURCHASE_DISCOUNT_NO_CLIP")
-        edit.setText("200")
         lines, error = page._validate_lines()
         self.assertIsNone(error)
         self.assertEqual(lines[0].line_discount, 20000)
@@ -237,8 +251,11 @@ class InvoiceLineLayoutTest(PosFixture):
                         if not cell.isVisibleTo(page):
                             continue
                         with self.subTest(dark=dark, width=width, name=row["name"], cell=key):
-                            self.assertLessEqual(abs(center_y(cell) - center_y(editor)), 1,
-                                                 "POS5_VERTICAL_FIELD_ALIGNMENT")
+                            if purchase and key == "disc_edit" and page._line_table.compact_discount:
+                                self.assertGreater(center_y(cell), center_y(editor), "PURCHASE_DISCOUNT_SECOND_LINE")
+                            else:
+                                self.assertLessEqual(abs(center_y(cell) - center_y(editor)), 1,
+                                                     "POS5_VERTICAL_FIELD_ALIGNMENT")
                     with self.subTest(dark=dark, width=width, name=row["name"], cell="item_icon"):
                         self.assertLessEqual(abs(center_y(icons[0]) - center_y(name)), 1,
                                              "POS5_NAME_ICON_ALIGNMENT")
