@@ -440,6 +440,127 @@ class PurchasesUiTest(unittest.TestCase):
         row["cost_edit"].setText("9")   # 10% lower than last cost
         self.assertIn("أقل من آخر شراء", row["cost_note"].text())
 
+    def _configure_supplier_vat(self, status, inclusive=False):
+        from morv.infra import settings, suppliers
+        supplier = suppliers.get(self.con, self.sup)
+        supplier.vat_status = status
+        supplier.vat_prices_inclusive = inclusive
+        suppliers.update(self.con, self.admin, supplier)
+        settings.put(self.con, "tax.enabled", "1")
+
+    def test_supplier_without_vat_calculates_and_posts_zero_tax(self):
+        from morv.infra import ledger
+        self._configure_supplier_vat("unregistered")
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "5000")
+        self.assertEqual(dlg._vat_mode, "none")
+        self.assertIn("0.00", dlg.tax.text())
+        self.assertIn("5,000.00", dlg._total_lbl.text())
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 500000)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 0)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 500000)
+
+    def _confirm_vat(self, dlg, eligible=True):
+        from unittest.mock import patch
+
+        from PySide6.QtWidgets import QDialog
+        from morv.ui.purchase_vat import PurchaseVatDialog
+
+        def confirm(modal):
+            for _, deduction in modal.editors:
+                deduction.setCurrentIndex(deduction.findData(eligible))
+            modal.save()
+            self.assertIsNotNone(modal.result_values)
+            return QDialog.DialogCode.Accepted
+
+        with patch.object(PurchaseVatDialog, "exec", confirm):
+            dlg._edit_vat_details()
+
+    def test_exclusive_supplier_tax_preview_and_posting_match(self):
+        from PySide6.QtWidgets import QLabel
+        from morv.infra import inventory, ledger, purchase_view, suppliers
+        self._configure_supplier_vat("registered")
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "5000")
+        self.assertIsInstance(dlg.tax, QLabel)
+        self.assertIn("700.00", dlg.tax.text())
+        self.assertIn("5,700.00", dlg._total_lbl.text())
+        dlg.post()
+        self.assertIsNone(dlg.posted)
+        self.assertIn("قابلية خصم", dlg.notice.text())
+        self._confirm_vat(dlg)
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 570000)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 70000)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 500000)
+        self.assertEqual(ledger.account_balance(self.con, "2110"), -570000)
+        self.assertEqual(inventory.reconcile(self.con), [])
+        supplier = suppliers.get(self.con, self.sup)
+        supplier.vat_status = "unregistered"
+        suppliers.update(self.con, self.admin, supplier)
+        historical = purchase_view.get_invoice(self.con, dlg.posted.id)
+        self.assertEqual((historical.total, historical.tax_total, historical.prices_tax_inclusive),
+                         (570000, 70000, False))
+
+    def test_inclusive_supplier_tax_extracted_not_added(self):
+        from morv.infra import ledger
+        self._configure_supplier_vat("registered", True)
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "5000")
+        self.assertIn("614.04", dlg.tax.text())
+        self.assertIn("5,000.00", dlg._total_lbl.text())
+        self._confirm_vat(dlg)
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 500000)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 61404)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 438596)
+
+    def test_unknown_supplier_never_assumed_to_have_zero_tax(self):
+        self._configure_supplier_vat("unknown")
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "5000")
+        self.assertEqual(dlg.tax.text(), "—")
+        self.assertEqual(dlg._total_lbl.text(), "—")
+        dlg.post()
+        self.assertIsNone(dlg.posted)
+        self.assertEqual(self.invoices(), 0)
+        self.assertIn("حدد حالة ضريبة المورد", dlg.notice.text())
+
+    def test_supplier_switch_resets_tax_exceptions(self):
+        from morv.infra import suppliers
+        self._configure_supplier_vat("registered")
+        dlg = self.dialog()
+        row = self.add_row(dlg, self.battery, 1, "5000")
+        self._confirm_vat(dlg, False)
+        self.assertEqual(row["vat_override"], (1400, False))
+        other = suppliers.create(self.con, self.admin, suppliers.Supplier(
+            None, "مورد آخر", "01000000002", vat_status="unregistered"))
+        dlg._pick_supplier(other.id, other.name, other.mobile)
+        self.assertNotIn("vat_override", row)
+        self.assertIn("0.00", dlg.tax.text())
+        self.assertIn("5,000.00", dlg._total_lbl.text())
+
+    def test_full_and_quick_supplier_vat_defaults_are_saved(self):
+        from morv.infra import suppliers
+        from morv.ui.purchases_page import _NewSupplierDialog
+        from morv.ui.suppliers_page import SupplierDialog
+
+        full = self.destroy_on_cleanup(SupplierDialog(self.session, suppliers.get(self.con, self.sup)))
+        full.vat_fields.status.setCurrentIndex(full.vat_fields.status.findData("registered"))
+        full.vat_fields.prices.setCurrentIndex(full.vat_fields.prices.findData(True))
+        full.save()
+        self.assertIsNotNone(full.saved)
+        self.assertEqual(suppliers.get(self.con, self.sup).vat_mode, "inclusive")
+        quick = self.destroy_on_cleanup(_NewSupplierDialog("مورد سريع", "01000000002", self.session))
+        quick.vat_fields.status.setCurrentIndex(quick.vat_fields.status.findData("unregistered"))
+        quick.save()
+        self.assertIsNotNone(quick.created)
+        self.assertEqual(quick.created.vat_mode, "none")
+
     def test_discount_and_shipping_enabled_tax_and_payment_still_disabled(self):
         # P01/P02 enable discount and shipping; tax waits for P04 and the payment
         # fields are a separate future feature, so both stay disabled.
