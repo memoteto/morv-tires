@@ -35,6 +35,29 @@ class PurchaseReturnsTest(Base):
         self.assertEqual(treasury.supplier_owed(self.con, self.sup), 100000)
         self.assertReconciled()
 
+    def test_preview_matches_post_and_rejects_changed_book_total(self):
+        from morv.infra.purchasing import PurchaseLine
+
+        self.buy(self.tire, 4, 100000, lines=[PurchaseLine(self.tire, 4, 100000, "2324", 40000)],
+                 freight_amount=8001)
+        line = self.line_id(self.tire)
+        lines = [ReturnLine(line, 2)]
+        before = self.counts()
+        preview = purchase_returns.preview_book_total(self.con, self.sup, lines, "2026-11-10")
+        self.assertEqual(preview, 184001)
+        self.assertEqual(self.counts(), before)
+        with self.assertRaises(PurchaseReturnError):
+            self.send(line, 2, expected_book_total=preview - 1, settlement_amount=180000,
+                      settlement_reason="شحن غير مسترد")
+        self.assertEqual(self.counts(), before)
+        r = self.send(line, 2, expected_book_total=preview, settlement_amount=180000,
+                      settlement_reason="شحن غير مسترد")
+        self.assertEqual(r.total, preview)
+        self.assertEqual(self.balance("1410"), 184000)
+        self.assertEqual(self.balance("2110"), -188001)
+        self.assertEqual(self.balance("5160"), 4001)
+        self.assertReconciled()
+
     def test_caps_and_validation(self):
         self.buy(self.tire, 2, 100000)
         line = self.line_id(self.tire)

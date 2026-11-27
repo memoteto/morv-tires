@@ -55,6 +55,29 @@ def fmt(minor: int) -> str:
     return f"{sign}{pounds:,}.{piasters:02d}"
 
 
+def allocate(bases: list[int], amount: int) -> list[int]:
+    """Split amount across bases by largest-remainder, exactly proportional, summing to amount.
+
+    amount need not be bounded by sum(bases) — it is just the pie being split proportionally
+    (e.g. a freight charge), not necessarily a discount taken out of the bases themselves. A
+    caller for whom the amount really must not exceed the bases' total (a discount) checks
+    that itself before calling, since this function does not assume that relationship.
+    """
+    total = sum(bases)
+    if amount < 0:
+        raise MoneyError("المبلغ الموزَّع سالب")
+    if amount == 0:
+        return [0] * len(bases)
+    if total == 0:
+        raise MoneyError("لا يمكن التوزيع على أساس مجموعه صفر")
+    shares = [b * amount // total for b in bases]
+    left = amount - sum(shares)
+    by_remainder = sorted(range(len(bases)), key=lambda i: (-(bases[i] * amount % total), i))
+    for i in by_remainder[:left]:
+        shares[i] += 1
+    return shares
+
+
 def percent_of(minor: int, rate: str, rounding=ROUND_HALF_UP) -> int:
     try:
         r = Decimal(to_latin(rate).strip())

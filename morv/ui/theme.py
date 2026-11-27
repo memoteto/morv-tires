@@ -175,6 +175,8 @@ QLabel#costUp {{ color:{t['danger']}; font-size:{t['fs']-2}px; }}
 QLabel#costDown {{ color:{t['success']}; font-size:{t['fs']-2}px; }}
 QPushButton#stepperBtn {{ min-width:28px; max-width:28px; min-height:28px; max-height:28px;
                          padding:0; font-weight:700; }}
+QPushButton#stepperBtn[percentToggle="true"]:checked {{ background:{t['primary_soft']};
+                         color:{t['primary']}; border-color:{t['primary']}; }}
 QLabel#keybox {{ font-family:'Courier New',monospace; font-size:22px; font-weight:700; letter-spacing:2px;
                  background:{t['surface2']}; border:2px dashed {t['border_strong']}; border-radius:12px; padding:16px; }}
 QWidget#wizSide {{ background:{t['side']}; }}

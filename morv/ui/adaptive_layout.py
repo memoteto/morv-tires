@@ -106,9 +106,11 @@ class AdaptiveCards(QScrollArea):
 class InvoiceWorkspace(QWidget):
     """Keep approval outside scroll areas; stack the same content when the width is limited."""
 
-    def __init__(self, primary, summary, footer, *, spacing, content_margins=(0, 0, 0, 0)):
+    def __init__(self, primary, summary, footer, *, spacing, content_margins=(0, 0, 0, 0),
+                 line_table=None):
         super().__init__()
         self.primary, self.summary, self.footer = primary, summary, footer
+        self.line_table = line_table
         self.summary.setObjectName("invoiceSummaryBody")
         self.columns = 0
         self._reflowing = False
@@ -182,6 +184,11 @@ class InvoiceWorkspace(QWidget):
         left, right = self._column_minima()
         margins = self.grid.contentsMargins()
         available = self.width() - margins.left() - margins.right()
+        if self.line_table is not None:
+            # Reserve summary and card chrome before choosing the line table layout.
+            overhead = max(0, left - self.line_table.minimumSizeHint().width())
+            self.line_table.set_discount_budget(max(0, available - right - self.grid.horizontalSpacing() - overhead))
+            left, right = self._column_minima()
         columns = 2 if available >= left + right + self.grid.horizontalSpacing() else 1
         if columns != self.columns:
             focus = self.focusWidget()

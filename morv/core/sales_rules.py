@@ -1,6 +1,8 @@
 """Pure sale rules: discount allocation, account map, payment checks."""
 from dataclasses import dataclass
 
+from morv.core import money
+
 REVENUE_ACCOUNT = {"tire": "4110", "battery": "4120", "service": "4130"}
 PAYMENT_ACCOUNT = {"cash": "1110", "card": "1220", "transfer": "1210", "wallet": "1230", "credit": "1310",
                    "installment": "1320"}
@@ -20,17 +22,13 @@ class Payment:
 
 
 def allocate(bases: list[int], amount: int) -> list[int]:
-    total = sum(bases)
-    if amount < 0 or amount > total:
+    """Thin wrapper over the shared money.allocate: a discount may never exceed the bases' total."""
+    if amount > sum(bases):
         raise SaleRuleError("الخصم أكبر من قيمة السطور")
-    if total == 0 or amount == 0:
-        return [0] * len(bases)
-    shares = [b * amount // total for b in bases]
-    left = amount - sum(shares)
-    by_remainder = sorted(range(len(bases)), key=lambda i: (-(bases[i] * amount % total), i))
-    for i in by_remainder[:left]:
-        shares[i] += 1
-    return shares
+    try:
+        return money.allocate(bases, amount)
+    except money.MoneyError as e:
+        raise SaleRuleError("الخصم أكبر من قيمة السطور") from e
 
 
 def check_payments(total: int, payments: list) -> None:

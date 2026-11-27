@@ -105,7 +105,7 @@ class InvoiceSummaryPolishTest(fixtures.PosFixture):
         if not win.dark:
             win.toggle_theme()
         self.settle()
-        field = page.disc
+        field = page.tax      # discount/shipping are now enabled (P01/P02); tax stays disabled until P04
         self.assertFalse(field.isEnabled())
         self.assertEqual(field.placeholderText(), "0.00")
         self.assertEqual(field.text(), "")
