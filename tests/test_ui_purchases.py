@@ -410,10 +410,11 @@ class PurchasesUiTest(unittest.TestCase):
         dlg = self.dialog()
         row = self.add_row(dlg, self.battery, 1, "10")
         row_w = row["widget"]
-        steppers = [b for b in row_w.findChildren(QPushButton) if b.objectName() == "stepperBtn"]
+        # The amount/percent toggle buttons share the compact stepperBtn style too, so this
+        # regression (the −/+ glyph buttons) filters to the quantity steppers by their glyph.
+        steppers = [b for b in row_w.findChildren(QPushButton)
+                    if b.objectName() == "stepperBtn" and b.text() in ("−", "+")]
         self.assertEqual(len(steppers), 2)
-        for b in steppers:
-            self.assertIn(b.text(), ("−", "+"))
 
     def test_cost_note_hidden_until_there_is_something_to_say(self):
         dlg = self.dialog()
@@ -439,23 +440,21 @@ class PurchasesUiTest(unittest.TestCase):
         row["cost_edit"].setText("9")   # 10% lower than last cost
         self.assertIn("أقل من آخر شراء", row["cost_note"].text())
 
-    def test_discount_tax_shipping_paid_fields_are_disabled(self):
-        # These fields exist in the approved design but aren't wired to the
-        # engine yet (purchasing.post_invoice has no such parameters), so they
-        # must stay disabled rather than imply a function that doesn't work.
+    def test_discount_and_shipping_enabled_tax_and_payment_still_disabled(self):
+        # P01/P02 enable discount and shipping; tax waits for P04 and the payment
+        # fields are a separate future feature, so both stay disabled.
         dlg = self.dialog()
-        for field in (dlg.disc, dlg.tax, dlg.ship, dlg.paid, dlg.pay_method):
-            self.assertFalse(field.isEnabled())
+        for enabled in (dlg.disc_edit, dlg.ship, dlg.freight_basis):
+            self.assertTrue(enabled.isEnabled())
+        for disabled in (dlg.tax, dlg.paid, dlg.pay_method):
+            self.assertFalse(disabled.isEnabled())
 
-    def test_disabled_fields_never_affect_the_shown_or_posted_total(self):
+    def test_still_disabled_fields_never_affect_the_shown_or_posted_total(self):
         dlg = self.dialog()
         self.add_row(dlg, self.battery, 2, "100")
-        # Force values into the disabled fields (bypassing the UI, as a stray
-        # future edit might) to prove the summary and the posted total both
-        # ignore them completely rather than silently double-counting.
-        dlg.disc.setText("50")
+        # Force values into the fields that remain disabled (as a stray future edit
+        # might) to prove the summary and the posted total ignore them completely.
         dlg.tax.setText("20")
-        dlg.ship.setText("30")
         dlg.paid.setText("999")
         dlg._refresh_summary()
         self.assertIn("200.00", dlg._total_lbl.text())
@@ -477,6 +476,25 @@ class PurchasesUiTest(unittest.TestCase):
             (dlg.posted.id,)).fetchone()[0]
         self.assertEqual(inv_debit, 20000)
         self.assertEqual(sup_credit, 20000)
+
+    def test_discount_and_freight_flow_through_the_form_to_the_engine(self):
+        # End-to-end UI wiring: a discount and shipping entered in the form reach
+        # purchasing.post_invoice and land in net_total, not just the engine tests.
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 2, "100", "")
+        dlg.disc_edit.setText("50")          # 5000 piasters off the 20000 gross
+        dlg.ship.setText("30")               # 3000 piasters freight, default qty basis
+        dlg.inv_no.setText("S-1")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 18000)      # 20000 - 5000 + 3000
+        net = self.con.execute(
+            "SELECT net_total FROM purchase_lines WHERE invoice_id=?", (dlg.posted.id,)).fetchone()[0]
+        self.assertEqual(net, 18000)
+        freight, discount = self.con.execute(
+            "SELECT freight_amount, invoice_discount FROM purchase_invoices WHERE id=?",
+            (dlg.posted.id,)).fetchone()
+        self.assertEqual((freight, discount), (3000, 5000))
 
     def test_shell_uses_real_purchases_page(self):
         from morv.ui.purchases_page import PurchasesPage
