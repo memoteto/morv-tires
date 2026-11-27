@@ -10,6 +10,7 @@ from morv.infra.suppliers import Supplier
 from morv.ui.listpage import ListPage
 from morv.ui.modal import Modal
 from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
+from morv.ui.purchase_vat import SupplierVatFields
 from morv.ui.widgets import ask, danger_button, form, ltr_edit, muted, primary_button
 
 
@@ -55,6 +56,10 @@ class SuppliersPage(ListPage):
         extra = []
         if s.commercial_reg:
             extra.append(("السجل التجاري", ltr(s.commercial_reg)))
+        if s.vat_status != "unknown":
+            extra.append(("القيمة المضافة", suppliers.VAT_STATUSES[s.vat_status]))
+            if s.vat_status == "registered":
+                extra.append(("أساس السعر", "شامل الضريبة" if s.vat_prices_inclusive else "غير شامل الضريبة"))
         if s.tax_id:
             extra.append(("الرقم الضريبي", ltr(s.tax_id)))
         if s.bank_info:
@@ -127,7 +132,6 @@ class SupplierDialog(Modal):
         self.body.addWidget(muted("الرصيد السابق مع المورد يُدخل مع مرحلة الخزينة."))
 
         self.more = QCheckBox("بيانات إضافية (اختيارية)")
-        self.more.toggled.connect(lambda on: self.more_box.setVisible(on))
         self.body.addWidget(self.more)
         self.more_box = QWidget()
         mf = form()
@@ -164,11 +168,16 @@ class SupplierDialog(Modal):
         mf.addRow("طريقة السداد المفضلة", self.pay)
         mf.addRow("السجل التجاري", self.creg)
         mf.addRow("رقم التسجيل الضريبي", self.tax)
+        self.vat_fields = SupplierVatFields(mf, s)
         mf.addRow("بيانات التحويل", self.bank)
         self.more_box.setLayout(mf)
         self.more_box.setVisible(False)
         self.body.addWidget(self.more_box)
-        if s and any((s.contact_person, s.phone2, s.payment_days, s.credit_limit, s.commercial_reg, s.tax_id, s.bank_info)):
+        self.more.toggled.connect(self.more_box.setVisible)
+        self.more.toggled.connect(self.request_content_fit)
+        self.vat_fields.status.currentIndexChanged.connect(self.request_content_fit)
+        if s and any((s.contact_person, s.phone2, s.payment_days, s.credit_limit, s.commercial_reg, s.tax_id, s.bank_info,
+                      s.vat_status != "unknown")):
             self.more.setChecked(True)
         self.add_footer("حفظ", self.save)
         self.name.setFocus()
@@ -182,7 +191,7 @@ class SupplierDialog(Modal):
         s = Supplier(self.s.id if self.s else None, self.name.text(), self.mobile.text(), self.phone2.text(),
                      self.contact.text(), self.address.text(), self.tax.text(), self.notes.toPlainText(), True,
                      self.days.value(), limit, self.supplies.currentData(), self.pay.currentData(),
-                     self.creg.text(), self.bank.text())
+                     self.creg.text(), self.bank.text(), *self.vat_fields.values())
         try:
             self.saved = (suppliers.update if self.s else suppliers.create)(self.session.con, self.session.user, s)
         except suppliers.SupplierError as e:

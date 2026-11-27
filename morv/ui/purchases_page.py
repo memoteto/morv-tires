@@ -1,5 +1,6 @@
 """Purchases screen: invoice list and a full-page form matching the approved v1.0 design."""
 import uuid
+from dataclasses import replace
 from datetime import date
 
 from PySide6.QtCore import Qt
@@ -13,7 +14,7 @@ from PySide6.QtWidgets import (
 from morv.core import dot as dotmod
 from morv.core.money import MoneyError, fmt, parse_money, percent_of
 from morv.core.text import ltr
-from morv.infra import purchase_view, purchasing, suppliers
+from morv.infra import purchase_view, purchasing, settings, suppliers
 from morv.infra.purchasing import FREIGHT_BASES, PurchaseError, PurchaseLine
 from morv.infra import suppliers as sup_infra
 from morv.ui import icons
@@ -24,6 +25,7 @@ from morv.ui.party_search import (FoldableDetails, PartyInfoStrip, PartySearch,
                                   QuickPartyDialog, party_field, phone_query)
 from morv.ui.listpage import ListPage
 from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, SupplierReturnsDialog
+from morv.ui.purchase_vat import PurchaseVatDialog, SupplierVatFields, VAT_MODES
 from morv.ui.widgets import (DateEdit, InvoiceFooter, InvoiceTotal, chip, confirm_discard_invoice, deferred_button, field, ICON_MUTED, kv_row, ltr_edit, muted, Notice, primary_button, section_card)
 
 
@@ -128,6 +130,8 @@ class PurchasesListPage(ListPage):
             details.append(("ملاحظات", inv.notes))
         self.summary_details(details)
         metrics = [("إجمالي الفاتورة", ltr(fmt(inv.total)))]
+        if inv.tax_total:
+            metrics.append(("الضريبة", ltr(fmt(inv.tax_total))))
         if inv.invoice_discount:
             metrics.append(("خصم الفاتورة", ltr(fmt(inv.invoice_discount))))
         if inv.freight_amount:
@@ -138,10 +142,12 @@ class PurchasesListPage(ListPage):
         self.summary_metrics(metrics)
         self.summary_section("تفاصيل الأصناف", "tire")
         self.summary_records(
-            ["الصنف", "الكمية", "تكلفة الوحدة", "الإجمالي قبل الخصم والشحن", "الصافي", "DOT"],
+            ["الصنف", "الكمية", "تكلفة الوحدة", "الإجمالي قبل الخصم والشحن",
+             "الإجمالي" if inv.tax_total else "الصافي", "DOT"],
             [(f"{ln.line_no}. {ln.item_name}", ltr(str(ln.qty)), ltr(fmt(ln.unit_cost)),
-              ltr(fmt(ln.line_total)), ltr(fmt(ln.net_total)), ltr(ln.dot) if ln.dot else "")
-             for ln in inv.lines])
+              ltr(fmt(ln.line_total)),
+              ltr(fmt(ln.net_total + (0 if inv.prices_tax_inclusive else ln.tax_amount))),
+              ltr(ln.dot) if ln.dot else "") for ln in inv.lines])
         if self.session.can("purchases.post"):
             send_back = QPushButton("مرتجع للمورد")
             send_back.clicked.connect(lambda: self.open_return(inv))
@@ -169,12 +175,18 @@ class _NewSupplierDialog(QuickPartyDialog):
     def __init__(self, name_hint: str, mobile_hint: str, session, parent=None):
         super().__init__(session, "المورد", name_hint, mobile_hint, sup_infra.SupplierError,
                          optional=True, parent=parent)
+        self.tax_id = ltr_edit("")
+        self.body.addWidget(field("رقم التسجيل الضريبي", self.tax_id))
+        self.vat_fields = SupplierVatFields(self.body)
 
     def _create_party(self, name, mobile):
         return sup_infra.create(self.session.con, self.session.user,
                                 sup_infra.Supplier(id=None, name=name, mobile=mobile,
                                                    address=self.addr_edit.text().strip(),
-                                                   notes=self.notes_edit.text().strip()))
+                                                   notes=self.notes_edit.text().strip(),
+                                                   tax_id=self.tax_id.text().strip(),
+                                                   vat_status=self.vat_fields.values()[0],
+                                                   vat_prices_inclusive=self.vat_fields.values()[1]))
 
     def _save(self):
         self.save()
@@ -235,6 +247,9 @@ class PurchaseForm(QWidget):
         self._supplier_id: int | None = None
         self._supplier_name: str = ""
         self._supplier_mobile: str = ""
+        self._vat_enabled = settings.get(session.con, "tax.enabled", "0") == "1"
+        self._vat_mode = "unknown"
+        self._vat_freight = False
 
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 14, 20, 14)
@@ -284,6 +299,8 @@ class PurchaseForm(QWidget):
             [("رقم فاتورة المورد", self.inv_no), ("تاريخ فاتورة المورد", self.inv_date),
              ("ملاحظة", self.notes)],
             "تفاصيل الفاتورة والملاحظة", self._extra_summary_text, stretches=(2, 2, 3))
+        self.vat_details_btn = self.extra_box.add_detail_action("تفاصيل الضريبة", self._edit_vat_details)
+        self.vat_details_btn.setVisible(self._vat_enabled)
         self.extra_toggle = self.extra_box.toggle
         self.extra_summary = self.extra_box.summary
         self.party_info = PartyInfoStrip(self.extra_box)
@@ -339,15 +356,17 @@ class PurchaseForm(QWidget):
         self._sub_lbl.setObjectName("cardTitle")
         sbody.addWidget(kv_row("إجمالي الأصناف", self._sub_lbl))
 
+        # Read-only calculated VAT; no input field or tax controls in the summary.
+        self.tax = QLabel(ltr(fmt(0)))
+        self.tax.setObjectName("cardTitle")
+        self.tax.setEnabled(self._vat_enabled)
+        self.tax_row = kv_row("الضريبة", self.tax)
+        self.tax_row.setVisible(self._vat_enabled)
+        sbody.addWidget(self.tax_row)
+
         # Invoice discount: amount-or-percent, same pattern as the per-line discount.
         disc_field, self.disc_edit, self.disc_unit_btn = _amount_or_percent_row()
-        sbody.addWidget(field("خصم الفاتورة", disc_field))
-
-        # Tax stays disabled until P04; shown so the layout matches the approved design.
-        self.tax = ltr_edit("0.00")
-        self.tax.setEnabled(False)
-        self.tax.setToolTip("غير مفعّل حاليًا — يُضاف مع P04")
-        sbody.addWidget(field("ضريبة على فاتورة المورد", self.tax))
+        sbody.addWidget(field("الخصم", disc_field))
 
         # Shipping amount + allocation basis (qty/value/manual, per P01).
         self.ship = ltr_edit("0.00")
@@ -356,7 +375,9 @@ class PurchaseForm(QWidget):
         self.freight_basis = QComboBox()
         for basis in FREIGHT_BASES:
             self.freight_basis.addItem(basis_labels[basis], basis)
-        sbody.addWidget(field("أساس توزيع الشحن", self.freight_basis))
+        self.freight_basis_field = field("توزيع الشحن", self.freight_basis)
+        self.freight_basis_field.hide()
+        sbody.addWidget(self.freight_basis_field)
 
         self.summary_footer = InvoiceFooter()
         footer = self.summary_footer.layout()
@@ -405,7 +426,7 @@ class PurchaseForm(QWidget):
 
         self.disc_edit.textChanged.connect(self._on_row_changed)
         self.disc_unit_btn.toggled.connect(self._on_row_changed)
-        self.ship.textChanged.connect(self._on_row_changed)
+        self.ship.textChanged.connect(self._on_freight_basis_changed)
         self.freight_basis.currentIndexChanged.connect(self._on_freight_basis_changed)
         self._on_freight_basis_changed()
         if not suppliers.count(session.con):
@@ -435,13 +456,24 @@ class PurchaseForm(QWidget):
 
     # ---------- Builder helpers ----------
     def _pick_supplier(self, sup_id: int, name: str, mobile: str) -> None:
+        changed = self._supplier_id != sup_id
         self._supplier_id = sup_id
+        if self._vat_enabled and changed:
+            self._vat_mode = suppliers.get(self.session.con, sup_id).vat_mode
+            self._vat_freight = False
+            for row in self._rows:
+                row.pop("vat_override", None)
         self._supplier_name = name
         self._supplier_mobile = mobile
         self.sup_search.commit_text(name)
         self.party_info.set_info("مورد مسجّل", registered=True, mobile=mobile)
         if self.notice.text() == NO_SUPPLIERS_NOTICE:
             self.notice.show_message("")
+        if self._vat_enabled:
+            if changed:
+                self._refresh_vat_costs()
+            self.extra_box.refresh()
+            self._on_row_changed()
 
     def _extra_summary_text(self):
         parts = []
@@ -451,7 +483,76 @@ class PurchaseForm(QWidget):
             parts.append(ltr(self.inv_date.text()))
         if self.notes.text().strip():
             parts.append("ملاحظة")
+        if self._vat_enabled:
+            parts.append(VAT_MODES[self._vat_mode])
         return " · ".join(parts)
+
+    def _last_cost_for_mode(self, item_id):
+        if not self._vat_enabled:
+            return purchasing.last_cost(self.session.con, item_id)
+        if self._vat_mode == "unknown":
+            return None
+        return purchasing.last_cost(self.session.con, item_id,
+                                    prices_tax_inclusive=self._vat_mode == "inclusive")
+
+    def _refresh_vat_costs(self):
+        for row in self._rows:
+            row["last_cost"] = self._last_cost_for_mode(row["item_id"])
+
+    def _default_vat_rate(self):
+        try:
+            rate = int(settings.get(self.session.con, "tax.rate", ""))
+            return rate if rate >= 0 else None
+        except ValueError:
+            return None
+
+    def _edit_vat_details(self):
+        if not self._vat_enabled:
+            return
+        dlg = PurchaseVatDialog(self._vat_mode, self._vat_freight, self._rows,
+                                self._default_vat_rate(), self)
+        try:
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            mode, freight, values = dlg.result_values
+            self._vat_mode, self._vat_freight = mode, freight
+            for row in self._rows:
+                row.pop("vat_override", None)
+            if mode != "none":
+                for row, value in zip(self._rows, values, strict=True):
+                    row["vat_override"] = value
+            self._refresh_vat_costs()
+            self.extra_box.refresh()
+            self._on_row_changed()
+        finally:
+            dlg.deleteLater()
+
+    def _vat_lines(self, lines, *, preview=False):
+        if not self._vat_enabled:
+            return lines
+        if self._supplier_id is None or self.sup_search.pending:
+            raise PurchaseError("اختر المورد أولًا.")
+        if self._vat_mode == "unknown":
+            raise PurchaseError("حدد حالة ضريبة المورد من بياناته أو تفاصيل الفاتورة.")
+        if self._vat_mode == "none":
+            return [replace(line, input_tax_rate=0, input_tax_deductible=False) for line in lines]
+        result = []
+        for i, (row, line) in enumerate(zip(self._rows, lines, strict=True), 1):
+            rate, eligible = row.get("vat_override") or (self._default_vat_rate(), None)
+            if rate is None:
+                raise PurchaseError("نسبة الضريبة غير محددة في الإعدادات أو تفاصيل الفاتورة.")
+            if not rate:
+                eligible = False
+            if eligible is None and not preview:
+                raise PurchaseError(f"السطر {i}: أكد قابلية خصم الضريبة في تفاصيل الفاتورة.")
+            # Preview of supplier payable is independent of deduction eligibility.
+            # Do not post or display book cost using this provisional choice.
+            result.append(replace(line, input_tax_rate=rate, input_tax_deductible=bool(eligible)))
+        return result
+
+    def _vat_kwargs(self):
+        return dict(prices_tax_inclusive=self._vat_enabled and self._vat_mode == "inclusive",
+                    freight_taxable=self._vat_enabled and self._vat_mode != "none" and self._vat_freight)
 
     def _open_new_supplier_dialog(self, query=None) -> None:
         self.sup_search.close_results()
@@ -572,7 +673,7 @@ class PurchaseForm(QWidget):
         self._line_table.register_purchase_row(row_w)
 
         row = {"widget": row_w, "item_id": item_id, "kind": kind, "name": name,
-              "last_cost": purchasing.last_cost(self.session.con, item_id),
+              "last_cost": self._last_cost_for_mode(item_id),
               "num_lbl": num_lbl, "qty_spin": qty_spin, "cost_edit": cost_edit,
               "disc_edit": disc_edit, "disc_unit_btn": disc_unit_btn,
               "freight_row": freight_row, "freight_edit": freight_edit, "freight_value": freight_value,
@@ -606,7 +707,8 @@ class PurchaseForm(QWidget):
             row["num_lbl"].setText(str(i))
 
     def _on_freight_basis_changed(self) -> None:
-        manual = self.freight_basis.currentData() == "manual"
+        self.freight_basis_field.setVisible(self._has_positive_freight())
+        manual = self._freight_basis() == "manual"
         for row in self._rows:
             row["freight_edit"].setVisible(manual)
             row["freight_value"].setVisible(not manual)
@@ -683,7 +785,17 @@ class PurchaseForm(QWidget):
             total += row["qty_spin"].value() * cost
         return total
 
+    def _has_positive_freight(self) -> bool:
+        try:
+            return parse_money(self.ship.text().strip() or "0") > 0
+        except MoneyError:
+            return False
+
     def _freight_basis(self) -> str:
+        # Zero freight must never use hidden manual shares. Keep the selected
+        # basis and draft shares available if the user enters a positive amount again.
+        if not self._has_positive_freight():
+            return "qty"
         return self.freight_basis.currentData() or "qty"
 
     def _validate_lines(self) -> tuple[list[PurchaseLine] | None, str | None]:
@@ -728,6 +840,7 @@ class PurchaseForm(QWidget):
         sub = self._sub_total()
         self._sub_lbl.setText(ltr(fmt(sub)))
         allocations = None
+        tax_calcs = None
         lines = self._draft_lines()
         try:
             freight_amount = parse_money(self.ship.text().strip() or "0")
@@ -735,8 +848,11 @@ class PurchaseForm(QWidget):
             if lines and freight_amount >= 0 and invoice_discount is not None and invoice_discount >= 0:
                 allocations = purchasing.compute_allocations(
                     lines, freight_amount, self._freight_basis(), invoice_discount)
+                tax_calcs = purchasing.compute_line_taxes(
+                    self._vat_lines(lines, preview=True), allocations,
+                    tax_enabled=self._vat_enabled, **self._vat_kwargs())
         except (MoneyError, purchasing.PurchaseError):
-            pass  # Incomplete/invalid draft: show no calculated net cost until it is valid.
+            allocations = None  # Incomplete/invalid draft: show no misleading total.
 
         for i, row in enumerate(self._rows):
             total_label = row["total_lbl"]
@@ -747,23 +863,29 @@ class PurchaseForm(QWidget):
                 continue
             allocation, line = allocations[i], lines[i]
             row["freight_value"].setText(ltr(fmt(allocation.freight_share)))
-            total_label.setText(ltr(fmt(allocation.net_total)))
+            calc = tax_calcs[i]
+            payable = calc.cost_amount + calc.deductible_amount
+            total_label.setText(ltr(fmt(payable)))
             # Preserve the allocation breakdown on demand, without adding another visible row.
             if line.line_discount or allocation.invoice_share or allocation.freight_share:
-                average = (2 * allocation.net_total + line.qty) // (2 * line.qty)
-                approx = "≈ " if allocation.net_total % line.qty else ""
-                total_label.setToolTip(f"خصم الصنف {ltr(fmt(line.line_discount))} ج.م\n"
-                                       f"حصة خصم الفاتورة {ltr(fmt(allocation.invoice_share))} ج.م\n"
-                                       f"حصة الشحن {ltr(fmt(allocation.freight_share))} ج.م\n"
-                                       f"متوسط تكلفة الوحدة {approx}{ltr(fmt(average))} ج.م")
+                details = (f"خصم الصنف {ltr(fmt(line.line_discount))} ج.م\n"
+                           f"حصة خصم الفاتورة {ltr(fmt(allocation.invoice_share))} ج.م\n"
+                           f"حصة الشحن {ltr(fmt(allocation.freight_share))} ج.م")
+                if not self._vat_enabled or not calc.tax_amount or row.get("vat_override") is not None:
+                    average = (2 * calc.cost_amount + line.qty) // (2 * line.qty)
+                    approx = "≈ " if calc.cost_amount % line.qty else ""
+                    details += f"\nمتوسط تكلفة الوحدة {approx}{ltr(fmt(average))} ج.م"
+                total_label.setToolTip(details)
             else:
                 total_label.setToolTip("")
 
+        self.tax.setText("—" if allocations is None and self._rows else
+                         ltr(fmt(sum(c.tax_amount for c in tax_calcs or []))))
         if allocations is None and self._rows:
             self._total_lbl.setText("—")
             self._rem_lbl.setText("المعاينة غير مكتملة")
         else:
-            net = sum(a.net_total for a in allocations) if allocations else 0
+            net = sum(c.cost_amount + c.deductible_amount for c in tax_calcs or [])
             self._total_lbl.setText(f"{ltr(fmt(net))} ج.م")
             self._rem_lbl.setText(f"يُضاف بالكامل لرصيد المورد: {ltr(fmt(net))} ج.م")
         self._line_table.sync_columns()
@@ -809,6 +931,13 @@ class PurchaseForm(QWidget):
         if invoice_discount is None:
             self._fail("خصم الفاتورة: قيمة غير صحيحة.")
             return
+        try:
+            lines = self._vat_lines(lines)
+        except PurchaseError as error:
+            self._fail(str(error))
+            if self._vat_enabled:
+                self.extra_toggle.setChecked(True)
+            return
         self._busy = True
         self.post_btn.setEnabled(False)
         try:
@@ -824,6 +953,7 @@ class PurchaseForm(QWidget):
                 freight_amount=freight_amount,
                 freight_basis=self._freight_basis(),
                 invoice_discount=invoice_discount,
+                **self._vat_kwargs(),
             )
         except PurchaseError as e:
             self._fail(f"لم تُرحَّل الفاتورة: {e}")

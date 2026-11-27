@@ -10,6 +10,7 @@ from morv.infra.users import audit, require
 
 SUPPLIES = {"tires": "إطارات", "batteries": "بطاريات", "both": "إطارات وبطاريات", "other": "أخرى"}
 PAY_METHODS = {"cash": "نقدي", "transfer": "تحويل بنكي", "wallet": "InstaPay / محفظة"}
+VAT_STATUSES = {"unknown": "غير محدد", "unregistered": "غير مسجل", "registered": "مسجل"}
 
 
 class SupplierError(ValueError):
@@ -33,6 +34,14 @@ class Supplier:
     pay_method: str = "cash"
     commercial_reg: str = ""
     bank_info: str = ""
+    vat_status: str = "unknown"
+    vat_prices_inclusive: bool = False
+
+    @property
+    def vat_mode(self) -> str:
+        if self.vat_status == "registered":
+            return "inclusive" if self.vat_prices_inclusive else "exclusive"
+        return "none" if self.vat_status == "unregistered" else "unknown"
 
 
 def _clean(s: Supplier) -> Supplier:
@@ -46,6 +55,8 @@ def _clean(s: Supplier) -> Supplier:
         raise SupplierError(str(e)) from e
     if s.supplies not in SUPPLIES or s.pay_method not in PAY_METHODS:
         raise SupplierError("قيمة غير معروفة في «يورّد لنا» أو طريقة السداد")
+    if s.vat_status not in VAT_STATUSES or type(s.vat_prices_inclusive) is not bool:
+        raise SupplierError("حالة التسجيل أو طريقة أسعار الضريبة غير صحيحة")
     if s.payment_days < 0 or s.credit_limit < 0:
         raise SupplierError("مدة السداد وحد الائتمان لا يكونان سالبين")
     return s
@@ -65,10 +76,12 @@ def create(con, by, s: Supplier) -> Supplier:
     with transaction(con):
         cur = con.execute(
             "INSERT INTO suppliers (name, name_norm, mobile, phone2, contact_person, address, tax_id, notes, payment_days, "
-            "credit_limit, supplies, pay_method, commercial_reg, bank_info) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "credit_limit, supplies, pay_method, commercial_reg, bank_info, vat_status, vat_prices_inclusive) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (s.name, norm_ar(s.name), s.mobile, s.phone2 or None, s.contact_person.strip() or None,
              s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None, s.payment_days,
-             s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None))
+             s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None,
+             s.vat_status, int(s.vat_prices_inclusive)))
         s.id = cur.lastrowid
         audit(con, by, "supplier.create", "supplier", s.id, f"{s.name} · {s.mobile}")
     return get(con, s.id)
@@ -84,10 +97,12 @@ def update(con, by, s: Supplier) -> Supplier:
         con.execute(
             "UPDATE suppliers SET name=?, name_norm=?, mobile=?, phone2=?, contact_person=?, address=?, tax_id=?, notes=?, "
             "payment_days=?, credit_limit=?, supplies=?, pay_method=?, commercial_reg=?, bank_info=?, "
+            "vat_status=?, vat_prices_inclusive=?, "
             "updated_at=strftime('%Y-%m-%d %H:%M:%S','now','localtime') WHERE id=?",
             (s.name, norm_ar(s.name), s.mobile, s.phone2 or None, s.contact_person.strip() or None,
              s.address.strip() or None, s.tax_id.strip() or None, s.notes.strip() or None, s.payment_days,
-             s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None, s.id))
+             s.credit_limit, s.supplies, s.pay_method, s.commercial_reg.strip() or None, s.bank_info.strip() or None,
+             s.vat_status, int(s.vat_prices_inclusive), s.id))
         audit(con, by, "supplier.update", "supplier", s.id, s.name)
     return get(con, s.id)
 
@@ -124,7 +139,7 @@ def get(con, supplier_id: int) -> Supplier:
     return Supplier(r["id"], r["name"], r["mobile"], r["phone2"] or "", r["contact_person"] or "",
                     r["address"] or "", r["tax_id"] or "", r["notes"] or "", bool(r["active"]),
                     r["payment_days"], r["credit_limit"], r["supplies"], r["pay_method"],
-                    r["commercial_reg"] or "", r["bank_info"] or "")
+                    r["commercial_reg"] or "", r["bank_info"] or "", r["vat_status"], bool(r["vat_prices_inclusive"]))
 
 
 def search(con, query: str = "", include_inactive: bool = False, limit: int = 300, offset: int = 0) -> list[tuple]:

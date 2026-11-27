@@ -109,7 +109,6 @@ class InvoiceLineLayoutTest(PosFixture):
 
     def check_alignment(self, purchase):
         from PySide6.QtCore import QPoint
-        from PySide6.QtWidgets import QLabel
 
         win, page = self.invoice(purchase)
         price_key = "cost_edit" if purchase else "price_edit"
@@ -117,11 +116,11 @@ class InvoiceLineLayoutTest(PosFixture):
                     "تكلفة الوحدة" if purchase else "السعر",
                     "DOT" if purchase else "الخصم")
         headings += (("الخصم", "الشحن") if purchase else ()) + ("الإجمالي",)
-        headers = []
-        for heading in headings:
-            labels = [label for label in page.findChildren(QLabel) if label.text() == heading]
-            self.assertEqual(len(labels), 1, f"SETUP: header {heading}")
-            headers.append(labels[0])
+        # The summary and the line table can legitimately share label text.
+        # Assert the complete ordered header set, then measure those exact widgets.
+        self.assertEqual(tuple(label.text() for label in page._line_table.headers),
+                         headings + ("",), "SETUP: invoice line headers")
+        headers = page._line_table.headers[:-1]
 
         def edges(widget):
             left = widget.mapTo(page, QPoint()).x()

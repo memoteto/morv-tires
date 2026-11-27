@@ -1,5 +1,5 @@
 """The one modal window of the app, without an OS title bar."""
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QPoint, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractScrollArea, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
                                QToolButton, QVBoxLayout, QWidget)
@@ -50,6 +50,8 @@ class Modal(QDialog):
         col.addWidget(self.header)
 
         self.scroll = None
+        self._content_fit_timer = QTimer(self, singleShot=True, interval=0)
+        self._content_fit_timer.timeout.connect(self._refit_visible_content)
         if not table_mode:
             self.scroll = QScrollArea()
             self.scroll.setWidgetResizable(True)
@@ -115,6 +117,37 @@ class Modal(QDialog):
         wanted = self.scroll.widget().sizeHint().height()
         self.scroll.setMinimumHeight(max(0, min(wanted, self.maximumHeight() - chrome)))
         self.resize(self.width(), min(self.sizeHint().height(), self.maximumHeight()))
+
+    def request_content_fit(self, *_args) -> None:
+        """Opt in after changing visible form content; coalesce layout updates."""
+        if not self.table_mode and self.isVisible():
+            self._content_fit_timer.start()
+
+    def _refit_visible_content(self) -> None:
+        if self.table_mode or not self.isVisible():
+            return
+        # The scroll area's sizeHint can retain the expanded content height after
+        # folding. For an already displayed dialog use the measured non-scroll
+        # chrome and the current body hint, not another cached dialog sizeHint.
+        center_y = self.frameGeometry().center().y()
+        chrome = max(0, self.height() - self.scroll.height())
+        self.body.invalidate()
+        self.body.activate()
+        wanted = self.scroll.widget().sizeHint().height()
+        available = self.screen().availableGeometry()
+        limit = min(self.maximumHeight(), available.height())
+        body_height = max(0, min(wanted, limit - chrome))
+        self.scroll.setMinimumHeight(body_height)
+        # Clear the previous propagated minimum before applying the explicit target.
+        frame_layout = self.scroll.parentWidget().layout()
+        frame_layout.invalidate()
+        frame_layout.activate()
+        self.layout().invalidate()
+        self.layout().activate()
+        self.resize(self.width(), min(limit, chrome + body_height))
+        y = max(available.top(), min(center_y - self.height() // 2,
+                                     available.bottom() - self.height() + 1))
+        self.move(self.x(), y)
 
     # ---------- Dragging by the header ----------
     def mousePressEvent(self, e) -> None:

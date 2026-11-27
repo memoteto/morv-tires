@@ -43,10 +43,22 @@ class AuditLogTest(unittest.TestCase):
 
     def test_wrapping_translation_and_fixed_actions(self):
         from PySide6.QtCore import QPoint, QRect, Qt
+        from PySide6.QtGui import QFontInfo
         from morv.infra import users
+        from morv.ui import theme
         from morv.ui.settings_page import AuditTab
         from morv.ui.widgets import dispose
 
+        # This is a visual acceptance test. Use the exact shipped Arabic font and
+        # stylesheet instead of a platform-dependent uninitialized QApplication.
+        # In Windows CI the default Sans Serif measured 800 chars at only 840px.
+        old = (self.app.palette(), self.app.styleSheet(), self.app.font(), self.app.layoutDirection())
+        self.addCleanup(self.app.setPalette, old[0])
+        self.addCleanup(self.app.setStyleSheet, old[1])
+        self.addCleanup(self.app.setFont, old[2])
+        self.addCleanup(self.app.setLayoutDirection, old[3])
+        theme.apply(self.app, False)
+        self.assertEqual(QFontInfo(self.app.font()).family(), theme.DEFAULT_FONT)
         detail = "تفاصيل عملية تجريبية " * 40
         users.audit(self.con, self.admin, "unknown.example", detail="Unknown action")
         users.audit(self.con, self.admin, "sale.post", detail=detail)
@@ -58,8 +70,43 @@ class AuditLogTest(unittest.TestCase):
             tab.resize(width, 482)
             self.settle()
             self.assertEqual(tab.view.horizontalScrollBar().maximum(), 0)
-            self.assertGreater(tab.view.rowHeight(0), 36)
-            self.assertGreaterEqual(tab.view.rowHeight(0), tab.view.sizeHintForRow(0))
+            observed = {
+                "requested_width": width, "tab_size": tab.size().toTuple(),
+                "viewport_size": tab.view.viewport().size().toTuple(),
+                "column_widths": [tab.view.columnWidth(c) for c in range(tab.model.columnCount())],
+                "row_height": tab.view.rowHeight(0), "row_hint": tab.view.sizeHintForRow(0),
+                "minimum_row": tab.view.verticalHeader().minimumSectionSize(),
+                "word_wrap": tab.view.wordWrap(), "font": tab.view.font().toString(),
+                "reflow_pending": tab.columns.timer.isActive(),
+                "first_row_detail_matches": tab.model.index(0, 3).data() == detail,
+            }
+            if observed["row_height"] <= 36:
+                from PySide6.QtGui import QFontMetrics
+                from PySide6.QtWidgets import QStyleOptionViewItem
+
+                index = tab.model.index(0, 3)
+                width_px = tab.view.columnWidth(3)
+                metrics = QFontMetrics(tab.view.font())
+                option = QStyleOptionViewItem()
+                option.initFrom(tab.view)
+                option.font = tab.view.font()
+                option.rect = QRect(0, 0, width_px, tab.view.rowHeight(0))
+                option.features |= QStyleOptionViewItem.ViewItemFeature.WrapText
+                delegate = tab.view.itemDelegateForIndex(index)
+                observed.update({
+                    "text_advance": metrics.horizontalAdvance(detail),
+                    "measured_wrapped_height": metrics.boundingRect(
+                        QRect(0, 0, max(1, width_px - 20), 100000),
+                        int(Qt.TextFlag.TextWordWrap), detail).height(),
+                    "delegate_hint": delegate.sizeHint(option, index).toTuple(),
+                    "detail_rect": tab.view.visualRect(index).getRect(),
+                    "visible_columns": [tab.view.columnAt(x) for x in
+                                        (0, tab.view.viewport().width() // 2,
+                                         tab.view.viewport().width() - 1)],
+                })
+            self.assertGreater(tab.view.rowHeight(0), 36, f"AUDIT_ROW_LAYOUT {observed}")
+            self.assertGreaterEqual(tab.view.rowHeight(0), tab.view.sizeHintForRow(0),
+                                    f"AUDIT_ROW_LAYOUT {observed}")
             self.assertEqual(tab.model.index(0, 3).data(), detail)
             self.assertEqual(tab.model.index(0, 3).data(Qt.ItemDataRole.ToolTipRole), detail)
             self.assertEqual(tab.model.index(0, 2).data(), "ترحيل بيع")

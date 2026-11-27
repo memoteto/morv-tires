@@ -98,14 +98,16 @@ class InvoiceSummaryPolishTest(fixtures.PosFixture):
             self.assertGreaterEqual(ratio, 4.5,
                                     f"POS4_TOTAL_CONTRAST: {label.text()} {ratio:.2f}")
 
-    def test_dark_disabled_purchase_placeholder_contrast(self):
+    def test_dark_disabled_purchase_payment_placeholder_contrast(self):
         from PySide6.QtGui import QPalette
         win, page = self.invoice(purchase=True)
         win.resize(1366, 768)
         if not win.dark:
             win.toggle_theme()
         self.settle()
-        field = page.tax      # discount/shipping are now enabled (P01/P02); tax stays disabled until P04
+        self.assertTrue(page.tax_row.isHidden())
+        self.assertTrue(page.vat_details_btn.isHidden())
+        field = page.paid     # Payment remains disabled; VAT no longer has an input placeholder.
         self.assertFalse(field.isEnabled())
         self.assertEqual(field.placeholderText(), "0.00")
         self.assertEqual(field.text(), "")
@@ -116,3 +118,24 @@ class InvoiceSummaryPolishTest(fixtures.PosFixture):
                                    QPalette.ColorRole.PlaceholderText)
         ratio = contrast(fg, bg)
         self.assertGreaterEqual(ratio, 4.5, f"POS4_DISABLED_CONTRAST: {ratio:.2f}")
+
+    def test_dark_calculated_purchase_tax_contrast(self):
+        from PySide6.QtWidgets import QLabel
+        from morv.infra import settings, suppliers
+        settings.put(self.con, "tax.enabled", "1")
+        win, page = self.invoice(purchase=True)
+        supplier = suppliers.create(self.con, self.session.user, suppliers.Supplier(
+            None, "مورد غير مسجل", "01012345679", vat_status="unregistered"))
+        page._pick_supplier(supplier.id, supplier.name, supplier.mobile)
+        win.resize(1920, 1080)
+        if not win.dark:
+            win.toggle_theme()
+        self.settle()
+        label = page.tax
+        self.assertIsInstance(label, QLabel)
+        self.assertEqual(label.text().strip("\u200e\u200f\u2066\u2069"), "0.00")
+        self.assertTrue(label.isEnabled())
+        self.assertTrue(self.visible_inside_page(page, label))
+        img = page.tax_row.grab().toImage()
+        bg = img.pixelColor(0, 0)
+        self.assertGreaterEqual(contrast(label.palette().color(label.foregroundRole()), bg), 4.5)

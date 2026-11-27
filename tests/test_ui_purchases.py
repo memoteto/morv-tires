@@ -440,6 +440,244 @@ class PurchasesUiTest(unittest.TestCase):
         row["cost_edit"].setText("9")   # 10% lower than last cost
         self.assertIn("أقل من آخر شراء", row["cost_note"].text())
 
+    def _configure_supplier_vat(self, status, inclusive=False):
+        from morv.infra import settings, suppliers
+        supplier = suppliers.get(self.con, self.sup)
+        supplier.vat_status = status
+        supplier.vat_prices_inclusive = inclusive
+        suppliers.update(self.con, self.admin, supplier)
+        settings.put(self.con, "tax.enabled", "1")
+
+    def test_supplier_without_vat_calculates_and_posts_zero_tax(self):
+        from morv.infra import ledger
+        self._configure_supplier_vat("unregistered")
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "5000")
+        self.assertEqual(dlg._vat_mode, "none")
+        self.assertIn("0.00", dlg.tax.text())
+        self.assertIn("5,000.00", dlg._total_lbl.text())
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 500000)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 0)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 500000)
+
+    def _confirm_vat(self, dlg, eligible=True):
+        from unittest.mock import patch
+
+        from PySide6.QtWidgets import QDialog
+        from morv.ui.purchase_vat import PurchaseVatDialog
+
+        def confirm(modal):
+            for _, deduction in modal.editors:
+                deduction.setCurrentIndex(deduction.findData(eligible))
+            modal.save()
+            self.assertIsNotNone(modal.result_values)
+            return QDialog.DialogCode.Accepted
+
+        with patch.object(PurchaseVatDialog, "exec", confirm):
+            dlg._edit_vat_details()
+
+    def test_exclusive_supplier_tax_preview_and_posting_match(self):
+        from PySide6.QtWidgets import QLabel
+        from morv.infra import inventory, ledger, purchase_view, suppliers
+        self._configure_supplier_vat("registered")
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "5000")
+        self.assertIsInstance(dlg.tax, QLabel)
+        self.assertIn("700.00", dlg.tax.text())
+        self.assertIn("5,700.00", dlg._total_lbl.text())
+        dlg.post()
+        self.assertIsNone(dlg.posted)
+        self.assertIn("قابلية خصم", dlg.notice.text())
+        self._confirm_vat(dlg)
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 570000)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 70000)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 500000)
+        self.assertEqual(ledger.account_balance(self.con, "2110"), -570000)
+        self.assertEqual(inventory.reconcile(self.con), [])
+        supplier = suppliers.get(self.con, self.sup)
+        supplier.vat_status = "unregistered"
+        suppliers.update(self.con, self.admin, supplier)
+        historical = purchase_view.get_invoice(self.con, dlg.posted.id)
+        self.assertEqual((historical.total, historical.tax_total, historical.prices_tax_inclusive),
+                         (570000, 70000, False))
+
+    def test_inclusive_supplier_tax_extracted_not_added(self):
+        from morv.infra import ledger
+        self._configure_supplier_vat("registered", True)
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "5000")
+        self.assertIn("614.04", dlg.tax.text())
+        self.assertIn("5,000.00", dlg._total_lbl.text())
+        self._confirm_vat(dlg)
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 500000)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 61404)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 438596)
+
+    def test_unknown_supplier_never_assumed_to_have_zero_tax(self):
+        self._configure_supplier_vat("unknown")
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 1, "5000")
+        self.assertEqual(dlg.tax.text(), "—")
+        self.assertEqual(dlg._total_lbl.text(), "—")
+        dlg.post()
+        self.assertIsNone(dlg.posted)
+        self.assertEqual(self.invoices(), 0)
+        self.assertIn("حدد حالة ضريبة المورد", dlg.notice.text())
+
+    def test_supplier_switch_resets_tax_exceptions(self):
+        from morv.infra import suppliers
+        self._configure_supplier_vat("registered")
+        dlg = self.dialog()
+        row = self.add_row(dlg, self.battery, 1, "5000")
+        self._confirm_vat(dlg, False)
+        self.assertEqual(row["vat_override"], (1400, False))
+        other = suppliers.create(self.con, self.admin, suppliers.Supplier(
+            None, "مورد آخر", "01000000002", vat_status="unregistered"))
+        dlg._pick_supplier(other.id, other.name, other.mobile)
+        self.assertNotIn("vat_override", row)
+        self.assertIn("0.00", dlg.tax.text())
+        self.assertIn("5,000.00", dlg._total_lbl.text())
+
+    def test_supplier_folded_details_restore_compact_height(self):
+        """A supplier opened expanded must shrink to the same size as a fresh folded form."""
+        from PySide6.QtTest import QTest
+        from morv.infra import suppliers
+        from morv.ui import theme
+        from morv.ui.suppliers_page import SupplierDialog
+
+        old = (self.app.palette(), self.app.styleSheet(), self.app.font(), self.app.layoutDirection())
+        self.addCleanup(self.app.setPalette, old[0])
+        self.addCleanup(self.app.setStyleSheet, old[1])
+        self.addCleanup(self.app.setFont, old[2])
+        self.addCleanup(self.app.setLayoutDirection, old[3])
+        theme.apply(self.app, False)
+        supplier = suppliers.get(self.con, self.sup)
+        supplier.vat_status = "registered"
+
+        def settle():
+            self.app.processEvents()
+            QTest.qWait(100)
+            self.app.processEvents()
+
+        def measure(dlg):
+            return dict(height=dlg.height(), width=dlg.width(),
+                        minimum_scroll=dlg.scroll.minimumHeight(),
+                        body_hint=dlg.scroll.widget().sizeHint().height(),
+                        viewport=dlg.scroll.viewport().height(),
+                        gaps=tuple(b.geometry().top() - a.geometry().bottom() - 1
+                                   for a, b in ((dlg.name, dlg.mobile), (dlg.mobile, dlg.address),
+                                                (dlg.address, dlg.notes))),
+                        footer_visible=dlg.footer.isVisibleTo(dlg))
+
+        compact = self.destroy_on_cleanup(SupplierDialog(self.session, supplier))
+        compact.more.setChecked(False)
+        compact.show()
+        settle()
+        baseline = measure(compact)
+        compact.hide()
+
+        dlg = self.destroy_on_cleanup(SupplierDialog(self.session, supplier))
+        self.assertTrue(dlg.more.isChecked())
+        dlg.show()
+        settle()
+        expanded = measure(dlg)
+        self.assertGreater(expanded["body_hint"], baseline["body_hint"], (baseline, expanded))
+        self.assertGreater(expanded["height"], baseline["height"], (baseline, expanded))
+        for _ in range(2):
+            dlg.more.setChecked(False)
+            settle()
+            folded = measure(dlg)
+            self.assertTrue(dlg.more_box.isHidden())
+            self.assertTrue(folded["footer_visible"])
+            self.assertEqual(folded["width"], baseline["width"])
+            self.assertEqual(folded["minimum_scroll"], baseline["minimum_scroll"])
+            self.assertLessEqual(abs(folded["viewport"] - baseline["viewport"]), 4,
+                                 f"SUPPLIER_FOLD_VIEWPORT baseline={baseline} folded={folded}")
+            self.assertLessEqual(abs(folded["height"] - baseline["height"]), 4,
+                                 f"SUPPLIER_FOLD_HEIGHT baseline={baseline} expanded={expanded} folded={folded}")
+            self.assertTrue(all(abs(x - y) <= 4 for x, y in zip(folded["gaps"], baseline["gaps"], strict=True)),
+                            f"SUPPLIER_FOLD_GAPS baseline={baseline} folded={folded}")
+            dlg.more.setChecked(True)
+            settle()
+            reopened = measure(dlg)
+            self.assertLessEqual(abs(reopened["height"] - expanded["height"]), 4,
+                                 f"SUPPLIER_REOPEN_HEIGHT expanded={expanded} reopened={reopened}")
+            self.assertTrue(reopened["footer_visible"])
+
+    def test_supplier_vat_rows_match_existing_form(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QFormLayout
+        from morv.infra import suppliers
+        from morv.ui import theme
+        from morv.ui.suppliers_page import SupplierDialog
+        from tests.test_ui_invoice_summary_polish import contrast
+
+        old = (self.app.palette(), self.app.styleSheet(), self.app.font(), self.app.layoutDirection())
+        self.addCleanup(self.app.setPalette, old[0])
+        self.addCleanup(self.app.setStyleSheet, old[1])
+        self.addCleanup(self.app.setFont, old[2])
+        self.addCleanup(self.app.setLayoutDirection, old[3])
+        theme.apply(self.app, False)
+        dlg = self.destroy_on_cleanup(SupplierDialog(self.session, suppliers.get(self.con, self.sup)))
+        dlg.more.setChecked(True)
+        dlg.show()
+        self.app.processEvents()
+        layout = dlg.more_box.layout()
+        self.assertIsInstance(layout, QFormLayout)
+        vat = dlg.vat_fields
+        old_label = layout.labelForField(dlg.tax)
+        status_label = layout.labelForField(vat.status)
+        price_label = layout.labelForField(vat.prices)
+        self.assertEqual(status_label.text(), "القيمة المضافة")
+        self.assertEqual(price_label.text(), "أساس السعر")
+        self.assertTrue(vat.prices.isHidden())
+        self.assertTrue(price_label.isHidden())
+        vat.status.setCurrentIndex(vat.status.findData("registered"))
+        self.app.processEvents()
+        layout.activate()
+        self.assertFalse(vat.prices.isHidden())
+        self.assertFalse(price_label.isHidden())
+        self.assertEqual(dlg.layoutDirection(), Qt.LayoutDirection.RightToLeft)
+        for label, editor in ((status_label, vat.status), (price_label, vat.prices)):
+            self.assertEqual(label.objectName(), old_label.objectName())
+            self.assertEqual(label.font(), old_label.font())
+            self.assertEqual(editor.geometry().x(), dlg.tax.geometry().x())
+            self.assertEqual(editor.width(), dlg.tax.width())
+            self.assertGreater(label.geometry().left(), editor.geometry().right())
+            self.assertEqual(label.palette().color(label.foregroundRole()),
+                             old_label.palette().color(old_label.foregroundRole()))
+            image = label.grab().toImage()
+            bg = image.pixelColor(0, 0)
+            self.assertGreaterEqual(contrast(label.palette().color(label.foregroundRole()), bg), 4.5)
+        self.assertEqual(vat.prices.itemText(0), "غير شامل الضريبة")
+        self.assertEqual(vat.prices.itemText(1), "شامل الضريبة")
+        vat.status.setCurrentIndex(vat.status.findData("unregistered"))
+        self.assertTrue(vat.prices.isHidden())
+        self.assertTrue(price_label.isHidden())
+
+    def test_full_and_quick_supplier_vat_defaults_are_saved(self):
+        from morv.infra import suppliers
+        from morv.ui.purchases_page import _NewSupplierDialog
+        from morv.ui.suppliers_page import SupplierDialog
+
+        full = self.destroy_on_cleanup(SupplierDialog(self.session, suppliers.get(self.con, self.sup)))
+        full.vat_fields.status.setCurrentIndex(full.vat_fields.status.findData("registered"))
+        full.vat_fields.prices.setCurrentIndex(full.vat_fields.prices.findData(True))
+        full.save()
+        self.assertIsNotNone(full.saved)
+        self.assertEqual(suppliers.get(self.con, self.sup).vat_mode, "inclusive")
+        quick = self.destroy_on_cleanup(_NewSupplierDialog("مورد سريع", "01000000002", self.session))
+        quick.vat_fields.status.setCurrentIndex(quick.vat_fields.status.findData("unregistered"))
+        quick.save()
+        self.assertIsNotNone(quick.created)
+        self.assertEqual(quick.created.vat_mode, "none")
+
     def test_discount_and_shipping_enabled_tax_and_payment_still_disabled(self):
         # P01/P02 enable discount and shipping; tax waits for P04 and the payment
         # fields are a separate future feature, so both stay disabled.
@@ -476,6 +714,65 @@ class PurchasesUiTest(unittest.TestCase):
             (dlg.posted.id,)).fetchone()[0]
         self.assertEqual(inv_debit, 20000)
         self.assertEqual(sup_credit, 20000)
+
+    def test_summary_order_and_conditional_freight_basis(self):
+        from PySide6.QtWidgets import QLabel
+
+        self._configure_supplier_vat("unregistered")
+        dlg = self.dialog()
+        card_layout = dlg.tax_row.parentWidget().layout()
+        body = card_layout.itemAt(1).layout()
+        fields = [body.itemAt(i).widget() for i in range(5)]
+        labels = [w.findChild(QLabel, "fieldLabel").text() for w in fields]
+        self.assertEqual(labels, ["إجمالي الأصناف", "الضريبة", "الخصم",
+                                  "نقل وتحميل", "توزيع الشحن"])
+        self.assertIs(fields[-1], dlg.freight_basis_field)
+        self.assertTrue(dlg.freight_basis_field.isHidden())
+        for value in ("0", "0.00", "", "٠", "-1", "invalid"):
+            dlg.ship.setText(value)
+            self.assertTrue(dlg.freight_basis_field.isHidden(), value)
+        for value in ("0.01", "100", "١٠٠", "1,234.50"):
+            dlg.ship.setText(value)
+            self.assertFalse(dlg.freight_basis_field.isHidden(), value)
+        dlg.ship.clear()
+        self.assertTrue(dlg.freight_basis_field.isHidden())
+
+    def test_zero_freight_ignores_hidden_manual_shares_in_preview_and_post(self):
+        self._configure_supplier_vat("unregistered")
+        dlg = self.dialog()
+        a = self.add_row(dlg, self.battery, 1, "1000")
+        b = self.add_row(dlg, self.battery, 1, "1000")
+        dlg.ship.setText("100")
+        dlg.freight_basis.setCurrentIndex(dlg.freight_basis.findData("manual"))
+        a["freight_edit"].setText("40")
+        b["freight_edit"].setText("60")
+        self.assertFalse(dlg.freight_basis_field.isHidden())
+        self.assertIn("2,100.00", dlg._total_lbl.text())
+        for zero in ("0.00", ""):
+            dlg.ship.setText(zero)
+            self.assertTrue(dlg.freight_basis_field.isHidden())
+            self.assertEqual(dlg._freight_basis(), "qty")
+            self.assertIn("2,000.00", dlg._total_lbl.text())
+            for row in (a, b):
+                self.assertTrue(row["freight_edit"].isHidden())
+                self.assertFalse(row["freight_value"].isHidden())
+                self.assertIn("0.00", row["freight_value"].text())
+                self.assertIn("1,000.00", row["total_lbl"].text())
+        dlg.ship.setText("100")
+        self.assertEqual(dlg._freight_basis(), "manual")
+        self.assertIn("2,100.00", dlg._total_lbl.text())
+        dlg.ship.setText("0")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 200000)
+        stored = self.con.execute(
+            "SELECT freight_amount, freight_basis FROM purchase_invoices WHERE id=?",
+            (dlg.posted.id,)).fetchone()
+        self.assertEqual(tuple(stored), (0, "qty"))
+        shares = self.con.execute(
+            "SELECT freight_share FROM purchase_lines WHERE invoice_id=? ORDER BY line_no",
+            (dlg.posted.id,)).fetchall()
+        self.assertEqual([row[0] for row in shares], [0, 0])
 
     def test_discount_and_freight_flow_through_the_form_to_the_engine(self):
         # End-to-end UI wiring: a discount and shipping entered in the form reach

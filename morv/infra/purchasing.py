@@ -63,12 +63,19 @@ def next_number_preview(con: sqlite3.Connection) -> str:
     return f"PI-{next_id:06d}"
 
 
-def last_cost(con: sqlite3.Connection, item_id: int) -> int | None:
-    """The latest recorded unit cost (purchase or opening lot) for an item; adjustment lots never count."""
-    row = con.execute("SELECT purchase_unit_cost FROM stock_lots WHERE item_id=? AND adjustment_line_id IS NULL "
-                      "ORDER BY id DESC LIMIT 1",
-                      (item_id,)).fetchone()
-    return row[0] if row else None
+def last_cost(con: sqlite3.Connection, item_id: int, *, prices_tax_inclusive: bool | None = None) -> int | None:
+    """Latest entered price, comparing only matching tax price bases when requested."""
+    if prices_tax_inclusive is None:
+        row = con.execute("SELECT purchase_unit_cost FROM stock_lots WHERE item_id=? AND adjustment_line_id IS NULL "
+                          "ORDER BY id DESC LIMIT 1", (item_id,)).fetchone()
+        return row[0] if row else None
+    row = con.execute(
+        "SELECT l.purchase_unit_cost, p.prices_tax_inclusive FROM stock_lots l "
+        "LEFT JOIN purchase_lines pl ON pl.id=l.purchase_line_id "
+        "LEFT JOIN purchase_invoices p ON p.id=pl.invoice_id "
+        "WHERE l.item_id=? AND l.adjustment_line_id IS NULL ORDER BY l.id DESC LIMIT 1",
+        (item_id,)).fetchone()
+    return row[0] if row and row[1] == int(prices_tax_inclusive) else None
 
 
 def _shape_lines(lines, freight_basis: str) -> list:
@@ -179,6 +186,30 @@ def compute_allocations(clean: list, freight_amount: int, freight_basis: str,
     return [LineAllocation(s, f, n) for s, f, n in zip(invoice_shares, freight_shares, net_totals, strict=True)]
 
 
+def compute_line_taxes(lines: list[PurchaseLine], allocations: list[LineAllocation], *,
+                       tax_enabled: bool, prices_tax_inclusive: bool,
+                       freight_taxable: bool) -> list[LineTax]:
+    """Shared preview and posting calculation. No DB writes or implicit deduction decision."""
+    tax_calcs = []
+    for i, (ln, a) in enumerate(zip(lines, allocations, strict=True), start=1):
+        if tax_enabled:
+            if ln.input_tax_rate is None or ln.input_tax_deductible is None:
+                raise PurchaseError(f"السطر {i}: حدد نسبة ضريبة فاتورة المورد وقابليتها للخصم")
+            rate_bp = ln.input_tax_rate
+        else:
+            if ln.input_tax_rate is not None or ln.input_tax_deductible is not None:
+                raise PurchaseError(f"السطر {i}: الضريبة غير مفعلة")
+            rate_bp = 0
+        tax_base, tax_amount, cost_amount = taxmod.purchase_line_split(
+            a.net_total, a.freight_share, freight_taxable, rate_bp, prices_tax_inclusive)
+        deductible = tax_amount if ln.input_tax_deductible else 0
+        cost_amount += tax_amount - deductible
+        if cost_amount < ln.qty:
+            raise PurchaseError(f"السطر {i}: التكلفة بعد استبعاد الضريبة لا تكفي قرشًا واحدًا لكل قطعة")
+        tax_calcs.append(LineTax(tax_base, rate_bp, tax_amount, deductible, cost_amount))
+    return tax_calcs
+
+
 def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: int, supplier_invoice_no: str,
                  invoice_date: str, lines: list, received_date: str | None = None,
                  freight_amount: int = 0, freight_basis: str = "qty", invoice_discount: int = 0,
@@ -234,23 +265,8 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
             raise PurchaseError("فاتورة بنفس رقم فاتورة المورد مرحّلة من قبل")
         allocations = compute_allocations(clean, freight_amount, freight_basis, invoice_discount)
         tax_enabled = settings.get(con, "tax.enabled", "0") == "1"
-        tax_calcs = []
-        for i, (ln, a) in enumerate(zip(clean, allocations, strict=True), start=1):
-            if tax_enabled:
-                if ln.input_tax_rate is None or ln.input_tax_deductible is None:
-                    raise PurchaseError(f"السطر {i}: حدد نسبة ضريبة فاتورة المورد وقابليتها للخصم")
-                rate_bp = ln.input_tax_rate
-            else:
-                if ln.input_tax_rate is not None or ln.input_tax_deductible is not None:
-                    raise PurchaseError(f"السطر {i}: الضريبة غير مفعلة")
-                rate_bp = 0
-            tax_base, tax_amount, cost_amount = taxmod.purchase_line_split(
-                a.net_total, a.freight_share, freight_taxable, rate_bp, prices_tax_inclusive)
-            deductible = tax_amount if ln.input_tax_deductible else 0
-            cost_amount += tax_amount - deductible
-            if cost_amount < ln.qty:
-                raise PurchaseError(f"السطر {i}: التكلفة بعد استبعاد الضريبة لا تكفي قرشًا واحدًا لكل قطعة")
-            tax_calcs.append(LineTax(tax_base, rate_bp, tax_amount, deductible, cost_amount))
+        tax_calcs = compute_line_taxes(clean, allocations, tax_enabled=tax_enabled,
+                                        prices_tax_inclusive=prices_tax_inclusive, freight_taxable=freight_taxable)
         tax_total = sum(c.tax_amount for c in tax_calcs)
         deductible_total = sum(c.deductible_amount for c in tax_calcs)
         total = sum(c.cost_amount + c.deductible_amount for c in tax_calcs)
