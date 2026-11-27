@@ -24,6 +24,7 @@ class InvoiceLineTable(QWidget):
         self.purchase = purchase
         self.total_column = len(headings) - 2
         self.compact_discount = purchase
+        self.compact_freight = purchase
         self._discount_budget = 0
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -63,7 +64,10 @@ class InvoiceLineTable(QWidget):
         secondary = QWidget()
         widget._invoice_primary = self.row_layout(primary)
         widget._invoice_secondary = self.row_layout(secondary)
-        widget._invoice_secondary.addWidget(muted("خصم"))
+        widget._invoice_discount_label = muted("خصم")
+        widget._invoice_freight_label = muted("شحن")
+        widget._invoice_secondary.addWidget(widget._invoice_discount_label)
+        widget._invoice_secondary.addWidget(widget._invoice_freight_label)
         widget._invoice_secondary.addStretch(1)
         outer.addWidget(primary)
         outer.addWidget(secondary)
@@ -73,25 +77,30 @@ class InvoiceLineTable(QWidget):
     def register_purchase_row(self, widget):
         primary = widget._invoice_primary
         widget._invoice_cells = tuple(primary.itemAt(i).widget() for i in range(primary.count()))
-        self._place_discount(widget)
+        self._place_adjustments(widget)
 
-    def _place_discount(self, widget):
+    def _place_adjustments(self, widget):
         primary, secondary = widget._invoice_primary, widget._invoice_secondary
-        discount = widget._invoice_cells[5]
-        if self.compact_discount == (secondary.indexOf(discount) >= 0):
-            return
-        focus = discount.focusWidget()
-        restore_focus = focus is not None and focus.hasFocus()
-        if self.compact_discount:
-            primary.removeWidget(discount)
-            secondary.insertWidget(1, discount)
-        else:
-            secondary.removeWidget(discount)
-            primary.insertWidget(5, discount, 0, Qt.AlignmentFlag.AlignTop)
-        secondary.parentWidget().setVisible(self.compact_discount)
-        discount.show()
-        if restore_focus:
-            focus.setFocus()
+        discount, freight = widget._invoice_cells[5:7]
+        for column, cell, label, compact in (
+            (5, discount, widget._invoice_discount_label, self.compact_discount),
+            (6, freight, widget._invoice_freight_label, self.compact_freight),
+        ):
+            label.setVisible(compact)
+            if compact == (secondary.indexOf(cell) >= 0):
+                continue
+            focus = cell.focusWidget()
+            restore_focus = focus is not None and focus.hasFocus()
+            if compact:
+                primary.removeWidget(cell)
+                secondary.insertWidget(secondary.indexOf(label) + 1, cell, 0, Qt.AlignmentFlag.AlignTop)
+            else:
+                secondary.removeWidget(cell)
+                primary.insertWidget(column, cell, 0, Qt.AlignmentFlag.AlignTop)
+            cell.show()
+            if restore_focus:
+                focus.setFocus()
+        secondary.parentWidget().setVisible(self.compact_discount or self.compact_freight)
 
     def set_discount_budget(self, width):
         if width != self._discount_budget:
@@ -159,6 +168,11 @@ class InvoiceLineTable(QWidget):
                 values = ("999,999.99", editor.placeholderText(), editor.text()[:17])
                 editor_width = max(self._text_width(editor, value) for value in values) + inset
                 widths[5] = max(widths[5], editor_width + toggle.minimumWidth() + discount.spacing())
+                freight = cells[6].layout()
+                edit, value = freight.itemAt(0).widget(), freight.itemAt(1).widget()
+                freight_width = max(self._text_width(edit, sample)
+                                    for sample in ("999,999.99", edit.placeholderText(), edit.text()[:17])) + inset
+                widths[6] = max(widths[6], freight_width, self._text_width(value, value.text()) + 4)
             widths[total] = max(widths[total], self._text_width(cells[total], cells[total].text()) + 4)
 
         name_min = max(widths[1], max(widths[3], widths[4], widths[total])
@@ -166,10 +180,13 @@ class InvoiceLineTable(QWidget):
         if self.purchase:
             wide_min = (sum(widths) - widths[1] + name_min + 2 * LAYOUT["invoice_line_margin"]
                         + (len(widths) - 1) * LAYOUT["invoice_line_column_gap"])
-            self.compact_discount = wide_min > self._discount_budget
+            self.compact_freight = wide_min > self._discount_budget
+            without_freight = wide_min - widths[6] - LAYOUT["invoice_line_column_gap"]
+            self.compact_discount = without_freight > self._discount_budget
             self.headers[5].setVisible(not self.compact_discount)
+            self.headers[6].setVisible(not self.compact_freight)
             for widget in purchase_rows:
-                self._place_discount(widget)
+                self._place_adjustments(widget)
         for cells in cells_by_row:
             for column, cell in enumerate(cells):
                 if column == 1:
@@ -185,6 +202,11 @@ class InvoiceLineTable(QWidget):
                 editor = cells[3].layout().itemAt(0).widget()
                 if editor.minimumWidth() != widths[3] or editor.maximumWidth() != widths[3]:
                     editor.setFixedWidth(widths[3])
+                freight = cells[6].layout()
+                for index in (0, 1):
+                    control = freight.itemAt(index).widget()
+                    if control.minimumWidth() != widths[6] or control.maximumWidth() != widths[6]:
+                        control.setFixedWidth(widths[6])
 
     def changeEvent(self, event):
         super().changeEvent(event)

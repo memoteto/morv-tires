@@ -116,7 +116,7 @@ class InvoiceLineLayoutTest(PosFixture):
         headings = ("#", "الصنف" if purchase else "الصنف / الخدمة", "الكمية",
                     "تكلفة الوحدة" if purchase else "السعر",
                     "DOT" if purchase else "الخصم")
-        headings += (("الخصم",) if purchase else ()) + ("الإجمالي",)
+        headings += (("الخصم", "الشحن") if purchase else ()) + ("الإجمالي",)
         headers = []
         for heading in headings:
             labels = [label for label in page.findChildren(QLabel) if label.text() == heading]
@@ -137,10 +137,12 @@ class InvoiceLineLayoutTest(PosFixture):
                          row["dot_edit"] if purchase else row["disc_edit"], row["total_lbl"]]
                 if purchase:
                     cells.insert(5, row["disc_edit"].parentWidget())
+                    cells.insert(6, row["freight_row"])
                 for i, (header, cell) in enumerate(zip(headers, cells, strict=True)):
                     if purchase and i == 4 and row["kind"] == "battery":
                         continue
-                    if purchase and i == 5 and page._line_table.compact_discount:
+                    if purchase and ((i == 5 and page._line_table.compact_discount)
+                                     or (i == 6 and page._line_table.compact_freight)):
                         self.assertFalse(header.isVisibleTo(page))
                         self.assertTrue(cell.isVisibleTo(page))
                         continue
@@ -191,6 +193,46 @@ class InvoiceLineLayoutTest(PosFixture):
         self.assertIsNone(error)
         self.assertEqual(lines[0].line_discount, 52500)
         self.assertEqual(toggle.text(), "%")
+        self.assertIsNone(page.posted)
+
+    def test_purchase_freight_column_reflows_and_preserves_manual_draft(self):
+        from PySide6.QtCore import QPoint
+
+        from morv.ui.tokens import LAYOUT
+
+        win, page = self.invoice(True)
+        row = page._rows[0]
+        edit, value = row["freight_edit"], row["freight_value"]
+        page.ship.setText("300")
+        self.assertIn("100.00", value.text())
+        self.assertTrue(value.isVisibleTo(page))
+        self.assertFalse(edit.isVisibleTo(page))
+        page.freight_basis.setCurrentIndex(page.freight_basis.findData("manual"))
+        for entry in page._rows:
+            entry["freight_edit"].setText("100")
+        for width, height in ((1024, 640), (1366, 768), (1920, 1080), (1024, 640)):
+            win.resize(width, height)
+            self.settle()
+            self.assertTrue(edit.isVisibleTo(page))
+            self.assertFalse(value.isVisibleTo(page))
+            self.assertEqual(edit.text(), "100")
+            required = edit.fontMetrics().horizontalAdvance("999,999.99") + LAYOUT["invoice_line_edit_inset"]
+            self.assertGreaterEqual(edit.width(), required, "PURCHASE_FREIGHT_WIDTH")
+            if width == 1024:
+                self.assertTrue(page._line_table.compact_freight)
+            elif width == 1920:
+                self.assertFalse(page._line_table.compact_freight)
+            if page._line_table.compact_freight:
+                self.assertGreater(edit.mapTo(page, QPoint()).y(), row["cost_edit"].mapTo(page, QPoint()).y())
+            else:
+                self.assertLess(edit.mapTo(page, QPoint()).x(), row["disc_edit"].mapTo(page, QPoint()).x())
+                self.assertGreater(edit.mapTo(page, QPoint()).x(), row["total_lbl"].mapTo(page, QPoint()).x())
+            self.fits(page.invoice_layout, "PURCHASE_FREIGHT_NO_CLIP")
+        page.freight_basis.setCurrentIndex(page.freight_basis.findData("value"))
+        self.assertTrue(value.isVisibleTo(page))
+        self.assertIn("100.00", value.text())
+        page.freight_basis.setCurrentIndex(page.freight_basis.findData("manual"))
+        self.assertEqual(edit.text(), "100")
         self.assertIsNone(page.posted)
 
     def test_purchase_battery_dot_hidden_and_tire_dot_visible(self):

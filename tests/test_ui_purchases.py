@@ -496,6 +496,47 @@ class PurchasesUiTest(unittest.TestCase):
             (dlg.posted.id,)).fetchone()
         self.assertEqual((freight, discount), (3000, 5000))
 
+    def test_per_line_allocation_preview_matches_posting_in_all_freight_modes(self):
+        from morv.core.money import fmt
+        from morv.infra import inventory
+
+        dlg = self.dialog()
+        self.add_row(dlg, self.battery, 2, "100", "")
+        self.add_row(dlg, self.tire, 1, "200", "2324")
+        a, b = dlg._rows
+        a["disc_edit"].setText("50")
+        dlg.disc_edit.setText("35")
+        dlg.ship.setText("30")
+        # After line discount: 150 and 200; invoice discount: 15 and 20.
+        for basis, shares, totals in (
+            ("qty", (2000, 1000), (15500, 19000)),
+            ("value", (1286, 1714), (14786, 19714)),
+            ("manual", (1000, 2000), (14500, 20000)),
+        ):
+            dlg.freight_basis.setCurrentIndex(dlg.freight_basis.findData(basis))
+            if basis == "manual":
+                a["freight_edit"].setText("10")
+                b["freight_edit"].setText("20")
+            for row, share, total in zip((a, b), shares, totals, strict=True):
+                self.assertIn(fmt(share), row["freight_value"].text())
+                self.assertIn(fmt(total), row["total_lbl"].text())
+                self.assertFalse(row["allocation_note"].isHidden())
+            self.assertIn("345.00", dlg._total_lbl.text())
+        b["freight_edit"].setText("19")
+        self.assertEqual(dlg._total_lbl.text(), "—")
+        self.assertEqual(a["total_lbl"].text(), "—")
+        b["freight_edit"].setText("20")
+        self.assertIn("345.00", dlg._total_lbl.text())
+        dlg.inv_no.setText("PREVIEW-1")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 34500)
+        rows = self.con.execute(
+            "SELECT line_discount, invoice_share, freight_share, net_total FROM purchase_lines "
+            "WHERE invoice_id=? ORDER BY line_no", (dlg.posted.id,)).fetchall()
+        self.assertEqual(rows, [(5000, 1500, 1000, 14500), (0, 2000, 2000, 20000)])
+        self.assertEqual(inventory.reconcile(self.con), [])
+
     def test_shell_uses_real_purchases_page(self):
         from morv.ui.purchases_page import PurchasesPage
         from morv.ui.shell import MainWindow

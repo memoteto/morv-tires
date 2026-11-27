@@ -314,7 +314,7 @@ class PurchaseForm(QWidget):
 
         self._rows: list[dict] = []
         self._line_table = InvoiceLineTable(
-            ("#", "الصنف", "الكمية", "تكلفة الوحدة", "DOT", "الخصم", "الإجمالي", ""),
+            ("#", "الصنف", "الكمية", "تكلفة الوحدة", "DOT", "الخصم", "الشحن", "الإجمالي", ""),
             purchase=True)
         self._rows_container = self._line_table.rows
         ibody.addWidget(self._line_table, 1)
@@ -526,13 +526,6 @@ class PurchaseForm(QWidget):
         cw.setContentsMargins(0, 0, 0, 0)
         cw.setSpacing(2)
         cost_edit = ltr_edit("0.00")
-        # Only shown for the manual freight basis (see _on_freight_basis_changed); hidden rows add
-        # no row height, which is how this cell already keeps a single line most of the time.
-        freight_row, freight_edit, freight_unit_btn = _amount_or_percent_row("شحن")
-        freight_unit_btn.hide()   # freight is always an amount; no percent mode
-        # A row added after manual basis is already selected must start visible too, not just
-        # rows that existed when the combo changed (see _on_freight_basis_changed).
-        freight_row.setVisible(self.freight_basis.currentData() == "manual")
         cost_note = wrapping_line_label()
         # Hidden (not just empty) so the cell is single-line height like its
         # row-mates; it only grows the row when there is a note to show,
@@ -540,7 +533,6 @@ class PurchaseForm(QWidget):
         # up and out of vertical alignment with the rest of the row.
         cost_note.hide()
         cw.addWidget(cost_edit)
-        cw.addWidget(freight_row)
         cw.addWidget(cost_note)
         h.addWidget(cost_w, 1, Qt.AlignmentFlag.AlignTop)
 
@@ -555,6 +547,21 @@ class PurchaseForm(QWidget):
         disc_row, disc_edit, disc_unit_btn = _amount_or_percent_row(percent_only=True)
         h.addWidget(disc_row, 0, Qt.AlignmentFlag.AlignTop)
 
+        # Keep manual input separate from the calculated share to preserve the draft when switching basis.
+        freight_row = QWidget()
+        freight_layout = QHBoxLayout(freight_row)
+        freight_layout.setContentsMargins(0, 0, 0, 0)
+        freight_layout.setSpacing(0)
+        freight_edit = ltr_edit("0.00")
+        freight_value = QLabel("—")
+        freight_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        freight_layout.addWidget(freight_edit)
+        freight_layout.addWidget(freight_value)
+        manual = self._freight_basis() == "manual"
+        freight_edit.setVisible(manual)
+        freight_value.setVisible(not manual)
+        h.addWidget(freight_row, 0, Qt.AlignmentFlag.AlignTop)
+
         total_lbl = QLabel(ltr(fmt(0)))
         total_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute
                                | Qt.AlignmentFlag.AlignVCenter)
@@ -567,13 +574,17 @@ class PurchaseForm(QWidget):
         del_btn.setToolTip("حذف السطر")
         h.addWidget(del_btn, 0, Qt.AlignmentFlag.AlignTop)
         self._line_table.register_purchase_row(row_w)
+        allocation_note = wrapping_line_label()
+        allocation_note.setObjectName("muted")
+        row_w.layout().addWidget(allocation_note)
+        allocation_note.hide()
 
         row = {"widget": row_w, "item_id": item_id, "kind": kind, "name": name,
               "last_cost": purchasing.last_cost(self.session.con, item_id),
               "num_lbl": num_lbl, "qty_spin": qty_spin, "cost_edit": cost_edit,
               "disc_edit": disc_edit, "disc_unit_btn": disc_unit_btn,
-              "freight_row": freight_row, "freight_edit": freight_edit,
-              "freight_unit_btn": freight_unit_btn,
+              "freight_row": freight_row, "freight_edit": freight_edit, "freight_value": freight_value,
+              "allocation_note": allocation_note,
               "cost_note": cost_note, "dot_edit": dot_edit, "total_lbl": total_lbl}
         qty_spin.valueChanged.connect(self._on_row_changed)
         cost_edit.textChanged.connect(self._on_row_changed)
@@ -606,7 +617,8 @@ class PurchaseForm(QWidget):
     def _on_freight_basis_changed(self) -> None:
         manual = self.freight_basis.currentData() == "manual"
         for row in self._rows:
-            row["freight_row"].setVisible(manual)
+            row["freight_edit"].setVisible(manual)
+            row["freight_value"].setVisible(not manual)
         self._on_row_changed()
 
     def _on_row_changed(self) -> None:
@@ -615,18 +627,15 @@ class PurchaseForm(QWidget):
                 cost = parse_money(row["cost_edit"].text())
             except MoneyError:
                 cost = 0
-            row["total_lbl"].setText(ltr(fmt(row["qty_spin"].value() * cost)))
             self._update_cost_note(row, cost)
-        self._line_table.sync_columns()
         self._line_count_lbl.setText(f"{len(self._rows)} سطر")
         self._refresh_summary()
 
     def _draft_lines(self) -> list[PurchaseLine] | None:
         """Best-effort PurchaseLines from the current row widgets, for the live preview only.
 
-        Unlike _validate_lines, this never reports an error to the person: an unparsable or
-        out-of-range field just makes the preview fall back to a plain subtotal (see
-        _refresh_summary), since the person is still mid-edit.
+        DOT is not needed to calculate cost. Invalid money/quantity fields make the
+        preview unavailable rather than showing a misleading gross amount.
         """
         lines = []
         for row in self._rows:
@@ -636,13 +645,15 @@ class PurchaseForm(QWidget):
                 return None
             qty = row["qty_spin"].value()
             disc = _resolve_amount_or_percent(row["disc_edit"], row["disc_unit_btn"], qty * cost)
-            if disc is None:
+            if cost <= 0 or disc is None or not 0 <= disc <= qty * cost:
                 return None
             freight_share = None
-            if self.freight_basis.currentData() == "manual":
-                freight_share = _resolve_amount_or_percent(
-                    row["freight_edit"], row["freight_unit_btn"], 0)
-                if freight_share is None:
+            if self._freight_basis() == "manual":
+                try:
+                    freight_share = parse_money(row["freight_edit"].text().strip() or "0")
+                except MoneyError:
+                    return None
+                if freight_share < 0:
                     return None
             lines.append(PurchaseLine(row["item_id"], qty, cost, None,
                                        line_discount=disc, freight_share=freight_share))
@@ -712,10 +723,12 @@ class PurchaseForm(QWidget):
                 return None, f"السطر {i} ({row['name']}): خصم السطر: قيمة غير صحيحة."
             freight_share = None
             if manual:
-                freight_share = _resolve_amount_or_percent(
-                    row["freight_edit"], row["freight_unit_btn"], 0)
-                if freight_share is None:
+                try:
+                    freight_share = parse_money(row["freight_edit"].text().strip() or "0")
+                except MoneyError:
                     return None, f"السطر {i} ({row['name']}): نصيب الشحن: قيمة غير صحيحة."
+                if freight_share < 0:
+                    return None, f"السطر {i} ({row['name']}): نصيب الشحن لا يمكن أن يكون سالبًا."
             lines.append(PurchaseLine(row["item_id"], qty, cost, dot,
                                        line_discount=disc, freight_share=freight_share))
         return lines, None
@@ -723,22 +736,45 @@ class PurchaseForm(QWidget):
     def _refresh_summary(self) -> None:
         sub = self._sub_total()
         self._sub_lbl.setText(ltr(fmt(sub)))
-        try:
-            freight_amount = parse_money(self.ship.text())
-        except MoneyError:
-            freight_amount = 0
-        invoice_discount = _resolve_amount_or_percent(self.disc_edit, self.disc_unit_btn, sub)
+        allocations = None
         lines = self._draft_lines()
-        net = sub
-        if lines is not None and invoice_discount is not None:
-            try:
+        try:
+            freight_amount = parse_money(self.ship.text().strip() or "0")
+            invoice_discount = _resolve_amount_or_percent(self.disc_edit, self.disc_unit_btn, sub)
+            if lines and freight_amount >= 0 and invoice_discount is not None and invoice_discount >= 0:
                 allocations = purchasing.compute_allocations(
                     lines, freight_amount, self._freight_basis(), invoice_discount)
-                net = sum(a.net_total for a in allocations)
-            except purchasing.PurchaseError:
-                net = sub  # transient/invalid state mid-edit; shown total falls back to gross
-        self._total_lbl.setText(f"{ltr(fmt(net))} ج.م")
-        self._rem_lbl.setText(f"يُضاف بالكامل لرصيد المورد: {ltr(fmt(net))} ج.م")
+        except (MoneyError, purchasing.PurchaseError):
+            pass  # Incomplete/invalid draft: show no calculated net cost until it is valid.
+
+        for i, row in enumerate(self._rows):
+            note = row["allocation_note"]
+            if allocations is None:
+                row["freight_value"].setText("—")
+                row["total_lbl"].setText("—")
+                note.hide()
+                continue
+            allocation, line = allocations[i], lines[i]
+            row["freight_value"].setText(ltr(fmt(allocation.freight_share)))
+            row["total_lbl"].setText(ltr(fmt(allocation.net_total)))
+            if line.line_discount or allocation.invoice_share or allocation.freight_share:
+                average = (2 * allocation.net_total + line.qty) // (2 * line.qty)
+                approx = "≈ " if allocation.net_total % line.qty else ""
+                note.setText(f"خصم الصنف {ltr(fmt(line.line_discount))} · "
+                             f"حصة خصم الفاتورة {ltr(fmt(allocation.invoice_share))} · "
+                             f"متوسط تكلفة الوحدة {approx}{ltr(fmt(average))} ج.م")
+                note.show()
+            else:
+                note.hide()
+
+        if allocations is None and self._rows:
+            self._total_lbl.setText("—")
+            self._rem_lbl.setText("المعاينة غير مكتملة")
+        else:
+            net = sum(a.net_total for a in allocations) if allocations else 0
+            self._total_lbl.setText(f"{ltr(fmt(net))} ج.م")
+            self._rem_lbl.setText(f"يُضاف بالكامل لرصيد المورد: {ltr(fmt(net))} ج.م")
+        self._line_table.sync_columns()
 
     def _fail(self, text: str) -> bool:
         self.notice.show_message(text)
