@@ -55,6 +55,21 @@ def fmt(minor: int) -> str:
     return f"{sign}{pounds:,}.{piasters:02d}"
 
 
+def allocate(bases: list[int], amount: int) -> list[int]:
+    """Split amount across bases by largest-remainder, exactly proportional, summing to amount."""
+    total = sum(bases)
+    if amount < 0 or amount > total:
+        raise MoneyError("المبلغ الموزَّع أكبر من إجمالي الأساس")
+    if total == 0 or amount == 0:
+        return [0] * len(bases)
+    shares = [b * amount // total for b in bases]
+    left = amount - sum(shares)
+    by_remainder = sorted(range(len(bases)), key=lambda i: (-(bases[i] * amount % total), i))
+    for i in by_remainder[:left]:
+        shares[i] += 1
+    return shares
+
+
 def percent_of(minor: int, rate: str, rounding=ROUND_HALF_UP) -> int:
     try:
         r = Decimal(to_latin(rate).strip())
