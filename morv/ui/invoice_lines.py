@@ -22,6 +22,7 @@ class InvoiceLineTable(QWidget):
     def __init__(self, headings, *, purchase=False):
         super().__init__()
         self.purchase = purchase
+        self.total_column = len(headings) - 2
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(LAYOUT["invoice_line_header_gap"])
@@ -62,7 +63,7 @@ class InvoiceLineTable(QWidget):
         height = max(reference.minimumHeight(), reference.minimumSizeHint().height(),
                      reference.sizeHint().height())
         # Keep single-line labels centered on the first input, even in taller rows.
-        for label in (cells[0], cells[5]):
+        for label in (cells[0], cells[self.total_column]):
             if label.minimumHeight() != height or label.maximumHeight() != height:
                 label.setFixedHeight(height)
         # A wrapped name may grow naturally; its icon remains centered beside it.
@@ -84,8 +85,9 @@ class InvoiceLineTable(QWidget):
             samples = ("9999", "WWYY") if self.purchase and column == 4 else ("999,999.99",)
             widths[column] = max(widths[column], max(self._text_width(self.headers[column], sample)
                                                      for sample in samples) + inset)
-        widths[5] = max(widths[5], self._text_width(self.headers[5], "999,999.99") + 4)
-        widths[6] = LAYOUT["invoice_line_delete_width"]
+        total = self.total_column
+        widths[total] = max(widths[total], self._text_width(self.headers[total], "999,999.99") + 4)
+        widths[-1] = LAYOUT["invoice_line_delete_width"]
 
         for cells in cells_by_row[1:]:
             widths[0] = max(widths[0], self._text_width(cells[0], cells[0].text()) + 2)
@@ -99,9 +101,17 @@ class InvoiceLineTable(QWidget):
                 values = (*samples, editor.placeholderText(), editor.text()[:17])
                 widths[column] = max(widths[column], max(self._text_width(editor, value)
                                                          for value in values) + inset)
-            widths[5] = max(widths[5], self._text_width(cells[5], cells[5].text()) + 4)
+            if self.purchase:
+                discount = cells[5].layout()
+                editor = discount.itemAt(0).widget()
+                toggle = discount.itemAt(1).widget()
+                values = ("999,999.99", editor.placeholderText(), editor.text()[:17])
+                editor_width = max(self._text_width(editor, value) for value in values) + inset
+                widths[5] = max(widths[5], editor_width + toggle.minimumWidth() + discount.spacing())
+            widths[total] = max(widths[total], self._text_width(cells[total], cells[total].text()) + 4)
 
-        name_min = max(widths[1], max(widths[3:6]) + LAYOUT["invoice_line_name_icon_space"])
+        name_min = max(widths[1], max(widths[3], widths[4], widths[total])
+                       + LAYOUT["invoice_line_name_icon_space"])
         for cells in cells_by_row:
             for column, cell in enumerate(cells):
                 if column == 1:

@@ -180,7 +180,8 @@ class _NewSupplierDialog(QuickPartyDialog):
         self.save()
 
 
-def _amount_or_percent_row(label: str = "", placeholder: str = "0.00") -> tuple[QWidget, QLineEdit, QPushButton]:
+def _amount_or_percent_row(label: str = "", placeholder: str = "0.00", *,
+                           percent_only: bool = False) -> tuple[QWidget, QLineEdit, QPushButton]:
     """An amount-or-percent input row, shared by the line and invoice discount inputs."""
     row = QWidget()
     h = QHBoxLayout(row)
@@ -190,12 +191,17 @@ def _amount_or_percent_row(label: str = "", placeholder: str = "0.00") -> tuple[
         h.addWidget(muted(label))
     edit = ltr_edit(placeholder)
     h.addWidget(edit, 1)
-    unit_btn = QPushButton("ج.م")
+    unit_btn = QPushButton("%" if percent_only else "ج.م")
     unit_btn.setObjectName("stepperBtn")
     unit_btn.setCheckable(True)
     unit_btn.setFixedWidth(34)
-    unit_btn.setToolTip("بالمبلغ أو كنسبة من قيمة السطر")
-    unit_btn.toggled.connect(lambda on, b=unit_btn: b.setText("%" if on else "ج.م"))
+    if percent_only:
+        unit_btn.setProperty("percentToggle", True)
+        unit_btn.setAccessibleName("الخصم بالنسبة المئوية")
+        unit_btn.setToolTip("مفعّل: نسبة مئوية؛ غير مفعّل: مبلغ")
+    else:
+        unit_btn.setToolTip("بالمبلغ أو كنسبة من قيمة السطر")
+        unit_btn.toggled.connect(lambda on, b=unit_btn: b.setText("%" if on else "ج.م"))
     h.addWidget(unit_btn)
     return row, edit, unit_btn
 
@@ -308,7 +314,7 @@ class PurchaseForm(QWidget):
 
         self._rows: list[dict] = []
         self._line_table = InvoiceLineTable(
-            ("#", "الصنف", "الكمية", "تكلفة الوحدة", "DOT", "الإجمالي", ""),
+            ("#", "الصنف", "الكمية", "تكلفة الوحدة", "DOT", "الخصم", "الإجمالي", ""),
             purchase=True)
         self._rows_container = self._line_table.rows
         ibody.addWidget(self._line_table, 1)
@@ -520,7 +526,6 @@ class PurchaseForm(QWidget):
         cw.setContentsMargins(0, 0, 0, 0)
         cw.setSpacing(2)
         cost_edit = ltr_edit("0.00")
-        disc_row, disc_edit, disc_unit_btn = _amount_or_percent_row("خصم")
         # Only shown for the manual freight basis (see _on_freight_basis_changed); hidden rows add
         # no row height, which is how this cell already keeps a single line most of the time.
         freight_row, freight_edit, freight_unit_btn = _amount_or_percent_row("شحن")
@@ -535,7 +540,6 @@ class PurchaseForm(QWidget):
         # up and out of vertical alignment with the rest of the row.
         cost_note.hide()
         cw.addWidget(cost_edit)
-        cw.addWidget(disc_row)
         cw.addWidget(freight_row)
         cw.addWidget(cost_note)
         h.addWidget(cost_w, 1, Qt.AlignmentFlag.AlignTop)
@@ -547,6 +551,9 @@ class PurchaseForm(QWidget):
             dot_edit.setSizePolicy(policy)
             dot_edit.hide()
         h.addWidget(dot_edit, 1, Qt.AlignmentFlag.AlignTop)
+
+        disc_row, disc_edit, disc_unit_btn = _amount_or_percent_row(percent_only=True)
+        h.addWidget(disc_row, 0, Qt.AlignmentFlag.AlignTop)
 
         total_lbl = QLabel(ltr(fmt(0)))
         total_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute

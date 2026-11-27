@@ -115,7 +115,8 @@ class InvoiceLineLayoutTest(PosFixture):
         price_key = "cost_edit" if purchase else "price_edit"
         headings = ("#", "الصنف" if purchase else "الصنف / الخدمة", "الكمية",
                     "تكلفة الوحدة" if purchase else "السعر",
-                    "DOT" if purchase else "الخصم", "الإجمالي")
+                    "DOT" if purchase else "الخصم")
+        headings += (("الخصم",) if purchase else ()) + ("الإجمالي",)
         headers = []
         for heading in headings:
             labels = [label for label in page.findChildren(QLabel) if label.text() == heading]
@@ -134,6 +135,8 @@ class InvoiceLineLayoutTest(PosFixture):
                          row["qty_spin"].parentWidget(),
                          row[price_key].parentWidget() if purchase else row[price_key],
                          row["dot_edit"] if purchase else row["disc_edit"], row["total_lbl"]]
+                if purchase:
+                    cells.insert(5, row["disc_edit"].parentWidget())
                 for i, (header, cell) in enumerate(zip(headers, cells, strict=True)):
                     if purchase and i == 4 and row["kind"] == "battery":
                         continue
@@ -146,6 +149,35 @@ class InvoiceLineLayoutTest(PosFixture):
 
     def test_purchase_headers_and_rows_share_column_edges(self):
         self.check_alignment(True)
+
+    def test_purchase_discount_has_room_and_keeps_both_modes(self):
+        from PySide6.QtCore import QPoint
+
+        from morv.ui.tokens import LAYOUT
+
+        win, page = self.invoice(True)
+        row = page._rows[0]
+        edit, toggle = row["disc_edit"], row["disc_unit_btn"]
+        self.assertEqual(toggle.text(), "%")
+        self.assertFalse(toggle.isChecked())
+        for width, height in ((1024, 640), (1366, 768), (1920, 1080)):
+            win.resize(width, height)
+            self.settle()
+            required = edit.fontMetrics().horizontalAdvance("999,999.99") + LAYOUT["invoice_line_edit_inset"]
+            self.assertGreaterEqual(edit.width(), required, "PURCHASE_DISCOUNT_WIDTH")
+            self.assertLess(edit.mapTo(page, QPoint()).x(), row["dot_edit"].mapTo(page, QPoint()).x())
+            self.fits(page.invoice_layout, "PURCHASE_DISCOUNT_NO_CLIP")
+        edit.setText("200")
+        lines, error = page._validate_lines()
+        self.assertIsNone(error)
+        self.assertEqual(lines[0].line_discount, 20000)
+        edit.setText("5")
+        toggle.setChecked(True)
+        lines, error = page._validate_lines()
+        self.assertIsNone(error)
+        self.assertEqual(lines[0].line_discount, 52500)
+        self.assertEqual(toggle.text(), "%")
+        self.assertIsNone(page.posted)
 
     def test_purchase_battery_dot_hidden_and_tire_dot_visible(self):
         _, page = self.invoice(True)
@@ -197,8 +229,10 @@ class InvoiceLineLayoutTest(PosFixture):
                              if label is not name and label.pixmap() is not None
                              and not label.pixmap().isNull()]
                     self.assertEqual(len(icons), 1, "SETUP: item icon")
-                    for key in ("num_lbl", "total_lbl", "qty_spin",
-                                "dot_edit" if purchase else "disc_edit"):
+                    keys = ("num_lbl", "total_lbl", "qty_spin", "disc_edit")
+                    if purchase:
+                        keys += ("dot_edit",)
+                    for key in keys:
                         cell = row[key]
                         if not cell.isVisibleTo(page):
                             continue
