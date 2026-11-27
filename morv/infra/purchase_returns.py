@@ -73,9 +73,44 @@ def returnable(con: sqlite3.Connection, supplier_id: int) -> list[tuple]:
     return [r for r in rows if r[4] > 0]
 
 
+def _shape_return_lines(con, supplier_id: int, lines: list[ReturnLine], day: str) -> list:
+    if not lines:
+        raise PurchaseReturnError("المرتجع بلا أسطر")
+    if len({ln.purchase_line_id for ln in lines}) != len(lines):
+        raise PurchaseReturnError("سطر الشراء مكرر في المرتجع؛ اجمعه في سطر واحد")
+    if not con.execute("SELECT 1 FROM suppliers WHERE id=?", (supplier_id,)).fetchone():
+        raise PurchaseReturnError("المورد غير موجود")
+    shaped = []
+    for no, ln in enumerate(lines, start=1):
+        if type(ln.qty) is not int or ln.qty <= 0:
+            raise PurchaseReturnError(f"السطر {no}: الكمية عدد صحيح موجب")
+        row = _stock_row(con, ln.purchase_line_id, supplier_id)
+        if row is None or row[1] not in STOCKED:
+            raise PurchaseReturnError(f"السطر {no}: سطر شراء غير موجود لهذا المورد أو صنف غير مخزّن")
+        if day < row[3]:
+            raise PurchaseReturnError(f"السطر {no}: تاريخ المرتجع قبل تاريخ استلام الدفعة")
+        if ln.qty > min(row[5], row[7]):
+            raise PurchaseReturnError(f"السطر {no}: الكمية أكبر من المتاح في الدفعة {row[9]} ({min(row[5], row[7])})")
+        if row[10] - row[11] != row[8]:
+            raise PurchaseReturnError(f"السطر {no}: تكلفة الطبقة لا تطابق صافي تخصيصاتها المسجلة؛ راجع المخزون")
+        value = costing.slice_cost(row[8], row[7], ln.qty)
+        shaped.append((no, ln, row, value))
+    return shaped
+
+
+def preview_book_total(con: sqlite3.Connection, supplier_id: int, lines: list[ReturnLine],
+                       return_date: str | None = None) -> int:
+    """Read-only preview using the same lot, layer and rounding rules as posting."""
+    try:
+        day = ledger.valid_date(return_date or date.today().isoformat(), "تاريخ المرتجع")
+    except ledger.LedgerError as e:
+        raise PurchaseReturnError(str(e)) from e
+    return sum(x[3] for x in _shape_return_lines(con, supplier_id, lines, day))
+
+
 def post_return(con: sqlite3.Connection, by, *, request_key: str, supplier_id: int, lines: list[ReturnLine],
                 reason: str, return_date: str | None = None, settlement_amount: int | None = None,
-                settlement_reason: str | None = None) -> PostedReturn:
+                settlement_reason: str | None = None, expected_book_total: int | None = None) -> PostedReturn:
     """Sends lot quantities back at their book value and settles what the shop owes the supplier.
 
     settlement_amount is the agreed amount the supplier actually credits; it defaults to the book value
@@ -107,24 +142,10 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, supplier_id: i
             if old[3] != digest:
                 raise PurchaseReturnError("مفتاح الطلب سبق استخدامه لمرتجع بمحتوى مختلف")
             return PostedReturn(old[0], old[1], old[2], True)
-        if not con.execute("SELECT 1 FROM suppliers WHERE id=?", (supplier_id,)).fetchone():
-            raise PurchaseReturnError("المورد غير موجود")
-        shaped = []
-        for no, ln in enumerate(lines, start=1):
-            if type(ln.qty) is not int or ln.qty <= 0:
-                raise PurchaseReturnError(f"السطر {no}: الكمية عدد صحيح موجب")
-            row = _stock_row(con, ln.purchase_line_id, supplier_id)
-            if row is None or row[1] not in STOCKED:
-                raise PurchaseReturnError(f"السطر {no}: سطر شراء غير موجود لهذا المورد أو صنف غير مخزّن")
-            if day < row[3]:
-                raise PurchaseReturnError(f"السطر {no}: تاريخ المرتجع قبل تاريخ استلام الدفعة")
-            if ln.qty > min(row[5], row[7]):
-                raise PurchaseReturnError(f"السطر {no}: الكمية أكبر من المتاح في الدفعة {row[9]} ({min(row[5], row[7])})")
-            if row[10] - row[11] != row[8]:
-                raise PurchaseReturnError(f"السطر {no}: تكلفة الطبقة لا تطابق صافي تخصيصاتها المسجلة؛ راجع المخزون")
-            value = costing.slice_cost(row[8], row[7], ln.qty)
-            shaped.append((no, ln, row, value))
+        shaped = _shape_return_lines(con, supplier_id, lines, day)
         total = sum(x[3] for x in shaped)
+        if expected_book_total is not None and expected_book_total != total:
+            raise PurchaseReturnError("تغيّرت القيمة الدفترية للمرتجع؛ راجع المعاينة قبل الترحيل")
         settle = total if settlement_amount is None else settlement_amount
         diff = settle - total
         if diff and len(settlement_reason) < 3:
