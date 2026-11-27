@@ -108,9 +108,13 @@ class ChartOfAccounts(_TempDir):
                 self.assertEqual(len(code), 1, code)
 
     def test_no_unused_accounts(self):
-        names = " ".join(r[0] for r in self.con.execute("SELECT name FROM accounts"))
+        rows = self.con.execute("SELECT code, name FROM accounts").fetchall()
+        names = " ".join(r[1] for r in rows)
         self.assertNotIn("مقدمات العملاء", names)
-        self.assertNotIn("ضريبة", names)
+        # P04-4a (claude/p04-vat-design-2026-11-27.md) is the one owner-approved exception:
+        # exactly 1520/2350 may name a VAT account; any other such account is still unapproved speculation.
+        tax_codes = {code for code, name in rows if "ضريبة" in name}
+        self.assertEqual(tax_codes, {"1520", "2350"})
 
 
 class Backups(_TempDir):
