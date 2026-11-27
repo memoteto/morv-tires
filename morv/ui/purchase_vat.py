@@ -1,5 +1,5 @@
 """VAT controls shared by full/quick supplier forms and purchase invoice exceptions."""
-from PySide6.QtWidgets import QCheckBox, QComboBox, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QPushButton, QVBoxLayout, QWidget
 
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.infra.suppliers import VAT_STATUSES
@@ -19,24 +19,30 @@ def _combo(options, selected):
     return combo
 
 
-class SupplierVatFields(QWidget):
-    """One shared editor for supplier VAT defaults; no inferred registration."""
+class SupplierVatFields:
+    """Shared controls installed into the host's existing layout and label style."""
 
-    def __init__(self, supplier=None, parent=None):
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+    def __init__(self, layout, supplier=None):
+        self.layout = layout
         self.status = _combo(VAT_STATUSES, supplier.vat_status if supplier else "unknown")
-        self.prices = _combo({False: "غير شاملة الضريبة", True: "شاملة الضريبة"},
+        self.prices = _combo({False: "غير شامل الضريبة", True: "شامل الضريبة"},
                              supplier.vat_prices_inclusive if supplier else False)
-        layout.addWidget(field("التسجيل في ضريبة القيمة المضافة", self.status))
-        self.prices_field = field("أسعار الشراء المعتادة", self.prices)
-        layout.addWidget(self.prices_field)
+        if isinstance(layout, QFormLayout):
+            layout.addRow("القيمة المضافة", self.status)
+            layout.addRow("أساس السعر", self.prices)
+        else:
+            layout.addWidget(field("القيمة المضافة", self.status))
+            self.prices_field = field("أساس السعر", self.prices)
+            layout.addWidget(self.prices_field)
         self.status.currentIndexChanged.connect(self._refresh)
         self._refresh()
 
     def _refresh(self, *_args):
-        self.prices_field.setVisible(self.status.currentData() == "registered")
+        visible = self.status.currentData() == "registered"
+        if isinstance(self.layout, QFormLayout):
+            self.layout.setRowVisible(self.prices, visible)
+        else:
+            self.prices_field.setVisible(visible)
 
     def values(self):
         return self.status.currentData(), bool(self.prices.currentData())

@@ -175,10 +175,9 @@ class _NewSupplierDialog(QuickPartyDialog):
     def __init__(self, name_hint: str, mobile_hint: str, session, parent=None):
         super().__init__(session, "المورد", name_hint, mobile_hint, sup_infra.SupplierError,
                          optional=True, parent=parent)
-        self.vat_fields = SupplierVatFields()
         self.tax_id = ltr_edit("")
-        self.body.addWidget(self.vat_fields)
         self.body.addWidget(field("رقم التسجيل الضريبي", self.tax_id))
+        self.vat_fields = SupplierVatFields(self.body)
 
     def _create_party(self, name, mobile):
         return sup_infra.create(self.session.con, self.session.user,
@@ -300,9 +299,7 @@ class PurchaseForm(QWidget):
             [("رقم فاتورة المورد", self.inv_no), ("تاريخ فاتورة المورد", self.inv_date),
              ("ملاحظة", self.notes)],
             "تفاصيل الفاتورة والملاحظة", self._extra_summary_text, stretches=(2, 2, 3))
-        self.vat_details_btn = QPushButton("تفاصيل الضريبة")
-        self.vat_details_btn.clicked.connect(self._edit_vat_details)
-        self.extra_box.layout().addWidget(self.vat_details_btn, 1, 0, 1, 3)
+        self.vat_details_btn = self.extra_box.add_detail_action("تفاصيل الضريبة", self._edit_vat_details)
         self.vat_details_btn.setVisible(self._vat_enabled)
         self.extra_toggle = self.extra_box.toggle
         self.extra_summary = self.extra_box.summary

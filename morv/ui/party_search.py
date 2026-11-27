@@ -282,6 +282,15 @@ class FoldableDetails(QWidget):
         self.hide()
         self.refresh()
 
+    def add_detail_action(self, title, callback):
+        """Secondary action inside the existing folded details, never a page action."""
+        button = QPushButton(title)
+        button.setObjectName("link")
+        button.clicked.connect(callback)
+        grid = self.layout()
+        grid.addWidget(button, grid.rowCount(), 0, 1, grid.columnCount())
+        return button
+
     def refresh(self, *_args):
         self.summary.setText(self.summary_text())
 

@@ -57,9 +57,9 @@ class SuppliersPage(ListPage):
         if s.commercial_reg:
             extra.append(("السجل التجاري", ltr(s.commercial_reg)))
         if s.vat_status != "unknown":
-            extra.append(("التسجيل في ضريبة القيمة المضافة", suppliers.VAT_STATUSES[s.vat_status]))
+            extra.append(("القيمة المضافة", suppliers.VAT_STATUSES[s.vat_status]))
             if s.vat_status == "registered":
-                extra.append(("أسعار الشراء", "شاملة الضريبة" if s.vat_prices_inclusive else "غير شاملة الضريبة"))
+                extra.append(("أساس السعر", "شامل الضريبة" if s.vat_prices_inclusive else "غير شامل الضريبة"))
         if s.tax_id:
             extra.append(("الرقم الضريبي", ltr(s.tax_id)))
         if s.bank_info:
@@ -158,7 +158,6 @@ class SupplierDialog(Modal):
         self.creg.setText(s.commercial_reg if s else "")
         self.tax = ltr_edit("")
         self.tax.setText(s.tax_id if s else "")
-        self.vat_fields = SupplierVatFields(s)
         self.bank = ltr_edit("اسم البنك ورقم الحساب أو رقم المحفظة")
         self.bank.setText(s.bank_info if s else "")
         mf.addRow("اسم المسؤول / المندوب", self.contact)
@@ -170,7 +169,7 @@ class SupplierDialog(Modal):
         mf.addRow("طريقة السداد المفضلة", self.pay)
         mf.addRow("السجل التجاري", self.creg)
         mf.addRow("رقم التسجيل الضريبي", self.tax)
-        mf.addRow(self.vat_fields)
+        self.vat_fields = SupplierVatFields(mf, s)
         mf.addRow("بيانات التحويل", self.bank)
         self.more_box.setLayout(mf)
         self.more_box.setVisible(False)

@@ -544,6 +544,57 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertIn("0.00", dlg.tax.text())
         self.assertIn("5,000.00", dlg._total_lbl.text())
 
+    def test_supplier_vat_rows_match_existing_form(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QFormLayout
+        from morv.infra import suppliers
+        from morv.ui import theme
+        from morv.ui.suppliers_page import SupplierDialog
+        from tests.test_ui_invoice_summary_polish import contrast
+
+        old = (self.app.palette(), self.app.styleSheet(), self.app.font(), self.app.layoutDirection())
+        self.addCleanup(self.app.setPalette, old[0])
+        self.addCleanup(self.app.setStyleSheet, old[1])
+        self.addCleanup(self.app.setFont, old[2])
+        self.addCleanup(self.app.setLayoutDirection, old[3])
+        theme.apply(self.app, False)
+        dlg = self.destroy_on_cleanup(SupplierDialog(self.session, suppliers.get(self.con, self.sup)))
+        dlg.more.setChecked(True)
+        dlg.show()
+        self.app.processEvents()
+        layout = dlg.more_box.layout()
+        self.assertIsInstance(layout, QFormLayout)
+        vat = dlg.vat_fields
+        old_label = layout.labelForField(dlg.tax)
+        status_label = layout.labelForField(vat.status)
+        price_label = layout.labelForField(vat.prices)
+        self.assertEqual(status_label.text(), "القيمة المضافة")
+        self.assertEqual(price_label.text(), "أساس السعر")
+        self.assertTrue(vat.prices.isHidden())
+        self.assertTrue(price_label.isHidden())
+        vat.status.setCurrentIndex(vat.status.findData("registered"))
+        self.app.processEvents()
+        layout.activate()
+        self.assertFalse(vat.prices.isHidden())
+        self.assertFalse(price_label.isHidden())
+        self.assertEqual(dlg.layoutDirection(), Qt.LayoutDirection.RightToLeft)
+        for label, editor in ((status_label, vat.status), (price_label, vat.prices)):
+            self.assertEqual(label.objectName(), old_label.objectName())
+            self.assertEqual(label.font(), old_label.font())
+            self.assertEqual(editor.geometry().x(), dlg.tax.geometry().x())
+            self.assertEqual(editor.width(), dlg.tax.width())
+            self.assertGreater(label.geometry().left(), editor.geometry().right())
+            self.assertEqual(label.palette().color(label.foregroundRole()),
+                             old_label.palette().color(old_label.foregroundRole()))
+            image = label.grab().toImage()
+            bg = image.pixelColor(0, 0)
+            self.assertGreaterEqual(contrast(label.palette().color(label.foregroundRole()), bg), 4.5)
+        self.assertEqual(vat.prices.itemText(0), "غير شامل الضريبة")
+        self.assertEqual(vat.prices.itemText(1), "شامل الضريبة")
+        vat.status.setCurrentIndex(vat.status.findData("unregistered"))
+        self.assertTrue(vat.prices.isHidden())
+        self.assertTrue(price_label.isHidden())
+
     def test_full_and_quick_supplier_vat_defaults_are_saved(self):
         from morv.infra import suppliers
         from morv.ui.purchases_page import _NewSupplierDialog
