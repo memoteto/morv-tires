@@ -6,12 +6,14 @@ from dataclasses import dataclass
 
 from morv.core import dot as dotmod
 from morv.core import money
-from morv.infra import ledger
+from morv.core import tax as taxmod
+from morv.infra import ledger, settings
 from morv.infra.db.connection import transaction
 from morv.infra.users import audit, has_permission
 
 INVENTORY_ACCOUNT = "1410"     # tyre and battery stock
 SUPPLIERS_ACCOUNT = "2110"     # suppliers
+INPUT_VAT_ACCOUNT = "1520"     # deductible input VAT (P04-4b)
 FREIGHT_BASES = ("qty", "value", "manual")
 
 
@@ -42,6 +44,14 @@ class LineAllocation:
     invoice_share: int
     freight_share: int
     net_total: int
+
+
+@dataclass(frozen=True)
+class LineTax:
+    tax_base: int
+    rate_bp: int
+    tax_amount: int
+    cost_amount: int
 
 
 def next_number_preview(con: sqlite3.Connection) -> str:
@@ -84,9 +94,12 @@ def _shape_lines(lines, freight_basis: str) -> list:
     return out
 
 
-def _check_items(con, lines: list) -> None:
+def _check_items(con, lines: list) -> dict:
+    """Validates each line's item and returns {item_id: (tax_treatment, tax_rate)} for P04-4b."""
+    tax_info = {}
     for i, ln in enumerate(lines, start=1):
-        row = con.execute("SELECT kind, active FROM items WHERE id=?", (ln.item_id,)).fetchone()
+        row = con.execute("SELECT kind, active, tax_treatment, tax_rate FROM items WHERE id=?",
+                          (ln.item_id,)).fetchone()
         if not row:
             raise PurchaseError(f"السطر {i}: الصنف غير موجود")
         if not row[1]:
@@ -95,10 +108,21 @@ def _check_items(con, lines: list) -> None:
             raise PurchaseError(f"السطر {i}: الخدمات لا تُشترى ولا تُخزَّن")
         if row[0] == "tire" and not ln.dot:
             raise PurchaseError(f"السطر {i}: رمز DOT إلزامي للإطارات")
+        tax_info[ln.item_id] = (row[2], row[3])
+    return tax_info
 
 
 def _payload_hash(supplier_id, inv_no, inv_date, recv_date, lines, freight_amount, freight_basis,
-                  invoice_discount) -> str:
+                  invoice_discount, prices_tax_inclusive, freight_taxable) -> str:
+    body = [supplier_id, inv_no, inv_date, recv_date, freight_amount, freight_basis, invoice_discount,
+            int(prices_tax_inclusive), int(freight_taxable),
+            [[x.item_id, x.qty, x.unit_cost, x.dot, x.line_discount, x.freight_share] for x in lines]]
+    return hashlib.sha256(json.dumps(body, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def _pre_tax_payload_hash(supplier_id, inv_no, inv_date, recv_date, lines, freight_amount, freight_basis,
+                          invoice_discount) -> str:
+    """Pre-P04-4b signature (#175 and earlier), kept so in-flight request_key replays still match."""
     body = [supplier_id, inv_no, inv_date, recv_date, freight_amount, freight_basis, invoice_discount,
             [[x.item_id, x.qty, x.unit_cost, x.dot, x.line_discount, x.freight_share] for x in lines]]
     return hashlib.sha256(json.dumps(body, ensure_ascii=False).encode("utf-8")).hexdigest()
@@ -154,6 +178,7 @@ def compute_allocations(clean: list, freight_amount: int, freight_basis: str,
 def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: int, supplier_invoice_no: str,
                  invoice_date: str, lines: list, received_date: str | None = None,
                  freight_amount: int = 0, freight_basis: str = "qty", invoice_discount: int = 0,
+                 prices_tax_inclusive: bool = False, freight_taxable: bool = False,
                  notes: str | None = None) -> PostedInvoice:
     if by is None or not has_permission(con, by, "purchases.post"):
         raise PurchaseError("لا تملك صلاحية ترحيل فواتير الشراء")
@@ -169,6 +194,8 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
         raise PurchaseError("أساس توزيع الشحن غير معروف")
     if type(invoice_discount) is not int or invoice_discount < 0:
         raise PurchaseError("خصم الفاتورة عدد صحيح بالقرش لا يقل عن صفر")
+    if type(prices_tax_inclusive) is not bool or type(freight_taxable) is not bool:
+        raise PurchaseError("خيارا الضريبة الشاملة وخضوع الشحن قيمتان منطقيتان")
     try:
         inv_date = ledger.valid_date(invoice_date, "تاريخ الفاتورة")
         recv_date = ledger.valid_date(received_date or invoice_date, "تاريخ الاستلام")
@@ -177,17 +204,20 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
     with transaction(con):
         clean = _shape_lines(lines, freight_basis)
         h = _payload_hash(supplier_id, inv_no.casefold(), inv_date, recv_date, clean, freight_amount,
-                          freight_basis, invoice_discount)
+                          freight_basis, invoice_discount, prices_tax_inclusive, freight_taxable)
         old = con.execute("SELECT id, number, total, payload_hash FROM purchase_invoices WHERE request_key=?",
                           (key,)).fetchone()
         if old:
             legacy_match = (freight_amount == 0 and freight_basis == "qty" and invoice_discount == 0
                             and all(ln.line_discount == 0 and ln.freight_share is None for ln in clean)
                             and old[3] == _legacy_payload_hash(supplier_id, inv_no.casefold(), inv_date, recv_date, clean))
-            if old[3] != h and not legacy_match:
+            pre_tax_match = (not prices_tax_inclusive and not freight_taxable
+                            and old[3] == _pre_tax_payload_hash(supplier_id, inv_no.casefold(), inv_date, recv_date,
+                                                                clean, freight_amount, freight_basis, invoice_discount))
+            if old[3] != h and not legacy_match and not pre_tax_match:
                 raise PurchaseError("مفتاح الطلب سبق استخدامه لفاتورة بمحتوى مختلف")
             return PostedInvoice(old[0], old[1], old[2], True)
-        _check_items(con, clean)        # After the replay check: deactivating an item later must not block a replayed request
+        tax_info = _check_items(con, clean)  # After the replay check: deactivating an item later must not block a replay
         sup = con.execute("SELECT active FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
         if not sup:
             raise PurchaseError("المورد غير موجود")
@@ -197,34 +227,51 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
                        (supplier_id, inv_no)).fetchone():
             raise PurchaseError("فاتورة بنفس رقم فاتورة المورد مرحّلة من قبل")
         allocations = compute_allocations(clean, freight_amount, freight_basis, invoice_discount)
-        total = sum(a.net_total for a in allocations)
+        tax_enabled = settings.get(con, "tax.enabled", "0") == "1"
+        general_rate = int(settings.get(con, "tax.rate", "0"))
+        tax_calcs = []
+        for ln, a in zip(clean, allocations, strict=True):
+            treatment, item_rate = tax_info[ln.item_id]
+            rate_bp = taxmod.resolve_rate(treatment, item_rate, general_rate) if tax_enabled else 0
+            tax_base, tax_amount, cost_amount = taxmod.purchase_line_split(
+                a.net_total, a.freight_share, freight_taxable, rate_bp, prices_tax_inclusive)
+            tax_calcs.append(LineTax(tax_base, rate_bp, tax_amount, cost_amount))
+        tax_total = sum(c.tax_amount for c in tax_calcs)
+        total = sum(c.cost_amount + c.tax_amount for c in tax_calcs)
         inv_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM purchase_invoices").fetchone()[0]
         number = f"PI-{inv_id:06d}"
+        entry_lines = [(INVENTORY_ACCOUNT, total - tax_total, 0)]
+        if tax_total > 0:
+            entry_lines.append((INPUT_VAT_ACCOUNT, tax_total, 0))
+        entry_lines.append((SUPPLIERS_ACCOUNT, 0, total))
         try:
             entry_id = ledger.post_entry(con, by, recv_date, "purchase_invoice", inv_id, f"فاتورة شراء {number}",
-                                         [(INVENTORY_ACCOUNT, total, 0), (SUPPLIERS_ACCOUNT, 0, total)])
+                                         entry_lines)
         except ledger.LedgerError as e:
             raise PurchaseError(str(e)) from e
         con.execute(
             "INSERT INTO purchase_invoices (id, number, request_key, payload_hash, supplier_id, supplier_invoice_no, "
             "invoice_date, received_date, total, freight_amount, freight_basis, invoice_discount, "
-            "journal_entry_id, notes, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "prices_tax_inclusive, freight_taxable, tax_total, journal_entry_id, notes, user_id) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (inv_id, number, key, h, supplier_id, inv_no, inv_date, recv_date, total, freight_amount,
-             freight_basis, invoice_discount, entry_id, (notes or "").strip() or None, by.id))
-        for no, (ln, a) in enumerate(zip(clean, allocations, strict=True), start=1):
-            _receive_line(con, by, inv_id, number, no, ln, recv_date, a.invoice_share, a.freight_share, a.net_total)
+             freight_basis, invoice_discount, int(prices_tax_inclusive), int(freight_taxable), tax_total,
+             entry_id, (notes or "").strip() or None, by.id))
+        for no, (ln, a, c) in enumerate(zip(clean, allocations, tax_calcs, strict=True), start=1):
+            _receive_line(con, by, inv_id, number, no, ln, recv_date, a.invoice_share, a.freight_share, a.net_total, c)
         audit(con, by, "purchase.post", "purchase_invoice", inv_id, f"{number} · {total}")
     return PostedInvoice(inv_id, number, total, False)
 
 
 def _receive_line(con, by, inv_id: int, number: str, no: int, ln: PurchaseLine, recv_date: str,
-                  invoice_share: int, freight_share: int, net_total: int) -> None:
+                  invoice_share: int, freight_share: int, net_total: int, tax: LineTax) -> None:
     gross = ln.qty * ln.unit_cost
     line_id = con.execute(
         "INSERT INTO purchase_lines (invoice_id, line_no, item_id, dot, qty, unit_cost, line_total, "
-        "line_discount, invoice_share, freight_share, net_total) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "line_discount, invoice_share, freight_share, net_total, tax_base, tax_rate, tax_amount) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (inv_id, no, ln.item_id, ln.dot, ln.qty, ln.unit_cost, gross, ln.line_discount, invoice_share,
-         freight_share, net_total)).lastrowid
+         freight_share, net_total, tax.tax_base, tax.rate_bp, tax.tax_amount)).lastrowid
     lot_id = con.execute(
         "INSERT INTO stock_lots (ref_no, item_id, purchase_line_id, dot, mfg_key, received_date, qty_received, "
         "qty_on_hand, purchase_unit_cost) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -232,6 +279,8 @@ def _receive_line(con, by, inv_id: int, number: str, no: int, ln: PurchaseLine, 
          ln.qty, ln.qty, ln.unit_cost)).lastrowid
     con.execute("INSERT INTO stock_movements (item_id, lot_id, kind, qty, purchase_line_id, user_id) "
                 "VALUES (?,?,?,?,?,?)", (ln.item_id, lot_id, "receipt", ln.qty, line_id, by.id))
+    # cost_layers/cost_layers.cost_total feed FIFO and purchase returns with the TAX-EXCLUDED book
+    # value (P04-4b); the deductible tax portion never sits in inventory cost.
     con.execute("INSERT INTO cost_layers (item_id, purchase_line_id, received_date, qty_received, cost_total, "
                 "qty_remaining, cost_remaining) VALUES (?,?,?,?,?,?,?)",
-                (ln.item_id, line_id, recv_date, ln.qty, net_total, ln.qty, net_total))
+                (ln.item_id, line_id, recv_date, ln.qty, tax.cost_amount, ln.qty, tax.cost_amount))

@@ -1,14 +1,15 @@
 """P04-4a: migration 0034 adds the VAT accounts, settings defaults and per-item treatment only."""
+import hashlib
 import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
-from morv.infra import inventory, ledger, purchasing, settings, users
+from morv.core import dot as dotmod
+from morv.infra import inventory, ledger, settings, users
 from morv.infra.db.bootstrap import open_main_db
-from morv.infra.db.connection import open_db
+from morv.infra.db.connection import open_db, transaction
 from morv.infra.db.migrator import current_version, load_migrations, migrate
-from morv.infra.purchasing import PurchaseLine
 
 
 class FreshDbTest(unittest.TestCase):
@@ -62,8 +63,9 @@ class OldDbUpgradeTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.con = open_db(Path(self.temp.name) / "old.db", create=True)
         self.addCleanup(self.con.close)
-        self.migrations = load_migrations()
-        self.assertEqual((self.migrations[33].version, self.migrations[33].name), (34, "vat_foundation"))
+        all_migrations = load_migrations()
+        self.assertEqual((all_migrations[33].version, all_migrations[33].name), (34, "vat_foundation"))
+        self.migrations = all_migrations[:34]      # this test is about migration 0034 only
         migrate(self.con, self.migrations[:33])
         self.assertEqual(current_version(self.con), 33)
 
@@ -72,7 +74,10 @@ class OldDbUpgradeTest(unittest.TestCase):
             "VALUES ('battery', 'OLD-B1', 'x', 'x', 100, 100, 100)").lastrowid
 
         # a real posted purchase: stock lot, cost layer, journal entry and a supplier balance
-        # already exist at v33, so the upgrade must leave every one of them untouched.
+        # already exist at v33, so the upgrade must leave every one of them untouched. Seeded by
+        # raw SQL mirroring the v33 shape, not purchasing.post_invoice -- that function now reads
+        # items.tax_treatment/tax_rate (P04-4b), columns migration 0034 itself has not added yet
+        # at this point in the test.
         self.manager = users.create_user(self.con, None, "vat_old_admin", "مدير", "Admin12345", "manager")
         self.supplier_id = self.con.execute(
             "INSERT INTO suppliers (name, name_norm, mobile) VALUES ('مورد', 'مورد', '01000000002') "
@@ -80,10 +85,7 @@ class OldDbUpgradeTest(unittest.TestCase):
         self.purchase_item = self.con.execute(
             "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
             "VALUES ('tire', 'OLD-T1', 'x', 'x', 100, 100, 100) RETURNING id").fetchone()[0]
-        purchasing.post_invoice(
-            self.con, self.manager, request_key="vat-old-key-01", supplier_id=self.supplier_id,
-            supplier_invoice_no="S-OLD-1", invoice_date="2026-11-01",
-            lines=[PurchaseLine(self.purchase_item, 5, 20000, "2324")])
+        self._seed_v33_purchase(qty=5, unit_cost=20000, dot="2324")
 
         self.before = (
             current_version(self.con),
@@ -93,6 +95,35 @@ class OldDbUpgradeTest(unittest.TestCase):
             self.con.execute("SELECT count(*) FROM journal_entries").fetchone()[0],
             self.con.execute("SELECT count(*) FROM purchase_invoices").fetchone()[0],
         )
+
+    def _seed_v33_purchase(self, qty: int, unit_cost: int, dot: str) -> None:
+        total = qty * unit_cost
+        with transaction(self.con):
+            entry_id = ledger.post_entry(
+                self.con, self.manager, "2026-11-01", "purchase_invoice", 1, "فاتورة شراء PI-000001",
+                [("1410", total, 0), ("2110", 0, total)])
+            h = hashlib.sha256(b"vat-foundation-fixture-v33").hexdigest()
+            inv_id = self.con.execute(
+                "INSERT INTO purchase_invoices (number, request_key, payload_hash, supplier_id, "
+                "supplier_invoice_no, invoice_date, received_date, total, journal_entry_id, user_id) "
+                "VALUES ('PI-000001', 'vat-old-key-01', ?, ?, 'S-OLD-1', '2026-11-01', '2026-11-01', "
+                "?, ?, ?)", (h, self.supplier_id, total, entry_id, self.manager.id)).lastrowid
+            line_id = self.con.execute(
+                "INSERT INTO purchase_lines (invoice_id, line_no, item_id, dot, qty, unit_cost, line_total, "
+                "net_total) VALUES (?, 1, ?, ?, ?, ?, ?, ?)",
+                (inv_id, self.purchase_item, dot, qty, unit_cost, total, total)).lastrowid
+            lot_id = self.con.execute(
+                "INSERT INTO stock_lots (ref_no, item_id, purchase_line_id, dot, mfg_key, received_date, "
+                "qty_received, qty_on_hand, purchase_unit_cost) VALUES "
+                "('PI-000001/1', ?, ?, ?, ?, '2026-11-01', ?, ?, ?)",
+                (self.purchase_item, line_id, dot, dotmod.mfg_key(dot), qty, qty, unit_cost)).lastrowid
+            self.con.execute(
+                "INSERT INTO stock_movements (item_id, lot_id, kind, qty, purchase_line_id, user_id) "
+                "VALUES (?, ?, 'receipt', ?, ?, ?)", (self.purchase_item, lot_id, qty, line_id, self.manager.id))
+            self.con.execute(
+                "INSERT INTO cost_layers (item_id, purchase_line_id, received_date, qty_received, cost_total, "
+                "qty_remaining, cost_remaining) VALUES (?, ?, '2026-11-01', ?, ?, ?, ?)",
+                (self.purchase_item, line_id, qty, total, qty, total))
 
     def test_upgrade_backfills_standard_treatment_on_existing_item(self):
         migrate(self.con, self.migrations)
