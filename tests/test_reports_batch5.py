@@ -52,6 +52,19 @@ class SupplierAgingTest(Base):
         self.assertEqual([r[1][-1] for r in t.rows if r[0] == "grand"], [100000])
         self.assertIn("يطابق الدفتر", t.subtitle)
 
+    def test_return_settlement_differing_from_book_value_still_ties(self):
+        # full return of a 200000 invoice settled for only 180000: 20000 stays payable (matches
+        # supplier_balances/treasury.supplier_owed), not zero as book-value aggregation would show.
+        self.buy(self.tire, 2, 100000, invoice_date="2026-11-01")
+        line_id = self.con.execute("SELECT id FROM purchase_lines").fetchone()[0]
+        purchase_returns.post_return(self.con, self.admin, request_key="ret-key-0002", supplier_id=self.sup,
+                                     lines=[ReturnLine(line_id, 2)], reason="فحص الجودة", return_date="2026-11-10",
+                                     settlement_amount=180000, settlement_reason="خصم المورد قيمة الفحص")
+        t = self.aging()
+        self.assertEqual([r[1][-1] for r in t.rows if r[0] == "grand"], [20000])
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), 20000)
+        self.assertIn("يطابق الدفتر", t.subtitle)
+
     def test_date_filter_ignores_later_documents(self):
         self.buy(self.tire, 1, 100000, invoice_date="2026-11-01")
         self.assertEqual(self.aging("2026-10-31").rows[-1][1][-1], 0)
