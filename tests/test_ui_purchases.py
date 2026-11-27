@@ -602,6 +602,10 @@ class PurchasesUiTest(unittest.TestCase):
                             f"SUPPLIER_FOLD_GAPS baseline={baseline} folded={folded}")
             dlg.more.setChecked(True)
             settle()
+            reopened = measure(dlg)
+            self.assertLessEqual(abs(reopened["height"] - expanded["height"]), 4,
+                                 f"SUPPLIER_REOPEN_HEIGHT expanded={expanded} reopened={reopened}")
+            self.assertTrue(reopened["footer_visible"])
 
     def test_supplier_vat_rows_match_existing_form(self):
         from PySide6.QtCore import Qt

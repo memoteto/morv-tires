@@ -68,6 +68,30 @@ class AuditLogTest(unittest.TestCase):
                 "reflow_pending": tab.columns.timer.isActive(),
                 "first_row_detail_matches": tab.model.index(0, 3).data() == detail,
             }
+            if observed["row_height"] <= 36:
+                from PySide6.QtGui import QFontMetrics
+                from PySide6.QtWidgets import QStyleOptionViewItem
+
+                index = tab.model.index(0, 3)
+                width_px = tab.view.columnWidth(3)
+                metrics = QFontMetrics(tab.view.font())
+                option = QStyleOptionViewItem()
+                option.initFrom(tab.view)
+                option.font = tab.view.font()
+                option.rect = QRect(0, 0, width_px, tab.view.rowHeight(0))
+                option.features |= QStyleOptionViewItem.ViewItemFeature.WrapText
+                delegate = tab.view.itemDelegateForIndex(index)
+                observed.update({
+                    "text_advance": metrics.horizontalAdvance(detail),
+                    "measured_wrapped_height": metrics.boundingRect(
+                        QRect(0, 0, max(1, width_px - 20), 100000),
+                        int(Qt.TextFlag.TextWordWrap), detail).height(),
+                    "delegate_hint": delegate.sizeHint(option, index).toTuple(),
+                    "detail_rect": tab.view.visualRect(index).getRect(),
+                    "visible_columns": [tab.view.columnAt(x) for x in
+                                        (0, tab.view.viewport().width() // 2,
+                                         tab.view.viewport().width() - 1)],
+                })
             self.assertGreater(tab.view.rowHeight(0), 36, f"AUDIT_ROW_LAYOUT {observed}")
             self.assertGreaterEqual(tab.view.rowHeight(0), tab.view.sizeHintForRow(0),
                                     f"AUDIT_ROW_LAYOUT {observed}")

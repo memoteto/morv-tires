@@ -132,7 +132,6 @@ class SupplierDialog(Modal):
         self.body.addWidget(muted("الرصيد السابق مع المورد يُدخل مع مرحلة الخزينة."))
 
         self.more = QCheckBox("بيانات إضافية (اختيارية)")
-        self.more.toggled.connect(lambda on: self.more_box.setVisible(on))
         self.body.addWidget(self.more)
         self.more_box = QWidget()
         mf = form()
@@ -174,6 +173,9 @@ class SupplierDialog(Modal):
         self.more_box.setLayout(mf)
         self.more_box.setVisible(False)
         self.body.addWidget(self.more_box)
+        self.more.toggled.connect(self.more_box.setVisible)
+        self.more.toggled.connect(self.request_content_fit)
+        self.vat_fields.status.currentIndexChanged.connect(self.request_content_fit)
         if s and any((s.contact_person, s.phone2, s.payment_days, s.credit_limit, s.commercial_reg, s.tax_id, s.bank_info,
                       s.vat_status != "unknown")):
             self.more.setChecked(True)
