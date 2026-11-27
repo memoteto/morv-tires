@@ -1,5 +1,5 @@
 {
-  "source_commit": "0bcea0bc0c5b993344307794e31e90cf60c109fd",
+  "source_commit": "77db6bb4799881c97bbc0269c075eac3c156bd71",
   "source_scope": "morv/",
   "graphify_version": "0.9.120",
   "mode": "code-only / no-label",
@@ -7,26 +7,26 @@
     "input": 0,
     "output": 0
   },
-  "nodes": 2625,
-  "links": 5595,
-  "source_files": 146,
-  "sql_files_expected": 32,
-  "sql_files_covered": 32,
+  "nodes": 2656,
+  "links": 5673,
+  "source_files": 147,
+  "sql_files_expected": 33,
+  "sql_files_covered": 33,
   "relations": {
-    "calls": 1487,
-    "contains": 1125,
+    "calls": 1524,
+    "contains": 1135,
     "imports": 135,
-    "imports_from": 597,
+    "imports_from": 598,
     "indexes": 56,
     "indirect_call": 11,
     "inherits": 158,
-    "method": 713,
-    "rationale_for": 354,
+    "method": 724,
+    "rationale_for": 361,
     "reads_from": 6,
-    "references": 598,
-    "triggers": 142,
-    "uses": 213
+    "references": 607,
+    "triggers": 143,
+    "uses": 215
   },
-  "run_id": "45949550311",
+  "run_id": "45978670616",
   "limitations": "Static navigation aid; not proof of complete dependencies or current business semantics."
 }
