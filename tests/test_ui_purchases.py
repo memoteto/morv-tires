@@ -715,6 +715,65 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual(inv_debit, 20000)
         self.assertEqual(sup_credit, 20000)
 
+    def test_summary_order_and_conditional_freight_basis(self):
+        from PySide6.QtWidgets import QLabel
+
+        self._configure_supplier_vat("unregistered")
+        dlg = self.dialog()
+        card_layout = dlg.tax_row.parentWidget().layout()
+        body = card_layout.itemAt(1).layout()
+        fields = [body.itemAt(i).widget() for i in range(5)]
+        labels = [w.findChild(QLabel, "fieldLabel").text() for w in fields]
+        self.assertEqual(labels, ["إجمالي الأصناف", "الضريبة", "الخصم",
+                                  "نقل وتحميل", "توزيع الشحن"])
+        self.assertIs(fields[-1], dlg.freight_basis_field)
+        self.assertTrue(dlg.freight_basis_field.isHidden())
+        for value in ("0", "0.00", "", "٠", "-1", "invalid"):
+            dlg.ship.setText(value)
+            self.assertTrue(dlg.freight_basis_field.isHidden(), value)
+        for value in ("0.01", "100", "١٠٠", "1,234.50"):
+            dlg.ship.setText(value)
+            self.assertFalse(dlg.freight_basis_field.isHidden(), value)
+        dlg.ship.clear()
+        self.assertTrue(dlg.freight_basis_field.isHidden())
+
+    def test_zero_freight_ignores_hidden_manual_shares_in_preview_and_post(self):
+        self._configure_supplier_vat("unregistered")
+        dlg = self.dialog()
+        a = self.add_row(dlg, self.battery, 1, "1000")
+        b = self.add_row(dlg, self.battery, 1, "1000")
+        dlg.ship.setText("100")
+        dlg.freight_basis.setCurrentIndex(dlg.freight_basis.findData("manual"))
+        a["freight_edit"].setText("40")
+        b["freight_edit"].setText("60")
+        self.assertFalse(dlg.freight_basis_field.isHidden())
+        self.assertIn("2,100.00", dlg._total_lbl.text())
+        for zero in ("0.00", ""):
+            dlg.ship.setText(zero)
+            self.assertTrue(dlg.freight_basis_field.isHidden())
+            self.assertEqual(dlg._freight_basis(), "qty")
+            self.assertIn("2,000.00", dlg._total_lbl.text())
+            for row in (a, b):
+                self.assertTrue(row["freight_edit"].isHidden())
+                self.assertFalse(row["freight_value"].isHidden())
+                self.assertIn("0.00", row["freight_value"].text())
+                self.assertIn("1,000.00", row["total_lbl"].text())
+        dlg.ship.setText("100")
+        self.assertEqual(dlg._freight_basis(), "manual")
+        self.assertIn("2,100.00", dlg._total_lbl.text())
+        dlg.ship.setText("0")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        self.assertEqual(dlg.posted.total, 200000)
+        stored = self.con.execute(
+            "SELECT freight_amount, freight_basis FROM purchase_invoices WHERE id=?",
+            (dlg.posted.id,)).fetchone()
+        self.assertEqual(tuple(stored), (0, "qty"))
+        shares = self.con.execute(
+            "SELECT freight_share FROM purchase_lines WHERE invoice_id=? ORDER BY line_no",
+            (dlg.posted.id,)).fetchall()
+        self.assertEqual([row[0] for row in shares], [0, 0])
+
     def test_discount_and_freight_flow_through_the_form_to_the_engine(self):
         # End-to-end UI wiring: a discount and shipping entered in the form reach
         # purchasing.post_invoice and land in net_total, not just the engine tests.

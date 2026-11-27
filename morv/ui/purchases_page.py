@@ -356,10 +356,6 @@ class PurchaseForm(QWidget):
         self._sub_lbl.setObjectName("cardTitle")
         sbody.addWidget(kv_row("إجمالي الأصناف", self._sub_lbl))
 
-        # Invoice discount: amount-or-percent, same pattern as the per-line discount.
-        disc_field, self.disc_edit, self.disc_unit_btn = _amount_or_percent_row()
-        sbody.addWidget(field("خصم الفاتورة", disc_field))
-
         # Read-only calculated VAT; no input field or tax controls in the summary.
         self.tax = QLabel(ltr(fmt(0)))
         self.tax.setObjectName("cardTitle")
@@ -368,6 +364,10 @@ class PurchaseForm(QWidget):
         self.tax_row.setVisible(self._vat_enabled)
         sbody.addWidget(self.tax_row)
 
+        # Invoice discount: amount-or-percent, same pattern as the per-line discount.
+        disc_field, self.disc_edit, self.disc_unit_btn = _amount_or_percent_row()
+        sbody.addWidget(field("الخصم", disc_field))
+
         # Shipping amount + allocation basis (qty/value/manual, per P01).
         self.ship = ltr_edit("0.00")
         sbody.addWidget(field("نقل وتحميل", self.ship))
@@ -375,7 +375,9 @@ class PurchaseForm(QWidget):
         self.freight_basis = QComboBox()
         for basis in FREIGHT_BASES:
             self.freight_basis.addItem(basis_labels[basis], basis)
-        sbody.addWidget(field("أساس توزيع الشحن", self.freight_basis))
+        self.freight_basis_field = field("توزيع الشحن", self.freight_basis)
+        self.freight_basis_field.hide()
+        sbody.addWidget(self.freight_basis_field)
 
         self.summary_footer = InvoiceFooter()
         footer = self.summary_footer.layout()
@@ -424,7 +426,7 @@ class PurchaseForm(QWidget):
 
         self.disc_edit.textChanged.connect(self._on_row_changed)
         self.disc_unit_btn.toggled.connect(self._on_row_changed)
-        self.ship.textChanged.connect(self._on_row_changed)
+        self.ship.textChanged.connect(self._on_freight_basis_changed)
         self.freight_basis.currentIndexChanged.connect(self._on_freight_basis_changed)
         self._on_freight_basis_changed()
         if not suppliers.count(session.con):
@@ -705,7 +707,8 @@ class PurchaseForm(QWidget):
             row["num_lbl"].setText(str(i))
 
     def _on_freight_basis_changed(self) -> None:
-        manual = self.freight_basis.currentData() == "manual"
+        self.freight_basis_field.setVisible(self._has_positive_freight())
+        manual = self._freight_basis() == "manual"
         for row in self._rows:
             row["freight_edit"].setVisible(manual)
             row["freight_value"].setVisible(not manual)
@@ -782,7 +785,17 @@ class PurchaseForm(QWidget):
             total += row["qty_spin"].value() * cost
         return total
 
+    def _has_positive_freight(self) -> bool:
+        try:
+            return parse_money(self.ship.text().strip() or "0") > 0
+        except MoneyError:
+            return False
+
     def _freight_basis(self) -> str:
+        # Zero freight must never use hidden manual shares. Keep the selected
+        # basis and draft shares available if the user enters a positive amount again.
+        if not self._has_positive_freight():
+            return "qty"
         return self.freight_basis.currentData() or "qty"
 
     def _validate_lines(self) -> tuple[list[PurchaseLine] | None, str | None]:
