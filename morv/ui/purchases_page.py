@@ -128,14 +128,19 @@ class PurchasesListPage(ListPage):
             details.append(("ملاحظات", inv.notes))
         self.summary_details(details)
         metrics = [("إجمالي الفاتورة", ltr(fmt(inv.total)))]
+        if inv.invoice_discount:
+            metrics.append(("خصم الفاتورة", ltr(fmt(inv.invoice_discount))))
+        if inv.freight_amount:
+            basis_label = {"qty": "كمية", "value": "قيمة", "manual": "يدوي"}[inv.freight_basis]
+            metrics.append((f"نقل وتحميل (أساس {basis_label})", ltr(fmt(inv.freight_amount))))
         if inv.returned:
             metrics += [("المرتجع", ltr(fmt(inv.returned))), ("الصافي", ltr(fmt(inv.total - inv.returned)))]
         self.summary_metrics(metrics)
         self.summary_section("تفاصيل الأصناف", "tire")
         self.summary_records(
-            ["الصنف", "الكمية", "تكلفة الوحدة", "الإجمالي", "DOT"],
+            ["الصنف", "الكمية", "تكلفة الوحدة", "الإجمالي قبل الخصم والشحن", "الصافي", "DOT"],
             [(f"{ln.line_no}. {ln.item_name}", ltr(str(ln.qty)), ltr(fmt(ln.unit_cost)),
-              ltr(fmt(ln.line_total)), ltr(ln.dot) if ln.dot else "")
+              ltr(fmt(ln.line_total)), ltr(fmt(ln.net_total)), ltr(ln.dot) if ln.dot else "")
              for ln in inv.lines])
         if self.session.can("purchases.post"):
             send_back = QPushButton("مرتجع للمورد")

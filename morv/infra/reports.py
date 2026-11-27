@@ -601,7 +601,9 @@ def purchases(con, start: str, end: str) -> Table:
     start, end = _range(start, end)
     suppliers_rows: dict[int, list] = {}
     for sid, sname, code, name, qty, amount in con.execute(
-            "SELECT s.id, s.name, i.code, i.name, sum(pl.qty), sum(pl.line_total) FROM purchase_invoices p "
+            # net_total (not the gross line_total) so this ties to what was actually
+            # posted to 2110, once freight/discount make the two differ (P01/P02).
+            "SELECT s.id, s.name, i.code, i.name, sum(pl.qty), sum(pl.net_total) FROM purchase_invoices p "
             "JOIN journal_entries e ON e.id = p.journal_entry_id JOIN suppliers s ON s.id = p.supplier_id "
             "JOIN purchase_lines pl ON pl.invoice_id = p.id JOIN items i ON i.id = pl.item_id "
             "WHERE e.entry_date BETWEEN ? AND ? GROUP BY s.id, i.id ORDER BY s.name, i.code", (start, end)):

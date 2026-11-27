@@ -13,6 +13,10 @@ class InvoiceLine:
     qty: int
     unit_cost: int
     line_total: int
+    line_discount: int
+    invoice_share: int
+    freight_share: int
+    net_total: int
 
 
 @dataclass(frozen=True)
@@ -27,6 +31,9 @@ class InvoiceView:
     total: int
     notes: str
     returned: int
+    freight_amount: int
+    freight_basis: str
+    invoice_discount: int
     lines: list
 
 
@@ -55,15 +62,17 @@ def get_invoice(con, invoice_id: int) -> InvoiceView:
         "p.total, p.notes, "
         "(SELECT coalesce(sum(CASE WHEN r.kind = 'return' THEN rl.value ELSE -rl.value END), 0) "
            "FROM purchase_return_lines rl JOIN purchase_returns r ON r.id = rl.return_id "
-           "JOIN purchase_lines pl ON pl.id = rl.purchase_line_id WHERE pl.invoice_id = p.id) "
+           "JOIN purchase_lines pl ON pl.id = rl.purchase_line_id WHERE pl.invoice_id = p.id), "
+        "p.freight_amount, p.freight_basis, p.invoice_discount "
         "FROM purchase_invoices p JOIN suppliers s ON s.id = p.supplier_id WHERE p.id = ?", (invoice_id,)).fetchone()
     if not h:
         raise KeyError(invoice_id)
     lines = [InvoiceLine(*r) for r in con.execute(
-        "SELECT l.line_no, i.name, i.code, l.dot, l.qty, l.unit_cost, l.line_total "
+        "SELECT l.line_no, i.name, i.code, l.dot, l.qty, l.unit_cost, l.line_total, "
+        "l.line_discount, l.invoice_share, l.freight_share, l.net_total "
         "FROM purchase_lines l JOIN items i ON i.id = l.item_id WHERE l.invoice_id = ? ORDER BY l.line_no",
         (invoice_id,))]
-    return InvoiceView(h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], h[8] or "", h[9], lines)
+    return InvoiceView(h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], h[8] or "", h[9], h[10], h[11], h[12], lines)
 
 
 def supplier_totals(con, supplier_id: int) -> tuple[int, int]:
