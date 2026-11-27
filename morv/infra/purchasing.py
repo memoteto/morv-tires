@@ -70,12 +70,13 @@ def last_cost(con: sqlite3.Connection, item_id: int, *, prices_tax_inclusive: bo
                           "ORDER BY id DESC LIMIT 1", (item_id,)).fetchone()
         return row[0] if row else None
     row = con.execute(
-        "SELECT l.purchase_unit_cost, p.prices_tax_inclusive FROM stock_lots l "
-        "LEFT JOIN purchase_lines pl ON pl.id=l.purchase_line_id "
-        "LEFT JOIN purchase_invoices p ON p.id=pl.invoice_id "
-        "WHERE l.item_id=? AND l.adjustment_line_id IS NULL ORDER BY l.id DESC LIMIT 1",
-        (item_id,)).fetchone()
-    return row[0] if row and row[1] == int(prices_tax_inclusive) else None
+        "SELECT l.purchase_unit_cost FROM stock_lots l "
+        "JOIN purchase_lines pl ON pl.id=l.purchase_line_id "
+        "JOIN purchase_invoices p ON p.id=pl.invoice_id "
+        "WHERE l.item_id=? AND l.adjustment_line_id IS NULL AND p.prices_tax_inclusive=? "
+        "ORDER BY l.id DESC LIMIT 1",
+        (item_id, int(prices_tax_inclusive))).fetchone()
+    return row[0] if row else None
 
 
 def _shape_lines(lines, freight_basis: str) -> list:

@@ -189,6 +189,12 @@ class OpeningInventoryTest(OpeningBase):
         dots = {r[0] for r in self.con.execute("SELECT dot FROM stock_lots WHERE item_id=?", (self.tire,))}
         self.assertEqual(dots, {"2024", "2224"})
 
+    def test_opening_price_has_no_documented_vat_basis(self):
+        self.post_stock()
+        self.assertEqual(purchasing.last_cost(self.con, self.tire), 32000)
+        self.assertIsNone(purchasing.last_cost(self.con, self.tire, prices_tax_inclusive=False))
+        self.assertIsNone(purchasing.last_cost(self.con, self.tire, prices_tax_inclusive=True))
+
     def test_opening_cost_feeds_fifo_sales_and_counts_as_a_recorded_cost(self):
         self.post_stock()
         sales.post_sale(self.con, self.admin, request_key="sale-key-0001", customer_id=None,
