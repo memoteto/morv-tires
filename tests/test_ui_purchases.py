@@ -544,6 +544,65 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertIn("0.00", dlg.tax.text())
         self.assertIn("5,000.00", dlg._total_lbl.text())
 
+    def test_supplier_folded_details_restore_compact_height(self):
+        """A supplier opened expanded must shrink to the same size as a fresh folded form."""
+        from PySide6.QtTest import QTest
+        from morv.infra import suppliers
+        from morv.ui import theme
+        from morv.ui.suppliers_page import SupplierDialog
+
+        old = (self.app.palette(), self.app.styleSheet(), self.app.font(), self.app.layoutDirection())
+        self.addCleanup(self.app.setPalette, old[0])
+        self.addCleanup(self.app.setStyleSheet, old[1])
+        self.addCleanup(self.app.setFont, old[2])
+        self.addCleanup(self.app.setLayoutDirection, old[3])
+        theme.apply(self.app, False)
+        supplier = suppliers.get(self.con, self.sup)
+        supplier.vat_status = "registered"
+
+        def settle():
+            self.app.processEvents()
+            QTest.qWait(100)
+            self.app.processEvents()
+
+        def measure(dlg):
+            return dict(height=dlg.height(), width=dlg.width(),
+                        minimum_scroll=dlg.scroll.minimumHeight(),
+                        body_hint=dlg.scroll.widget().sizeHint().height(),
+                        viewport=dlg.scroll.viewport().height(),
+                        gaps=tuple(b.geometry().top() - a.geometry().bottom() - 1
+                                   for a, b in ((dlg.name, dlg.mobile), (dlg.mobile, dlg.address),
+                                                (dlg.address, dlg.notes))),
+                        footer_visible=dlg.footer.isVisibleTo(dlg))
+
+        compact = self.destroy_on_cleanup(SupplierDialog(self.session, supplier))
+        compact.more.setChecked(False)
+        compact.show()
+        settle()
+        baseline = measure(compact)
+        compact.hide()
+
+        dlg = self.destroy_on_cleanup(SupplierDialog(self.session, supplier))
+        self.assertTrue(dlg.more.isChecked())
+        dlg.show()
+        settle()
+        expanded = measure(dlg)
+        self.assertGreater(expanded["body_hint"], baseline["body_hint"], (baseline, expanded))
+        self.assertGreater(expanded["height"], baseline["height"], (baseline, expanded))
+        for _ in range(2):
+            dlg.more.setChecked(False)
+            settle()
+            folded = measure(dlg)
+            self.assertTrue(dlg.more_box.isHidden())
+            self.assertTrue(folded["footer_visible"])
+            self.assertEqual(folded["width"], baseline["width"])
+            self.assertLessEqual(abs(folded["height"] - baseline["height"]), 4,
+                                 f"SUPPLIER_FOLD_HEIGHT baseline={baseline} expanded={expanded} folded={folded}")
+            self.assertTrue(all(abs(x - y) <= 4 for x, y in zip(folded["gaps"], baseline["gaps"], strict=True)),
+                            f"SUPPLIER_FOLD_GAPS baseline={baseline} folded={folded}")
+            dlg.more.setChecked(True)
+            settle()
+
     def test_supplier_vat_rows_match_existing_form(self):
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QFormLayout

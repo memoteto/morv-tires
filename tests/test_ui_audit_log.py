@@ -58,8 +58,19 @@ class AuditLogTest(unittest.TestCase):
             tab.resize(width, 482)
             self.settle()
             self.assertEqual(tab.view.horizontalScrollBar().maximum(), 0)
-            self.assertGreater(tab.view.rowHeight(0), 36)
-            self.assertGreaterEqual(tab.view.rowHeight(0), tab.view.sizeHintForRow(0))
+            observed = {
+                "requested_width": width, "tab_size": tab.size().toTuple(),
+                "viewport_size": tab.view.viewport().size().toTuple(),
+                "column_widths": [tab.view.columnWidth(c) for c in range(tab.model.columnCount())],
+                "row_height": tab.view.rowHeight(0), "row_hint": tab.view.sizeHintForRow(0),
+                "minimum_row": tab.view.verticalHeader().minimumSectionSize(),
+                "word_wrap": tab.view.wordWrap(), "font": tab.view.font().toString(),
+                "reflow_pending": tab.columns.timer.isActive(),
+                "first_row_detail_matches": tab.model.index(0, 3).data() == detail,
+            }
+            self.assertGreater(tab.view.rowHeight(0), 36, f"AUDIT_ROW_LAYOUT {observed}")
+            self.assertGreaterEqual(tab.view.rowHeight(0), tab.view.sizeHintForRow(0),
+                                    f"AUDIT_ROW_LAYOUT {observed}")
             self.assertEqual(tab.model.index(0, 3).data(), detail)
             self.assertEqual(tab.model.index(0, 3).data(Qt.ItemDataRole.ToolTipRole), detail)
             self.assertEqual(tab.model.index(0, 2).data(), "ترحيل بيع")
