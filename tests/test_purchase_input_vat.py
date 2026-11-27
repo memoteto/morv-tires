@@ -145,6 +145,25 @@ class InclusivePricesTest(Base):
         self.assertEqual(ledger.account_balance(self.con, "1410"), 11400 - 1400)
 
 
+class LastPurchasePriceBasisTest(Base):
+    def test_latest_matching_price_not_latest_unfiltered_lot(self):
+        self.enable_tax()
+        item_id = self.item()
+        self.assertIsNone(purchasing.last_cost(self.con, item_id, prices_tax_inclusive=False))
+        self.buy(item_id, 1, 10000, rate=1400, deductible=True, prices_tax_inclusive=False)
+        self.assertIsNone(purchasing.last_cost(self.con, item_id, prices_tax_inclusive=True))
+        self.buy(item_id, 1, 20000, rate=1400, deductible=True, prices_tax_inclusive=True)
+        self.assertEqual(purchasing.last_cost(self.con, item_id, prices_tax_inclusive=False), 10000)
+        self.assertEqual(purchasing.last_cost(self.con, item_id, prices_tax_inclusive=True), 20000)
+        self.assertEqual(purchasing.last_cost(self.con, item_id), 20000)
+        self.buy(item_id, 1, 12000, rate=1400, deductible=True, prices_tax_inclusive=False)
+        self.assertEqual(purchasing.last_cost(self.con, item_id, prices_tax_inclusive=False), 12000)
+        self.assertEqual(purchasing.last_cost(self.con, item_id, prices_tax_inclusive=True), 20000)
+        self.assertEqual(purchasing.last_cost(self.con, item_id), 12000)
+        self.assertEqual(inventory.reconcile(self.con), [])
+        self.assertEqual(ledger.unbalanced_entries(self.con), [])
+
+
 class MultiLineRoundingTest(Base):
     """Debit always equals credit and tax_total is the exact sum of the line tax_amounts."""
 
