@@ -334,7 +334,7 @@ class PurchaseForm(QWidget):
         sbody.addWidget(kv_row("إجمالي الأصناف", self._sub_lbl))
 
         # Invoice discount: amount-or-percent, same pattern as the per-line discount.
-        self.disc_edit, self.disc_unit_btn, disc_field = _amount_or_percent_row()
+        disc_field, self.disc_edit, self.disc_unit_btn = _amount_or_percent_row()
         sbody.addWidget(field("خصم الفاتورة", disc_field))
 
         # Tax stays disabled until P04; shown so the layout matches the approved design.
@@ -521,11 +521,13 @@ class PurchaseForm(QWidget):
         cw.setSpacing(2)
         cost_edit = ltr_edit("0.00")
         disc_row, disc_edit, disc_unit_btn = _amount_or_percent_row("خصم")
-        # Only shown for the manual freight basis (see _set_freight_basis); hidden rows add
+        # Only shown for the manual freight basis (see _on_freight_basis_changed); hidden rows add
         # no row height, which is how this cell already keeps a single line most of the time.
         freight_row, freight_edit, freight_unit_btn = _amount_or_percent_row("شحن")
         freight_unit_btn.hide()   # freight is always an amount; no percent mode
-        freight_row.hide()
+        # A row added after manual basis is already selected must start visible too, not just
+        # rows that existed when the combo changed (see _on_freight_basis_changed).
+        freight_row.setVisible(self.freight_basis.currentData() == "manual")
         cost_note = wrapping_line_label()
         # Hidden (not just empty) so the cell is single-line height like its
         # row-mates; it only grows the row when there is a note to show,
@@ -760,8 +762,9 @@ class PurchaseForm(QWidget):
         if err:
             self._fail(err)
             return
+        ship_text = self.ship.text().strip()
         try:
-            freight_amount = parse_money(self.ship.text())
+            freight_amount = parse_money(ship_text) if ship_text else 0
         except MoneyError as e:
             self._fail(f"الشحن: {e}")
             return
