@@ -400,50 +400,22 @@ class CustomerStatementUiTest(unittest.TestCase):
 
     def test_customer_phone_stays_below_name_at_the_right(self):
         from PySide6.QtCore import Qt
-        from morv.ui import theme
 
-        def measure(stage):
-            dlg = self.dialog()
-            dlg.show()
-            self.app.processEvents()
-            name, phone = dlg.customer_name_label, dlg.strip
-            right = (name.mapTo(dlg, name.rect().topRight()).x(),
-                     phone.mapTo(dlg, phone.rect().topRight()).x())
-            left = (name.mapTo(dlg, name.rect().topLeft()).x(),
-                    phone.mapTo(dlg, phone.rect().topLeft()).x())
-            below = name.y() < phone.y()
-            print(f"STATEMENT_ALIGN {stage}: app_direction={self.app.layoutDirection().name} "
-                  f"dialog_direction={dlg.layoutDirection().name} "
-                  f"stylesheet={bool(self.app.styleSheet())} "
-                  f"app_font={self.app.font().family()}/{self.app.font().pixelSize()} "
-                  f"name_font={name.font().family()}/{name.font().pixelSize()} "
-                  f"phone_font={phone.font().family()}/{phone.font().pixelSize()} "
-                  f"name_geometry={name.geometry()} phone_geometry={phone.geometry()} "
-                  f"left={left} right={right} delta={abs(right[0] - right[1])} "
-                  f"below={below}", flush=True)
-            dlg.close()
-            return abs(right[0] - right[1]), below
-
-        # Keep the original assertion; compare controlled conditions to diagnose
-        # the failure rather than relax the alignment requirement.
-        original = measure("inherited")
-        direction = self.app.layoutDirection()
-        stylesheet = self.app.styleSheet()
-        font = self.app.font()
-        palette = self.app.palette()
-        try:
-            self.app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-            measure("rtl_only")
-            theme.load_bundled_fonts()
-            theme.apply(self.app)
-            measure("production_theme")
-        finally:
-            self.app.setStyleSheet(stylesheet)
-            self.app.setPalette(palette)
-            self.app.setFont(font)
-            self.app.setLayoutDirection(direction)
-        self.assertLessEqual(original[0], 2)
-        self.assertTrue(original[1])
+        # Production theme.apply sets RTL. The shared test application may
+        # inherit LTR from another module or start without the theme.
+        # This right-edge assertion must run in the production direction.
+        self.addCleanup(self.app.setLayoutDirection, self.app.layoutDirection())
+        self.app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        dlg = self.dialog()
+        dlg.show()
+        self.app.processEvents()
+        self.assertEqual(dlg.layoutDirection(), Qt.LayoutDirection.RightToLeft)
+        name_right = dlg.customer_name_label.mapTo(
+            dlg, dlg.customer_name_label.rect().topRight()).x()
+        phone_right = dlg.strip.mapTo(dlg, dlg.strip.rect().topRight()).x()
+        self.assertLessEqual(abs(name_right - phone_right), 2)
+        self.assertLess(dlg.customer_name_label.y(), dlg.strip.y())
+        dlg.close()
 
     def test_table_headers_stay_visible_when_results_are_empty(self):
         from PySide6.QtCore import Qt
