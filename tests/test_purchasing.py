@@ -866,6 +866,27 @@ class FreightDiscountTest(Base):
         with self.assertRaises(PurchaseError):
             self.buy(self.tire, 1, 1000, lines=[PurchaseLine(self.tire, 1, 1000, "2324", 1000)])
 
+    def test_net_cost_below_one_piaster_per_unit_is_refused_atomically(self):
+        before = self.counts()
+        for extra in (
+            {"lines": [PurchaseLine(self.tire, 2, 1000, "2324", 1999)]},
+            {"invoice_discount": 1999},
+        ):
+            with self.subTest(extra=extra), self.assertRaises(PurchaseError):
+                self.buy(self.tire, 2, 1000, **extra)
+            self.assertEqual(self.counts(), before)
+            self.assertReconciled()
+
+    def test_one_piaster_per_unit_can_be_issued_and_reconciled(self):
+        inv = self.buy(self.tire, 2, 1000, invoice_discount=1998)
+        self.assertEqual(inv.total, 2)
+        for i in range(2):
+            result = inventory.issue(self.con, self.admin, self.tire, 1, source_type="test",
+                                     source_id=i + 1, source_line_id=1)
+            self.assertEqual(result.cost_total, 1)
+            self.assertReconciled()
+        self.assertEqual(inventory.on_hand(self.con, self.tire), 0)
+
     def test_line_discount_exceeding_line_value_is_refused(self):
         with self.assertRaises(PurchaseError):
             self.buy(self.tire, 1, 1000, lines=[PurchaseLine(self.tire, 1, 1000, "2324", 1001)])

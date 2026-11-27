@@ -104,6 +104,11 @@ def _payload_hash(supplier_id, inv_no, inv_date, recv_date, lines, freight_amoun
     return hashlib.sha256(json.dumps(body, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
+def _legacy_payload_hash(supplier_id, inv_no, inv_date, recv_date, lines) -> str:
+    body = [supplier_id, inv_no, inv_date, recv_date, [[x.item_id, x.qty, x.unit_cost, x.dot] for x in lines]]
+    return hashlib.sha256(json.dumps(body, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def _allocate_freight(clean: list, freight_amount: int, freight_basis: str, nets_before_freight: list) -> list:
     if freight_basis == "manual":
         shares = [ln.freight_share for ln in clean]
@@ -137,9 +142,12 @@ def compute_allocations(clean: list, freight_amount: int, freight_basis: str,
     nets_before_freight = [b - s for b, s in zip(after_line_discount, invoice_shares, strict=True)]
     freight_shares = _allocate_freight(clean, freight_amount, freight_basis, nets_before_freight)
     net_totals = [b + f for b, f in zip(nets_before_freight, freight_shares, strict=True)]
-    for i, net in enumerate(net_totals, start=1):
+    for i, (ln, net) in enumerate(zip(clean, net_totals, strict=True), start=1):
         if net <= 0:
             raise PurchaseError(f"السطر {i}: التكلفة الصافية بعد الخصم والشحن صفر أو سالبة")
+        # Positive cost per remaining unit is required by the FIFO layer and issue constraints.
+        if net < ln.qty:
+            raise PurchaseError(f"السطر {i}: التكلفة الصافية لا تكفي قرشًا واحدًا على الأقل لكل قطعة")
     return [LineAllocation(s, f, n) for s, f, n in zip(invoice_shares, freight_shares, net_totals, strict=True)]
 
 
@@ -173,7 +181,10 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
         old = con.execute("SELECT id, number, total, payload_hash FROM purchase_invoices WHERE request_key=?",
                           (key,)).fetchone()
         if old:
-            if old[3] != h:
+            legacy_match = (freight_amount == 0 and freight_basis == "qty" and invoice_discount == 0
+                            and all(ln.line_discount == 0 and ln.freight_share is None for ln in clean)
+                            and old[3] == _legacy_payload_hash(supplier_id, inv_no.casefold(), inv_date, recv_date, clean))
+            if old[3] != h and not legacy_match:
                 raise PurchaseError("مفتاح الطلب سبق استخدامه لفاتورة بمحتوى مختلف")
             return PostedInvoice(old[0], old[1], old[2], True)
         _check_items(con, clean)        # After the replay check: deactivating an item later must not block a replayed request
