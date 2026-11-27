@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from morv.infra import ledger, purchasing, settings, users
+from morv.infra import inventory, ledger, purchasing, settings, treasury, users
 from morv.infra.db.bootstrap import open_main_db
 from morv.infra.db.connection import transaction
 from morv.infra.purchasing import PurchaseLine
@@ -38,10 +38,11 @@ class Base(unittest.TestCase):
         settings.put(self.con, "tax.enabled", "1")
         settings.put(self.con, "tax.rate", str(rate_bp))
 
-    def buy(self, item_id, qty, cost, **kw):
+    def buy(self, item_id, qty, cost, *, rate=None, deductible=None, **kw):
         self.n += 1
         args = dict(request_key=f"key-{self.n:06d}", supplier_id=self.sup, supplier_invoice_no=f"S-{self.n}",
-                    invoice_date="2026-11-27", lines=[PurchaseLine(item_id, qty, cost, "2324")])
+                    invoice_date="2026-11-27", lines=[PurchaseLine(
+                        item_id, qty, cost, "2324", input_tax_rate=rate, input_tax_deductible=deductible)])
         args.update(kw)
         return purchasing.post_invoice(self.con, self.admin, **args)
 
@@ -78,7 +79,8 @@ class ExclusivePricesTest(Base):
 
     def test_standard_item_debits_1520_and_credits_supplier_net_plus_tax(self):
         item_id = self.item("standard")
-        posted = self.buy(item_id, 1, 10000, prices_tax_inclusive=False, freight_taxable=False)
+        posted = self.buy(item_id, 1, 10000, rate=1400, deductible=True,
+                          prices_tax_inclusive=False, freight_taxable=False)
         net_total, tax_base, tax_rate, tax_amount = self.line_row(posted.id)
         self.assertEqual(net_total, 10000)
         self.assertEqual(tax_rate, 1400)
@@ -89,25 +91,26 @@ class ExclusivePricesTest(Base):
         self.assertEqual(ledger.account_balance(self.con, "2110"), -11400)
         self.assertEqual(self.cost_layer(posted.id), 10000)  # inventory cost unaffected by tax
 
-    def test_exempt_item_pays_no_tax_and_stays_fully_in_cost(self):
-        item_id = self.item("exempt")
-        posted = self.buy(item_id, 1, 10000)
+    def test_supplier_invoice_without_vat_stays_fully_in_cost(self):
+        item_id = self.item("standard")
+        posted = self.buy(item_id, 1, 10000, rate=0, deductible=False)
         net_total, tax_base, tax_rate, tax_amount = self.line_row(posted.id)
         self.assertEqual((tax_rate, tax_amount), (0, 0))
         self.assertEqual(ledger.account_balance(self.con, "1520"), 0)
         self.assertEqual(posted.total, 10000)
         self.assertEqual(self.cost_layer(posted.id), 10000)
 
-    def test_item_rate_override_wins_over_general_rate(self):
-        item_id = self.item("standard", 500)        # 5% override instead of the 14% general rate
-        posted = self.buy(item_id, 1, 10000)
+    def test_supplier_rate_is_independent_of_output_treatment_and_rate(self):
+        item_id = self.item("exempt", 2000)
+        posted = self.buy(item_id, 1, 10000, rate=500, deductible=True)
         _, _, tax_rate, tax_amount = self.line_row(posted.id)
         self.assertEqual(tax_rate, 500)
         self.assertEqual(tax_amount, 500)
 
     def test_freight_not_taxable_excluded_from_base_but_kept_in_cost(self):
         item_id = self.item("standard")
-        posted = self.buy(item_id, 1, 10000, freight_amount=700, freight_basis="qty", freight_taxable=False)
+        posted = self.buy(item_id, 1, 10000, rate=1400, deductible=True,
+                          freight_amount=700, freight_basis="qty", freight_taxable=False)
         net_total, tax_base, tax_rate, tax_amount = self.line_row(posted.id)
         self.assertEqual(net_total, 10700)       # freight folded into net_total (P01)
         self.assertEqual(tax_base, 10000)        # but excluded from the tax base
@@ -117,7 +120,8 @@ class ExclusivePricesTest(Base):
 
     def test_freight_taxable_is_included_in_base(self):
         item_id = self.item("standard")
-        posted = self.buy(item_id, 1, 10000, freight_amount=700, freight_basis="qty", freight_taxable=True)
+        posted = self.buy(item_id, 1, 10000, rate=1400, deductible=True,
+                          freight_amount=700, freight_basis="qty", freight_taxable=True)
         net_total, tax_base, tax_rate, tax_amount = self.line_row(posted.id)
         self.assertEqual(tax_base, 10700)
         self.assertEqual(tax_amount, 1498)   # 14% of 10700
@@ -130,7 +134,8 @@ class InclusivePricesTest(Base):
 
     def test_tax_is_carved_out_of_net_total_cost_excludes_it(self):
         item_id = self.item("standard")
-        posted = self.buy(item_id, 1, 11400, prices_tax_inclusive=True, freight_taxable=False)
+        posted = self.buy(item_id, 1, 11400, rate=1400, deductible=True,
+                          prices_tax_inclusive=True, freight_taxable=False)
         net_total, tax_base, tax_rate, tax_amount = self.line_row(posted.id)
         self.assertEqual(net_total, 11400)
         self.assertEqual(tax_amount, 1400)
@@ -149,13 +154,88 @@ class MultiLineRoundingTest(Base):
         self.n += 1
         posted = purchasing.post_invoice(
             self.con, self.admin, request_key="multi-key-01", supplier_id=self.sup, supplier_invoice_no="S-multi",
-            invoice_date="2026-11-27", lines=[PurchaseLine(a, 3, 777, "2324"), PurchaseLine(b, 5, 1333, "2324")])
+            invoice_date="2026-11-27", lines=[
+                PurchaseLine(a, 3, 777, "2324", input_tax_rate=1437, input_tax_deductible=True),
+                PurchaseLine(b, 5, 1333, "2324", input_tax_rate=1437, input_tax_deductible=True)])
         rows = self.con.execute("SELECT tax_amount FROM purchase_lines WHERE invoice_id=?", (posted.id,)).fetchall()
         tax_total = self.con.execute("SELECT tax_total FROM purchase_invoices WHERE id=?", (posted.id,)).fetchone()[0]
         self.assertEqual(sum(r[0] for r in rows), tax_total)
         self.assertEqual(ledger.account_balance(self.con, "1520"), tax_total)
         self.assertEqual(ledger.account_balance(self.con, "2110"), -posted.total)
         self.assertEqual(ledger.account_balance(self.con, "1410"), posted.total - tax_total)
+
+
+class InputTaxEligibilityTest(Base):
+    """Supplier VAT and its deductibility are distinct from the item's output tax treatment."""
+
+    def test_non_deductible_vat_capitalized_in_both_price_modes(self):
+        self.enable_tax()
+        item_id = self.item("zero")
+        for inclusive, price in ((False, 10000), (True, 11400)):
+            posted = self.buy(item_id, 1, price, rate=1400, deductible=False,
+                              prices_tax_inclusive=inclusive)
+            self.assertEqual(posted.total, 11400)
+            self.assertEqual(self.cost_layer(posted.id), 11400)
+            self.assertEqual(self.line_row(posted.id)[2:], (1400, 1400))
+            self.assertEqual(self.con.execute(
+                "SELECT deductible_tax_amount FROM purchase_lines WHERE invoice_id=?", (posted.id,)
+            ).fetchone()[0], 0)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 0)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 22800)
+        self.assertEqual(ledger.account_balance(self.con, "2110"), -22800)
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), 22800)
+        self.assertEqual(inventory.reconcile(self.con), [])
+
+    def test_mixed_deductibility_on_same_item(self):
+        self.enable_tax()
+        item_id = self.item()
+        posted = self.buy(item_id, 1, 10000, lines=[
+            PurchaseLine(item_id, 1, 10000, "2324", input_tax_rate=1400, input_tax_deductible=True),
+            PurchaseLine(item_id, 1, 10000, "2325", input_tax_rate=1400, input_tax_deductible=False)])
+        rows = self.con.execute(
+            "SELECT tax_amount, deductible_tax_amount FROM purchase_lines WHERE invoice_id=? ORDER BY line_no",
+            (posted.id,)).fetchall()
+        self.assertEqual(rows, [(1400, 1400), (1400, 0)])
+        self.assertEqual(self.con.execute(
+            "SELECT tax_total FROM purchase_invoices WHERE id=?", (posted.id,)).fetchone()[0], 2800)
+        self.assertEqual(posted.total, 22800)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 1400)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 21400)
+        self.assertEqual(ledger.account_balance(self.con, "2110"), -22800)
+        self.assertEqual(inventory.reconcile(self.con), [])
+
+    def test_explicit_rate_and_eligibility_required_when_enabled(self):
+        self.enable_tax()
+        item_id = self.item()
+        for rate, deductible in ((None, True), (1400, None), (True, True), (-1, True), (1400, 1)):
+            with self.subTest(rate=rate, deductible=deductible):
+                with self.assertRaises(purchasing.PurchaseError):
+                    self.buy(item_id, 1, 10000, rate=rate, deductible=deductible)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM purchase_invoices").fetchone()[0], 0)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 0)
+
+    def test_disabled_tax_rejects_explicit_vat_data(self):
+        with self.assertRaises(purchasing.PurchaseError):
+            self.buy(self.item(), 1, 10000, rate=1400, deductible=True)
+
+    def test_tax_choice_is_part_of_request_identity(self):
+        self.enable_tax()
+        item_id = self.item()
+        args = dict(request_key="vat-replay-01", supplier_id=self.sup, supplier_invoice_no="S-vat",
+                    invoice_date="2026-11-27")
+        line = PurchaseLine(item_id, 1, 10000, "2324", input_tax_rate=1400, input_tax_deductible=True)
+        posted = purchasing.post_invoice(self.con, self.admin, lines=[line], **args)
+        self.assertTrue(purchasing.post_invoice(self.con, self.admin, lines=[line], **args).replayed)
+        self.assertEqual(posted.total, 11400)
+        changed = PurchaseLine(item_id, 1, 10000, "2324", input_tax_rate=1400, input_tax_deductible=False)
+        with self.assertRaises(purchasing.PurchaseError):
+            purchasing.post_invoice(self.con, self.admin, lines=[changed], **args)
+
+    def test_rejects_cost_below_one_piaster_per_unit_after_deduction(self):
+        self.enable_tax()
+        with self.assertRaises(purchasing.PurchaseError):
+            self.buy(self.item(), 2, 1, rate=10000, deductible=True, prices_tax_inclusive=True)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM purchase_invoices").fetchone()[0], 0)
 
 
 class ReplayBackwardCompatibilityTest(Base):

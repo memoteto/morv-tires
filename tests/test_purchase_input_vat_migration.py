@@ -23,8 +23,8 @@ class FreshDbTest(unittest.TestCase):
         self.assertEqual((cols["prices_tax_inclusive"], cols["freight_taxable"], cols["tax_total"]),
                          ("0", "0", "0"))
         line_cols = {r[1]: r[4] for r in self.con.execute("PRAGMA table_info(purchase_lines)")}
-        self.assertEqual((line_cols["tax_base"], line_cols["tax_rate"], line_cols["tax_amount"]),
-                         ("0", "0", "0"))
+        self.assertEqual((line_cols["tax_base"], line_cols["tax_rate"], line_cols["tax_amount"],
+                          line_cols["deductible_tax_amount"]), ("0", "0", "0", "0"))
 
     def test_purchase_invoices_rejects_out_of_range_boolean(self):
         import sqlite3
@@ -103,8 +103,9 @@ class OldDbUpgradeTest(unittest.TestCase):
         row = self.con.execute(
             "SELECT prices_tax_inclusive, freight_taxable, tax_total FROM purchase_invoices").fetchone()
         self.assertEqual(row, (0, 0, 0))
-        line_row = self.con.execute("SELECT tax_base, tax_rate, tax_amount FROM purchase_lines").fetchone()
-        self.assertEqual(line_row, (0, 0, 0))
+        line_row = self.con.execute(
+            "SELECT tax_base, tax_rate, tax_amount, deductible_tax_amount FROM purchase_lines").fetchone()
+        self.assertEqual(line_row, (0, 0, 0, 0))
 
     def test_upgrade_changes_no_existing_balance_stock_or_posting(self):
         migrate(self.con, self.migrations)
