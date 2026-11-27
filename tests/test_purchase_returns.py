@@ -192,6 +192,29 @@ class PurchaseReturnsTest(Base):
                           treasury.supplier_owed(self.con, self.sup)), before)
         self.assertReconciled()
 
+    def test_zero_settlement_posts_without_a_zero_journal_line(self):
+        # the supplier credits nothing at all: still a valid, balanced entry (no (0, 0) journal line).
+        self.buy(self.tire, 2, 100000)
+        line = self.line_id(self.tire)
+        r = self.send(line, 2, settlement_amount=0, settlement_reason="المورد رفض أي تعويض")
+        self.assertEqual(r.total, 200000)
+        self.assertEqual(self.balance("1410"), 0)                        # book value still removed
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), 200000)   # nothing credited: still owed in full
+        self.assertEqual(self.balance("5160"), 200000)                   # the whole amount is a loss
+        self.assertReconciled()
+
+    def test_zero_settlement_return_can_be_reversed(self):
+        self.buy(self.tire, 2, 100000)
+        line = self.line_id(self.tire)
+        before = (self.balance("1410"), self.balance("2110"), self.balance("5160"),
+                 treasury.supplier_owed(self.con, self.sup))
+        r = self.send(line, 2, settlement_amount=0, settlement_reason="المورد رفض أي تعويض")
+        purchase_returns.reverse_return(self.con, self.admin, request_key="rev-zero-0001", return_id=r.id,
+                                        reason="المورد وافق لاحقًا")
+        self.assertEqual((self.balance("1410"), self.balance("2110"), self.balance("5160"),
+                          treasury.supplier_owed(self.con, self.sup)), before)
+        self.assertReconciled()
+
     def test_layer_whose_remaining_cost_does_not_match_its_allocations_is_refused(self):
         self.buy(self.tire, 2, 100000)
         line = self.line_id(self.tire)
