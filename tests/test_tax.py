@@ -88,11 +88,40 @@ class SplitInclusiveTest(unittest.TestCase):
                 self.assertGreaterEqual(amount, 0)
 
 
+class DirectlyEnteredInclusivePriceTest(unittest.TestCase):
+    """A shelf/sticker price the cashier types as the tax-inclusive total directly -- never
+    built by adding tax_on_exclusive(net) to some net. These are hand-verified against the
+    documented formula (total*rate/(10000+rate), half up), not against tax_on_exclusive, since
+    there is no "original net" for a directly-typed total to be consistent with.
+    """
+
+    def test_a_typical_shelf_price(self):
+        self.assertEqual(tax.split_inclusive(11500, 1400), (10088, 1412))
+
+    def test_an_odd_three_digit_price(self):
+        self.assertEqual(tax.split_inclusive(999, 1400), (876, 123))
+
+    def test_a_small_price(self):
+        self.assertEqual(tax.split_inclusive(50, 1400), (44, 6))
+
+    def test_one_piaster_is_all_net_no_tax_roundable(self):
+        self.assertEqual(tax.split_inclusive(1, 1400), (1, 0))
+
+    def test_a_large_invoice_total(self):
+        self.assertEqual(tax.split_inclusive(123456789, 1400), (108295429, 15161360))
+
+    def test_sum_always_reconstructs_the_typed_total_exactly(self):
+        for total in (11500, 999, 50, 1, 123456789):
+            net, amount = tax.split_inclusive(total, 1400)
+            self.assertEqual(net + amount, total)
+
+
 class InclusiveExclusiveConsistencyTest(unittest.TestCase):
-    """The owner's finding on PR #175: a floor-only split_inclusive disagreed with
-    tax_on_exclusive on the very same sale. net=10, tax=1 (14%) gives total=11; decoding
-    11 back used to yield (9, 2) -- a different tax on the same invoice depending only on
-    which price mode was used. This is the reproduction plus the permanent regression guard.
+    """The owner's finding on PR #175: split_inclusive disagreed with tax_on_exclusive on the
+    very same sale. net=10, tax=1 (14%) gives total=11; decoding 11 back used to yield (9, 2) --
+    a different tax on the same invoice depending only on which price mode was used. Fixed by
+    computing split_inclusive's tax with the same formula/rounding direction as tax_on_exclusive
+    instead of flooring the net; this is the reproduction plus the permanent regression guard.
     """
 
     def test_owners_exact_example_round_trips(self):
