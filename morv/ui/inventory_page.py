@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 from morv.core import tire_catalog, validate
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr, norm_ar
-from morv.infra import inventory, items
+from morv.infra import inventory, items, settings, users
 from morv.infra.items import Item
 from morv.ui import tokens
 from morv.ui.adaptive_layout import AdaptiveTableColumns
@@ -175,6 +175,9 @@ class ItemDialog(Modal):
         self.body.addWidget(self.fields_box)
         self.body.addWidget(muted("الحقول الظاهرة والإلزامية تتبع «الإعدادات ← حقول بطاقة الصنف»."))
         self.widgets: dict = {}
+        self._vat_enabled = settings.get(session.con, "tax.enabled", "0") == "1"
+        self._vat_editable = self._vat_enabled and users.is_active_manager(session.con, session.user)
+        self.tax_treatment = self.tax_rate = None
         self.add_footer("حفظ", self.save)
         self.set_kind(it.kind if it else "tire")
         if it:
@@ -200,7 +203,9 @@ class ItemDialog(Modal):
         self._category_manual = it is not None
         self._tyre_catalog = items.tyre_catalog(self.session.con) if kind == "tire" else {}
         price_ok = self.session.can("items.prices")
-        for fld in self._ordered_fields(kind):
+        ordered = self._ordered_fields(kind)
+        last_price = next((fld.key for fld in reversed(ordered) if fld.key.startswith("price_")), None)
+        for fld in ordered:
             label = fld.label + (" *" if fld.required else "")
             current = ""
             if it:
@@ -253,11 +258,46 @@ class ItemDialog(Modal):
             f.addRow(label, w)
             if fld.key == "code":
                 f.addRow("", muted("الاسم والكود يُقترحان تلقائيًا من الماركة والمقاس؛ اتركهما فارغين لقبول المقترح أو اكتب ما تريد"))
+            if self._vat_enabled and fld.key == last_price:
+                self._add_tax_fields(f)
+        if self._vat_enabled and last_price is None:
+            self._add_tax_fields(f)
         self.fields_box.setLayout(f)
         self.body.replaceWidget(old, self.fields_box)
         old.hide()
         old.deleteLater()
         self._suggest()
+        self.request_content_fit()
+
+    def _add_tax_fields(self, layout):
+        self.tax_treatment = QComboBox()
+        for key, label in (("standard", "خاضع للضريبة"), ("exempt", "معفى من الضريبة"),
+                           ("zero", "خاضع بنسبة صفر")):
+            self.tax_treatment.addItem(label, key)
+        treatment = (self.it.tax_treatment if self.it else None) or "standard"
+        self.tax_treatment.setCurrentIndex(self.tax_treatment.findData(treatment))
+        self.tax_rate = ltr_edit("النسبة العامة")
+        try:
+            general = int(settings.get(self.session.con, "tax.rate", ""))
+            if general >= 0:
+                self.tax_rate.setPlaceholderText(f"النسبة العامة — {fmt(general)}%")
+        except ValueError:
+            pass
+        if self.it and self.it.tax_rate is not None:
+            self.tax_rate.setText(fmt(self.it.tax_rate))
+        self.tax_treatment.setEnabled(self._vat_editable)
+        self.tax_rate.setEnabled(self._vat_editable)
+        self.tax_rate.setToolTip("اترك النسبة فارغة لاستخدام النسبة العامة. للمدير فقط.")
+        layout.addRow("المعاملة الضريبية", self.tax_treatment)
+        layout.addRow("نسبة خاصة (%)", self.tax_rate)
+        combo, rate = self.tax_treatment, self.tax_rate
+
+        def refresh(*_args):
+            layout.setRowVisible(rate, combo.currentData() == "standard")
+            self.request_content_fit()
+
+        combo.currentIndexChanged.connect(refresh)
+        refresh()
 
     def _category_edited(self, *_args) -> None:
         self._category_manual = True
@@ -317,6 +357,18 @@ class ItemDialog(Modal):
         it = Item(self.it.id if self.it else None, self.kind, self._value("code").strip() or code,
                   self._value("name").strip() or name, self._value("barcode"), self._value("brand"),
                   self._value("model"), *prices, int(self._value("min_qty") or 0), self._value("notes"), True, attrs)
+        if self._vat_editable and self.tax_treatment is not None:
+            treatment = self.tax_treatment.currentData()
+            try:
+                rate = (parse_money(self.tax_rate.text())
+                        if treatment == "standard" and self.tax_rate.text().strip() else None)
+            except MoneyError as e:
+                self.notice.show_message(f"نسبة الضريبة: {e}")
+                return
+            # Do not submit unchanged tax fields on an ordinary item edit.
+            previous = ((self.it.tax_treatment or "standard"), self.it.tax_rate) if self.it else ("standard", None)
+            if (treatment, rate) != previous:
+                it.tax_treatment, it.tax_rate = treatment, rate
         try:
             self.saved = (items.update if self.it else items.create)(self.session.con, self.session.user, it)
         except items.ItemError as e:

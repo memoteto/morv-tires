@@ -2,10 +2,11 @@
 import sqlite3
 from dataclasses import dataclass, field
 
-from morv.core import tire_catalog, validate
+from morv.core import tax, tire_catalog, validate
+from morv.core.money import MoneyError
 from morv.core.text import norm_ar, scanner_fix
 from morv.infra.db.connection import transaction
-from morv.infra.users import audit, require
+from morv.infra.users import audit, is_active_manager, require
 
 KINDS = {"tire": "إطار", "battery": "بطارية", "service": "خدمة"}
 FIXED_KEYS = {"name", "code", "barcode", "brand", "model", "price_retail", "price_wholesale", "price_super",
@@ -48,6 +49,10 @@ class Item:
     notes: str = ""
     active: bool = True
     attrs: dict = field(default_factory=dict)
+    # None means the caller did not submit VAT fields (legacy/hidden form).
+    # A loaded item always has the stored treatment, or standard on pre-34 schemas.
+    tax_treatment: str | None = None
+    tax_rate: int | None = None
 
 
 # ---------- Field setup ----------
@@ -224,11 +229,35 @@ def _unique_errors(con, it: Item) -> None:
             raise ItemError(f"الباركود مسجّل للصنف: {r[0]}")
 
 
+def _vat_change(con, by, it: Item, previous: tuple) -> tuple | None:
+    """Return explicit, authorized changes only; omission preserves the old pair."""
+    if it.tax_treatment is None:
+        if it.tax_rate is not None:
+            raise ItemError("حدد المعاملة الضريبية قبل النسبة الخاصة")
+        return None
+    desired = (it.tax_treatment, it.tax_rate)
+    if desired == previous:
+        # Includes old records with a redundant rate on a non-standard treatment.
+        return None
+    if by is None or not is_active_manager(con, by):
+        raise ItemError("تعديل المعاملة الضريبية من صلاحية المدير فقط")
+    try:
+        tax.resolve_rate(it.tax_treatment, it.tax_rate, 0)
+    except MoneyError as e:
+        raise ItemError(str(e)) from e
+    if it.tax_treatment != "standard" and it.tax_rate is not None:
+        raise ItemError("النسبة الخاصة للصنف الخاضع للضريبة فقط")
+    if it.tax_rate is not None and it.tax_rate > 2**63 - 1:
+        raise ItemError("النسبة الخاصة أكبر من الحد المسموح")
+    return desired
+
+
 def create(con, by, it: Item) -> Item:
     require(con, by, "items.manage", ItemError)
     _clean(con, it)
     _unique_errors(con, it)
     with transaction(con):
+        vat = _vat_change(con, by, it, ("standard", None))
         cur = con.execute(
             "INSERT INTO items (kind, code, barcode, name, name_norm, brand, model, price_retail, price_wholesale, price_super, "
             "min_qty, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -236,7 +265,11 @@ def create(con, by, it: Item) -> Item:
              it.price_retail, it.price_wholesale, it.price_super, it.min_qty, it.notes.strip() or None))
         it.id = cur.lastrowid
         _save_attrs(con, it.id, it.attrs)
-        audit(con, by, "item.create", "item", it.id, f"{it.code} · {it.name}")
+        detail = f"{it.code} · {it.name}"
+        if vat is not None:
+            con.execute("UPDATE items SET tax_treatment=?, tax_rate=? WHERE id=?", (*vat, it.id))
+            detail += f" · ضريبة المخرجات: {vat[0]}/{vat[1]}"
+        audit(con, by, "item.create", "item", it.id, detail)
     return get(con, it.id)
 
 
@@ -245,6 +278,7 @@ def update(con, by, it: Item) -> Item:
     with transaction(con):
         # Kind and legacy category must be read under the same write lock as the update.
         old = get(con, it.id)
+        vat = _vat_change(con, by, it, (old.tax_treatment, old.tax_rate))
         _clean(con, it, old.attrs.get("cat", "") if old.kind == "tire" else "")
         _unique_errors(con, it)
         if old.kind != it.kind and has_documents(con, it.id):
@@ -261,6 +295,9 @@ def update(con, by, it: Item) -> Item:
         if (old.price_retail, old.price_wholesale, old.price_super) != (it.price_retail, it.price_wholesale, it.price_super):
             detail += (f" · الأسعار {old.price_retail}/{old.price_wholesale}/{old.price_super} → "
                        f"{it.price_retail}/{it.price_wholesale}/{it.price_super}")
+        if vat is not None:
+            con.execute("UPDATE items SET tax_treatment=?, tax_rate=? WHERE id=?", (*vat, it.id))
+            detail += f" · ضريبة المخرجات: {old.tax_treatment}/{old.tax_rate} → {vat[0]}/{vat[1]}"
         audit(con, by, "item.update", "item", it.id, detail)
     return get(con, it.id)
 
@@ -297,7 +334,9 @@ def get(con, item_id: int) -> Item:
     attrs = dict(con.execute("SELECT field_key, value FROM item_attrs WHERE item_id=?", (item_id,)).fetchall())
     return Item(r["id"], r["kind"], r["code"], r["name"], r["barcode"] or "", r["brand"] or "", r["model"] or "",
                 r["price_retail"], r["price_wholesale"], r["price_super"], r["min_qty"], r["notes"] or "",
-                bool(r["active"]), attrs)
+                bool(r["active"]), attrs,
+                r["tax_treatment"] if "tax_treatment" in r.keys() else "standard",
+                r["tax_rate"] if "tax_rate" in r.keys() else None)
 
 
 def by_barcode(con, code: str, *, unique: bool = False) -> Item | None:

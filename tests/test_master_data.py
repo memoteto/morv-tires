@@ -137,6 +137,61 @@ class ItemsTest(_Db):
         base.update(kw)
         return Item(**base)
 
+    def test_item_vat_defaults_and_explicit_roundtrip(self):
+        from morv.infra import sales, settings
+        from morv.infra.sales import SaleLineIn
+
+        item = items.create(self.con, self.admin, self.tire())
+        self.assertEqual((item.tax_treatment, item.tax_rate), ("standard", None))
+        item.tax_rate = 500
+        item = items.update(self.con, self.admin, item)
+        self.assertEqual((item.tax_treatment, item.tax_rate), ("standard", 500))
+        self.assertIn("ضريبة المخرجات", users.audit_rows(self.con, 1)[0][6])
+        settings.put(self.con, "tax.enabled", "1")
+        quote = sales.compute_sale_totals(
+            self.con, [SaleLineIn(item.id, 1, 10000)], prices_tax_inclusive=False)
+        self.assertEqual((quote.tax_total, quote.total), (500, 10500))
+        for treatment in ("exempt", "zero"):
+            item.tax_treatment, item.tax_rate = treatment, None
+            item = items.update(self.con, self.admin, item)
+            self.assertEqual((item.tax_treatment, item.tax_rate), (treatment, None))
+            quote = sales.compute_sale_totals(
+                self.con, [SaleLineIn(item.id, 1, 10000)], prices_tax_inclusive=False)
+            self.assertEqual((quote.lines[0].tax_treatment, quote.tax_total), (treatment, 0))
+        self.assertEqual(item.price_retail, 645000)
+
+    def test_ordinary_item_edit_omits_and_preserves_vat_even_when_disabled(self):
+        item = items.create(self.con, self.admin, self.tire(tax_treatment="standard", tax_rate=500))
+        replacement = self.tire(id=item.id, notes="ordinary edit")
+        saved = items.update(self.con, self.admin, replacement)
+        self.assertEqual((saved.tax_treatment, saved.tax_rate, saved.notes), ("standard", 500, "ordinary edit"))
+        self.assertEqual(saved.attrs, item.attrs)
+
+    def test_vat_changes_require_current_manager_even_with_item_permissions(self):
+        cashier = users.create_user(self.con, self.admin, "cash", "كاشير", "Cash12345", "cashier")
+        users.set_permission(self.con, self.admin, cashier.id, "items.manage", True)
+        users.set_permission(self.con, self.admin, cashier.id, "items.prices", True)
+        with self.assertRaisesRegex(items.ItemError, "المدير"):
+            items.create(self.con, cashier, self.tire(tax_treatment="exempt"))
+        self.assertEqual(items.count(self.con), 0)
+        item = items.create(self.con, self.admin, self.tire(tax_treatment="zero"))
+        item.notes = "allowed"
+        saved = items.update(self.con, cashier, item)
+        self.assertEqual((saved.tax_treatment, saved.notes), ("zero", "allowed"))
+        saved.tax_treatment, saved.tax_rate = "standard", 500
+        saved.notes = "must not persist"
+        with self.assertRaisesRegex(items.ItemError, "المدير"):
+            items.update(self.con, cashier, saved)
+        actual = items.get(self.con, item.id)
+        self.assertEqual((actual.tax_treatment, actual.tax_rate, actual.notes), ("zero", None, "allowed"))
+
+    def test_invalid_vat_values_are_rejected_atomically(self):
+        for treatment, rate in (("unknown", None), ("standard", -1), ("standard", True),
+                                ("standard", 1.5), ("exempt", 500), (None, 500)):
+            with self.subTest(treatment=treatment, rate=rate), self.assertRaises(items.ItemError):
+                items.create(self.con, self.admin, self.tire(tax_treatment=treatment, tax_rate=rate))
+            self.assertEqual(items.count(self.con), 0)
+
     def test_create_tire_with_required_attrs(self):
         it = items.create(self.con, self.admin, self.tire())
         self.assertEqual(it.attrs["size"], "205/55R16")

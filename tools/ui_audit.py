@@ -197,6 +197,42 @@ def _capture_checked(root, app, out, name, report, *, dialog=False, screen_h=Non
     print(f"audit: captured {name}", flush=True)
 
 
+def _capture_item_vat(win, session, app, out, tag, report, screen_h):
+    from morv.infra import items, settings
+    from morv.ui.inventory_page import ItemDialog
+
+    con = session.con
+    old_enabled = settings.get(con, "tax.enabled", "0")
+    try:
+        settings.put(con, "tax.enabled", "1")
+        for kind, code in (("tire", "AUDIT-SEARCH-0"), ("battery", "AUDIT-SEARCH-3"),
+                           ("service", "AUDIT-SEARCH-4")):
+            item_id = con.execute("SELECT id FROM items WHERE code=?", (code,)).fetchone()[0]
+            dlg = ItemDialog(session, items.get(con, item_id), win)
+            try:
+                dlg.show()
+                _settle(app)
+                if (dlg.kind != kind or not dlg.tax_treatment.isVisible()
+                        or not dlg.tax_rate.isVisible()):
+                    raise RuntimeError(f"audit: missing item VAT controls for {kind}")
+                dlg.scroll.ensureWidgetVisible(dlg.tax_rate)
+                _capture_checked(dlg, app, out, f"dlg_item_vat_{kind}_standard_{tag}", report,
+                                 dialog=True, screen_h=screen_h)
+                dlg.tax_treatment.setCurrentIndex(dlg.tax_treatment.findData("exempt"))
+                _settle(app)
+                if not dlg.tax_rate.isHidden():
+                    raise RuntimeError(f"audit: item VAT rate not hidden for {kind}")
+                dlg.scroll.ensureWidgetVisible(dlg.tax_treatment)
+                _capture_checked(dlg, app, out, f"dlg_item_vat_{kind}_exempt_{tag}", report,
+                                 dialog=True, screen_h=screen_h)
+            finally:
+                dlg.close()
+                dlg.deleteLater()
+                _settle(app)
+    finally:
+        settings.put(con, "tax.enabled", old_enabled)
+
+
 def _capture_purchase_vat(win, page, session, supplier_records, app, out, tag, report, screen_h):
     """Populate an isolated draft in the real purchase workspace, without posting."""
     from morv.infra import settings
@@ -388,6 +424,7 @@ def run(out: Path, size: tuple) -> dict:
                     report["pages"][tab_shot] = _measure(win)
                     tabs.setCurrentIndex(0)
                     _settle(app)
+            _capture_item_vat(win, session, app, out, f"{w}x{h}_{mode}", report, h)
             for dname, make in _dialogs(session, item_id):
                 name = f"dlg_{dname}_{w}x{h}_{mode}"
                 try:
