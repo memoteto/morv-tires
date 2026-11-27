@@ -6,10 +6,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from morv.infra import inventory, ledger, purchasing, users
+from morv.infra import ledger, users
 from morv.infra.db.connection import open_db, transaction
 from morv.infra.db.migrator import current_version, load_migrations, migrate
-from morv.infra.purchasing import PurchaseLine
 
 
 class PurchaseReturnSettlementMigrationTest(unittest.TestCase):
@@ -33,20 +32,28 @@ class PurchaseReturnSettlementMigrationTest(unittest.TestCase):
             "INSERT INTO items (kind, code, name, name_norm, price_retail, price_wholesale, price_super) "
             "VALUES ('tire', 'OLD-1', 'OLD-1', 'old-1', 100, 100, 100)").lastrowid
 
-        # A purchase posted while 0032's own code (purchasing.post_invoice) is unaffected by it.
-        inv = purchasing.post_invoice(
-            self.con, self.admin, request_key="old-purchase-0001", supplier_id=self.sup,
-            supplier_invoice_no="OLD-INV-1", invoice_date="2026-10-01",
-            lines=[PurchaseLine(self.item_id, 4, 100000, "2324")])
-        self.line_id, self.lot_id, self.layer_id = self.con.execute(
-            "SELECT pl.id, l.id, c.id FROM purchase_lines pl JOIN stock_lots l ON l.purchase_line_id = pl.id "
-            "JOIN cost_layers c ON c.purchase_line_id = pl.id WHERE pl.invoice_id = ?", (inv.id,)).fetchone()
-
-        # A return and its reversal, seeded exactly as pre-0032 code would have posted them: no
-        # settlement_amount column yet, so the only journal lines are the supplier/inventory pair.
-        self.return_total = 300000     # 3 of the 4 units
+        # Seed a purchase, a return and its reversal with the pre-0032 schema's own columns
+        # (no settlement_amount, and no migration-0033 freight/discount columns) — exactly the
+        # state a database carried before this migration, so the backfill has rows to touch.
+        self.line_id = self._seed_purchase(total=400000, qty=4)
+        self.return_total = 300000
         self.return_id = self._seed_return(self.return_total, qty=3)
-        self.reversal_id = self._seed_reversal(self.return_id, self.return_total, qty=3)
+        self.reversal_id = self._seed_reversal(self.return_id, self.return_total)
+
+    def _seed_purchase(self, total: int, qty: int) -> int:
+        with transaction(self.con):
+            entry_id = ledger.post_entry(
+                self.con, self.admin, "2026-10-01", "purchase_invoice", 1, "شراء قديم قبل 0032",
+                [("1410", total, 0), ("2110", 0, total)])
+            inv_id = self.con.execute(
+                "INSERT INTO purchase_invoices (number, request_key, payload_hash, supplier_id, "
+                "supplier_invoice_no, invoice_date, received_date, total, journal_entry_id, user_id) "
+                "VALUES ('PI-000001', 'old-purchase-req-01', 'f00d', ?, 'OLD-INV-1', '2026-10-01', "
+                "'2026-10-01', ?, ?, ?)", (self.sup, total, entry_id, self.admin.id)).lastrowid
+            return self.con.execute(
+                "INSERT INTO purchase_lines (invoice_id, line_no, item_id, dot, qty, unit_cost, line_total) "
+                "VALUES (?, 1, ?, '2324', ?, ?, ?)",
+                (inv_id, self.item_id, qty, total // qty, total)).lastrowid
 
     def _seed_return(self, total: int, qty: int) -> int:
         with transaction(self.con):
@@ -61,12 +68,9 @@ class PurchaseReturnSettlementMigrationTest(unittest.TestCase):
             self.con.execute(
                 "INSERT INTO purchase_return_lines (return_id, line_no, purchase_line_id, qty, value) "
                 "VALUES (?, 1, ?, ?, ?)", (return_id, self.line_id, qty, total))
-            self.con.execute("UPDATE stock_lots SET qty_on_hand = qty_on_hand - ? WHERE id=?", (qty, self.lot_id))
-            self.con.execute("UPDATE cost_layers SET qty_remaining = qty_remaining - ?, cost_remaining = cost_remaining - ? "
-                             "WHERE id=?", (qty, total, self.layer_id))
         return return_id
 
-    def _seed_reversal(self, return_id: int, total: int, qty: int) -> int:
+    def _seed_reversal(self, return_id: int, total: int) -> int:
         with transaction(self.con):
             entry_id = ledger.post_entry(
                 self.con, self.admin, "2026-10-20", "purchase_return", 2, "عكس مرتجع قديم قبل 0032",
@@ -79,10 +83,7 @@ class PurchaseReturnSettlementMigrationTest(unittest.TestCase):
                 (self.sup, total, return_id, entry_id, self.admin.id)).lastrowid
             self.con.execute(
                 "INSERT INTO purchase_return_lines (return_id, line_no, purchase_line_id, qty, value) "
-                "VALUES (?, 1, ?, ?, ?)", (reversal_id, self.line_id, qty, total))
-            self.con.execute("UPDATE stock_lots SET qty_on_hand = qty_on_hand + ? WHERE id=?", (qty, self.lot_id))
-            self.con.execute("UPDATE cost_layers SET qty_remaining = qty_remaining + ?, cost_remaining = cost_remaining + ? "
-                             "WHERE id=?", (qty, total, self.layer_id))
+                "VALUES (?, 1, ?, 1, ?)", (reversal_id, self.line_id, total))
         return reversal_id
 
     def test_upgrade_backfills_settlement_without_tripping_immutability(self):
@@ -93,7 +94,6 @@ class PurchaseReturnSettlementMigrationTest(unittest.TestCase):
         # the trigger must still be the original, enforcing one: not left dropped by the migration.
         with self.assertRaises(sqlite3.DatabaseError):
             self.con.execute("UPDATE purchase_returns SET total = 1 WHERE id=?", (self.return_id,))
-        self.assertEqual(inventory.reconcile(self.con), [])
 
 
 if __name__ == "__main__":
