@@ -659,7 +659,8 @@ def supplier_aging(con, end: str) -> Table:
         invoices.setdefault(sid, [name, []])[1].insert(0, [due, amount])        # the opening is the oldest debt
     settled: dict[int, int] = {}
     for sid, net in con.execute(
-            "SELECT r.supplier_id, sum(CASE r.kind WHEN 'return' THEN r.total ELSE -r.total END) "
+            # settlement_amount, not the inventory book value, is what actually changed what's owed (as in supplier_balances)
+            "SELECT r.supplier_id, sum(CASE r.kind WHEN 'return' THEN r.settlement_amount ELSE -r.settlement_amount END) "
             "FROM purchase_returns r JOIN journal_entries e ON e.id = r.journal_entry_id "
             "WHERE e.entry_date <= ? GROUP BY r.supplier_id", (end,)):
         settled[sid] = net

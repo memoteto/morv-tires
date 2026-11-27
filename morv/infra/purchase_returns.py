@@ -132,7 +132,12 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, supplier_id: i
         return_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM purchase_returns").fetchone()[0]
         number = f"PRT-{day[:4]}-{return_id:06d}"
         memo = f"مرتجع مورد {number}: {reason}"
-        je_lines = [(SUPPLIERS_ACCOUNT, settle, 0), (INVENTORY_ACCOUNT, 0, total)]
+        # A zero settlement means the supplier credited nothing; a (debit, credit) = (0, 0) line
+        # would violate journal_lines' "exactly one side positive" check, so it is omitted rather
+        # than posted. The diff branch below still balances the entry on its own in that case.
+        je_lines = [(INVENTORY_ACCOUNT, 0, total)]
+        if settle > 0:
+            je_lines.append((SUPPLIERS_ACCOUNT, settle, 0))
         if diff < 0:
             je_lines.append((SETTLEMENT_DIFF_ACCOUNT, -diff, 0))
             memo += f" · فرق تسوية مدين {-diff} قرش: {settlement_reason}"
@@ -191,7 +196,9 @@ def reverse_return(con: sqlite3.Connection, by, *, request_key: str, return_id: 
         number = f"PRT-{today[:4]}-{new_id:06d}"
         total, settle = src[2], src[4]
         diff = settle - total
-        je_lines = [(INVENTORY_ACCOUNT, total, 0), (SUPPLIERS_ACCOUNT, 0, settle)]
+        je_lines = [(INVENTORY_ACCOUNT, total, 0)]      # see post_return: a zero settlement omits the supplier line
+        if settle > 0:
+            je_lines.append((SUPPLIERS_ACCOUNT, 0, settle))
         if diff < 0:
             je_lines.append((SETTLEMENT_DIFF_ACCOUNT, 0, -diff))
         elif diff > 0:
