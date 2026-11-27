@@ -126,13 +126,25 @@ class Modal(QDialog):
     def _refit_visible_content(self) -> None:
         if self.table_mode or not self.isVisible():
             return
-        # Apply after the visibility change and reuse the same content measurement
-        # as initial show. Otherwise the old scroll minimum stretches folded forms.
+        # The scroll area's sizeHint can retain the expanded content height after
+        # folding. For an already displayed dialog use the measured non-scroll
+        # chrome and the current body hint, not another cached dialog sizeHint.
         center_y = self.frameGeometry().center().y()
+        chrome = max(0, self.height() - self.scroll.height())
         self.body.invalidate()
         self.body.activate()
-        self._fit_height()
+        wanted = self.scroll.widget().sizeHint().height()
         available = self.screen().availableGeometry()
+        limit = min(self.maximumHeight(), available.height())
+        body_height = max(0, min(wanted, limit - chrome))
+        self.scroll.setMinimumHeight(body_height)
+        # Clear the previous propagated minimum before applying the explicit target.
+        frame_layout = self.scroll.parentWidget().layout()
+        frame_layout.invalidate()
+        frame_layout.activate()
+        self.layout().invalidate()
+        self.layout().activate()
+        self.resize(self.width(), min(limit, chrome + body_height))
         y = max(available.top(), min(center_y - self.height() // 2,
                                      available.bottom() - self.height() + 1))
         self.move(self.x(), y)

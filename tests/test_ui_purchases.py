@@ -596,6 +596,9 @@ class PurchasesUiTest(unittest.TestCase):
             self.assertTrue(dlg.more_box.isHidden())
             self.assertTrue(folded["footer_visible"])
             self.assertEqual(folded["width"], baseline["width"])
+            self.assertEqual(folded["minimum_scroll"], baseline["minimum_scroll"])
+            self.assertLessEqual(abs(folded["viewport"] - baseline["viewport"]), 4,
+                                 f"SUPPLIER_FOLD_VIEWPORT baseline={baseline} folded={folded}")
             self.assertLessEqual(abs(folded["height"] - baseline["height"]), 4,
                                  f"SUPPLIER_FOLD_HEIGHT baseline={baseline} expanded={expanded} folded={folded}")
             self.assertTrue(all(abs(x - y) <= 4 for x, y in zip(folded["gaps"], baseline["gaps"], strict=True)),

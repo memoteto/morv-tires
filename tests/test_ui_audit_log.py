@@ -43,10 +43,22 @@ class AuditLogTest(unittest.TestCase):
 
     def test_wrapping_translation_and_fixed_actions(self):
         from PySide6.QtCore import QPoint, QRect, Qt
+        from PySide6.QtGui import QFontInfo
         from morv.infra import users
+        from morv.ui import theme
         from morv.ui.settings_page import AuditTab
         from morv.ui.widgets import dispose
 
+        # This is a visual acceptance test. Use the exact shipped Arabic font and
+        # stylesheet instead of a platform-dependent uninitialized QApplication.
+        # In Windows CI the default Sans Serif measured 800 chars at only 840px.
+        old = (self.app.palette(), self.app.styleSheet(), self.app.font(), self.app.layoutDirection())
+        self.addCleanup(self.app.setPalette, old[0])
+        self.addCleanup(self.app.setStyleSheet, old[1])
+        self.addCleanup(self.app.setFont, old[2])
+        self.addCleanup(self.app.setLayoutDirection, old[3])
+        theme.apply(self.app, False)
+        self.assertEqual(QFontInfo(self.app.font()).family(), theme.DEFAULT_FONT)
         detail = "تفاصيل عملية تجريبية " * 40
         users.audit(self.con, self.admin, "unknown.example", detail="Unknown action")
         users.audit(self.con, self.admin, "sale.post", detail=detail)
