@@ -184,10 +184,112 @@ def _capture_item_search(form, app, out, name, expected, report):
         _settle(app)
 
 
+def _capture_checked(root, app, out, name, report, *, dialog=False, screen_h=None):
+    """Capture an actual settled widget; a missing required screenshot is an audit failure."""
+    _settle(app)
+    if not root.isVisible() or not root.grab().save(str(out / f"{name}.png")):
+        raise RuntimeError(f"audit: cannot capture {name}")
+    info = _measure(root)
+    if dialog:
+        info["size"] = [root.width(), root.height()]
+        info["screen_h"] = screen_h
+    report["dialogs" if dialog else "pages"][name] = info
+    print(f"audit: captured {name}", flush=True)
+
+
+def _capture_purchase_vat(win, page, session, supplier_records, app, out, tag, report, screen_h):
+    """Populate an isolated draft in the real purchase workspace, without posting."""
+    from morv.infra import settings
+    from morv.ui.purchase_vat import PurchaseVatDialog
+    from morv.ui.purchases_page import PurchaseForm
+    from morv.ui.suppliers_page import SupplierDialog
+
+    con = session.con
+    old_enabled = settings.get(con, "tax.enabled", "0")
+    old_rate = settings.get(con, "tax.rate", "1400")
+    form = None
+    try:
+        settings.put(con, "tax.enabled", "1")
+        settings.put(con, "tax.rate", "1400")
+        form = PurchaseForm(session, page)
+        page.addWidget(form)
+        page.setCurrentWidget(form)
+        items = con.execute(
+            "SELECT id, kind, name FROM items WHERE code IN ('AUDIT-SEARCH-0','AUDIT-SEARCH-3') "
+            "ORDER BY code").fetchall()
+        if len(items) != 2:
+            raise RuntimeError("audit: missing VAT purchase examples")
+        for item_id, kind, name in items:
+            form._add_row(item_id, kind, name)
+            row = form._rows[-1]
+            row["cost_edit"].setText("1000")
+            if kind == "tire":
+                row["dot_edit"].setText("2324")
+        for mode, supplier in zip(("exclusive", "inclusive"), supplier_records, strict=True):
+            form._pick_supplier(supplier.id, supplier.name, supplier.mobile)
+            for amount, freight in (("0", "no_freight"), ("100", "freight")):
+                form.ship.setText(amount)
+                _settle(app)
+                expected_tax = "280.00" if mode == "exclusive" else "245.62"
+                # Freight is untaxed in this fixture; two lines of 1000 each.
+                if (form._vat_mode != mode or form.tax_row.isHidden()
+                        or expected_tax not in form.tax.text()
+                        or form.freight_basis_field.isHidden() != (amount == "0")):
+                    raise RuntimeError(f"audit: wrong purchase VAT state {mode}/{freight}")
+                workspace = form.invoice_layout
+                area = workspace.summary_area if workspace.columns == 2 else workspace.primary_area
+                area.verticalScrollBar().setValue(0)
+                _capture_checked(win, app, out, f"form_purchase_vat_{mode}_{freight}_{tag}", report)
+                # A stacked or short layout may put the summary below the initial viewport.
+                area.ensureWidgetVisible(form.freight_basis_field if amount != "0" else form.ship)
+                _capture_checked(win, app, out, f"form_purchase_vat_{mode}_{freight}_summary_{tag}", report)
+        # Instantiate exactly the production detail dialog with the populated draft.
+        dlg = PurchaseVatDialog(form._vat_mode, form._vat_freight, form._rows,
+                                form._default_vat_rate(), form)
+        try:
+            dlg.show()
+            _settle(app)
+            if len(dlg.editors) != 2 or not dlg.line_box.isVisible():
+                raise RuntimeError("audit: missing VAT line editors")
+            _capture_checked(dlg, app, out, f"dlg_purchase_vat_{tag}", report,
+                             dialog=True, screen_h=screen_h)
+            dlg.scroll.ensureWidgetVisible(dlg.editors[-1][1])
+            _capture_checked(dlg, app, out, f"dlg_purchase_vat_lines_{tag}", report,
+                             dialog=True, screen_h=screen_h)
+        finally:
+            dlg.close()
+            dlg.deleteLater()
+        # The registered supplier opens expanded; scroll to the real VAT controls.
+        dlg = SupplierDialog(session, supplier_records[0], win)
+        try:
+            dlg.show()
+            _settle(app)
+            if not dlg.more.isChecked() or not dlg.vat_fields.prices.isVisible():
+                raise RuntimeError("audit: missing expanded supplier VAT fields")
+            _capture_checked(dlg, app, out, f"dlg_supplier_expanded_{tag}", report,
+                             dialog=True, screen_h=screen_h)
+            dlg.scroll.ensureWidgetVisible(dlg.vat_fields.prices)
+            _capture_checked(dlg, app, out, f"dlg_supplier_vat_{tag}", report,
+                             dialog=True, screen_h=screen_h)
+        finally:
+            dlg.close()
+            dlg.deleteLater()
+    finally:
+        # Only the audit-owned temporary draft is discarded. No invoice is posted,
+        # no production discard confirmation is bypassed, and later shots are untaxed.
+        if form is not None:
+            page.setCurrentWidget(page.list_page)
+            page.removeWidget(form)
+            form.deleteLater()
+        settings.put(con, "tax.enabled", old_enabled)
+        settings.put(con, "tax.rate", old_rate)
+        _settle(app)
+
+
 def run(out: Path, size: tuple) -> dict:
     os.environ["MORV_DATA_DIR"] = tempfile.mkdtemp()
     from PySide6.QtWidgets import QApplication
-    from morv.infra import users
+    from morv.infra import suppliers, users
     from morv.infra.db.bootstrap import open_main_db
     from morv.ui import theme
     from morv.ui.session import Session
@@ -199,6 +301,14 @@ def run(out: Path, size: tuple) -> dict:
     admin = users.create_user(con, None, "admin", "المدير", "Admin12345", "manager")
     seed(con, admin, n_customers=60, n_items=80, n_suppliers=10)
     _seed_search_examples(con, admin)
+    supplier_records = [
+        suppliers.create(con, admin, suppliers.Supplier(
+            None, name, mobile, vat_status="registered", vat_prices_inclusive=inclusive))
+        for name, mobile, inclusive in (
+            ("مورد تجريبي غير شامل الضريبة", "01099990001", False),
+            ("مورد تجريبي شامل الضريبة", "01099990002", True),
+        )
+    ]
     item_id = con.execute("SELECT id FROM items ORDER BY id LIMIT 1").fetchone()[0]
     session = Session(con, admin)
     geo = app.primaryScreen().availableGeometry()
@@ -240,6 +350,8 @@ def run(out: Path, size: tuple) -> dict:
                                          f"popup_purchase_search_{w}x{h}_{mode}", 4, report)
                     page.back_to_list()
                     _settle(app)
+                    _capture_purchase_vat(win, page, session, supplier_records, app, out,
+                                          f"{w}x{h}_{mode}", report, h)
                 if _open_first_preview(win.stack.currentWidget(), app):
                     shot = f"page_{key}_preview_{w}x{h}_{mode}"
                     print(f"audit: preview {key} {mode}", flush=True)
