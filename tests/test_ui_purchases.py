@@ -497,6 +497,8 @@ class PurchasesUiTest(unittest.TestCase):
         self.assertEqual((freight, discount), (3000, 5000))
 
     def test_per_line_allocation_preview_matches_posting_in_all_freight_modes(self):
+        from PySide6.QtWidgets import QLabel
+
         from morv.core.money import fmt
         from morv.infra import inventory
 
@@ -520,10 +522,19 @@ class PurchasesUiTest(unittest.TestCase):
             for row, share, total in zip((a, b), shares, totals, strict=True):
                 self.assertIn(fmt(share), row["freight_value"].text())
                 self.assertIn(fmt(total), row["total_lbl"].text())
-                self.assertFalse(row["allocation_note"].isHidden())
+                tooltip = row["total_lbl"].toolTip()
+                self.assertIn("حصة خصم الفاتورة", tooltip)
+                self.assertIn("حصة الشحن", tooltip)
+                self.assertIn(fmt(share), tooltip)
+                self.assertIn("متوسط تكلفة الوحدة", tooltip)
+                self.assertFalse(any("متوسط تكلفة الوحدة" in label.text()
+                                     for label in row["widget"].findChildren(QLabel)))
             self.assertIn("345.00", dlg._total_lbl.text())
+        self.assertFalse(any("الضريبة غير مفعّلة بعد" in label.text()
+                             for label in dlg.findChildren(QLabel)))
         b["freight_edit"].setText("19")
         self.assertEqual(dlg._total_lbl.text(), "—")
+        self.assertEqual(a["total_lbl"].toolTip(), "")
         self.assertEqual(a["total_lbl"].text(), "—")
         b["freight_edit"].setText("20")
         self.assertIn("345.00", dlg._total_lbl.text())

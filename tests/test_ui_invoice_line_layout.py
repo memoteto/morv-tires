@@ -261,6 +261,8 @@ class InvoiceLineLayoutTest(PosFixture):
         from PySide6.QtWidgets import QLabel
 
         win, page = self.invoice(purchase)
+        if purchase:
+            page.ship.setText("300")
         if cost_note:
             page._rows[0]["last_cost"] = 1000000
             page._on_row_changed()
@@ -287,7 +289,7 @@ class InvoiceLineLayoutTest(PosFixture):
                     self.assertEqual(len(icons), 1, "SETUP: item icon")
                     keys = ("num_lbl", "total_lbl", "qty_spin", "disc_edit")
                     if purchase:
-                        keys += ("dot_edit",)
+                        keys += ("dot_edit", "freight_value")
                     for key in keys:
                         cell = row[key]
                         if not cell.isVisibleTo(page):
@@ -295,6 +297,8 @@ class InvoiceLineLayoutTest(PosFixture):
                         with self.subTest(dark=dark, width=width, name=row["name"], cell=key):
                             if purchase and key == "disc_edit" and page._line_table.compact_discount:
                                 self.assertGreater(center_y(cell), center_y(editor), "PURCHASE_DISCOUNT_SECOND_LINE")
+                            elif purchase and key == "freight_value" and page._line_table.compact_freight:
+                                self.assertGreater(center_y(cell), center_y(editor), "PURCHASE_FREIGHT_SECOND_LINE")
                             else:
                                 self.assertLessEqual(abs(center_y(cell) - center_y(editor)), 1,
                                                      "POS5_VERTICAL_FIELD_ALIGNMENT")

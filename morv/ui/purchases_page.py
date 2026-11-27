@@ -358,10 +358,6 @@ class PurchaseForm(QWidget):
             self.freight_basis.addItem(basis_labels[basis], basis)
         sbody.addWidget(field("أساس توزيع الشحن", self.freight_basis))
 
-        hint = muted("الضريبة غير مفعّلة بعد (P04). الخصم والشحن يُحسبان ضمن تكلفة المخزون.")
-        hint.setWordWrap(True)
-        sbody.addWidget(hint)
-
         self.summary_footer = InvoiceFooter()
         footer = self.summary_footer.layout()
         self.total_box = InvoiceTotal("إجمالي الفاتورة", compact=True)
@@ -574,17 +570,12 @@ class PurchaseForm(QWidget):
         del_btn.setToolTip("حذف السطر")
         h.addWidget(del_btn, 0, Qt.AlignmentFlag.AlignTop)
         self._line_table.register_purchase_row(row_w)
-        allocation_note = wrapping_line_label()
-        allocation_note.setObjectName("muted")
-        row_w.layout().addWidget(allocation_note)
-        allocation_note.hide()
 
         row = {"widget": row_w, "item_id": item_id, "kind": kind, "name": name,
               "last_cost": purchasing.last_cost(self.session.con, item_id),
               "num_lbl": num_lbl, "qty_spin": qty_spin, "cost_edit": cost_edit,
               "disc_edit": disc_edit, "disc_unit_btn": disc_unit_btn,
               "freight_row": freight_row, "freight_edit": freight_edit, "freight_value": freight_value,
-              "allocation_note": allocation_note,
               "cost_note": cost_note, "dot_edit": dot_edit, "total_lbl": total_lbl}
         qty_spin.valueChanged.connect(self._on_row_changed)
         cost_edit.textChanged.connect(self._on_row_changed)
@@ -748,24 +739,25 @@ class PurchaseForm(QWidget):
             pass  # Incomplete/invalid draft: show no calculated net cost until it is valid.
 
         for i, row in enumerate(self._rows):
-            note = row["allocation_note"]
+            total_label = row["total_lbl"]
             if allocations is None:
                 row["freight_value"].setText("—")
-                row["total_lbl"].setText("—")
-                note.hide()
+                total_label.setText("—")
+                total_label.setToolTip("")
                 continue
             allocation, line = allocations[i], lines[i]
             row["freight_value"].setText(ltr(fmt(allocation.freight_share)))
-            row["total_lbl"].setText(ltr(fmt(allocation.net_total)))
+            total_label.setText(ltr(fmt(allocation.net_total)))
+            # Preserve the allocation breakdown on demand, without adding another visible row.
             if line.line_discount or allocation.invoice_share or allocation.freight_share:
                 average = (2 * allocation.net_total + line.qty) // (2 * line.qty)
                 approx = "≈ " if allocation.net_total % line.qty else ""
-                note.setText(f"خصم الصنف {ltr(fmt(line.line_discount))} · "
-                             f"حصة خصم الفاتورة {ltr(fmt(allocation.invoice_share))} · "
-                             f"متوسط تكلفة الوحدة {approx}{ltr(fmt(average))} ج.م")
-                note.show()
+                total_label.setToolTip(f"خصم الصنف {ltr(fmt(line.line_discount))} ج.م\n"
+                                       f"حصة خصم الفاتورة {ltr(fmt(allocation.invoice_share))} ج.م\n"
+                                       f"حصة الشحن {ltr(fmt(allocation.freight_share))} ج.م\n"
+                                       f"متوسط تكلفة الوحدة {approx}{ltr(fmt(average))} ج.م")
             else:
-                note.hide()
+                total_label.setToolTip("")
 
         if allocations is None and self._rows:
             self._total_lbl.setText("—")

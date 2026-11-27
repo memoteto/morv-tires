@@ -117,7 +117,10 @@ class InvoiceLineTable(QWidget):
         height = max(reference.minimumHeight(), reference.minimumSizeHint().height(),
                      reference.sizeHint().height())
         # Keep single-line labels centered on the first input, even in taller rows.
-        for label in (cells[0], cells[self.total_column]):
+        labels = (cells[0], cells[self.total_column])
+        if self.purchase:
+            labels += (cells[6].layout().itemAt(1).widget(),)  # calculated freight share
+        for label in labels:
             if label.minimumHeight() != height or label.maximumHeight() != height:
                 label.setFixedHeight(height)
         # A wrapped name may grow naturally; its icon remains centered beside it.
