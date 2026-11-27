@@ -37,6 +37,13 @@ class PostedInvoice:
     replayed: bool
 
 
+@dataclass(frozen=True)
+class LineAllocation:
+    invoice_share: int
+    freight_share: int
+    net_total: int
+
+
 def next_number_preview(con: sqlite3.Connection) -> str:
     """Best-effort preview of the invoice number the next post will get."""
     next_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM purchase_invoices").fetchone()[0]
@@ -110,6 +117,32 @@ def _allocate_freight(clean: list, freight_amount: int, freight_basis: str, nets
         raise PurchaseError("تعذّر توزيع الشحن: أساس التوزيع صفري؛ استخدم أساسًا آخر أو التوزيع اليدوي") from e
 
 
+def compute_allocations(clean: list, freight_amount: int, freight_basis: str,
+                        invoice_discount: int) -> list[LineAllocation]:
+    """The P02 order (line value -> line discount -> invoice-discount share -> + freight share),
+
+    shared by post_invoice and the purchase form's live preview so the two can never diverge.
+    clean must already be shaped (PurchaseLine.line_discount/freight_share validated, e.g. by
+    _shape_lines). Raises PurchaseError for a discount exceeding the value it reduces, a
+    zero-basis freight split, a manual-freight sum mismatch, or a zero/negative net cost.
+    """
+    gross = [ln.qty * ln.unit_cost for ln in clean]
+    after_line_discount = [g - ln.line_discount for g, ln in zip(gross, clean, strict=True)]
+    if invoice_discount > sum(after_line_discount):     # a discount, unlike freight, may never exceed the value it reduces
+        raise PurchaseError("خصم الفاتورة أكبر من صافي قيمة الأصناف بعد خصم السطور")
+    try:
+        invoice_shares = money.allocate(after_line_discount, invoice_discount)
+    except money.MoneyError as e:
+        raise PurchaseError("خصم الفاتورة أكبر من صافي قيمة الأصناف بعد خصم السطور") from e
+    nets_before_freight = [b - s for b, s in zip(after_line_discount, invoice_shares, strict=True)]
+    freight_shares = _allocate_freight(clean, freight_amount, freight_basis, nets_before_freight)
+    net_totals = [b + f for b, f in zip(nets_before_freight, freight_shares, strict=True)]
+    for i, net in enumerate(net_totals, start=1):
+        if net <= 0:
+            raise PurchaseError(f"السطر {i}: التكلفة الصافية بعد الخصم والشحن صفر أو سالبة")
+    return [LineAllocation(s, f, n) for s, f, n in zip(invoice_shares, freight_shares, net_totals, strict=True)]
+
+
 def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: int, supplier_invoice_no: str,
                  invoice_date: str, lines: list, received_date: str | None = None,
                  freight_amount: int = 0, freight_basis: str = "qty", invoice_discount: int = 0,
@@ -152,23 +185,8 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
         if con.execute("SELECT 1 FROM purchase_invoices WHERE supplier_id=? AND supplier_invoice_no=?",
                        (supplier_id, inv_no)).fetchone():
             raise PurchaseError("فاتورة بنفس رقم فاتورة المورد مرحّلة من قبل")
-        # Calculation order (P02, approved 2026-11-27): line value -> line discount ->
-        # this line's share of the invoice discount -> + its share of freight.
-        gross = [ln.qty * ln.unit_cost for ln in clean]
-        after_line_discount = [g - ln.line_discount for g, ln in zip(gross, clean, strict=True)]
-        if invoice_discount > sum(after_line_discount):     # a discount, unlike freight, may never exceed the value it reduces
-            raise PurchaseError("خصم الفاتورة أكبر من صافي قيمة الأصناف بعد خصم السطور")
-        try:
-            invoice_shares = money.allocate(after_line_discount, invoice_discount)
-        except money.MoneyError as e:
-            raise PurchaseError("خصم الفاتورة أكبر من صافي قيمة الأصناف بعد خصم السطور") from e
-        nets_before_freight = [b - s for b, s in zip(after_line_discount, invoice_shares, strict=True)]
-        freight_shares = _allocate_freight(clean, freight_amount, freight_basis, nets_before_freight)
-        net_totals = [b + f for b, f in zip(nets_before_freight, freight_shares, strict=True)]
-        for i, net in enumerate(net_totals, start=1):
-            if net <= 0:
-                raise PurchaseError(f"السطر {i}: التكلفة الصافية بعد الخصم والشحن صفر أو سالبة")
-        total = sum(net_totals)
+        allocations = compute_allocations(clean, freight_amount, freight_basis, invoice_discount)
+        total = sum(a.net_total for a in allocations)
         inv_id = con.execute("SELECT coalesce(max(id), 0) + 1 FROM purchase_invoices").fetchone()[0]
         number = f"PI-{inv_id:06d}"
         try:
@@ -182,9 +200,8 @@ def post_invoice(con: sqlite3.Connection, by, *, request_key: str, supplier_id: 
             "journal_entry_id, notes, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (inv_id, number, key, h, supplier_id, inv_no, inv_date, recv_date, total, freight_amount,
              freight_basis, invoice_discount, entry_id, (notes or "").strip() or None, by.id))
-        for no, (ln, share, net) in enumerate(zip(clean, invoice_shares, net_totals, strict=True), start=1):
-            freight_share = freight_shares[no - 1]
-            _receive_line(con, by, inv_id, number, no, ln, recv_date, share, freight_share, net)
+        for no, (ln, a) in enumerate(zip(clean, allocations, strict=True), start=1):
+            _receive_line(con, by, inv_id, number, no, ln, recv_date, a.invoice_share, a.freight_share, a.net_total)
         audit(con, by, "purchase.post", "purchase_invoice", inv_id, f"{number} · {total}")
     return PostedInvoice(inv_id, number, total, False)
 
