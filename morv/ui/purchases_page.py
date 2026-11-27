@@ -11,10 +11,10 @@ from PySide6.QtWidgets import (
 )
 
 from morv.core import dot as dotmod
-from morv.core.money import MoneyError, fmt, parse_money
+from morv.core.money import MoneyError, fmt, parse_money, percent_of
 from morv.core.text import ltr
 from morv.infra import purchase_view, purchasing, suppliers
-from morv.infra.purchasing import PurchaseError, PurchaseLine
+from morv.infra.purchasing import FREIGHT_BASES, PurchaseError, PurchaseLine
 from morv.infra import suppliers as sup_infra
 from morv.ui import icons
 from morv.ui.adaptive_layout import HeaderPlacement, InvoiceWorkspace
@@ -180,6 +180,37 @@ class _NewSupplierDialog(QuickPartyDialog):
         self.save()
 
 
+def _amount_or_percent_row(label: str = "", placeholder: str = "0.00") -> tuple[QWidget, QLineEdit, QPushButton]:
+    """An amount-or-percent input row, shared by the line and invoice discount inputs."""
+    row = QWidget()
+    h = QHBoxLayout(row)
+    h.setContentsMargins(0, 0, 0, 0)
+    h.setSpacing(4)
+    if label:
+        h.addWidget(muted(label))
+    edit = ltr_edit(placeholder)
+    h.addWidget(edit, 1)
+    unit_btn = QPushButton("ج.م")
+    unit_btn.setObjectName("stepperBtn")
+    unit_btn.setCheckable(True)
+    unit_btn.setFixedWidth(34)
+    unit_btn.setToolTip("بالمبلغ أو كنسبة من قيمة السطر")
+    unit_btn.toggled.connect(lambda on, b=unit_btn: b.setText("%" if on else "ج.م"))
+    h.addWidget(unit_btn)
+    return row, edit, unit_btn
+
+
+def _resolve_amount_or_percent(edit: QLineEdit, unit_btn: QPushButton, base: int) -> int | None:
+    """None means the field could not be parsed; caller decides how to surface that."""
+    text = edit.text().strip()
+    if not text:
+        return 0
+    try:
+        return percent_of(base, text) if unit_btn.isChecked() else parse_money(text)
+    except MoneyError:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Full-page purchase form
 # ---------------------------------------------------------------------------
@@ -302,20 +333,26 @@ class PurchaseForm(QWidget):
         self._sub_lbl.setObjectName("cardTitle")
         sbody.addWidget(kv_row("إجمالي الأصناف", self._sub_lbl))
 
-        # Discount/tax/shipping are shown in the approved design's layout but not
-        # yet wired to the engine (purchasing.post_invoice has no such parameters),
-        # so they stay disabled rather than silently affecting the totals below.
-        self.disc = ltr_edit("0.00")
-        self.tax = ltr_edit("0.00")
-        self.ship = ltr_edit("0.00")
-        for disabled_edit in (self.disc, self.tax, self.ship):
-            disabled_edit.setEnabled(False)
-            disabled_edit.setToolTip("غير مفعّل حاليًا — سيُضاف لاحقًا")
+        # Invoice discount: amount-or-percent, same pattern as the per-line discount.
+        self.disc_edit, self.disc_unit_btn, disc_field = _amount_or_percent_row()
+        sbody.addWidget(field("خصم الفاتورة", disc_field))
 
-        sbody.addWidget(field("خصم المورد", self.disc))
+        # Tax stays disabled until P04; shown so the layout matches the approved design.
+        self.tax = ltr_edit("0.00")
+        self.tax.setEnabled(False)
+        self.tax.setToolTip("غير مفعّل حاليًا — يُضاف مع P04")
         sbody.addWidget(field("ضريبة على فاتورة المورد", self.tax))
+
+        # Shipping amount + allocation basis (qty/value/manual, per P01).
+        self.ship = ltr_edit("0.00")
         sbody.addWidget(field("نقل وتحميل", self.ship))
-        hint = muted("هذه الحقول غير مفعّلة بعد؛ إجمالي الفاتورة يُضاف بالكامل لرصيد المورد.")
+        basis_labels = {"qty": "بالكمية", "value": "بالقيمة", "manual": "توزيع يدوي"}
+        self.freight_basis = QComboBox()
+        for basis in FREIGHT_BASES:
+            self.freight_basis.addItem(basis_labels[basis], basis)
+        sbody.addWidget(field("أساس توزيع الشحن", self.freight_basis))
+
+        hint = muted("الضريبة غير مفعّلة بعد (P04). الخصم والشحن يُحسبان ضمن تكلفة المخزون.")
         hint.setWordWrap(True)
         sbody.addWidget(hint)
 
@@ -364,7 +401,11 @@ class PurchaseForm(QWidget):
             primary, summary, self.summary_footer, spacing=14)
         root.addWidget(self.invoice_layout, 1)
 
-        self._refresh_summary()
+        self.disc_edit.textChanged.connect(self._on_row_changed)
+        self.disc_unit_btn.toggled.connect(self._on_row_changed)
+        self.ship.textChanged.connect(self._on_row_changed)
+        self.freight_basis.currentIndexChanged.connect(self._on_freight_basis_changed)
+        self._on_freight_basis_changed()
         if not suppliers.count(session.con):
             self.notice.show_message(NO_SUPPLIERS_NOTICE, "warn")
 
@@ -479,6 +520,12 @@ class PurchaseForm(QWidget):
         cw.setContentsMargins(0, 0, 0, 0)
         cw.setSpacing(2)
         cost_edit = ltr_edit("0.00")
+        disc_row, disc_edit, disc_unit_btn = _amount_or_percent_row("خصم")
+        # Only shown for the manual freight basis (see _set_freight_basis); hidden rows add
+        # no row height, which is how this cell already keeps a single line most of the time.
+        freight_row, freight_edit, freight_unit_btn = _amount_or_percent_row("شحن")
+        freight_unit_btn.hide()   # freight is always an amount; no percent mode
+        freight_row.hide()
         cost_note = wrapping_line_label()
         # Hidden (not just empty) so the cell is single-line height like its
         # row-mates; it only grows the row when there is a note to show,
@@ -486,6 +533,8 @@ class PurchaseForm(QWidget):
         # up and out of vertical alignment with the rest of the row.
         cost_note.hide()
         cw.addWidget(cost_edit)
+        cw.addWidget(disc_row)
+        cw.addWidget(freight_row)
         cw.addWidget(cost_note)
         h.addWidget(cost_w, 1, Qt.AlignmentFlag.AlignTop)
 
@@ -512,9 +561,15 @@ class PurchaseForm(QWidget):
         row = {"widget": row_w, "item_id": item_id, "kind": kind, "name": name,
               "last_cost": purchasing.last_cost(self.session.con, item_id),
               "num_lbl": num_lbl, "qty_spin": qty_spin, "cost_edit": cost_edit,
+              "disc_edit": disc_edit, "disc_unit_btn": disc_unit_btn,
+              "freight_row": freight_row, "freight_edit": freight_edit,
+              "freight_unit_btn": freight_unit_btn,
               "cost_note": cost_note, "dot_edit": dot_edit, "total_lbl": total_lbl}
         qty_spin.valueChanged.connect(self._on_row_changed)
         cost_edit.textChanged.connect(self._on_row_changed)
+        disc_edit.textChanged.connect(self._on_row_changed)
+        disc_unit_btn.toggled.connect(self._on_row_changed)
+        freight_edit.textChanged.connect(self._on_row_changed)
         del_btn.clicked.connect(lambda _=False, rw=row: self._remove_row(rw))
 
         self._rows.append(row)
@@ -538,6 +593,12 @@ class PurchaseForm(QWidget):
         for i, row in enumerate(self._rows, start=1):
             row["num_lbl"].setText(str(i))
 
+    def _on_freight_basis_changed(self) -> None:
+        manual = self.freight_basis.currentData() == "manual"
+        for row in self._rows:
+            row["freight_row"].setVisible(manual)
+        self._on_row_changed()
+
     def _on_row_changed(self) -> None:
         for row in self._rows:
             try:
@@ -549,6 +610,33 @@ class PurchaseForm(QWidget):
         self._line_table.sync_columns()
         self._line_count_lbl.setText(f"{len(self._rows)} سطر")
         self._refresh_summary()
+
+    def _draft_lines(self) -> list[PurchaseLine] | None:
+        """Best-effort PurchaseLines from the current row widgets, for the live preview only.
+
+        Unlike _validate_lines, this never reports an error to the person: an unparsable or
+        out-of-range field just makes the preview fall back to a plain subtotal (see
+        _refresh_summary), since the person is still mid-edit.
+        """
+        lines = []
+        for row in self._rows:
+            try:
+                cost = parse_money(row["cost_edit"].text())
+            except MoneyError:
+                return None
+            qty = row["qty_spin"].value()
+            disc = _resolve_amount_or_percent(row["disc_edit"], row["disc_unit_btn"], qty * cost)
+            if disc is None:
+                return None
+            freight_share = None
+            if self.freight_basis.currentData() == "manual":
+                freight_share = _resolve_amount_or_percent(
+                    row["freight_edit"], row["freight_unit_btn"], 0)
+                if freight_share is None:
+                    return None
+            lines.append(PurchaseLine(row["item_id"], qty, cost, None,
+                                       line_discount=disc, freight_share=freight_share))
+        return lines
 
     @staticmethod
     def _update_cost_note(row: dict, cost: int) -> None:
@@ -583,10 +671,14 @@ class PurchaseForm(QWidget):
             total += row["qty_spin"].value() * cost
         return total
 
+    def _freight_basis(self) -> str:
+        return self.freight_basis.currentData() or "qty"
+
     def _validate_lines(self) -> tuple[list[PurchaseLine] | None, str | None]:
         """Parse and validate every row. Returns (lines, None) or (None, error)."""
         if not self._rows:
             return None, "أضف سطرًا واحدًا على الأقل قبل الترحيل."
+        manual = self._freight_basis() == "manual"
         lines = []
         for i, row in enumerate(self._rows, start=1):
             try:
@@ -595,6 +687,7 @@ class PurchaseForm(QWidget):
                 return None, f"السطر {i} ({row['name']}): تكلفة الوحدة: {e}"
             if cost <= 0:
                 return None, f"السطر {i} ({row['name']}): تكلفة الوحدة يجب أن تكون أكبر من صفر."
+            qty = row["qty_spin"].value()
             dot_text = row["dot_edit"].text().strip()
             dot = None
             if dot_text:
@@ -604,17 +697,38 @@ class PurchaseForm(QWidget):
                     return None, f"السطر {i} ({row['name']}): {e}"
             elif row["kind"] == "tire":
                 return None, f"رمز DOT إلزامي للإطار «{row['name']}»."
-            lines.append(PurchaseLine(row["item_id"], row["qty_spin"].value(), cost, dot))
+            disc = _resolve_amount_or_percent(row["disc_edit"], row["disc_unit_btn"], qty * cost)
+            if disc is None:
+                return None, f"السطر {i} ({row['name']}): خصم السطر: قيمة غير صحيحة."
+            freight_share = None
+            if manual:
+                freight_share = _resolve_amount_or_percent(
+                    row["freight_edit"], row["freight_unit_btn"], 0)
+                if freight_share is None:
+                    return None, f"السطر {i} ({row['name']}): نصيب الشحن: قيمة غير صحيحة."
+            lines.append(PurchaseLine(row["item_id"], qty, cost, dot,
+                                       line_discount=disc, freight_share=freight_share))
         return lines, None
 
     def _refresh_summary(self) -> None:
-        # Discount/tax/shipping/paid are disabled (see _card above) and the engine
-        # (purchasing.post_invoice) never receives them, so the total shown here
-        # must equal exactly what gets posted: the raw line subtotal, in full.
         sub = self._sub_total()
         self._sub_lbl.setText(ltr(fmt(sub)))
-        self._total_lbl.setText(f"{ltr(fmt(sub))} ج.م")
-        self._rem_lbl.setText(f"يُضاف بالكامل لرصيد المورد: {ltr(fmt(sub))} ج.م")
+        try:
+            freight_amount = parse_money(self.ship.text())
+        except MoneyError:
+            freight_amount = 0
+        invoice_discount = _resolve_amount_or_percent(self.disc_edit, self.disc_unit_btn, sub)
+        lines = self._draft_lines()
+        net = sub
+        if lines is not None and invoice_discount is not None:
+            try:
+                allocations = purchasing.compute_allocations(
+                    lines, freight_amount, self._freight_basis(), invoice_discount)
+                net = sum(a.net_total for a in allocations)
+            except purchasing.PurchaseError:
+                net = sub  # transient/invalid state mid-edit; shown total falls back to gross
+        self._total_lbl.setText(f"{ltr(fmt(net))} ج.م")
+        self._rem_lbl.setText(f"يُضاف بالكامل لرصيد المورد: {ltr(fmt(net))} ج.م")
 
     def _fail(self, text: str) -> bool:
         self.notice.show_message(text)
@@ -646,6 +760,16 @@ class PurchaseForm(QWidget):
         if err:
             self._fail(err)
             return
+        try:
+            freight_amount = parse_money(self.ship.text())
+        except MoneyError as e:
+            self._fail(f"الشحن: {e}")
+            return
+        sub = sum(ln.qty * ln.unit_cost for ln in lines)
+        invoice_discount = _resolve_amount_or_percent(self.disc_edit, self.disc_unit_btn, sub)
+        if invoice_discount is None:
+            self._fail("خصم الفاتورة: قيمة غير صحيحة.")
+            return
         self._busy = True
         self.post_btn.setEnabled(False)
         try:
@@ -658,6 +782,9 @@ class PurchaseForm(QWidget):
                 received_date=self._received_date,
                 lines=lines,
                 notes=self.notes.text(),
+                freight_amount=freight_amount,
+                freight_basis=self._freight_basis(),
+                invoice_discount=invoice_discount,
             )
         except PurchaseError as e:
             self._fail(f"لم تُرحَّل الفاتورة: {e}")
