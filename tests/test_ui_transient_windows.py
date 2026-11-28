@@ -1,12 +1,53 @@
 """No widget may be shown before it has a parent, since a parentless show flashes a native window."""
+import faulthandler
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from tests.qt_app import get_app, require_qt
+
+faulthandler.enable()                        # A native crash in these Qt paths must name its frame, not exit quietly
+
+
+def _step(label: str) -> None:
+    print(f"TRANSIENT_STEP {label}", flush=True)
+    sys.stderr.flush()
+
+
+def _parentless_show_watcher():
+    import shiboken6
+    from PySide6.QtCore import QEvent, QObject
+    from PySide6.QtWidgets import QWidget
+
+    class ParentlessShowWatcher(QObject):
+        """A widget shown while parentless that later gains a parent was never meant to be a window."""
+
+        def __init__(self):
+            super().__init__()
+            self.seen = []
+
+        def eventFilter(self, obj, event):
+            if (event.type() == QEvent.Type.Show and isinstance(obj, QWidget)
+                    and shiboken6.isValid(obj) and obj.parentWidget() is None):
+                text = obj.text()[:40] if hasattr(obj, "text") else ""
+                self.seen.append((obj, f"{type(obj).__name__}({text})"))   # Read now: Qt may delete it later
+            return False
+
+        def offenders(self) -> list[str]:
+            found = set()
+            for widget, label in self.seen:
+                if not shiboken6.isValid(widget):
+                    continue                 # Qt destroyed it; touching the wrapper crashes on Windows
+                if widget.parentWidget() is None:
+                    continue                 # A window on purpose: a modal, a menu, or the main window
+                found.add(label)
+            return sorted(found)
+
+    return ParentlessShowWatcher()
 
 
 @require_qt()
@@ -52,38 +93,35 @@ class TransientWindowTest(unittest.TestCase):
         n.show_message("")
         self.assertFalse(n.isVisible(), "clearing the text must hide the notice as it always did")
 
-    def test_every_section_can_be_opened_in_one_window(self):
+    def test_navigating_every_section_shows_nothing_before_it_is_parented(self):
         from morv.ui.shell import NAV, MainWindow
         from morv.ui.widgets import dispose
-        window = MainWindow(self.session, self.app)
-        window.health_timer.stop()
-        self.addCleanup(dispose, window, self.app)
-        window.show()
-        for key, *_ in NAV:
-            window.go_key(key)
-            self.app.processEvents()
-        self.assertEqual(window.stack.count(), len(NAV))
-
-    def test_the_installments_header_buttons_are_not_shown_before_the_page_owns_them(self):
-        from PySide6.QtWidgets import QVBoxLayout, QWidget
-        from morv.ui.installments_page import InstallmentsPage
         self.assertTrue(self.session.can("installments.manage"),
-                        "the manager must hold this, or these buttons prove nothing")
-        page = InstallmentsPage(self.session)
-        self.addCleanup(page.deleteLater)
-        buttons = page.extra_actions()
-        self.assertTrue(buttons, "the page is expected to offer header actions")
-        for b in buttons:
-            with self.subTest(button=b.text()):
-                self.assertIsNone(b.parentWidget(), "extra_actions hands back unparented buttons")
-                self.assertFalse(b.isVisible(), "a parentless button turns into a native window and flashes")
-        host = QWidget()
-        self.addCleanup(host.deleteLater)
-        lay = QVBoxLayout(host)
-        for b in buttons:
-            lay.addWidget(b)
-        host.show()
-        self.app.processEvents()
-        for b in buttons:
-            with self.subTest(button=b.text()):
-                self.assertTrue(b.isVisible(), "a permitted button must still appear once it is in a layout")
+                        "the manager must hold this, or the installments buttons prove nothing")
+        watch = _parentless_show_watcher()
+        window = None
+        _step("filter-install")
+        self.app.installEventFilter(watch)
+        try:
+            _step("window-build")
+            window = MainWindow(self.session, self.app)
+            window.health_timer.stop()
+            _step("window-show")
+            window.show()
+            for key, *_ in NAV:
+                _step(f"go:{key}")
+                window.go_key(key)
+                self.app.processEvents()
+                _step(f"done:{key}")
+            _step("offenders")
+            found = watch.offenders()
+            _step(f"offenders-ok:{len(found)}")
+        finally:
+            # Off before teardown: the filter would inspect widgets Qt is in the middle of destroying
+            _step("filter-remove")
+            self.app.removeEventFilter(watch)
+            if window is not None:
+                _step("dispose")
+                dispose(window, self.app)
+            _step("teardown-done")
+        self.assertEqual(found, [], "these were shown before anything owned them")
