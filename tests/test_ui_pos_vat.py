@@ -146,6 +146,9 @@ class PosVatTest(_Fixture, unittest.TestCase):
     def test_tax_disabled_and_mode_change_require_review(self):
         from morv.infra import settings
         p = self.page(False)
+        # Finish the initial row's queued show event before simulating the next user action.
+        self.app.processEvents()
+        self.assertTrue(p._rows[0]["widget"].isVisibleTo(p))
         self.assertTrue(p.tax_inclusive.isHidden())
         self.assertTrue(p.tax_row.isHidden())
         self.assertTrue(p.before_tax_row.isHidden())
@@ -160,23 +163,7 @@ class PosVatTest(_Fixture, unittest.TestCase):
         self.assertTrue(p.tax_inclusive.isChecked())
         self.assertTrue(p._line_table.sale_tax_visible)
         cell = p._rows[0]["tax_lbl"]
-        if not cell.isVisibleTo(p):
-            def visibility_chain():
-                chain = []
-                widget = cell
-                while widget is not None:
-                    chain.append((type(widget).__name__, widget.objectName(),
-                                  widget.isHidden(), widget.isVisible(), widget.isVisibleTo(p)))
-                    if widget is p:
-                        break
-                    widget = widget.parentWidget()
-                return chain
-
-            # Preserve the failing condition; distinguish queued show events from explicit hiding.
-            before = visibility_chain()
-            self.app.processEvents()
-            after = visibility_chain()
-            self.fail(f"VAT_VISIBILITY_DIAG before={before!r} after={after!r}")
+        self.assertFalse(cell.isHidden())
         self.assertTrue(cell.isVisibleTo(p))
         self.assertTrue(p.post_print_btn.isEnabled())
         p.tax_inclusive.setChecked(False)
