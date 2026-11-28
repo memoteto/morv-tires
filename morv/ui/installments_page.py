@@ -111,10 +111,12 @@ class ContractsPage(ListPage):
     def extra_actions(self) -> list:
         self.interest_btn = QPushButton("اعتراف بفوائد الأشهر المنتهية")
         self.interest_btn.clicked.connect(self.recognise_interest)
-        self.interest_btn.setVisible(self.session.can("installments.manage"))
         self.reverse_interest_btn = QPushButton("عكس اعتراف بفائدة")
         self.reverse_interest_btn.clicked.connect(self.reverse_interest)
-        self.reverse_interest_btn.setVisible(self.session.can("installments.manage"))
+        if not self.session.can("installments.manage"):
+            # Only hiding here: showing one before the page's layout owns it flashes a native window
+            self.interest_btn.hide()
+            self.reverse_interest_btn.hide()
         return [self.interest_btn, self.reverse_interest_btn]
 
     def reverse_interest(self) -> None:

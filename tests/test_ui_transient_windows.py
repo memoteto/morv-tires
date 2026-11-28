@@ -1,0 +1,146 @@
+"""No widget may be shown before it has a parent, since a parentless show flashes a native window."""
+import faulthandler
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from tests.qt_app import get_app, require_qt
+
+faulthandler.enable()                        # A native crash in these Qt paths must name its frame, not exit quietly
+
+
+def _step(label: str) -> None:
+    print(f"TRANSIENT_STEP {label}", flush=True)
+    sys.stderr.flush()
+
+
+def _parentless_show_watcher():
+    import shiboken6
+    from PySide6.QtCore import QEvent, QObject
+    from PySide6.QtWidgets import QWidget
+
+    class ParentlessShowWatcher(QObject):
+        """A widget shown while parentless that later gains a parent was never meant to be a window."""
+
+        def __init__(self):
+            super().__init__()
+            self.seen = []
+            self.errors = []
+
+        def eventFilter(self, obj, event):
+            # PySide6 aborts the process when an exception leaves a virtual, so record it and carry on
+            try:
+                if (event.type() == QEvent.Type.Show and isinstance(obj, QWidget)
+                        and shiboken6.isValid(obj) and obj.parentWidget() is None):
+                    text = obj.text()[:40] if hasattr(obj, "text") else ""
+                    self.seen.append((obj, f"{type(obj).__name__}({text})"))   # Qt may delete it later
+            except BaseException as e:
+                self.errors.append(f"{type(e).__name__}: {e}")
+            return False
+
+        def offenders(self) -> list[str]:
+            found = set()
+            for widget, label in self.seen:
+                if not shiboken6.isValid(widget):
+                    continue                 # Qt destroyed it; touching the wrapper crashes on Windows
+                if widget.parentWidget() is None:
+                    continue                 # A window on purpose: a modal, a menu, or the main window
+                found.add(label)
+            return sorted(found)
+
+    return ParentlessShowWatcher()
+
+
+@require_qt()
+class TransientWindowTest(unittest.TestCase):
+    def setUp(self):
+        from morv.infra import users
+        from morv.infra.db.bootstrap import open_main_db
+        from morv.ui.session import Session
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.enterContext(patch.dict(os.environ, {"MORV_DATA_DIR": str(self.tmp)}))
+        self.con = open_main_db(self.tmp / "morv_tires.db")
+        self.addCleanup(self.con.close)
+        self.user = users.create_user(self.con, None, "admin", "المدير", "Admin12345", "manager")
+        self.session = Session(self.con, self.user)
+        self.app = get_app()
+
+    def test_a_notice_waits_for_a_parent_before_it_turns_visible(self):
+        from PySide6.QtWidgets import QVBoxLayout, QWidget
+        from morv.ui.widgets import Notice
+        n = Notice()
+        n.show_message("تنبيه للمستخدم")
+        self.assertFalse(n.isVisible(), "a parentless notice becomes a top-level window and flashes on screen")
+        host = QWidget()
+        self.addCleanup(host.deleteLater)
+        QVBoxLayout(host).addWidget(n)
+        host.show()
+        self.app.processEvents()
+        self.assertTrue(n.isVisible(), "the notice must still appear once it sits in a layout")
+        self.assertEqual(n.text(), "تنبيه للمستخدم")
+
+    def test_an_emptied_notice_is_hidden_again(self):
+        from PySide6.QtWidgets import QVBoxLayout, QWidget
+        from morv.ui.widgets import Notice
+        host = QWidget()
+        self.addCleanup(host.deleteLater)
+        n = Notice()
+        QVBoxLayout(host).addWidget(n)
+        host.show()
+        n.show_message("خطأ")
+        self.app.processEvents()
+        self.assertTrue(n.isVisible())
+        n.show_message("")
+        self.assertFalse(n.isVisible(), "clearing the text must hide the notice as it always did")
+
+    def test_applying_the_theme_under_a_show_filter_is_survivable(self):
+        from morv.ui import theme
+        watch = _parentless_show_watcher()
+        _step("theme-filter-install")
+        self.app.installEventFilter(watch)
+        try:
+            _step("theme-apply")
+            theme.apply(self.app, False, theme.DEFAULT_FONT, theme.DEFAULT_SIZE)
+            _step("theme-applied")
+        finally:
+            self.app.removeEventFilter(watch)
+        self.assertEqual(watch.errors, [], "the filter raised during the application-wide style cascade")
+
+    def test_navigating_every_section_shows_nothing_before_it_is_parented(self):
+        from morv.ui.shell import NAV, MainWindow
+        from morv.ui.widgets import dispose
+        self.assertTrue(self.session.can("installments.manage"),
+                        "the manager must hold this, or the installments buttons prove nothing")
+        watch = _parentless_show_watcher()
+        window = None
+        _step("filter-install")
+        self.app.installEventFilter(watch)
+        try:
+            _step("window-build")
+            window = MainWindow(self.session, self.app)
+            window.health_timer.stop()
+            _step("window-show")
+            window.show()
+            for key, *_ in NAV:
+                _step(f"go:{key}")
+                window.go_key(key)
+                self.app.processEvents()
+                _step(f"done:{key}")
+            _step("offenders")
+            found = watch.offenders()
+            _step(f"offenders-ok:{len(found)}")
+        finally:
+            # Off before teardown: the filter would inspect widgets Qt is in the middle of destroying
+            _step("filter-remove")
+            self.app.removeEventFilter(watch)
+            if window is not None:
+                _step("dispose")
+                dispose(window, self.app)
+            _step("teardown-done")
+        self.assertEqual(watch.errors, [], "the filter raised while watching navigation")
+        self.assertEqual(found, [], "these were shown before anything owned them")
