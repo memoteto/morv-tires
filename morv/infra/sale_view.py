@@ -74,6 +74,7 @@ class ReturnableLine:
     sold: int
     returned: int
     net_total: int
+    tax_amount: int = 0
 
     @property
     def available(self) -> int:
@@ -134,7 +135,7 @@ def get_sale(con: sqlite3.Connection, sale_id: int) -> SaleView:
 def returnable_lines(con: sqlite3.Connection, sale_id: int) -> list[ReturnableLine]:
     rows = con.execute(
         "SELECT l.id, l.line_no, i.name, l.qty, "
-        "(SELECT coalesce(sum(x.qty), 0) FROM sale_return_lines x WHERE x.sale_line_id = l.id), l.net_total "
+        "(SELECT coalesce(sum(x.qty), 0) FROM sale_return_lines x WHERE x.sale_line_id = l.id), l.net_total, l.tax_amount "
         "FROM sale_lines l JOIN items i ON i.id = l.item_id WHERE l.sale_id=? ORDER BY l.line_no",
         (sale_id,))
     return [ReturnableLine(*r) for r in rows]

@@ -231,6 +231,47 @@ def _capture_pos_vat(win, page, session, app, out, tag, report):
         _settle(app)
 
 
+def _capture_sale_returns(win, session, app, out, tag, report, screen_h):
+    from morv.core.sales_rules import Payment
+    from morv.infra import sale_view, sales, settings
+    from morv.infra.sales import SaleLineIn
+    from morv.ui.sale_return_dialog import SaleReturnDialog
+
+    con = session.con
+    previous = settings.get(con, "tax.enabled", "0")
+    try:
+        items = con.execute("SELECT id FROM items WHERE kind='service' ORDER BY id LIMIT 2").fetchall()
+        if len(items) != 2:
+            raise RuntimeError("audit: two service items are required")
+        for enabled in (False, True):
+            settings.put(con, "tax.enabled", str(int(enabled)))
+            lines = [SaleLineIn(items[0][0], 2, 57000), SaleLineIn(items[1][0], 1, 57000)]
+            sale = sales.post_sale(con, session.user, request_key=f"audit-return-{tag}-{enabled}",
+                                   customer_id=None, lines=lines, payments=[Payment("cash", 171000, received=171000)],
+                                   prices_tax_inclusive=True if enabled else None)
+            dlg = SaleReturnDialog(session, sale_view.get_sale(con, sale.id),
+                                   sale_view.returnable_lines(con, sale.id),
+                                   sale_view.refund_methods(con, sale.id), win)
+            try:
+                dlg.reason.setCurrentText("مقاس خاطئ")
+                dlg.model.setData(dlg.model.index(0, dlg.model.QTY), 1)
+                dlg.show()
+                _settle(app)
+                if (dlg.scroll is not None or not dlg.footer.isVisible()
+                        or not dlg.screen().availableGeometry().contains(dlg.frameGeometry())
+                        or dlg.view.horizontalScrollBar().isVisible() or _clipped_buttons(dlg)):
+                    raise RuntimeError("audit: sale return controls or dialog bounds are clipped")
+                mode = "vat" if enabled else "legacy"
+                _capture_checked(dlg, app, out, f"dlg_sale_return_{mode}_{tag}", report,
+                                 dialog=True, screen_h=screen_h)
+            finally:
+                dlg.close()
+                dlg.deleteLater()
+                _settle(app)
+    finally:
+        settings.put(con, "tax.enabled", previous)
+
+
 def _capture_vat_print_preview(win, app, out, tag, report, screen_h):
     from morv.ui.printing import PrintPreview
     from tools.print_samples import _shop, _vat_sale
@@ -481,6 +522,7 @@ def run(out: Path, size: tuple) -> dict:
                     _settle(app)
             _capture_item_vat(win, session, app, out, f"{w}x{h}_{mode}", report, h)
             _capture_vat_print_preview(win, app, out, f"{w}x{h}_{mode}", report, h)
+            _capture_sale_returns(win, session, app, out, f"{w}x{h}_{mode}", report, h)
             for dname, make in _dialogs(session, item_id):
                 name = f"dlg_{dname}_{w}x{h}_{mode}"
                 try:

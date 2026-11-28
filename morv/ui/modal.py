@@ -10,9 +10,10 @@ from morv.ui.widgets import Notice, primary_button
 
 class Modal(QDialog):
     def __init__(self, title: str, parent=None, width: int = 560, *,
-                 table_mode: bool = False, height: int = 680):
+                 table_mode: bool = False, height: int = 680, keep_on_screen: bool = False):
         super().__init__(parent)
         self.table_mode = table_mode
+        self.keep_on_screen = keep_on_screen
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setModal(True)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)   # so the rounded corners show
@@ -170,7 +171,12 @@ class Modal(QDialog):
             self._fit_height()
         anchor = self.parentWidget().window() if self.parentWidget() else None
         geo = anchor.frameGeometry() if anchor else QGuiApplication.primaryScreen().availableGeometry()
-        self.move(geo.center() - self.rect().center())
+        pos = geo.center() - self.rect().center()
+        if self.keep_on_screen:
+            available = self.screen().availableGeometry()
+            pos.setX(max(available.left(), min(pos.x(), available.right() - self.width() + 1)))
+            pos.setY(max(available.top(), min(pos.y(), available.bottom() - self.height() + 1)))
+        self.move(pos)
 
 
 class Confirm(Modal):
