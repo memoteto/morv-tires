@@ -10,7 +10,7 @@ description: Use when a Morv Tires test, CI job or screen behaves wrongly and ne
 2. Find the root cause in the code, not by guessing. Separate what you verified from what you assume.
 3. Fix inside the approved scope. Keep existing behaviour, approved design, accounting and stock rules.
 4. Write or keep a permanent test that fails before the fix and passes after. Every discovered bug becomes a test.
-5. Run `ruff check morv tests` and `python run_tests.py`; repeat until green.
+5. Run focused lint and the failing/regression tests, then the relevant regression suite. Use full CI per `CLAUDE.md`; do not duplicate the full suite locally without a reason.
 6. Stop and ask the owner if the fix needs a scope change, a rule change, or migrating operational data.
 
 ## Rules

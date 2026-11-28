@@ -9,8 +9,8 @@ Use the repository's actual source at the current commit as the authority. Also 
 
 ## For each development task
 
-1. Check the current source branch and commit. Read the maps' metadata and check changes since their recorded source commits in the relevant files.
-2. Use a small, targeted graph query or extract only the relevant nodes and edges by file path/symbol; do not put an entire graph into the model context. If the graph is unavailable, stale, or irrelevant, proceed with targeted source inspection.
+1. Check the current source branch and commit. Read the relevant source and tests with targeted searches. Consult map metadata only when a map would help resolve dependencies or architectural questions.
+2. When using a map, check changes since its recorded source commit in the relevant files. Use a small, targeted query by path/symbol; do not put an entire graph into the model context. If unavailable, stale, or irrelevant, proceed with targeted source inspection.
 3. Verify every material dependency, function, business rule and proposed change against current source and tests. Treat static guesses and dynamic dispatch as unverified. Inspect shared UI components and accounting/inventory constraints where relevant.
 4. Do not regenerate Understand Anything or run semantic labeling/LLM graph extraction without explicit owner approval. Do not add API keys. Graphify generation is code-only, with no AI labeling, on GitHub Actions.
 5. Never merge generated map branches into main or edit their generated files as a substitute for fixing source. Keep existing engineering approval and verification rules.
