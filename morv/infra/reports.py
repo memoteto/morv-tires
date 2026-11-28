@@ -11,13 +11,13 @@ from morv.infra import customer_receipts, income_statement, ledger, suspended_ba
 TEXT, CODE, MONEY, DATE = "text", "code", "money", "date"
 # The catalogue in reading order, grouped: a flat list of twenty mixed reports is not scannable,
 # and a new report has to join a group instead of landing at the end.
-GROUPS = (("المالية", ("income", "trial", "journal", "ledger", "partner", "suspended")),
+GROUPS = (("المالية", ("income", "trial", "journal", "ledger", "partner", "suspended", "vat")),
           ("المبيعات", ("daily_sales", "sales_profit", "top_items", "returns")),
           ("المشتريات والمخزون", ("purchases", "stock_valuation", "slow_moving", "item_card")),
           ("ذمم العملاء والموردين", ("credit_aging", "aging", "suppliers", "supplier_aging")),
           ("الخزينة", ("collections", "expenses")))
 KEYS = tuple(key for _group, keys in GROUPS for key in keys)
-TITLES = {"income": "قائمة الدخل", "daily_sales": "ملخص المبيعات اليومي", "top_items": "الأصناف الأكثر مبيعًا",
+TITLES = {"vat": "ضريبة القيمة المضافة", "income": "قائمة الدخل", "daily_sales": "ملخص المبيعات اليومي", "top_items": "الأصناف الأكثر مبيعًا",
           "sales_profit": "المبيعات وربحية الأصناف", "slow_moving": "الأصناف بطيئة الحركة",
           "journal": "دفتر اليومية", "trial": "ميزان المراجعة", "ledger": "كشف حساب",
           "aging": "أعمار ديون التقسيط", "credit_aging": "أعمار البيع الآجل",
@@ -744,8 +744,106 @@ def item_card(con, item_id: str, start: str, end: str) -> Table:
                  (DATE, TEXT, CODE, CODE, CODE, CODE), tuple(rows), 1)
 
 
+def vat(con, start: str, end: str) -> Table:
+    """Posted VAT in normal account signs: input debit-positive, output credit-positive.
+
+    Compare each posted document to its own journal, in one read snapshot. Other
+    movements are visible, never assumed to be tax payments or netted into document VAT.
+    """
+    start, end = _range(start, end)
+    data = con.execute("""
+        WITH period_entries AS (
+            SELECT id, source_type, source_id FROM journal_entries
+            WHERE status='posted' AND entry_date BETWEEN :start AND :end
+        ), docs AS (
+            SELECT e.id, 'sale' AS kind, 0 AS input_vat, s.tax_total AS output_vat
+            FROM sales s JOIN period_entries e
+                ON e.id=s.journal_entry_id AND e.source_type='sale' AND e.source_id=s.id
+            UNION ALL
+            SELECT e.id, 'sale_return', 0, -r.tax_total
+            FROM sale_returns r JOIN period_entries e
+                ON e.id=r.journal_entry_id AND e.source_type='sale_return' AND e.source_id=r.id
+            UNION ALL
+            SELECT e.id, 'purchase', coalesce(sum(l.deductible_tax_amount),0), 0
+            FROM purchase_invoices p JOIN period_entries e
+                ON e.id=p.journal_entry_id AND e.source_type='purchase_invoice' AND e.source_id=p.id
+            LEFT JOIN purchase_lines l ON l.invoice_id=p.id
+            GROUP BY e.id
+            UNION ALL
+            SELECT e.id, CASE r.kind WHEN 'return' THEN 'purchase_return' ELSE 'purchase_reversal' END,
+                CASE r.kind WHEN 'return' THEN -r.deductible_tax_total ELSE r.deductible_tax_total END, 0
+            FROM purchase_returns r JOIN period_entries e
+                ON e.id=r.journal_entry_id AND e.source_type='purchase_return' AND e.source_id=r.id
+        ), vat_entries AS (
+            SELECT e.id, e.entry_date,
+                sum(CASE WHEN l.account_code='1520' THEN l.debit-l.credit ELSE 0 END) AS i,
+                sum(CASE WHEN l.account_code='2350' THEN l.credit-l.debit ELSE 0 END) AS o
+            FROM journal_lines l JOIN journal_entries e ON e.id=l.entry_id
+            WHERE e.status='posted' AND e.entry_date<=:end AND l.account_code IN ('1520','2350')
+            GROUP BY e.id
+        ), paired AS (
+            SELECT d.kind, coalesce(v.i,0) AS i, coalesce(v.o,0) AS o,
+                CASE WHEN d.input_vat<>coalesce(v.i,0) OR d.output_vat<>coalesce(v.o,0) THEN 1 ELSE 0 END AS bad
+            FROM docs d LEFT JOIN vat_entries v ON v.id=d.id
+            UNION ALL
+            SELECT 'other', v.i, v.o, 1 FROM vat_entries v
+            WHERE v.entry_date>=:start AND NOT EXISTS (SELECT 1 FROM docs d WHERE d.id=v.id)
+        )
+        SELECT kind, sum(i), sum(o), sum(bad) FROM paired GROUP BY kind
+        UNION ALL
+        SELECT 'opening', coalesce(sum(i),0), coalesce(sum(o),0), 0
+        FROM vat_entries WHERE entry_date<:start
+        """, {"start": start, "end": end}).fetchall()
+    groups = {kind: (i, o, bad) for kind, i, o, bad in data}
+
+    def get(kind):
+        return groups.get(kind, (0, 0, 0))
+
+    opening_i, opening_o, _ = get("opening")
+    sale, sale_return = get("sale")[1], get("sale_return")[1]
+    purchase, purchase_return, reversal = (get(k)[0] for k in
+                                           ("purchase", "purchase_return", "purchase_reversal"))
+    net_o = sale + sale_return
+    net_i = purchase + purchase_return + reversal
+    period_i = sum(v[0] for k, v in groups.items() if k != "opening")
+    period_o = sum(v[1] for k, v in groups.items() if k != "opening")
+    other_i, other_o = period_i - net_i, period_o - net_o
+    closing_i, closing_o = opening_i + period_i, opening_o + period_o
+    rows = [
+        ("head", ("ضريبة المخرجات", "")),
+        ("line", ("ضريبة المبيعات", sale)),
+        ("line", ("ضريبة مرتجعات البيع", sale_return)),
+        ("total", ("صافي ضريبة المخرجات", net_o)),
+        ("head", ("ضريبة المدخلات القابلة للخصم", "")),
+        ("line", ("ضريبة المشتريات القابلة للخصم", purchase)),
+        ("line", ("ضريبة مرتجعات الشراء القابلة للخصم", purchase_return)),
+        ("line", ("ضريبة عكس مرتجعات الشراء", reversal)),
+        ("total", ("صافي ضريبة المدخلات", net_i)),
+        ("total", ("صافي ضريبة الفترة قبل التسويات", net_o - net_i)),
+        ("head", ("أرصدة دفتر الأستاذ", "")),
+        ("line", ("رصيد 1520 أول الفترة (مدين)", opening_i)),
+        ("line", ("رصيد 2350 أول الفترة (دائن)", opening_o)),
+        ("line", ("حركات أخرى في 1520", other_i)),
+        ("line", ("حركات أخرى في 2350", other_o)),
+        ("line", ("رصيد 1520 آخر الفترة (مدين)", closing_i)),
+        ("line", ("رصيد 2350 آخر الفترة (دائن)", closing_o)),
+        ("grand", ("صافي الرصيد الختامي (دائن / مدين بالسالب)", closing_o - closing_i)),
+    ]
+    mismatches = sum(v[2] for k, v in groups.items() if k not in ("opening", "other"))
+    unknown = get("other")[2]
+    if mismatches or unknown:
+        note = f"تحذير: {mismatches} مستند غير مطابق و{unknown} قيد غير مصنف؛ لا يعتمد التقرير قبل المراجعة"
+    else:
+        note = "مستندات الفترة تطابق الدفتر"
+    return Table("vat", TITLES["vat"],
+                 f"من {start} إلى {end} · {note} · الموجب مستحق والسالب رصيد مدين في الصافي",
+                 ("البيان", "المبلغ"), (TEXT, MONEY), tuple(rows), 0)
+
+
 def build(con, key: str, start: str, end: str, account: str = "", compare: bool = False,
           full: bool = False) -> Table:
+    if key == "vat":
+        return vat(con, start, end)
     if key == "income":
         return income(con, start, end, compare)
     if key == "trial":

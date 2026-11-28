@@ -69,13 +69,14 @@ class ReportsPageTest(unittest.TestCase):
                          [group for group, _keys in GROUPS])
         for key in ("trial", "ledger", "sales_profit", "aging", "suspended", "daily_sales", "top_items",
                     "slow_moving", "journal", "suppliers", "income", "credit_aging", "stock_valuation",
-                    "expenses", "collections", "purchases", "returns", "item_card", "supplier_aging"):
+                    "expenses", "collections", "purchases", "returns", "item_card", "supplier_aging", "vat"):
             page.report_combo.setCurrentIndex(page.report_combo.findData(key))
             self.assertEqual(page.table.key, key)
             self.assertEqual(page.model.columnCount(), len(page.table.headers))
         self.assertTrue(page.account_combo.isHidden())
-        page.report_combo.setCurrentIndex(page.report_combo.findData("ledger"))
-        self.assertFalse(page.account_combo.isHidden())
+        page.report_combo.setCurrentIndex(page.report_combo.findData("vat"))
+        self.assertTrue(page.account_combo.isHidden())
+        self.assertEqual(page.table.key, "vat")
         for ext, fn in (("csv", page.export_csv_to), ("pdf", page.export_pdf_to)):
             path = os.path.join(self.tmp, f"r.{ext}")
             fn(path)
