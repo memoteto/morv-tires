@@ -74,15 +74,27 @@ class ReportsPageTest(unittest.TestCase):
             self.assertEqual(page.table.key, key)
             self.assertEqual(page.model.columnCount(), len(page.table.headers))
         self.assertTrue(page.account_combo.isHidden())
-        page.report_combo.setCurrentIndex(page.report_combo.findData("vat"))
-        self.assertTrue(page.account_combo.isHidden())
-        self.assertEqual(page.table.key, "vat")
+        page.report_combo.setCurrentIndex(page.report_combo.findData("ledger"))
+        self.assertFalse(page.account_combo.isHidden())
         for ext, fn in (("csv", page.export_csv_to), ("pdf", page.export_pdf_to)):
             path = os.path.join(self.tmp, f"r.{ext}")
             fn(path)
             self.assertGreater(os.path.getsize(path), 100)
         with open(os.path.join(self.tmp, "r.pdf"), "rb") as f:
             self.assertEqual(f.read(4), b"%PDF")
+
+    def test_vat_report_uses_the_existing_picker_and_export(self):
+        page = self.page()
+        page.report_combo.setCurrentIndex(page.report_combo.findData("vat"))
+        self.assertEqual(page.table.key, "vat")
+        self.assertTrue(page.account_combo.isHidden())
+        self.assertTrue(page.compare_box.isHidden())
+        for ext, fn in (("csv", page.export_csv_to), ("pdf", page.export_pdf_to)):
+            path = self.tmp / f"vat.{ext}"
+            fn(str(path))
+            self.assertGreater(path.stat().st_size, 100)
+        self.assertIn("صافي ضريبة الفترة", (self.tmp / "vat.csv").read_text(encoding="utf-8-sig"))
+        self.assertEqual((self.tmp / "vat.pdf").read_bytes()[:4], b"%PDF")
 
     def test_pdf_header_is_a_visible_paragraph_with_ltr_dates(self):
         from morv.ui.report_export import table_html
