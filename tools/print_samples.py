@@ -44,7 +44,29 @@ def _receipt():
         note="وصل بمبلغ ألف وخمسمائة جنيه سدادًا من حساب العميل.")
 
 
-SAMPLES = {"sale": _sale, "purchase": _purchase, "receipt": _receipt}
+def _vat_sale(inclusive: bool):
+    from morv.infra.sale_view import SaleLineView, SaleView
+    from morv.ui.printing import sale_document
+
+    # These sample snapshots are consistent with the actual engine's 14%/exempt
+    # calculations for 1000.00 + 1000.00 after 200.00 invoice discount.
+    tax = 11053 if inclusive else 12600
+    payable = 90000 if inclusive else 102600
+    total = payable + 90000
+    sale = SaleView(
+        1, "SI-000001", "عميل نقدي", "2026-11-28", 200000, 0, 20000, total, None, "",
+        (("cash", total, total, None),),
+        (SaleLineView(1, "خدمة تركيب", 1, 100000, 0, 10000, payable,
+                      "standard", 1400, tax, inclusive),
+         SaleLineView(2, "خدمة معفاة", 1, 100000, 0, 10000, 90000,
+                      "exempt", 0, 0, inclusive)),
+        0, (), True, inclusive, tax)
+    return sale_document(sale, _shop())
+
+
+SAMPLES = {"sale": _sale, "purchase": _purchase, "receipt": _receipt,
+           "sale_vat_inclusive": lambda: _vat_sale(True),
+           "sale_vat_exclusive": lambda: _vat_sale(False)}
 
 
 def main(out_dir: str) -> int:

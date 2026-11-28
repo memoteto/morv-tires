@@ -699,10 +699,6 @@ class PosPage(QWidget):
         self.no_tax_chip.setVisible(not enabled)
         self.tax_inclusive.setVisible(enabled)
         self.tax_row.setVisible(enabled)
-        # VAT document rendering is a separate stage; do not print an incomplete
-        # tax invoice from this experimental flow.
-        self.post_print_btn.setEnabled(not enabled)
-        self.post_print_btn.setToolTip("طباعة الفاتورة الضريبية في المرحلة التالية" if enabled else "")
         self._tax_quote = None
         self._tax_error = None
         self.subtotal_label.setText(ltr(fmt(self.subtotal_minor())))
@@ -846,9 +842,6 @@ class PosPage(QWidget):
             if enabled != self._tax_enabled:
                 self._refresh_total()
                 self._fail("تغيّر إعداد الضريبة؛ راجع الإجمالي ثم اعتمد مرة أخرى.")
-                return
-            if enabled and and_print:
-                self._fail("طباعة الفاتورة الضريبية لم تكتمل بعد؛ استخدم الاعتماد فقط.")
                 return
             basis = self.tax_inclusive.isChecked() if enabled else None
             inv_disc = parse_money(self.invoice_disc.text() or "0")

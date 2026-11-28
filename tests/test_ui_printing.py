@@ -53,6 +53,33 @@ class SaleDocumentTest(unittest.TestCase):
         self.assertIn(("المرتجع", "3,800.00"), doc.totals)
         self.assertEqual("33,700.00 ج.م", dict(doc.totals)["الصافي"])
 
+    def test_vat_totals_and_per_line_treatments_on_all_paper_shapes(self):
+        from morv.ui import print_doc
+        from tools.print_samples import _vat_sale
+
+        for inclusive in (True, False):
+            doc = _vat_sale(inclusive)
+            with self.subTest(inclusive=inclusive):
+                self.assertIn(("أساس السعر", "شامل الضريبة" if inclusive else "غير شامل الضريبة"), doc.info)
+                self.assertEqual(doc.totals, [
+                    ("الإجمالي قبل الخصم", "2,000.00"),
+                    ("الخصم", "200.00"),
+                    ("القيمة قبل الضريبة", "1,689.47" if inclusive else "1,800.00"),
+                    ("ضريبة القيمة المضافة", "110.53" if inclusive else "126.00"),
+                    ("الإجمالي المستحق", "1,800.00 ج.م" if inclusive else "1,926.00 ج.م"),
+                ])
+                self.assertIn("ضريبة 14%", doc.lines[0].detail)
+                self.assertIn("خصم: 100.00", doc.lines[0].detail)
+                self.assertIn("معفى: 0.00", doc.lines[1].detail)
+                for shape in print_doc.SHAPES.values():
+                    with self.subTest(shape=shape.key):
+                        rendered = print_doc.render(_shop(), doc, shape)
+                        self.assertIn("ضريبة القيمة المضافة", rendered.toPlainText())
+                        self.assertIn("القيمة قبل الضريبة", rendered.toPlainText())
+                        self.assertIn("الإجمالي المستحق", rendered.toPlainText())
+                        image = print_doc.preview_image(_shop(), doc, shape)
+                        self.assertFalse(image.isNull())
+
     def test_the_paper_follows_the_shop_setting(self):
         from morv.ui.printing import shape_for
         self.assertEqual("a4", shape_for(_shop()).key)

@@ -143,14 +143,34 @@ class PosVatTest(_Fixture, unittest.TestCase):
         self.assertEqual(self.count_sales(), 0)
         self.assertTrue(p.tax_inclusive.isVisible())
         self.assertTrue(p.tax_inclusive.isChecked())
-        self.assertFalse(p.post_print_btn.isEnabled())
-        p.post(and_print=True)
-        self.assertEqual(self.count_sales(), 0)
+        self.assertTrue(p.post_print_btn.isEnabled())
         p.tax_inclusive.setChecked(False)
         with patch("morv.ui.modal.ask", return_value=True):
             p.cancel_invoice()
         self.assertTrue(p.tax_inclusive.isChecked())
         self.assertFalse(p._rows)
+
+    def test_post_and_print_uses_saved_tax_snapshot(self):
+        from morv.infra import settings
+        from morv.ui import printing
+
+        p = self.page()
+        p.tax_inclusive.setChecked(False)
+        p.invoice_disc.setText("140.00")
+        p._fill_exact_cash()
+        with patch.object(printing, "send", return_value="TEST") as send:
+            p.post(and_print=True)
+        self.assertIsNotNone(p.posted, p.notice.text())
+        send.assert_called_once()
+        doc = send.call_args.args[1]
+        self.assertEqual(dict(doc.totals)["ضريبة القيمة المضافة"], "140.00")
+        self.assertEqual(dict(doc.totals)["الإجمالي المستحق"], "1,140.00 ج.م")
+        settings.put(self.con, "tax.enabled", "0")
+        settings.put(self.con, "tax.rate", "500")
+        from morv.infra import sale_view, shop
+        saved = sale_view.get_sale(self.con, p.posted.id)
+        self.assertEqual(printing.sale_document(saved, shop.load(self.con)).totals, doc.totals)
+        self.assertEqual(saved.lines[0].tax_rate, 1400)
 
     def test_transaction_guard_rejects_rate_change_after_preview(self):
         from morv.infra import sales, settings

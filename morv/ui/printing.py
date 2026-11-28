@@ -26,16 +26,32 @@ def sale_document(sale, shop) -> print_doc.Document:
         info.append(("المركبة", sale.vehicle_plate))
     paid = " + ".join(PAYMENT_LABELS.get(p[0], p[0]) for p in sale.payments)
     info.append(("الدفع", paid or "—"))
-    lines = [print_doc.Line(line.item_name, "", str(line.qty), line.unit_price, line.net_total)
-             for line in sale.lines]
-    totals = [("الإجمالي", fmt(sale.subtotal))]
+    if sale.tax_enabled:
+        info.append(("أساس السعر", sale.tax_basis_label))
+    lines = []
+    for line in sale.lines:
+        detail = ""
+        if sale.tax_enabled:
+            detail = f"{line.tax_label}: {fmt(line.tax_amount)}"
+            discount = line.line_discount + line.invoice_share
+            if discount:
+                detail += f" · خصم: {fmt(discount)}"
+        lines.append(print_doc.Line(line.item_name, detail, str(line.qty), line.unit_price, line.net_total))
+    totals = [("الإجمالي قبل الخصم" if sale.tax_enabled else "الإجمالي", fmt(sale.subtotal))]
     discount = sale.line_discount + sale.invoice_discount
     if discount:
-        # Without this row the customer cannot see why the total and the net differ
         totals.append(("الخصم", fmt(discount)))
+    if sale.tax_enabled:
+        totals.extend([
+            ("القيمة قبل الضريبة", fmt(sale.value_before_tax)),
+            ("ضريبة القيمة المضافة", fmt(sale.tax_total)),
+        ])
     if sale.returned:
+        if sale.tax_enabled:
+            totals.append(("إجمالي الفاتورة", fmt(sale.total)))
         totals.append(("المرتجع", fmt(sale.returned)))
-    totals.append(("الصافي", f"{fmt(sale.total - sale.returned)} ج.م"))
+    caption = ("الصافي بعد المرتجع" if sale.returned else "الإجمالي المستحق") if sale.tax_enabled else "الصافي"
+    totals.append((caption, f"{fmt(sale.total - sale.returned)} ج.م"))
     return print_doc.Document(title="فاتورة بيع", number=sale.number, date=sale.sale_date,
                               info=info, lines=lines, totals=totals)
 
