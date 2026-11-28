@@ -1,0 +1,5 @@
+source_ref=phase-p04e2-vat-report
+source_sha=aaddb42d80b25d97b3554149a632f15c22dd0fd0
+checkout_sha=aaddb42d80b25d97b3554149a632f15c22dd0fd0
+run_id=46157516837
+run_attempt=1

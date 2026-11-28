@@ -1,0 +1,3635 @@
+{
+ "platform": "offscreen",
+ "screen": [
+  1093,
+  614
+ ],
+ "pages": {
+  "sidebar_open_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_home_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_pos_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "popup_pos_search_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    646,
+    266
+   ],
+   "search_width": 290,
+   "minimum_popup_width": 290,
+   "fits_screen": true,
+   "search_labels": [
+    {
+     "row": 0,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Bridgestone Turanza",
+     "width": 337,
+     "height": 33,
+     "needed_width": 154,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "muted",
+     "text": "⁦225/45R17⁩",
+     "width": 70,
+     "height": 21,
+     "needed_width": 70,
+     "needed_height": 21,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "pillDanger",
+     "text": "متوفر: ⁦0⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 71,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "chip",
+     "text": "⁦9,900.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Continental PremiumContact 6 215/60R16 95V",
+     "width": 413,
+     "height": 33,
+     "needed_width": 373,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "pillWarn",
+     "text": "متوفر: ⁦2⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 66,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "chip",
+     "text": "⁦8,750.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Michelin Primacy 205/55R16",
+     "width": 413,
+     "height": 32,
+     "needed_width": 191,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "pillOk",
+     "text": "متوفر: ⁦12⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 74,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "chip",
+     "text": "⁦12,500.50⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 93,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "cardTitle",
+     "text": "بطارية تجريبية Varta 70 أمبير",
+     "width": 413,
+     "height": 33,
+     "needed_width": 180,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "pillOk",
+     "text": "متوفر: ⁦8⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 66,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "chip",
+     "text": "⁦4,650.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 4,
+     "role": "cardTitle",
+     "text": "خدمة تجريبية ترصيص العجلات",
+     "width": 413,
+     "height": 33,
+     "needed_width": 186,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 4,
+     "role": "chip",
+     "text": "⁦150.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 76,
+     "needed_height": 24,
+     "clipped": false
+    }
+   ]
+  },
+  "page_pos_vat_inclusive_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل المركبة والملاحظة",
+     "x": 69,
+     "y": -68,
+     "w": 157,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "تقسيم الدفع على وسيلتين",
+     "x": 52,
+     "y": 583,
+     "w": 162,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "⁦12,600.00⁩",
+     "x": 517,
+     "y": 726,
+     "w": 447,
+     "h": 32,
+     "in_scroll": true
+    },
+    {
+     "text": "⁦13,000.00⁩",
+     "x": 65,
+     "y": 726,
+     "w": 446,
+     "h": 32,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_pos_vat_exclusive_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل المركبة والملاحظة",
+     "x": 69,
+     "y": -68,
+     "w": 157,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "تقسيم الدفع على وسيلتين",
+     "x": 52,
+     "y": 583,
+     "w": 162,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "⁦14,400.00⁩",
+     "x": 517,
+     "y": 726,
+     "w": 447,
+     "h": 32,
+     "in_scroll": true
+    },
+    {
+     "text": "⁦14,500.00⁩",
+     "x": 65,
+     "y": 726,
+     "w": 446,
+     "h": 32,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_sales_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_purchases_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 1
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "popup_purchase_search_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    488,
+    224
+   ],
+   "search_width": 488,
+   "minimum_popup_width": 488,
+   "fits_screen": true,
+   "search_labels": [
+    {
+     "row": 0,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Bridgestone Turanza",
+     "width": 358,
+     "height": 33,
+     "needed_width": 154,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "muted",
+     "text": "⁦225/45R17⁩",
+     "width": 70,
+     "height": 21,
+     "needed_width": 70,
+     "needed_height": 21,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Continental PremiumContact 6 215/60R16 95V",
+     "width": 434,
+     "height": 33,
+     "needed_width": 373,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Michelin Primacy 205/55R16",
+     "width": 434,
+     "height": 33,
+     "needed_width": 191,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "cardTitle",
+     "text": "بطارية تجريبية Varta 70 أمبير",
+     "width": 434,
+     "height": 33,
+     "needed_width": 180,
+     "needed_height": 22,
+     "clipped": false
+    }
+   ]
+  },
+  "form_purchase_vat_exclusive_no_freight_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "%",
+     "x": 809,
+     "y": 580,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": 628,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": 628,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": 710,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "ج.م",
+     "x": 43,
+     "y": 939,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_exclusive_no_freight_summary_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل الفاتورة والملاحظة",
+     "x": 60,
+     "y": -323,
+     "w": 158,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "صنف جديد",
+     "x": 47,
+     "y": -194,
+     "w": 91,
+     "h": 40,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -102,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -102,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": -20,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_exclusive_freight_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "%",
+     "x": 809,
+     "y": 580,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": 628,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": 628,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": 710,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "ج.م",
+     "x": 43,
+     "y": 939,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_exclusive_freight_summary_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل الفاتورة والملاحظة",
+     "x": 60,
+     "y": -414,
+     "w": 158,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "صنف جديد",
+     "x": 47,
+     "y": -285,
+     "w": 91,
+     "h": 40,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -193,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -193,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": -111,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -63,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -63,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_inclusive_no_freight_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "−",
+     "x": 460,
+     "y": 590,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": 590,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": 634,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "ج.م",
+     "x": 43,
+     "y": 863,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_inclusive_no_freight_summary_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل الفاتورة والملاحظة",
+     "x": 60,
+     "y": -257,
+     "w": 158,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "صنف جديد",
+     "x": 47,
+     "y": -128,
+     "w": 91,
+     "h": 40,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -36,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -36,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_inclusive_freight_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "−",
+     "x": 460,
+     "y": 590,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": 590,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": 634,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "ج.م",
+     "x": 43,
+     "y": 863,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_inclusive_freight_summary_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل الفاتورة والملاحظة",
+     "x": 60,
+     "y": -338,
+     "w": 158,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "صنف جديد",
+     "x": 47,
+     "y": -209,
+     "w": 91,
+     "h": 40,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -117,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -117,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": -73,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -25,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -25,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_inventory_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 915,
+     "columns_w": 915,
+     "h_scroll": false,
+     "rows": 85
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_inventory_tab_lots_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 923,
+     "columns_w": 923,
+     "h_scroll": false,
+     "rows": 3
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_inventory_tab_stock_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 915,
+     "columns_w": 915,
+     "h_scroll": false,
+     "rows": 76
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_customers_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 965,
+     "columns_w": 965,
+     "h_scroll": false,
+     "rows": 60
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_customers_preview_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_suppliers_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 965,
+     "columns_w": 965,
+     "h_scroll": false,
+     "rows": 12
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_suppliers_preview_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_installments_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_treasury_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_reports_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 8
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_reports_preview_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "النسخ الاحتياطي والاستعادة",
+     "x": 539,
+     "y": 559,
+     "w": 439,
+     "h": 40,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_sidebar_open_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "النسخ الاحتياطي والاستعادة",
+     "x": 453,
+     "y": 559,
+     "w": 353,
+     "h": 40,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_shop_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_printing_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "طباعة صفحة تجريبية",
+     "x": 235,
+     "y": 651,
+     "w": 159,
+     "h": 40,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_item_fields_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableWidget",
+     "viewport_w": 965,
+     "columns_w": 965,
+     "h_scroll": false,
+     "rows": 14
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_partners_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_opening_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_users_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "الاطلاع على الخزينة وحركة الأموال",
+     "x": 372,
+     "y": 563,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "تسجيل حركات الخزينة وإدارة الشركاء",
+     "x": 372,
+     "y": 590,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "الاطلاع على التقارير المالية",
+     "x": 372,
+     "y": 617,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "حصص الشركاء وتوزيع الأرباح",
+     "x": 372,
+     "y": 644,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "قفل الفترة المالية وفتحها",
+     "x": 372,
+     "y": 671,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "إقفال الصندوق اليومي وإلغاء الإقفال",
+     "x": 372,
+     "y": 698,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "إدخال الأرصدة الافتتاحية وعكسها",
+     "x": 372,
+     "y": 725,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "المستخدمون والصلاحيات",
+     "x": 75,
+     "y": 563,
+     "w": 255,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "الإعدادات العامة",
+     "x": 75,
+     "y": 590,
+     "w": 255,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "الاستعادة من نسخة احتياطية",
+     "x": 75,
+     "y": 617,
+     "w": 255,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_audit_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 935,
+     "columns_w": 935,
+     "h_scroll": false,
+     "rows": 155
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_backup_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 943,
+     "columns_w": 943,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_appearance_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 547,
+     "columns_w": 547,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_shortcuts_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_reports_vat_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "sidebar_open_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_home_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_pos_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "popup_pos_search_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    646,
+    266
+   ],
+   "search_width": 290,
+   "minimum_popup_width": 290,
+   "fits_screen": true,
+   "search_labels": [
+    {
+     "row": 0,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Bridgestone Turanza",
+     "width": 337,
+     "height": 33,
+     "needed_width": 154,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "muted",
+     "text": "⁦225/45R17⁩",
+     "width": 70,
+     "height": 21,
+     "needed_width": 70,
+     "needed_height": 21,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "pillDanger",
+     "text": "متوفر: ⁦0⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 71,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "chip",
+     "text": "⁦9,900.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Continental PremiumContact 6 215/60R16 95V",
+     "width": 413,
+     "height": 33,
+     "needed_width": 373,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "pillWarn",
+     "text": "متوفر: ⁦2⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 66,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "chip",
+     "text": "⁦8,750.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Michelin Primacy 205/55R16",
+     "width": 413,
+     "height": 32,
+     "needed_width": 191,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "pillOk",
+     "text": "متوفر: ⁦12⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 74,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "chip",
+     "text": "⁦12,500.50⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 93,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "cardTitle",
+     "text": "بطارية تجريبية Varta 70 أمبير",
+     "width": 413,
+     "height": 33,
+     "needed_width": 180,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "pillOk",
+     "text": "متوفر: ⁦8⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 66,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "chip",
+     "text": "⁦4,650.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 4,
+     "role": "cardTitle",
+     "text": "خدمة تجريبية ترصيص العجلات",
+     "width": 413,
+     "height": 33,
+     "needed_width": 186,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 4,
+     "role": "chip",
+     "text": "⁦150.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 76,
+     "needed_height": 24,
+     "clipped": false
+    }
+   ]
+  },
+  "page_pos_vat_inclusive_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل المركبة والملاحظة",
+     "x": 69,
+     "y": -68,
+     "w": 157,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "تقسيم الدفع على وسيلتين",
+     "x": 52,
+     "y": 583,
+     "w": 162,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "⁦12,600.00⁩",
+     "x": 517,
+     "y": 726,
+     "w": 447,
+     "h": 32,
+     "in_scroll": true
+    },
+    {
+     "text": "⁦13,000.00⁩",
+     "x": 65,
+     "y": 726,
+     "w": 446,
+     "h": 32,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_pos_vat_exclusive_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل المركبة والملاحظة",
+     "x": 69,
+     "y": -68,
+     "w": 157,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "تقسيم الدفع على وسيلتين",
+     "x": 52,
+     "y": 583,
+     "w": 162,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "⁦14,400.00⁩",
+     "x": 517,
+     "y": 726,
+     "w": 447,
+     "h": 32,
+     "in_scroll": true
+    },
+    {
+     "text": "⁦14,500.00⁩",
+     "x": 65,
+     "y": 726,
+     "w": 446,
+     "h": 32,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_sales_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_sales_preview_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_purchases_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 3
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "popup_purchase_search_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    488,
+    224
+   ],
+   "search_width": 488,
+   "minimum_popup_width": 488,
+   "fits_screen": true,
+   "search_labels": [
+    {
+     "row": 0,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Bridgestone Turanza",
+     "width": 358,
+     "height": 33,
+     "needed_width": 154,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "muted",
+     "text": "⁦225/45R17⁩",
+     "width": 70,
+     "height": 21,
+     "needed_width": 70,
+     "needed_height": 21,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Continental PremiumContact 6 215/60R16 95V",
+     "width": 434,
+     "height": 33,
+     "needed_width": 373,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Michelin Primacy 205/55R16",
+     "width": 434,
+     "height": 33,
+     "needed_width": 191,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "cardTitle",
+     "text": "بطارية تجريبية Varta 70 أمبير",
+     "width": 434,
+     "height": 33,
+     "needed_width": 180,
+     "needed_height": 22,
+     "clipped": false
+    }
+   ]
+  },
+  "form_purchase_vat_exclusive_no_freight_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "%",
+     "x": 809,
+     "y": 580,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": 628,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": 628,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": 710,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "ج.م",
+     "x": 43,
+     "y": 939,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_exclusive_no_freight_summary_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل الفاتورة والملاحظة",
+     "x": 60,
+     "y": -323,
+     "w": 158,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "صنف جديد",
+     "x": 47,
+     "y": -194,
+     "w": 91,
+     "h": 40,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -102,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -102,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": -20,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_exclusive_freight_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "%",
+     "x": 809,
+     "y": 580,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": 628,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": 628,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": 710,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "ج.م",
+     "x": 43,
+     "y": 939,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_exclusive_freight_summary_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل الفاتورة والملاحظة",
+     "x": 60,
+     "y": -414,
+     "w": 158,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "صنف جديد",
+     "x": 47,
+     "y": -285,
+     "w": 91,
+     "h": 40,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -193,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -193,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": -111,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -63,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -63,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_inclusive_no_freight_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "−",
+     "x": 460,
+     "y": 590,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": 590,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": 634,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "ج.م",
+     "x": 43,
+     "y": 863,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_inclusive_no_freight_summary_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل الفاتورة والملاحظة",
+     "x": 60,
+     "y": -257,
+     "w": 158,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "صنف جديد",
+     "x": 47,
+     "y": -128,
+     "w": 91,
+     "h": 40,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -36,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -36,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_inclusive_freight_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "−",
+     "x": 460,
+     "y": 590,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": 590,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": 634,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "ج.م",
+     "x": 43,
+     "y": 863,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "form_purchase_vat_inclusive_freight_summary_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "تفاصيل الفاتورة والملاحظة",
+     "x": 60,
+     "y": -338,
+     "w": 158,
+     "h": 28,
+     "in_scroll": true
+    },
+    {
+     "text": "صنف جديد",
+     "x": 47,
+     "y": -209,
+     "w": 91,
+     "h": 40,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -117,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -117,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "%",
+     "x": 809,
+     "y": -73,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "−",
+     "x": 460,
+     "y": -25,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    },
+    {
+     "text": "+",
+     "x": 345,
+     "y": -25,
+     "w": 30,
+     "h": 30,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_inventory_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 915,
+     "columns_w": 915,
+     "h_scroll": false,
+     "rows": 85
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_inventory_tab_lots_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 915,
+     "columns_w": 915,
+     "h_scroll": false,
+     "rows": 13
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_inventory_tab_stock_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 915,
+     "columns_w": 915,
+     "h_scroll": false,
+     "rows": 76
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_customers_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 965,
+     "columns_w": 965,
+     "h_scroll": false,
+     "rows": 60
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_customers_preview_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_suppliers_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 965,
+     "columns_w": 965,
+     "h_scroll": false,
+     "rows": 14
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_suppliers_preview_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_installments_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_treasury_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_treasury_preview_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "summaryTable",
+     "viewport_w": 911,
+     "columns_w": 911,
+     "h_scroll": false,
+     "rows": 3
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_reports_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 9
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_reports_preview_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "النسخ الاحتياطي والاستعادة",
+     "x": 539,
+     "y": 559,
+     "w": 439,
+     "h": 40,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_sidebar_open_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "النسخ الاحتياطي والاستعادة",
+     "x": 453,
+     "y": 559,
+     "w": 353,
+     "h": 40,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_shop_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_printing_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "طباعة صفحة تجريبية",
+     "x": 235,
+     "y": 651,
+     "w": 159,
+     "h": 40,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_item_fields_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableWidget",
+     "viewport_w": 965,
+     "columns_w": 965,
+     "h_scroll": false,
+     "rows": 14
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_partners_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 973,
+     "columns_w": 973,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_opening_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_users_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "الاطلاع على الخزينة وحركة الأموال",
+     "x": 372,
+     "y": 563,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "تسجيل حركات الخزينة وإدارة الشركاء",
+     "x": 372,
+     "y": 590,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "الاطلاع على التقارير المالية",
+     "x": 372,
+     "y": 617,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "حصص الشركاء وتوزيع الأرباح",
+     "x": 372,
+     "y": 644,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "قفل الفترة المالية وفتحها",
+     "x": 372,
+     "y": 671,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "إقفال الصندوق اليومي وإلغاء الإقفال",
+     "x": 372,
+     "y": 698,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "إدخال الأرصدة الافتتاحية وعكسها",
+     "x": 372,
+     "y": 725,
+     "w": 256,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "المستخدمون والصلاحيات",
+     "x": 75,
+     "y": 563,
+     "w": 255,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "الإعدادات العامة",
+     "x": 75,
+     "y": 590,
+     "w": 255,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "الاستعادة من نسخة احتياطية",
+     "x": 75,
+     "y": 617,
+     "w": 255,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_audit_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 935,
+     "columns_w": 935,
+     "h_scroll": false,
+     "rows": 163
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_backup_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 943,
+     "columns_w": 943,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_appearance_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 547,
+     "columns_w": 547,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_settings_tab_shortcuts_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  },
+  "page_reports_vat_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1093,
+    574
+   ]
+  }
+ },
+ "dialogs": {
+  "dlg_purchase_vat_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    554
+   ],
+   "size": [
+    560,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_purchase_vat_lines_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "الشحن خاضع للضريبة حسب الفاتورة",
+     "x": 31,
+     "y": -54,
+     "w": 506,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    560,
+    554
+   ],
+   "size": [
+    560,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_supplier_expanded_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    554
+   ],
+   "size": [
+    600,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_supplier_vat_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "بيانات إضافية (اختيارية)",
+     "x": 31,
+     "y": -156,
+     "w": 546,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    600,
+    554
+   ],
+   "size": [
+    600,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_tire_standard_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -643,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -643,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -643,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -336,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -255,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -224,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_tire_exempt_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -643,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -643,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -643,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -336,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -255,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -224,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_battery_standard_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -681,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -681,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -681,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -124,
+     "w": 468,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_battery_exempt_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -681,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -681,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -681,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -124,
+     "w": 468,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_service_standard_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -150,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -150,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -150,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_service_exempt_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -150,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -150,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -150,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_vat_print_preview_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_sale_return_legacy_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1011,
+     "columns_w": 1011,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_sale_return_vat_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1011,
+     "columns_w": 1011,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_purchase_return_legacy_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1011,
+     "columns_w": 1011,
+     "h_scroll": false,
+     "rows": 5
+    }
+   ],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_purchase_return_vat_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1011,
+     "columns_w": 1011,
+     "h_scroll": false,
+     "rows": 5
+    }
+   ],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_opening_balances_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "summaryTable",
+     "viewport_w": 644,
+     "columns_w": 644,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_stock_adjustment_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    640,
+    554
+   ],
+   "size": [
+    640,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_customer_1093x614_light": {
+   "clipped_buttons": [
+    {
+     "text": "بيانات التقسيط والآجل",
+     "x": 31,
+     "y": 539,
+     "w": 586,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    640,
+    554
+   ],
+   "size": [
+    640,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_supplier_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    438
+   ],
+   "size": [
+    600,
+    438
+   ],
+   "screen_h": 614
+  },
+  "dlg_new_user_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    460,
+    381
+   ],
+   "size": [
+    460,
+    381
+   ],
+   "screen_h": 614
+  },
+  "dlg_treasury_movement_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    501
+   ],
+   "size": [
+    600,
+    501
+   ],
+   "screen_h": 614
+  },
+  "dlg_treasury_close_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    483
+   ],
+   "size": [
+    520,
+    483
+   ],
+   "screen_h": 614
+  },
+  "dlg_safe_count_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    450
+   ],
+   "size": [
+    520,
+    450
+   ],
+   "screen_h": 614
+  },
+  "dlg_reconciliation_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    550
+   ],
+   "size": [
+    560,
+    550
+   ],
+   "screen_h": 614
+  },
+  "dlg_profit_distribution_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    440
+   ],
+   "size": [
+    560,
+    440
+   ],
+   "screen_h": 614
+  },
+  "dlg_period_lock_1093x614_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    371
+   ],
+   "size": [
+    520,
+    371
+   ],
+   "screen_h": 614
+  },
+  "dlg_purchase_vat_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    554
+   ],
+   "size": [
+    560,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_purchase_vat_lines_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "الشحن خاضع للضريبة حسب الفاتورة",
+     "x": 31,
+     "y": -54,
+     "w": 506,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    560,
+    554
+   ],
+   "size": [
+    560,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_supplier_expanded_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    554
+   ],
+   "size": [
+    600,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_supplier_vat_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "بيانات إضافية (اختيارية)",
+     "x": 31,
+     "y": -156,
+     "w": 546,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    600,
+    554
+   ],
+   "size": [
+    600,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_tire_standard_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -643,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -643,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -643,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -336,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -255,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -224,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_tire_exempt_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -643,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -643,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -643,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -336,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -255,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -224,
+     "w": 491,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_battery_standard_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -681,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -681,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -681,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -124,
+     "w": 468,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_battery_exempt_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -681,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -681,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -681,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "نعم",
+     "x": 40,
+     "y": -124,
+     "w": 468,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_service_standard_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -150,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -150,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -150,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_vat_service_exempt_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -150,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -150,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -150,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_vat_print_preview_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_sale_return_legacy_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1011,
+     "columns_w": 1011,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_sale_return_vat_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1011,
+     "columns_w": 1011,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_purchase_return_legacy_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1011,
+     "columns_w": 1011,
+     "h_scroll": false,
+     "rows": 5
+    }
+   ],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_purchase_return_vat_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1011,
+     "columns_w": 1011,
+     "h_scroll": false,
+     "rows": 5
+    }
+   ],
+   "window": [
+    1053,
+    554
+   ],
+   "size": [
+    1053,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_opening_balances_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "summaryTable",
+     "viewport_w": 644,
+     "columns_w": 644,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_stock_adjustment_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    640,
+    554
+   ],
+   "size": [
+    640,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_item_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    700,
+    554
+   ],
+   "size": [
+    700,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_customer_1093x614_dark": {
+   "clipped_buttons": [
+    {
+     "text": "بيانات التقسيط والآجل",
+     "x": 31,
+     "y": 539,
+     "w": 586,
+     "h": 21,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    640,
+    554
+   ],
+   "size": [
+    640,
+    554
+   ],
+   "screen_h": 614
+  },
+  "dlg_supplier_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    438
+   ],
+   "size": [
+    600,
+    438
+   ],
+   "screen_h": 614
+  },
+  "dlg_new_user_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    460,
+    381
+   ],
+   "size": [
+    460,
+    381
+   ],
+   "screen_h": 614
+  },
+  "dlg_treasury_movement_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    501
+   ],
+   "size": [
+    600,
+    501
+   ],
+   "screen_h": 614
+  },
+  "dlg_treasury_close_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    483
+   ],
+   "size": [
+    520,
+    483
+   ],
+   "screen_h": 614
+  },
+  "dlg_safe_count_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    450
+   ],
+   "size": [
+    520,
+    450
+   ],
+   "screen_h": 614
+  },
+  "dlg_reconciliation_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    550
+   ],
+   "size": [
+    560,
+    550
+   ],
+   "screen_h": 614
+  },
+  "dlg_profit_distribution_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    440
+   ],
+   "size": [
+    560,
+    440
+   ],
+   "screen_h": 614
+  },
+  "dlg_period_lock_1093x614_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    371
+   ],
+   "size": [
+    520,
+    371
+   ],
+   "screen_h": 614
+  }
+ }
+}
