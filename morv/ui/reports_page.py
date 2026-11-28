@@ -1,15 +1,15 @@
 """Reports screen: a report picker, period and account controls, and CSV or PDF export."""
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QPushButton,
+from PySide6.QtGui import QBrush, QColor, QFont, QPalette
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QPushButton,
                                QWidget)
 
 from morv.core.money import fmt
 from morv.core.text import ltr
-from morv.infra import income_statement, ledger, reports
+from morv.infra import income_statement, ledger, reports, shop
 from morv.infra.reports import CODE, DATE, MONEY, ReportError
-from morv.ui import report_export
-from morv.ui.listpage import ListPage
+from morv.ui import report_export, tokens
+from morv.ui.listpage import ListPage, TupleModel
 from morv.ui.widgets import DateEdit, muted
 
 _INDENT = {"head": "", "line": "    ", "total": "", "grand": ""}
@@ -28,7 +28,29 @@ def _cell_text(value, kind: str) -> str:
     return ltr(text) if kind in (CODE, DATE) and text else text
 
 
+class ReportModel(TupleModel):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid():
+            return None
+        kind = self.rows[index.row()][1]
+        if kind in tokens.REPORT_ROW_BACKGROUND:
+            if role == Qt.ItemDataRole.FontRole:
+                font = QFont(QApplication.font())
+                font.setBold(True)
+                return font
+            if role in (Qt.ItemDataRole.BackgroundRole, Qt.ItemDataRole.ForegroundRole):
+                palette = QApplication.palette()
+                dark = palette.color(QPalette.ColorRole.Base) == QColor(tokens.DARK["surface"])
+                colors = tokens.DARK if dark else tokens.LIGHT
+                if role == Qt.ItemDataRole.BackgroundRole:
+                    return QBrush(QColor(colors[tokens.REPORT_ROW_BACKGROUND[kind]]))
+                if kind == "grand":
+                    return QBrush(QColor(colors["total_text"]))
+        return super().data(index, role)
+
+
 class ReportsPage(ListPage):
+    model_class = ReportModel
     title = "التقارير"
     add_label = None               # reading and exporting only; the financial actions live in the treasury
     search_placeholder = "بحث في البنود (F2)"
@@ -180,12 +202,19 @@ class ReportsPage(ListPage):
         header.setSectionResizeMode(table.stretch, QHeaderView.ResizeMode.Stretch)
 
     def _on_fetch_done(self, rows, err, keep_id, gen) -> None:
-        if rows is not None and not err and gen == self._fetch_gen and rows.table is not None:
-            self._apply_columns(rows.table)
+        if rows is not None and not err and gen == self._fetch_gen:
+            # Row IDs are local to each report, not shared between report types.
+            if self.table is not None and rows.table is not None and self.table.key != rows.table.key:
+                if self.current_id is not None:
+                    self.hide_preview()
+                keep_id = None
+            # The base handler reads total() and may build a preview using this table.
+            self.table = rows.table
+            if self.table is not None:
+                self._apply_columns(self.table)
         super()._on_fetch_done(rows, err, keep_id, gen)
         if rows is None or err or gen != self._fetch_gen:
             return
-        self.table = rows.table
         self.export_csv_btn.setEnabled(self.table is not None)
         self.export_pdf_btn.setEnabled(self.table is not None)
         if rows.error:
@@ -224,7 +253,7 @@ class ReportsPage(ListPage):
         reports.to_csv(self._export_table(), path)
 
     def export_pdf_to(self, path: str) -> None:
-        report_export.export_pdf(self._export_table(), path)
+        report_export.export_pdf(self._export_table(), path, shop_name=shop.load(self.session.con).name)
 
     def export_csv(self) -> None:
         path, _ = QFileDialog.getSaveFileName(self, "تصدير التقرير", f"{self.table.title}.csv", "Excel (*.csv)")

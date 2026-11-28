@@ -165,6 +165,7 @@ class SummaryDetailRow(QWidget):
 
 
 class ListPage(QWidget):
+    model_class = TupleModel
     columns: list = []
     title = ""
     add_label: str | None = "جديد"      # None on a page that creates nothing, so no button is built
@@ -246,7 +247,7 @@ class ListPage(QWidget):
         tools.setColumnStretch(0, 1)
         left.addLayout(tools)
 
-        self.model = TupleModel(self.columns, self.row_icon)
+        self.model = self.model_class(self.columns, self.row_icon)
         self.view = QTableView()
         self.view.setModel(self.model)
         self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)

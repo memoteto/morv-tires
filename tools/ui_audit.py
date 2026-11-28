@@ -322,6 +322,37 @@ def _capture_purchase_returns(win, session, app, out, tag, report, screen_h):
         settings.put(con, "tax.enabled", previous)
 
 
+def _capture_vat_report(win, app, out, tag, report):
+    from datetime import date
+
+    from morv.ui.reports_page import CUSTOM
+
+    win.go_key("reports")
+    _settle(app)
+    page = win.stack.currentWidget()
+    previous_report = page.report_combo.currentIndex()
+    previous_filter = page.filter_key
+    previous_from, previous_to = page.from_edit.text(), page.to_edit.text()
+    try:
+        today = date.today().isoformat()
+        page.from_edit.setText(min("2026-11-01", today))
+        page.to_edit.setText(max("2026-11-28", today))
+        page.set_filter(CUSTOM)
+        page.report_combo.setCurrentIndex(page.report_combo.findData("vat"))
+        _settle(app)
+        if (page.table is None or page.table.key != "vat"
+                or not page.account_combo.isHidden() or not page.compare_box.isHidden()
+                or not page.export_pdf_btn.isEnabled() or not page.export_csv_btn.isEnabled()):
+            raise RuntimeError("audit: VAT report or export controls unavailable")
+        _capture_checked(win, app, out, f"page_reports_vat_{tag}", report)
+    finally:
+        page.from_edit.setText(previous_from)
+        page.to_edit.setText(previous_to)
+        page.set_filter(previous_filter)
+        page.report_combo.setCurrentIndex(previous_report)
+        _settle(app)
+
+
 def _capture_vat_print_preview(win, app, out, tag, report, screen_h):
     from morv.ui.printing import PrintPreview
     from tools.print_samples import _shop, _vat_sale
@@ -574,6 +605,7 @@ def run(out: Path, size: tuple) -> dict:
             _capture_vat_print_preview(win, app, out, f"{w}x{h}_{mode}", report, h)
             _capture_sale_returns(win, session, app, out, f"{w}x{h}_{mode}", report, h)
             _capture_purchase_returns(win, session, app, out, f"{w}x{h}_{mode}", report, h)
+            _capture_vat_report(win, app, out, f"{w}x{h}_{mode}", report)
             for dname, make in _dialogs(session, item_id):
                 name = f"dlg_{dname}_{w}x{h}_{mode}"
                 try:
