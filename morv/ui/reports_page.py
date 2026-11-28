@@ -180,12 +180,19 @@ class ReportsPage(ListPage):
         header.setSectionResizeMode(table.stretch, QHeaderView.ResizeMode.Stretch)
 
     def _on_fetch_done(self, rows, err, keep_id, gen) -> None:
-        if rows is not None and not err and gen == self._fetch_gen and rows.table is not None:
-            self._apply_columns(rows.table)
+        if rows is not None and not err and gen == self._fetch_gen:
+            # Row IDs are local to each report, not shared between report types.
+            if self.table is not None and rows.table is not None and self.table.key != rows.table.key:
+                if self.current_id is not None:
+                    self.hide_preview()
+                keep_id = None
+            # The base handler reads total() and may build a preview using this table.
+            self.table = rows.table
+            if self.table is not None:
+                self._apply_columns(self.table)
         super()._on_fetch_done(rows, err, keep_id, gen)
         if rows is None or err or gen != self._fetch_gen:
             return
-        self.table = rows.table
         self.export_csv_btn.setEnabled(self.table is not None)
         self.export_pdf_btn.setEnabled(self.table is not None)
         if rows.error:
