@@ -80,5 +80,5 @@ class CentralControlsTest(unittest.TestCase):
         self.assertTrue(issubclass(PurchaseReturnEditor, DocumentEditor))
         self.assertTrue(issubclass(ReturnEditor, DocumentEditor))
         for cls in (PurchaseReturnDialog, SaleReturnDialog):
-            for member in ("fields", "add_document_table", "amount_row"):
+            for member in ("fields", "add_document_table", "amount_row", "add_document_metrics", "add_quantity_toolbar"):
                 self.assertNotIn(member, cls.__dict__)

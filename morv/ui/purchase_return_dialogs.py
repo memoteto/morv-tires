@@ -7,17 +7,17 @@ from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLineEdit, QSpinB
 
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
-from morv.infra import ledger, purchase_returns
+from morv.infra import ledger, purchase_returns, purchase_view
 from morv.infra.purchase_returns import PurchaseReturnError, ReturnLine
 from morv.ui.adaptive_layout import AdaptiveFields
 from morv.ui.document_table import DocumentEditor, DocumentTableDialog
 from morv.ui.modal import Modal
-from morv.ui.widgets import DateEdit, card, danger_button, field, form, icon_button, ltr_edit, muted
+from morv.ui.widgets import DateEdit, card, danger_button, field, form, ltr_edit, muted
 
 
 class PurchaseReturnModel(QAbstractTableModel):
-    NAME, LOT, AVAILABLE, QTY, BOOK, TAX = range(6)
-    HEADERS = ("الصنف", "الدفعة / DOT", "المتاح", "المرتجع", "القيمة الدفترية", "الضريبة")
+    NAME, INVOICE, LOT, AVAILABLE, QTY, BOOK, TAX = range(7)
+    HEADERS = ("الصنف", "الفاتورة", "الدفعة / DOT", "المتاح", "المرتجع", "القيمة الدفترية", "الضريبة")
     draftChanged = Signal()
 
     def __init__(self, rows, parent=None):
@@ -57,6 +57,8 @@ class PurchaseReturnModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.ToolTipRole:
             if col == self.NAME:
                 return source.name
+            if col == self.INVOICE:
+                return f"{source.invoice_number} · {source.supplier_invoice_no} · {source.invoice_date}"
             if col == self.TAX and qty:
                 if actual:
                     return (f"حصة الضريبة الأصلية {fmt(actual.allocated)}؛ "
@@ -67,7 +69,7 @@ class PurchaseReturnModel(QAbstractTableModel):
         tax = ("—" if not qty else
                (ltr(fmt(actual.tax_amount)) + (" *" if actual.manual else "") if actual else
                 (override or "—")))
-        return (source.name, ltr(source.ref + (" / " + source.dot if source.dot else "")),
+        return (source.name, ltr(source.invoice_number), ltr(source.ref + (" / " + source.dot if source.dot else "")),
                 ltr(str(source.available)), ltr(str(qty)),
                 ltr(fmt(actual.book_value)) if actual else "—", tax)[col]
 
@@ -119,6 +121,15 @@ class PurchaseReturnModel(QAbstractTableModel):
         if self.rows:
             self.dataChanged.emit(self.index(0, self.BOOK), self.index(len(self.rows) - 1, self.TAX), [])
 
+    def select_all(self):
+        for i, source in enumerate(self.rows):
+            if self.quantities[i] != source.available:
+                self.tax_inputs[i] = None
+            self.quantities[i] = source.available
+        self.draftChanged.emit()
+        if self.rows:
+            self.dataChanged.emit(self.index(0, self.QTY), self.index(len(self.rows) - 1, self.TAX), [])
+
     def clear_quantities(self):
         self.quantities = [0] * len(self.rows)
         self.tax_inputs = [None] * len(self.rows)
@@ -154,29 +165,37 @@ class PurchaseReturnEditor(DocumentEditor):
 
 
 class PurchaseReturnDialog(DocumentTableDialog):
-    def __init__(self, session, supplier_id: int, supplier_name: str, parent=None):
-        super().__init__(f"مرتجع للمورد — {supplier_name}", parent)
+    def __init__(self, session, supplier_id: int, supplier_name: str, parent=None, *, invoice_id=None):
+        super().__init__("مرتجع مشتريات", parent)
         self.session, self.supplier_id, self.saved = session, supplier_id, None
         self._key = uuid.uuid4().hex
         self._busy = False
         self.quote = None
-        rows = purchase_returns.returnable_details(session.con, supplier_id)
+        rows = purchase_returns.returnable_details(session.con, supplier_id, invoice_id)
         self.model = PurchaseReturnModel(rows, self)
         self.taxable_source = any(r.original_tax for r in rows)
+        invoices = {r.invoice_id: r for r in rows}
+        source_id = invoice_id if invoice_id is not None else next(iter(invoices)) if len(invoices) == 1 else None
+        invoice = purchase_view.get_invoice(session.con, source_id) if source_id is not None else None
+        if invoice and invoice.supplier_id != supplier_id:
+            raise PurchaseReturnError("الفاتورة لا تخص هذا المورد")
+        number = invoice.number if invoice else f"{len(invoices)} فواتير" if invoices else "—"
+        self.metrics = self.add_document_metrics([
+            ("اسم المورد", supplier_name), ("رقم الفاتورة", ltr(number) if invoice else number),
+            ("تاريخ الفاتورة", ltr(invoice.invoice_date) if invoice else "متعددة" if invoices else "—"),
+            ("فاتورة المورد", ltr(invoice.supplier_invoice_no) if invoice else "متعددة" if invoices else "—"),
+            ("إجمالي الفاتورة" if invoice else "إجمالي الفواتير",
+             ltr(fmt(invoice.total if invoice else sum(r.invoice_total for r in invoices.values())))),
+            ("المتاح للإرجاع", f"{len(rows)} دفعة · {sum(r.available for r in rows)} وحدة"),
+        ])
         self.reason = QLineEdit()
         self.reason.setPlaceholderText("سبب المرتجع (إلزامي)")
         self.date = DateEdit()
         self.date.setText(date.today().isoformat())
-        self.body.addWidget(self.fields([("سبب المرتجع *", self.reason), ("تاريخ المرتجع *", self.date)]))
-
-        toolbar = QHBoxLayout()
-        toolbar.addWidget(muted("حدّد الكمية في الجدول؛ الصفر يستبعد السطر."))
-        toolbar.addStretch(1)
-        clear = icon_button("مسح الكميات", "close")
-        clear.clicked.connect(self._clear)
-        toolbar.addWidget(clear)
-        self.body.addLayout(toolbar)
+        self.body.addWidget(self.fields([("تاريخ المرتجع *", self.date), ("سبب المرتجع *", self.reason)]))
+        self.add_quantity_toolbar("أصناف الفاتورة" if invoice else "دفعات المورد", "حدّد الكمية في الجدول")
         self.view = self.add_document_table(self.model, PurchaseReturnEditor, stretch_column=self.model.NAME)
+        self.view.setColumnHidden(self.model.INVOICE, invoice is not None)
         self.view.setColumnHidden(self.model.TAX, not self.taxable_source)
 
         bottom = QHBoxLayout()
@@ -223,11 +242,8 @@ class PurchaseReturnDialog(DocumentTableDialog):
     def book_total(self):
         return self.quote.book_total if self.quote else None
 
-    def _clear(self):
-        self.editor.finish()
-        self.model.clear_quantities()
-
     def _refresh_preview(self, *_args):
+        self.refresh_quantity_actions()
         self.quote = None
         try:
             lines = self.model.selected_lines()

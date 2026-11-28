@@ -154,7 +154,7 @@ class PurchasesListPage(ListPage):
             self.actions(send_back)
 
     def open_return(self, inv) -> None:
-        dlg = PurchaseReturnDialog(self.session, inv.supplier_id, inv.supplier_name, self)
+        dlg = PurchaseReturnDialog(self.session, inv.supplier_id, inv.supplier_name, self, invoice_id=inv.id)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.reload(keep_id=inv.id)
 

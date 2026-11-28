@@ -48,6 +48,11 @@ class ReturnableLot:
     available: int
     unit_cost: int
     original_tax: int
+    invoice_id: int
+    invoice_number: str
+    supplier_invoice_no: str
+    invoice_date: str
+    invoice_total: int
 
 
 @dataclass(frozen=True)
@@ -106,13 +111,16 @@ def returnable(con: sqlite3.Connection, supplier_id: int) -> list[tuple]:
             for r in returnable_details(con, supplier_id)]
 
 
-def returnable_details(con: sqlite3.Connection, supplier_id: int) -> list[ReturnableLot]:
-    """Read-only lot metadata, including original VAT rather than current settings."""
+def returnable_details(con: sqlite3.Connection, supplier_id: int,
+                       invoice_id: int | None = None) -> list[ReturnableLot]:
+    """Original lot and invoice metadata; optionally restrict to one invoice."""
     rows = con.execute(
-        "SELECT pl.id, l.ref_no, i.name, coalesce(l.dot, ''), min(l.qty_on_hand, c.qty_remaining), pl.unit_cost, pl.tax_amount "
+        "SELECT pl.id, l.ref_no, i.name, coalesce(l.dot, ''), min(l.qty_on_hand, c.qty_remaining), "
+        "pl.unit_cost, pl.tax_amount, p.id, p.number, p.supplier_invoice_no, p.invoice_date, p.total "
         "FROM purchase_lines pl JOIN purchase_invoices p ON p.id = pl.invoice_id JOIN items i ON i.id = pl.item_id "
         "JOIN stock_lots l ON l.purchase_line_id = pl.id JOIN cost_layers c ON c.purchase_line_id = pl.id "
-        "WHERE p.supplier_id = ? ORDER BY l.received_date, l.id", (supplier_id,)).fetchall()
+        "WHERE p.supplier_id = ? AND (? IS NULL OR p.id = ?) ORDER BY l.received_date, l.id",
+        (supplier_id, invoice_id, invoice_id)).fetchall()
     return [ReturnableLot(*r) for r in rows if r[4] > 0]
 
 

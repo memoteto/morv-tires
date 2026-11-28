@@ -75,6 +75,20 @@ class SaleReturnUiTest(_Fixture, unittest.TestCase):
             "SELECT total,tax_total FROM sale_returns WHERE sale_id=?", (sale.id,)).fetchone(), (10000, 1228))
         self.assertEqual(ledger.unbalanced_entries(self.con), [])
 
+    def test_bulk_clear_keeps_conditions_and_disables_approval(self):
+        _, dlg = self.make_dialog()
+        self.assertFalse(dlg.clear_btn.isEnabled())
+        dlg.all_btn.click()
+        model = dlg.model
+        self.assertTrue(model.setData(model.index(0, model.CONDITION), "defective"))
+        dlg.clear_btn.click()
+        self.assertEqual(model.quantities, [0])
+        self.assertEqual(model.conditions, ["defective"])
+        self.assertFalse(dlg.clear_btn.isEnabled())
+        self.assertFalse(dlg.post_btn.isEnabled())
+        dlg.all_btn.click()
+        self.assertEqual(dlg.lines[0].condition, "defective")
+
     def test_legacy_invoice_hides_tax_even_when_tax_enabled_now(self):
         _, dlg = self.make_dialog(False)
         self.assertTrue(dlg.view.isColumnHidden(dlg.model.TAX))

@@ -10,7 +10,7 @@ from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra.sale_returns import ReturnError, ReturnLineIn, post_return, preview_installment_refund
 from morv.ui.document_table import DocumentEditor, DocumentTableDialog
-from morv.ui.widgets import DateEdit, card, icon_button, ltr_edit, muted
+from morv.ui.widgets import DateEdit, card, ltr_edit, muted
 
 CONDITIONS = (("sound", "سليم"), ("defective", "معيب"))
 REFUND_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
@@ -96,6 +96,11 @@ class ReturnTableModel(QAbstractTableModel):
         if self.rows:
             self.dataChanged.emit(self.index(0, self.QTY), self.index(len(self.rows) - 1, self.TOTAL), [])
 
+    def clear_quantities(self):
+        self.quantities = [0] * len(self.rows)
+        if self.rows:
+            self.dataChanged.emit(self.index(0, self.QTY), self.index(len(self.rows) - 1, self.TOTAL), [])
+
     def selected_lines(self):
         return [ReturnLineIn(r.sale_line_id, qty, condition)
                 for r, qty, condition in zip(self.rows, self.quantities, self.conditions, strict=True) if qty]
@@ -140,19 +145,10 @@ class SaleReturnDialog(DocumentTableDialog):
         self.posted = None
         self._busy = False
         self._request_key = uuid.uuid4().hex
-        metrics = QHBoxLayout()
-        for caption, value in (("العميل", sale.customer_name),
-                               ("إجمالي الفاتورة", ltr(fmt(sale.total))),
-                               ("المتاح للإرجاع", ltr(fmt(sale.total - sale.returned)))):
-            box, layout = card(compact=True)
-            layout.addWidget(muted(caption))
-            label = QLabel(value)
-            label.setObjectName("cardTitle")
-            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-            label.setToolTip(value)
-            layout.addWidget(label)
-            metrics.addWidget(box, 1)
-        self.body.addLayout(metrics)
+        self.metrics = self.add_document_metrics([
+            ("العميل", sale.customer_name), ("إجمالي الفاتورة", ltr(fmt(sale.total))),
+            ("المتاح للإرجاع", ltr(fmt(sale.total - sale.returned))),
+        ])
 
         self.return_date = DateEdit()
         self.return_date.setText(max(date.today().isoformat(), sale.sale_date))
@@ -171,17 +167,7 @@ class SaleReturnDialog(DocumentTableDialog):
             ("طريقة الرد", self.refund), ("ملاحظة", self.note),
         ]))
 
-        toolbar = QHBoxLayout()
-        heading = QLabel("أصناف الفاتورة")
-        heading.setObjectName("cardTitle")
-        toolbar.addWidget(heading)
-        toolbar.addWidget(muted("حدّد الكمية مباشرة في الجدول"))
-        toolbar.addStretch(1)
-        self.all_btn = icon_button("إرجاع الكل", "check")
-        self.all_btn.setEnabled(any(r.available > 0 for r in returnable))
-        self.all_btn.clicked.connect(self._select_all)
-        toolbar.addWidget(self.all_btn)
-        self.body.addLayout(toolbar)
+        self.add_quantity_toolbar("أصناف الفاتورة", "حدّد الكمية مباشرة في الجدول")
 
         self.model = ReturnTableModel(returnable, self)
         self.view = self.add_document_table(self.model, ReturnEditor, stretch_column=self.model.NAME)
@@ -218,11 +204,8 @@ class SaleReturnDialog(DocumentTableDialog):
     def lines(self):
         return self.model.selected_lines()
 
-    def _select_all(self):
-        self.editor.finish()
-        self.model.select_all()
-
     def _refresh_total(self, *_args):
+        self.refresh_quantity_actions()
         amounts = self.model.expected_amounts()
         total = sum(a[1] for a in amounts.values())
         tax = sum(a[2] for a in amounts.values())

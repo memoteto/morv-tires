@@ -171,3 +171,45 @@ class PurchaseReturnDialogsUiTest(unittest.TestCase):
         self.assertIsNotNone(dlg.saved)
         self.assertEqual(ledger.account_balance(self.con, "5160"), 5000)
         self.assertEqual(ledger.account_balance(self.con, "1520"), 0)
+
+
+    def test_invoice_scope_and_bulk_actions(self):
+        from morv.infra import purchasing
+        from morv.infra.purchasing import PurchaseLine
+        from morv.ui.purchase_return_dialogs import PurchaseReturnDialog
+        from morv.ui.widgets import dispose
+
+        item = self.con.execute("SELECT id FROM items WHERE code='TR-1'").fetchone()[0]
+        inv = purchasing.post_invoice(
+            self.con, self.session.user, request_key="ui-scope-buy-01", supplier_id=self.sup,
+            supplier_invoice_no="S-SCOPE", invoice_date="2026-11-02",
+            lines=[PurchaseLine(item, 3, 200000, "2324")])
+        general = PurchaseReturnDialog(self.session, self.sup, "مورد وهمي")
+        self.addCleanup(dispose, general, self.app)
+        self.assertEqual(general.model.rowCount(), 2)
+        self.assertFalse(general.view.isColumnHidden(general.model.INVOICE))
+        self.assertEqual(len({r.invoice_number for r in general.model.rows}), 2)
+        dlg = PurchaseReturnDialog(self.session, self.sup, "مورد وهمي", invoice_id=inv.id)
+        self.addCleanup(dispose, dlg, self.app)
+        self.assertEqual(dlg.model.rowCount(), 1)
+        self.assertEqual(dlg.model.rows[0].invoice_id, inv.id)
+        self.assertIn("S-SCOPE", dlg.metrics["فاتورة المورد"].text())
+        self.assertIn(inv.number, dlg.metrics["رقم الفاتورة"].text())
+        self.assertIn("6,000.00", dlg.metrics["إجمالي الفاتورة"].text())
+        self.assertFalse(dlg.clear_btn.isEnabled())
+        dlg.reason.setText("عيب تصنيع")
+        dlg.settlement_mode.setCurrentIndex(dlg.settlement_mode.findData("book"))
+        dlg.all_btn.click()
+        self.assertEqual(dlg.model.quantities, [3])
+        self.assertTrue(dlg.clear_btn.isEnabled())
+        dlg.clear_btn.click()
+        self.assertEqual(dlg.model.quantities, [0])
+        self.assertIsNone(dlg.quote)
+        self.assertFalse(dlg.post_btn.isEnabled())
+        self.assertFalse(dlg.clear_btn.isEnabled())
+        self.assertEqual(dlg.reason.text(), "عيب تصنيع")
+        dlg.all_btn.click()
+        dlg.save()
+        self.assertIsNotNone(dlg.saved)
+        self.assertEqual(self.con.execute(
+            "SELECT qty_on_hand FROM stock_lots ORDER BY id").fetchall(), [(4,), (0,)])

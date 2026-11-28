@@ -290,11 +290,11 @@ def _capture_purchase_returns(win, session, app, out, tag, report, screen_h):
             sid = con.execute("INSERT INTO suppliers (name,name_norm,mobile) VALUES (?,?,?)",
                               (name, name, f"019{next_id:08d}")).lastrowid
             tax = dict(input_tax_rate=1400, input_tax_deductible=True) if enabled else {}
-            purchasing.post_invoice(
+            invoice = purchasing.post_invoice(
                 con, session.user, request_key=f"audit-preturn-{tag}-{enabled}", supplier_id=sid,
                 supplier_invoice_no=f"AUDIT-{tag}-{enabled}", invoice_date="2026-11-01",
                 lines=[PurchaseLine(i, 3, 100000, "2324", **tax) for i in item_ids])
-            dlg = PurchaseReturnDialog(session, sid, name, win)
+            dlg = PurchaseReturnDialog(session, sid, name, win, invoice_id=invoice.id)
             try:
                 dlg.date.setText("2026-11-28")
                 dlg.reason.setText("عيب تصنيع")

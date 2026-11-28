@@ -1,11 +1,11 @@
 """Shared table-document layout: business rules stay in each document model."""
-from PySide6.QtWidgets import (QAbstractItemView, QHeaderView, QHBoxLayout, QLabel, QSpinBox,
+from PySide6.QtWidgets import (QAbstractItemView, QGridLayout, QHeaderView, QHBoxLayout, QLabel, QSizePolicy, QSpinBox,
                                QStyledItemDelegate, QTableView, QWidget)
 
 from morv.ui.adaptive_layout import AdaptiveFields
 from morv.ui.modal import Modal
 from morv.ui.tokens import LAYOUT
-from morv.ui.widgets import field, muted
+from morv.ui.widgets import card, field, icon_button, muted
 
 
 class DocumentEditor(QStyledItemDelegate):
@@ -48,6 +48,51 @@ class DocumentTableDialog(Modal):
     @staticmethod
     def fields(entries):
         return AdaptiveFields([field(caption, widget) for caption, widget in entries])
+
+    def add_document_metrics(self, entries, *, columns=3):
+        grid = QGridLayout()
+        grid.setSpacing(LAYOUT["compact_card_spacing"])
+        labels = {}
+        for i, (caption, value) in enumerate(entries):
+            box, layout = card(compact=True)
+            layout.addWidget(muted(caption))
+            label = QLabel(value)
+            label.setObjectName("cardTitle")
+            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            label.setToolTip(value)
+            layout.addWidget(label)
+            grid.addWidget(box, i // columns, i % columns)
+            grid.setColumnStretch(i % columns, 1)
+            labels[caption] = label
+        self.body.addLayout(grid)
+        return labels
+
+    def add_quantity_toolbar(self, title, hint):
+        toolbar = QHBoxLayout()
+        heading = QLabel(title)
+        heading.setObjectName("cardTitle")
+        toolbar.addWidget(heading)
+        toolbar.addWidget(muted(hint))
+        toolbar.addStretch(1)
+        self.all_btn = icon_button("إرجاع الكل", "check")
+        self.clear_btn = icon_button("تصفير", "close")
+        self.all_btn.clicked.connect(lambda: self._bulk_quantities(True))
+        self.clear_btn.clicked.connect(lambda: self._bulk_quantities(False))
+        toolbar.addWidget(self.all_btn)
+        toolbar.addWidget(self.clear_btn)
+        self.body.addLayout(toolbar)
+
+    def _bulk_quantities(self, all_available):
+        self.editor.finish()
+        if all_available:
+            self.model.select_all()
+        else:
+            self.model.clear_quantities()
+        self.refresh_quantity_actions()
+
+    def refresh_quantity_actions(self):
+        self.all_btn.setEnabled(any(r.available > 0 for r in self.model.rows))
+        self.clear_btn.setEnabled(any(self.model.quantities))
 
     def add_document_table(self, model, delegate, *, stretch_column):
         view = QTableView()
