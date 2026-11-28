@@ -1,0 +1,5 @@
+source_ref=perf/installments-paging
+source_sha=08f5f23b503d971fc41fcbafef96fe78e334e862
+checkout_sha=b3a044c5b0fcf30c0c0c415a92b64406c19379d5
+run_id=46165683246
+run_attempt=1
