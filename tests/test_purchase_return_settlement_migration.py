@@ -167,6 +167,35 @@ class PurchaseReturnSettlementMigrationTest(unittest.TestCase):
                                   for table in tables})
         self.assertEqual(inventory.reconcile(self.con), [])
 
+    def test_upgrade_0039_preserves_legacy_returns_reversals_and_postings(self):
+        self.assertEqual(migrate(self.con, load_migrations()[:38]), list(range(32, 39)))
+        tables = ("purchase_returns", "purchase_return_lines", "purchase_invoices", "purchase_lines",
+                  "journal_entries", "journal_lines", "stock_lots", "stock_movements", "stock_issues",
+                  "cost_layers", "cost_allocations")
+        columns = {t: [r[1] for r in self.con.execute(f"PRAGMA table_info({t})")] for t in tables}
+
+        def snapshot():
+            return {t: self.con.execute(f"SELECT {','.join(columns[t])} FROM {t} ORDER BY id").fetchall()
+                    for t in tables}
+
+        before = snapshot()
+        self.assertEqual(migrate(self.con, load_migrations()[:39]), [39])
+        self.assertEqual(snapshot(), before)
+        self.assertEqual(self.con.execute(
+            "SELECT tax_total,deductible_tax_total,credit_note_ref,settlement_reason FROM purchase_returns"
+        ).fetchall(), [(0, 0, "", ""), (0, 0, "", "")])
+        self.assertEqual(self.con.execute(
+            "SELECT tax_allocated,tax_amount,deductible_tax_amount,tax_mode FROM purchase_return_lines"
+        ).fetchall(), [(0, 0, 0, "legacy"), (0, 0, 0, "legacy")])
+        for sql in ("UPDATE purchase_returns SET tax_total=1", "DELETE FROM purchase_returns",
+                    "UPDATE purchase_return_lines SET tax_amount=1", "DELETE FROM purchase_return_lines"):
+            with self.assertRaises(sqlite3.DatabaseError):
+                self.con.execute(sql)
+        self.assertEqual(self.con.execute("PRAGMA foreign_key_check").fetchall(), [])
+        self.assertEqual(self.con.execute("PRAGMA integrity_check").fetchone(), ("ok",))
+        self.assertEqual(inventory.reconcile(self.con), [])
+        self.assertEqual(ledger.unbalanced_entries(self.con), [])
+
 
 if __name__ == "__main__":
     unittest.main()
