@@ -2,7 +2,7 @@
 import uuid
 from datetime import date
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractTableModel, Qt
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHeaderView, QHBoxLayout, QLabel, QSizePolicy,
                                QSpinBox, QStyledItemDelegate, QTableView)
 
@@ -31,11 +31,11 @@ class ReturnTableModel(QAbstractTableModel):
         self.quantities = [0] * len(self.rows)
         self.conditions = ["sound"] * len(self.rows)
 
-    def rowCount(self, parent=QModelIndex()):
-        return 0 if parent.isValid() else len(self.rows)
+    def rowCount(self, parent=None):
+        return 0 if parent is not None and parent.isValid() else len(self.rows)
 
-    def columnCount(self, parent=QModelIndex()):
-        return 0 if parent.isValid() else len(self.HEADERS)
+    def columnCount(self, parent=None):
+        return 0 if parent is not None and parent.isValid() else len(self.HEADERS)
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
