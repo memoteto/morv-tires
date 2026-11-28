@@ -13,7 +13,7 @@ from morv.core.text import ltr
 from morv.infra import installment_view, installments
 from morv.infra.installments import ContractError, Guarantor
 from morv.ui.interest_dialogs import InterestRecognitionDialog, ReverseInterestDialog
-from morv.ui.listpage import ListPage, TupleModel
+from morv.ui.listpage import PAGE, ListPage, TupleModel
 from morv.ui.widgets import (DateEdit, Notice, card, deferred_button, field, kpi_tile, ltr_edit, muted,
                               primary_button, ro_field)
 
@@ -147,7 +147,8 @@ class ContractsPage(ListPage):
     def fetch(self, con, query, filter_key, offset):
         if not self.can_edit(con):
             return []
-        view = installment_view.list_view(con, query=query, filter_key=filter_key or "all")
+        view = installment_view.list_view(con, query=query, filter_key=filter_key or "all",
+                                          limit=PAGE, offset=offset)
         rows = _RowsWithKpis(
             (r.contract_id, r.number, r.customer_name, r.customer_mobile, r.next_due, r.amount_now,
              r.status, r.progress_text, r.remaining_total, r.can_collect) for r in view.rows)

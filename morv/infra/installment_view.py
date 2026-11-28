@@ -151,76 +151,108 @@ class ListView:
     rows: tuple
 
 
-def _category(overdue_amt: int, today_amt: int, remaining_total: int) -> tuple[str, str, str]:
-    if overdue_amt > 0:
-        return "متأخر", "danger", "late"
-    if today_amt > 0:
-        return "مستحق اليوم", "warn", "today"
-    if remaining_total <= 0:
-        return "مكتمل", "ok", "done"
-    return "نشط", "", "active"
+_KIND = {                                    # A fully returned contract reads differently from one paid off
+    "returned": ("مرتجع بالكامل", "ok", "done"),
+    "late": ("متأخر", "danger", "late"),
+    "today": ("مستحق اليوم", "warn", "today"),
+    "done": ("مكتمل", "ok", "done"),
+    "active": ("نشط", "", "active"),
+}
+
+# Per-row sums are grouped once rather than re-read per aggregate, and the schedule is reached
+# through installment_rows(contract_id, no), so a search touches only the contracts it matched.
+_NET = "(r.amount - coalesce(canc.amt, 0) - coalesce(paid.amt, 0))"
+_DUE = "(r.amount - coalesce(canc.amt, 0))"
+
+_AGG_CTE = f"""
+WITH paid AS (SELECT row_id, sum(amount) AS amt FROM installment_payment_lines GROUP BY row_id),
+canc AS (SELECT row_id, sum(amount) AS amt FROM installment_return_allocations GROUP BY row_id),
+back AS (SELECT contract_id, sum(principal) AS principal
+         FROM installment_return_adjustments GROUP BY contract_id),
+agg AS (
+  SELECT c.id AS id, c.number AS number, cu.name AS cname, coalesce(cu.mobile, '') AS cmobile,
+         coalesce(sum({_NET}), 0) AS remaining_total,
+         coalesce(sum(CASE WHEN {_DUE} > coalesce(paid.amt, 0) AND r.due_date < :today
+                           THEN {_NET} ELSE 0 END), 0) AS overdue_amt,
+         coalesce(sum(CASE WHEN {_DUE} > coalesce(paid.amt, 0) AND r.due_date = :today
+                           THEN {_NET} ELSE 0 END), 0) AS today_amt,
+         coalesce(sum(CASE WHEN {_DUE} > coalesce(paid.amt, 0)
+                           AND r.due_date > :today AND r.due_date <= :week
+                           THEN {_NET} ELSE 0 END), 0) AS week_amt,
+         count(r.no) AS row_count,
+         coalesce(sum(CASE WHEN {_DUE} > 0 AND coalesce(paid.amt, 0) >= {_DUE}
+                           THEN 1 ELSE 0 END), 0) AS paid_rows,
+         -- The zero padded number sorts numerically, so the min carries the first open row's date
+         min(CASE WHEN {_DUE} > coalesce(paid.amt, 0)
+                  THEN printf('%08d|', r.no) || r.due_date END) AS next_tag,
+         max(CASE WHEN coalesce(back.principal, 0) >= c.cash_price THEN 1 ELSE 0 END) AS all_returned
+  FROM installment_contracts c
+  JOIN customers cu ON cu.id = c.customer_id
+  LEFT JOIN installment_rows r ON r.contract_id = c.id
+  LEFT JOIN paid ON paid.row_id = r.id
+  LEFT JOIN canc ON canc.row_id = r.id
+  LEFT JOIN back ON back.contract_id = c.id
+  WHERE (:q = '' OR cu.name LIKE :like OR cu.mobile LIKE :like OR c.number LIKE :like)
+  GROUP BY c.id
+),
+shaped AS (
+  SELECT agg.*, CASE WHEN all_returned = 1 THEN 'returned'
+                     WHEN overdue_amt > 0 THEN 'late'
+                     WHEN today_amt > 0 THEN 'today'
+                     WHEN remaining_total <= 0 THEN 'done'
+                     ELSE 'active' END AS kind,
+         -- Window totals are taken before the category filter, so KPIs cover the whole search
+         coalesce(sum(overdue_amt > 0) OVER (), 0) AS k_late_count,
+         coalesce(sum(CASE WHEN overdue_amt > 0 THEN overdue_amt ELSE 0 END) OVER (), 0) AS k_late_amount,
+         coalesce(sum(today_amt > 0) OVER (), 0) AS k_today_count,
+         coalesce(sum(CASE WHEN today_amt > 0 THEN today_amt ELSE 0 END) OVER (), 0) AS k_today_amount,
+         coalesce(sum(week_amt > 0) OVER (), 0) AS k_week_count,
+         coalesce(sum(CASE WHEN week_amt > 0 THEN week_amt ELSE 0 END) OVER (), 0) AS k_week_amount,
+         coalesce(sum(remaining_total > 0) OVER (), 0) AS k_active_count,
+         coalesce(sum(CASE WHEN remaining_total > 0 THEN remaining_total ELSE 0 END) OVER (), 0)
+             AS k_active_amount
+  FROM agg
+)
+"""
+
+_KPI_SQL = _AGG_CTE + """
+SELECT coalesce(sum(overdue_amt > 0), 0), coalesce(sum(CASE WHEN overdue_amt > 0 THEN overdue_amt ELSE 0 END), 0),
+       coalesce(sum(today_amt > 0), 0), coalesce(sum(CASE WHEN today_amt > 0 THEN today_amt ELSE 0 END), 0),
+       coalesce(sum(week_amt > 0), 0), coalesce(sum(CASE WHEN week_amt > 0 THEN week_amt ELSE 0 END), 0),
+       coalesce(sum(remaining_total > 0), 0),
+       coalesce(sum(CASE WHEN remaining_total > 0 THEN remaining_total ELSE 0 END), 0)
+FROM agg
+"""
+
+_PAGE_SQL = _AGG_CTE + """
+SELECT id, number, cname, cmobile, next_tag, overdue_amt, today_amt, kind, paid_rows, row_count,
+       remaining_total, k_late_count, k_late_amount, k_today_count, k_today_amount,
+       k_week_count, k_week_amount, k_active_count, k_active_amount
+FROM shaped
+WHERE :fk = 'all' OR (:fk = 'week' AND week_amt > 0)
+      OR :fk = (CASE WHEN kind = 'returned' THEN 'done' ELSE kind END)
+ORDER BY id DESC LIMIT :limit OFFSET :offset
+"""
 
 
-def list_view(con: sqlite3.Connection, query: str = "", filter_key: str = "all",
-              today: str | None = None) -> ListView:
-    """One row per contract with its urgency category; KPI totals cover the query but not filter_key."""
+def list_view(con: sqlite3.Connection, query: str = "", filter_key: str = "all", today: str | None = None,
+              limit: int | None = None, offset: int = 0) -> ListView:
+    """One row per contract with its urgency category; KPIs cover the whole query, not the page."""
     today = today or date.today().isoformat()
-    week_end = (date.fromisoformat(today) + timedelta(days=7)).isoformat()
-    contracts = con.execute(
-        "SELECT c.id, c.number, cu.name, coalesce(cu.mobile, ''), c.instalments_total "
-        "FROM installment_contracts c JOIN customers cu ON cu.id = c.customer_id "
-        "WHERE (? = '' OR cu.name LIKE ? OR cu.mobile LIKE ? OR c.number LIKE ?) ORDER BY c.id DESC",
-        (query, _like(query), _like(query), _like(query))).fetchall()
-    by_contract: dict[int, list[tuple]] = {}
-    for cid, no, due_date, original, paid, canceled in con.execute(
-            "SELECT r.contract_id, r.no, r.due_date, r.amount, coalesce((SELECT sum(l.amount) "
-            "FROM installment_payment_lines l WHERE l.row_id = r.id), 0), "
-            "coalesce((SELECT sum(a.amount) FROM installment_return_allocations a WHERE a.row_id=r.id),0) "
-            "FROM installment_rows r ORDER BY r.contract_id, r.no"):
-        by_contract.setdefault(cid, []).append((no, due_date, original - canceled, paid))
-    returned = dict(con.execute(
-        "SELECT contract_id, sum(principal) FROM installment_return_adjustments GROUP BY contract_id"))
-    sale_prices = dict(con.execute("SELECT id, cash_price FROM installment_contracts"))
-
-    late_count = late_amount = today_count = today_amount = 0
-    week_count = week_amount = active_count = active_amount = 0
-    result = []
-    for cid, number, name, mobile, _instalments_total in contracts:
-        rows = by_contract.get(cid, [])
-        remaining_total = sum(a - p for _, _, a, p in rows)
-        overdue_amt = sum(a - p for _, d, a, p in rows if a > p and d < today)
-        due_today_amt = sum(a - p for _, d, a, p in rows if a > p and d == today)
-        due_week_amt = sum(a - p for _, d, a, p in rows if a > p and today < d <= week_end)
-        next_open = next(((d, a - p) for _, d, a, p in rows if a > p), None)
-        status, tone, cat = _category(overdue_amt, due_today_amt, remaining_total)
-        if returned.get(cid, 0) >= sale_prices[cid]:
-            status, tone, cat = "مرتجع بالكامل", "ok", "done"
-        paid_rows = sum(1 for _, _, a, p in rows if a > 0 and p >= a)
-
-        if overdue_amt > 0:
-            late_count += 1
-            late_amount += overdue_amt
-        if due_today_amt > 0:
-            today_count += 1
-            today_amount += due_today_amt
-        if due_week_amt > 0:
-            week_count += 1
-            week_amount += due_week_amt
-        if remaining_total > 0:
-            active_count += 1
-            active_amount += remaining_total
-
-        matches = (filter_key == "all" or filter_key == cat
-                   or (filter_key == "week" and due_week_amt > 0))
-        if matches:
-            result.append(ListRow(
-                cid, number, name, mobile, next_open[0] if next_open else "",
-                overdue_amt + due_today_amt, status, tone, f"{paid_rows} من {len(rows)} قسطًا",
-                remaining_total, remaining_total > 0))
-
-    kpis = ListKpis(late_count, late_amount, today_count, today_amount,
-                    week_count, week_amount, active_count, active_amount)
-    return ListView(kpis, tuple(result))
+    args = {"q": query, "like": _like(query), "today": today,
+            "week": (date.fromisoformat(today) + timedelta(days=7)).isoformat()}
+    page = con.execute(_PAGE_SQL, {**args, "fk": filter_key,
+                                   "limit": -1 if limit is None else limit, "offset": offset}).fetchall()
+    rows = []
+    for cid, number, name, mobile, next_tag, overdue_amt, today_amt, kind, paid_rows, row_count, remaining, *_k \
+            in page:
+        status, tone, _cat = _KIND[kind]
+        rows.append(ListRow(cid, number, name, mobile, next_tag.split("|", 1)[1] if next_tag else "",
+                            overdue_amt + today_amt, status, tone, f"{paid_rows} من {row_count} قسطًا",
+                            remaining, remaining > 0))
+    # The page carries the window totals; only an empty page has to ask for them on their own
+    kpis = ListKpis(*page[0][11:]) if page else ListKpis(*con.execute(_KPI_SQL, args).fetchone())
+    return ListView(kpis, tuple(rows))
 
 
 def invoices_without_contract(con: sqlite3.Connection) -> list[tuple]:
