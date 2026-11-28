@@ -475,3 +475,11 @@ class StreamingVaultTest(unittest.TestCase):
             vault.open_vault(self.sealed, out, dek=self.dek)
         self.assertFalse(out.exists())
         self.assertEqual(self._leftovers(), [])
+
+    def test_a_killed_restore_leaves_no_plaintext_part_for_the_next_one(self):
+        vault.seal(self.plain, self.sealed, self.dek, self.ring)
+        staged = self.dir / "morv_tires.db.restore-new"
+        orphan = vault.part_path(staged)
+        orphan.write_bytes(b"plaintext from a restore that was killed mid-stream")
+        backup._discard(staged)
+        self.assertFalse(orphan.exists(), "an interrupted restore must not leave decrypted bytes behind")

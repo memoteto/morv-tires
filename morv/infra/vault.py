@@ -134,6 +134,12 @@ def unlock(ring: dict, secret: str) -> bytes:
 
 # ---------- Reading and writing the file ----------
 
+def part_path(out_path) -> Path:
+    """The half-written twin a killed seal or restore leaves behind, so callers can clear it too."""
+    out = Path(out_path)
+    return out.with_name(out.name + ".part")
+
+
 def _hash_file(path) -> tuple[str, int]:
     h = hashlib.sha256()
     size = 0
@@ -159,7 +165,7 @@ def seal(plain_path, out_path, dek: bytes, ring: dict, meta: dict | None = None)
     }
     header.update(meta or {})
     hdr = json.dumps(header, ensure_ascii=False, sort_keys=True).encode("utf-8")
-    part = out.with_suffix(out.suffix + ".part")
+    part = part_path(out)
     try:
         with open(src, "rb") as fin, open(part, "wb") as f:
             f.write(MAGIC)
@@ -261,7 +267,7 @@ def opens_with(vault_path, dek: bytes) -> bool:
 def open_vault(vault_path, out_plain_path, *, dek: bytes | None = None, secret: str | None = None) -> dict:
     """Decrypts into a .part file first; the plaintext appears only once every check has passed."""
     out = Path(out_plain_path)
-    part = Path(str(out) + ".part")
+    part = part_path(out)
     try:
         f = open(vault_path, "rb")
     except OSError as e:

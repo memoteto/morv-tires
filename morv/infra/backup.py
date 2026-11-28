@@ -412,7 +412,7 @@ def _sidecars(db: Path) -> list[Path]:
 
 
 def _discard(path: Path) -> None:
-    for f in (path, *_sidecars(path)):
+    for f in (path, vault.part_path(path), *_sidecars(path)):   # A killed restore leaves plaintext in the .part
         try:
             f.unlink(missing_ok=True)
         except OSError:
