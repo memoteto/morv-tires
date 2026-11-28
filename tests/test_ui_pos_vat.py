@@ -159,7 +159,25 @@ class PosVatTest(_Fixture, unittest.TestCase):
         self.assertTrue(p.tax_inclusive.isVisible())
         self.assertTrue(p.tax_inclusive.isChecked())
         self.assertTrue(p._line_table.sale_tax_visible)
-        self.assertTrue(p._rows[0]["tax_lbl"].isVisibleTo(p))
+        cell = p._rows[0]["tax_lbl"]
+        if not cell.isVisibleTo(p):
+            def visibility_chain():
+                chain = []
+                widget = cell
+                while widget is not None:
+                    chain.append((type(widget).__name__, widget.objectName(),
+                                  widget.isHidden(), widget.isVisible(), widget.isVisibleTo(p)))
+                    if widget is p:
+                        break
+                    widget = widget.parentWidget()
+                return chain
+
+            # Preserve the failing condition; distinguish queued show events from explicit hiding.
+            before = visibility_chain()
+            self.app.processEvents()
+            after = visibility_chain()
+            self.fail(f"VAT_VISIBILITY_DIAG before={before!r} after={after!r}")
+        self.assertTrue(cell.isVisibleTo(p))
         self.assertTrue(p.post_print_btn.isEnabled())
         p.tax_inclusive.setChecked(False)
         with patch("morv.ui.modal.ask", return_value=True):

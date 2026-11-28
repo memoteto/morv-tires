@@ -78,7 +78,8 @@ class PosPage(QWidget):
         summary_layout.setContentsMargins(0, 0, 0, 0)
         summary.setLayout(summary_layout)
         self.invoice_layout = InvoiceWorkspace(
-            primary, summary, self.summary_footer, spacing=16, content_margins=(9, 9, 9, 9))
+            primary, summary, self.summary_footer, spacing=16, content_margins=(9, 9, 9, 9),
+            line_table=self._line_table)
         root.addWidget(self.invoice_layout, 1)
         self._shortcuts()
 
@@ -532,7 +533,7 @@ class PosPage(QWidget):
     # ---------- Lines: one self-contained row per item, added on pick ----------
     def _add_row(self, item_id: int, kind: str, name: str) -> None:
         row_w = QWidget()
-        h = self._line_table.row_layout(row_w)
+        h = self._line_table.sale_row_layout(row_w)
 
         num_lbl = muted("")
         num_lbl.setWordWrap(False)
@@ -600,6 +601,7 @@ class PosPage(QWidget):
         disc_edit.textChanged.connect(self._on_row_changed)
         del_btn.clicked.connect(lambda _=False, rw=row: self._remove_row(rw))
 
+        self._line_table.register_sale_row(row_w, tax_lbl)
         self._rows.append(row)
         self.empty_label.hide()
         # Insert before the trailing stretch (always the layout's last item)

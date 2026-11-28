@@ -167,21 +167,41 @@ class InvoiceLineLayoutTest(PosFixture):
         self.assertTrue(page._line_table.sale_tax_visible)
         header = page._line_table.headers[5]
         self.assertEqual(header.text(), "الضريبة")
+        discount_header = page._line_table.headers[4]
+        page._rows[0]["disc_edit"].setText("25.00")
         for width, height in ((1024, 640), (1366, 768), (1920, 1080)):
             win.resize(width, height)
             self.settle()
             self.fits(page.invoice_layout, "POS_VAT_HORIZONTAL_OVERFLOW")
             self.approval_reachable(page, page.invoice_layout)
+            compact = page._line_table.compact_sale_discount
+            if width == 1024:
+                self.assertTrue(compact)
+            elif width == 1920:
+                self.assertFalse(compact)
+            self.assertEqual(discount_header.isVisibleTo(page), not compact)
+            self.assertEqual(page._rows[0]["disc_edit"].text(), "25.00")
             for row in page._rows:
+                self.assertTrue(row["disc_edit"].isVisibleTo(page))
+                if not compact:
+                    self.assertLessEqual(abs(row["disc_edit"].mapTo(page, QPoint()).x()
+                                             - discount_header.mapTo(page, QPoint()).x()), 1)
                 cell = row["tax_lbl"]
                 self.assertTrue(cell.isVisibleTo(page))
                 self.assertEqual(cell.width(), header.width())
                 self.assertLessEqual(abs(cell.mapTo(page, QPoint()).x()
                                          - header.mapTo(page, QPoint()).x()), 1)
+        win.resize(1024, 640)
+        self.settle()
+        self.assertTrue(page._line_table.compact_sale_discount)
         settings.put(self.con, "tax.enabled", "0")
         page.refresh()
         self.settle()
         self.assertFalse(page._line_table.sale_tax_visible)
+        self.assertFalse(page._line_table.compact_sale_discount)
+        self.assertTrue(discount_header.isVisibleTo(page))
+        self.fits(page.invoice_layout, "POS_VAT_DISABLED_HORIZONTAL_OVERFLOW")
+        self.assertEqual(page._rows[0]["disc_edit"].text(), "25.00")
         self.assertTrue(all(row["tax_lbl"].isHidden() for row in page._rows))
         self.assertEqual(page._line_table.headers[5].text(), "الإجمالي")
         self.assertEqual(len(page._rows), 4)
