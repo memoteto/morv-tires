@@ -22,7 +22,8 @@ def _parentless_show_watcher():
             self.seen = []
 
         def eventFilter(self, obj, event):
-            if event.type() == QEvent.Type.Show and isinstance(obj, QWidget) and obj.parentWidget() is None:
+            if (event.type() == QEvent.Type.Show and isinstance(obj, QWidget)
+                    and shiboken6.isValid(obj) and obj.parentWidget() is None):
                 text = obj.text()[:40] if hasattr(obj, "text") else ""
                 self.seen.append((obj, f"{type(obj).__name__}({text})"))   # Read now: Qt may delete it later
             return False
@@ -89,13 +90,19 @@ class TransientWindowTest(unittest.TestCase):
         self.assertTrue(self.session.can("installments.manage"),
                         "the manager must hold this, or the installments buttons prove nothing")
         watch = _parentless_show_watcher()
+        window = None
         self.app.installEventFilter(watch)
-        self.addCleanup(self.app.removeEventFilter, watch)
-        w = MainWindow(self.session, self.app)
-        w.health_timer.stop()
-        self.addCleanup(dispose, w, self.app)
-        w.show()
-        for key, *_ in NAV:
-            w.go_key(key)
-            self.app.processEvents()
-        self.assertEqual(watch.offenders(), [], "these were shown before anything owned them")
+        try:
+            window = MainWindow(self.session, self.app)
+            window.health_timer.stop()
+            window.show()
+            for key, *_ in NAV:
+                window.go_key(key)
+                self.app.processEvents()
+            found = watch.offenders()
+        finally:
+            # Off before teardown: the filter would inspect widgets Qt is in the middle of destroying
+            self.app.removeEventFilter(watch)
+            if window is not None:
+                dispose(window, self.app)
+        self.assertEqual(found, [], "these were shown before anything owned them")
