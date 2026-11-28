@@ -4,14 +4,14 @@ from datetime import date, datetime
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QPushButton, QSpinBox,
                                QVBoxLayout, QWidget)
 
 from morv.core import sales_rules
 from morv.core.money import MoneyError, fmt, parse_money
 from morv.core.text import ltr
-from morv.infra import customer_receipts, customers, items, sale_view, sales, users
+from morv.infra import customer_receipts, customers, items, sale_view, sales, settings, users
 from morv.infra.sales import SaleError, SaleLineIn
 from morv.ui import icons, tokens
 from morv.ui.adaptive_layout import HeaderPlacement, InvoiceWorkspace
@@ -57,6 +57,9 @@ class PosPage(QWidget):
         self._request_key = uuid.uuid4().hex     # One key per invoice: pressing again cannot duplicate it
         self.tier = "retail"
         self._kind = None
+        self._tax_enabled = settings.get(session.con, "tax.enabled", "0") == "1"
+        self._tax_quote = None
+        self._tax_error = None
 
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 14, 20, 8)
@@ -238,10 +241,16 @@ class PosPage(QWidget):
 
     def _summary_card(self) -> QFrame:
         box, body, head = section_card("ملخص الفاتورة والدفع", "sales", compact=True)
-        # The shop is not tax-registered, so tax is a fixed fact in the header rather than a row
-        tax = chip("بدون ضريبة")
-        tax.setToolTip("الضريبة: المحل غير مسجّل — بدون ضريبة")
-        head.addWidget(tax)
+        self.no_tax_chip = chip("بدون ضريبة")
+        self.no_tax_chip.setToolTip("الضريبة: المحل غير مسجّل — بدون ضريبة")
+        head.addWidget(self.no_tax_chip)
+        self.tax_inclusive = QCheckBox("شامل الضريبة")
+        self.tax_inclusive.setChecked(True)
+        self.tax_inclusive.setToolTip("محدد: الضريبة ضمن السعر. غير محدد: تضاف إلى السعر.")
+        head.addWidget(self.tax_inclusive)
+        self.no_tax_chip.setVisible(not self._tax_enabled)
+        self.tax_inclusive.setVisible(self._tax_enabled)
+        self.tax_inclusive.toggled.connect(self._refresh_total)
         self.subtotal_label = QLabel()
         self.invoice_disc = ltr_edit("0.00")
         self.invoice_disc.setFixedWidth(150)
@@ -249,6 +258,11 @@ class PosPage(QWidget):
         for label, w in (("الإجمالي قبل الخصم", self.subtotal_label),
                           ("خصم على الفاتورة", self.invoice_disc)):
             body.addWidget(kv_row(label, w))
+        self.tax_value = QLabel()
+        self.tax_row = kv_row("منها ضريبة القيمة المضافة", self.tax_value)
+        self.tax_caption = self.tax_row.layout().itemAt(0).widget()
+        body.addWidget(self.tax_row)
+        self.tax_row.setVisible(self._tax_enabled)
         self.summary_footer = InvoiceFooter()
         footer = self.summary_footer.layout()
         self.total_box = InvoiceTotal(
@@ -660,17 +674,63 @@ class PosPage(QWidget):
         return total
 
     def total_minor(self) -> int:
-        """Total after line and invoice discounts, in piasters, as the engine computes it."""
+        """Gross payable in piasters; never use an invalid VAT preview for payment."""
+        if self._tax_enabled:
+            if self._tax_error:
+                raise SaleError(self._tax_error)
+            return self._tax_quote.total if self._tax_quote is not None else 0
         try:
             inv_disc = parse_money(self.invoice_disc.text() or "0")
         except MoneyError:
             inv_disc = 0
         return self.subtotal_minor() - self._line_discount_minor() - inv_disc
 
+    def refresh(self) -> None:
+        """Re-read tax settings and item treatments when returning to this page."""
+        self._refresh_total()
+
     def _refresh_total(self, *_args) -> None:
-        total = self.total_minor()
+        enabled = settings.get(self.session.con, "tax.enabled", "0") == "1"
+        if enabled != self._tax_enabled:
+            self._tax_enabled = enabled
+            self.tax_inclusive.blockSignals(True)
+            self.tax_inclusive.setChecked(True)
+            self.tax_inclusive.blockSignals(False)
+        self.no_tax_chip.setVisible(not enabled)
+        self.tax_inclusive.setVisible(enabled)
+        self.tax_row.setVisible(enabled)
+        # VAT document rendering is a separate stage; do not print an incomplete
+        # tax invoice from this experimental flow.
+        self.post_print_btn.setEnabled(not enabled)
+        self.post_print_btn.setToolTip("طباعة الفاتورة الضريبية في المرحلة التالية" if enabled else "")
+        self._tax_quote = None
+        self._tax_error = None
         self.subtotal_label.setText(ltr(fmt(self.subtotal_minor())))
-        self.total_label.setText(f"{ltr(fmt(total))} ج.م")
+        if enabled:
+            self.tax_caption.setText("منها ضريبة القيمة المضافة" if self.tax_inclusive.isChecked()
+                                     else "ضريبة القيمة المضافة")
+            try:
+                discount = parse_money(self.invoice_disc.text() or "0")
+                if self._rows:
+                    lines, error = self._validate_lines()
+                    if error:
+                        raise SaleError(error)
+                    self._tax_quote = sales.compute_sale_totals(
+                        self.session.con, lines, discount,
+                        prices_tax_inclusive=self.tax_inclusive.isChecked())
+                elif discount != 0:
+                    raise SaleError("الخصم أكبر من قيمة السطور")
+            except (MoneyError, SaleError) as e:
+                self._tax_error = str(e)
+            self.tax_value.setText("—" if self._tax_error else ltr(fmt(
+                self._tax_quote.tax_total if self._tax_quote is not None else 0)))
+            self.tax_value.setToolTip(self._tax_error or "")
+        try:
+            total = self.total_minor()
+        except SaleError:
+            self.total_label.setText("—")
+        else:
+            self.total_label.setText(f"{ltr(fmt(total))} ج.م")
         self._refresh_change()
 
     def _payment_parts(self, total: int) -> list[tuple]:
@@ -699,7 +759,7 @@ class PosPage(QWidget):
     def _fill_exact_cash(self, *_args) -> None:
         try:
             due = self._cash_due()
-        except (MoneyError, sales_rules.SaleRuleError):
+        except (MoneyError, SaleError, sales_rules.SaleRuleError):
             return
         if due > 0:
             self.pay1_received.setText(f"{due // 100}.{due % 100:02d}")
@@ -732,7 +792,7 @@ class PosPage(QWidget):
     def _refresh_change(self, *_args) -> None:
         try:
             due = self._cash_due()
-        except (MoneyError, sales_rules.SaleRuleError):
+        except (MoneyError, SaleError, sales_rules.SaleRuleError):
             due = 0
         self.total_box.setEnabled(due > 0)
         self.total_box.setCursor(Qt.CursorShape.PointingHandCursor if due > 0 else Qt.CursorShape.ArrowCursor)
@@ -782,9 +842,23 @@ class PosPage(QWidget):
             self._fail(err)
             return
         try:
-            total = self.total_minor()
-            payments = self._payments(total)
+            enabled = settings.get(self.session.con, "tax.enabled", "0") == "1"
+            if enabled != self._tax_enabled:
+                self._refresh_total()
+                self._fail("تغيّر إعداد الضريبة؛ راجع الإجمالي ثم اعتمد مرة أخرى.")
+                return
+            if enabled and and_print:
+                self._fail("طباعة الفاتورة الضريبية لم تكتمل بعد؛ استخدم الاعتماد فقط.")
+                return
+            basis = self.tax_inclusive.isChecked() if enabled else None
             inv_disc = parse_money(self.invoice_disc.text() or "0")
+            quote = sales.compute_sale_totals(self.session.con, lines, inv_disc,
+                                              prices_tax_inclusive=basis)
+            if enabled and quote != self._tax_quote:
+                self._refresh_total()
+                self._fail("تغيّر الحساب الضريبي؛ راجع الإجمالي ثم اعتمد مرة أخرى.")
+                return
+            payments = self._payments(quote.total)
             odometer = int(self.odometer.text()) if self.odometer.text().strip() else None
         except (MoneyError, ValueError, sales_rules.SaleRuleError) as e:
             self._fail(f"تحقق من المدخلات: {e}")
@@ -798,8 +872,10 @@ class PosPage(QWidget):
                 customer_id=customer[0] or None, lines=lines, payments=payments,
                 sale_date=self._stamp(), invoice_discount=inv_disc,
                 odometer=odometer, vehicle_plate=self.plate.text().strip() or None,
-                notes=self.note.text().strip() or None)
+                notes=self.note.text().strip() or None,
+                prices_tax_inclusive=basis, expected_totals=quote)
         except (SaleError, sales_rules.SaleRuleError) as e:
+            self._refresh_total()
             self._fail(f"لم تُرحَّل الفاتورة: {e}")
         except Exception as e:      # Any unexpected failure: the engine is atomic, so nothing half-written remains
             self._fail(f"تعذّر الترحيل ولم يُحفظ شيء ({type(e).__name__}). أعد المحاولة أو راجع السجل.")
@@ -835,6 +911,9 @@ class PosPage(QWidget):
             self._rows_container.removeWidget(row["widget"])
             row["widget"].deleteLater()
         self._rows.clear()
+        self.tax_inclusive.blockSignals(True)
+        self.tax_inclusive.setChecked(True)
+        self.tax_inclusive.blockSignals(False)
         self.empty_label.show()
         self.odometer.clear()
         self.plate.clear()
@@ -862,6 +941,7 @@ class PosPage(QWidget):
             or self.tier != "retail"
             or self.pay1_method.currentData() != "cash"
             or self.split_btn.isChecked()
+            or (self._tax_enabled and not self.tax_inclusive.isChecked())
             or any(widget.text().strip() for widget in (
                 self.note, self.plate, self.odometer,
                 self.invoice_disc, self.pay1_received,

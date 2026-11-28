@@ -213,7 +213,8 @@ def next_number_preview(con: sqlite3.Connection) -> str:
 def post_sale(con: sqlite3.Connection, by, *, request_key: str, customer_id: int | None, lines: list,
               payments: list, sale_date: str | None = None, invoice_discount: int = 0,
               odometer: int | None = None, vehicle_plate: str | None = None,
-              notes: str | None = None, prices_tax_inclusive: bool | None = None) -> PostedSale:
+              notes: str | None = None, prices_tax_inclusive: bool | None = None,
+              expected_totals: SaleTotals | None = None) -> PostedSale:
     if by is None or not has_permission(con, by, "sales.post"):
         raise SaleError("لا تملك صلاحية ترحيل فواتير البيع")
     key = (request_key or "").strip()
@@ -248,6 +249,10 @@ def post_sale(con: sqlite3.Connection, by, *, request_key: str, customer_id: int
         kinds = _check_items(con, shaped)
         totals = compute_sale_totals(con, shaped, invoice_discount,
                                      prices_tax_inclusive=prices_tax_inclusive)
+        # Compare inside the write transaction, including tax treatment/rate,
+        # not just gross payable (inclusive VAT can change without changing cash).
+        if expected_totals is not None and totals != expected_totals:
+            raise SaleError("تغيّر حساب الفاتورة؛ راجع الإجمالي والضريبة ثم اعتمد مرة أخرى")
         total = totals.total
         if totals.tax_enabled:
             h = vat_hash
