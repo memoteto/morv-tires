@@ -1,0 +1,347 @@
+SCREEN 1366x768: available 1366x768
+SCREEN 1920x1080: available 1920x1080
+SCREEN 1093x614: available 1093x614
+CLIPPED form_purchase_vat_exclusive_no_freight_1366x768_light: window [1366, 728]: button '%' at (910,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1366x768_light: window [1366, 728]: button '%' at (910,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1366x768_light: window [1366, 728]: button '%' at (910,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1366x768_light: window [1366, 728]: button '%' at (910,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1366x768_light: window [1366, 728]: button 'إدخال الأرصدة الافتتاحية وعكسها' at (420,725) 303x21 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1366x768_dark: window [1366, 728]: button '%' at (910,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1366x768_dark: window [1366, 728]: button '%' at (910,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1366x768_dark: window [1366, 728]: button '%' at (910,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1366x768_dark: window [1366, 728]: button '%' at (910,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1366x768_dark: window [1366, 728]: button 'إدخال الأرصدة الافتتاحية وعكسها' at (420,725) 303x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_inclusive_1093x614_light: window [1093, 574]: button 'تفاصيل المركبة والملاحظة' at (69,-68) 157x28 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_inclusive_1093x614_light: window [1093, 574]: button 'تقسيم الدفع على وسيلتين' at (52,583) 162x28 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_inclusive_1093x614_light: window [1093, 574]: button '⁦12,600.00⁩' at (517,726) 447x32 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_inclusive_1093x614_light: window [1093, 574]: button '⁦13,000.00⁩' at (65,726) 446x32 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_exclusive_1093x614_light: window [1093, 574]: button 'تفاصيل المركبة والملاحظة' at (69,-68) 157x28 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_exclusive_1093x614_light: window [1093, 574]: button 'تقسيم الدفع على وسيلتين' at (52,583) 162x28 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_exclusive_1093x614_light: window [1093, 574]: button '⁦14,400.00⁩' at (517,726) 447x32 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_exclusive_1093x614_light: window [1093, 574]: button '⁦14,500.00⁩' at (65,726) 446x32 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_light: window [1093, 574]: button '%' at (809,580) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_light: window [1093, 574]: button '−' at (460,628) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_light: window [1093, 574]: button '+' at (345,628) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_light: window [1093, 574]: button '%' at (809,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_light: window [1093, 574]: button 'ج.م' at (43,939) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_light: window [1093, 574]: button 'تفاصيل الفاتورة والملاحظة' at (60,-323) 158x28 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_light: window [1093, 574]: button 'صنف جديد' at (47,-194) 91x40 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_light: window [1093, 574]: button '−' at (460,-102) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_light: window [1093, 574]: button '+' at (345,-102) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_light: window [1093, 574]: button '%' at (809,-20) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_light: window [1093, 574]: button '%' at (809,580) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_light: window [1093, 574]: button '−' at (460,628) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_light: window [1093, 574]: button '+' at (345,628) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_light: window [1093, 574]: button '%' at (809,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_light: window [1093, 574]: button 'ج.م' at (43,939) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_light: window [1093, 574]: button 'تفاصيل الفاتورة والملاحظة' at (60,-414) 158x28 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_light: window [1093, 574]: button 'صنف جديد' at (47,-285) 91x40 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_light: window [1093, 574]: button '−' at (460,-193) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_light: window [1093, 574]: button '+' at (345,-193) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_light: window [1093, 574]: button '%' at (809,-111) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_light: window [1093, 574]: button '−' at (460,-63) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_light: window [1093, 574]: button '+' at (345,-63) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_1093x614_light: window [1093, 574]: button '−' at (460,590) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_1093x614_light: window [1093, 574]: button '+' at (345,590) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_1093x614_light: window [1093, 574]: button '%' at (809,634) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_1093x614_light: window [1093, 574]: button 'ج.م' at (43,863) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_summary_1093x614_light: window [1093, 574]: button 'تفاصيل الفاتورة والملاحظة' at (60,-257) 158x28 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_summary_1093x614_light: window [1093, 574]: button 'صنف جديد' at (47,-128) 91x40 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_summary_1093x614_light: window [1093, 574]: button '−' at (460,-36) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_summary_1093x614_light: window [1093, 574]: button '+' at (345,-36) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_1093x614_light: window [1093, 574]: button '−' at (460,590) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_1093x614_light: window [1093, 574]: button '+' at (345,590) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_1093x614_light: window [1093, 574]: button '%' at (809,634) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_1093x614_light: window [1093, 574]: button 'ج.م' at (43,863) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_light: window [1093, 574]: button 'تفاصيل الفاتورة والملاحظة' at (60,-338) 158x28 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_light: window [1093, 574]: button 'صنف جديد' at (47,-209) 91x40 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_light: window [1093, 574]: button '−' at (460,-117) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_light: window [1093, 574]: button '+' at (345,-117) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_light: window [1093, 574]: button '%' at (809,-73) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_light: window [1093, 574]: button '−' at (460,-25) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_light: window [1093, 574]: button '+' at (345,-25) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_1093x614_light: window [1093, 574]: button 'النسخ الاحتياطي والاستعادة' at (539,559) 439x40 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_sidebar_open_1093x614_light: window [1093, 574]: button 'النسخ الاحتياطي والاستعادة' at (453,559) 353x40 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_printing_1093x614_light: window [1093, 574]: button 'طباعة صفحة تجريبية' at (235,651) 159x40 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'الاطلاع على الخزينة وحركة الأموال' at (372,563) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'تسجيل حركات الخزينة وإدارة الشركاء' at (372,590) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'الاطلاع على التقارير المالية' at (372,617) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'حصص الشركاء وتوزيع الأرباح' at (372,644) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'قفل الفترة المالية وفتحها' at (372,671) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'إقفال الصندوق اليومي وإلغاء الإقفال' at (372,698) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'إدخال الأرصدة الافتتاحية وعكسها' at (372,725) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'المستخدمون والصلاحيات' at (75,563) 255x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'الإعدادات العامة' at (75,590) 255x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_light: window [1093, 574]: button 'الاستعادة من نسخة احتياطية' at (75,617) 255x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_inclusive_1093x614_dark: window [1093, 574]: button 'تفاصيل المركبة والملاحظة' at (69,-68) 157x28 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_inclusive_1093x614_dark: window [1093, 574]: button 'تقسيم الدفع على وسيلتين' at (52,583) 162x28 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_inclusive_1093x614_dark: window [1093, 574]: button '⁦12,600.00⁩' at (517,726) 447x32 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_inclusive_1093x614_dark: window [1093, 574]: button '⁦13,000.00⁩' at (65,726) 446x32 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_exclusive_1093x614_dark: window [1093, 574]: button 'تفاصيل المركبة والملاحظة' at (69,-68) 157x28 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_exclusive_1093x614_dark: window [1093, 574]: button 'تقسيم الدفع على وسيلتين' at (52,583) 162x28 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_exclusive_1093x614_dark: window [1093, 574]: button '⁦14,400.00⁩' at (517,726) 447x32 - inside a scroll area (reachable by scrolling)
+CLIPPED page_pos_vat_exclusive_1093x614_dark: window [1093, 574]: button '⁦14,500.00⁩' at (65,726) 446x32 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_dark: window [1093, 574]: button '%' at (809,580) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_dark: window [1093, 574]: button '−' at (460,628) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_dark: window [1093, 574]: button '+' at (345,628) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_dark: window [1093, 574]: button '%' at (809,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_1093x614_dark: window [1093, 574]: button 'ج.م' at (43,939) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_dark: window [1093, 574]: button 'تفاصيل الفاتورة والملاحظة' at (60,-323) 158x28 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_dark: window [1093, 574]: button 'صنف جديد' at (47,-194) 91x40 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_dark: window [1093, 574]: button '−' at (460,-102) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_dark: window [1093, 574]: button '+' at (345,-102) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_no_freight_summary_1093x614_dark: window [1093, 574]: button '%' at (809,-20) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_dark: window [1093, 574]: button '%' at (809,580) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_dark: window [1093, 574]: button '−' at (460,628) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_dark: window [1093, 574]: button '+' at (345,628) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_dark: window [1093, 574]: button '%' at (809,710) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_1093x614_dark: window [1093, 574]: button 'ج.م' at (43,939) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_dark: window [1093, 574]: button 'تفاصيل الفاتورة والملاحظة' at (60,-414) 158x28 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_dark: window [1093, 574]: button 'صنف جديد' at (47,-285) 91x40 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_dark: window [1093, 574]: button '−' at (460,-193) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_dark: window [1093, 574]: button '+' at (345,-193) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_dark: window [1093, 574]: button '%' at (809,-111) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_dark: window [1093, 574]: button '−' at (460,-63) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_exclusive_freight_summary_1093x614_dark: window [1093, 574]: button '+' at (345,-63) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_1093x614_dark: window [1093, 574]: button '−' at (460,590) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_1093x614_dark: window [1093, 574]: button '+' at (345,590) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_1093x614_dark: window [1093, 574]: button '%' at (809,634) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_1093x614_dark: window [1093, 574]: button 'ج.م' at (43,863) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_summary_1093x614_dark: window [1093, 574]: button 'تفاصيل الفاتورة والملاحظة' at (60,-257) 158x28 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_summary_1093x614_dark: window [1093, 574]: button 'صنف جديد' at (47,-128) 91x40 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_summary_1093x614_dark: window [1093, 574]: button '−' at (460,-36) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_no_freight_summary_1093x614_dark: window [1093, 574]: button '+' at (345,-36) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_1093x614_dark: window [1093, 574]: button '−' at (460,590) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_1093x614_dark: window [1093, 574]: button '+' at (345,590) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_1093x614_dark: window [1093, 574]: button '%' at (809,634) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_1093x614_dark: window [1093, 574]: button 'ج.م' at (43,863) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_dark: window [1093, 574]: button 'تفاصيل الفاتورة والملاحظة' at (60,-338) 158x28 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_dark: window [1093, 574]: button 'صنف جديد' at (47,-209) 91x40 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_dark: window [1093, 574]: button '−' at (460,-117) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_dark: window [1093, 574]: button '+' at (345,-117) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_dark: window [1093, 574]: button '%' at (809,-73) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_dark: window [1093, 574]: button '−' at (460,-25) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED form_purchase_vat_inclusive_freight_summary_1093x614_dark: window [1093, 574]: button '+' at (345,-25) 30x30 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_1093x614_dark: window [1093, 574]: button 'النسخ الاحتياطي والاستعادة' at (539,559) 439x40 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_sidebar_open_1093x614_dark: window [1093, 574]: button 'النسخ الاحتياطي والاستعادة' at (453,559) 353x40 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_printing_1093x614_dark: window [1093, 574]: button 'طباعة صفحة تجريبية' at (235,651) 159x40 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'الاطلاع على الخزينة وحركة الأموال' at (372,563) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'تسجيل حركات الخزينة وإدارة الشركاء' at (372,590) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'الاطلاع على التقارير المالية' at (372,617) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'حصص الشركاء وتوزيع الأرباح' at (372,644) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'قفل الفترة المالية وفتحها' at (372,671) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'إقفال الصندوق اليومي وإلغاء الإقفال' at (372,698) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'إدخال الأرصدة الافتتاحية وعكسها' at (372,725) 256x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'المستخدمون والصلاحيات' at (75,563) 255x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'الإعدادات العامة' at (75,590) 255x21 - inside a scroll area (reachable by scrolling)
+CLIPPED page_settings_tab_users_1093x614_dark: window [1093, 574]: button 'الاستعادة من نسخة احتياطية' at (75,617) 255x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_purchase_vat_1366x768_light: dialog 560x708 on screen height 768
+TALL dlg_purchase_vat_lines_1366x768_light: dialog 560x708 on screen height 768
+TALL dlg_supplier_expanded_1366x768_light: dialog 600x708 on screen height 768
+CLIPPED dlg_supplier_vat_1366x768_light: window [600, 708]: button 'بيانات إضافية (اختيارية)' at (31,-2) 546x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_supplier_vat_1366x768_light: dialog 600x708 on screen height 768
+CLIPPED dlg_item_vat_tire_standard_1366x768_light: window [700, 708]: button 'إطار' at (560,-489) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_light: window [700, 708]: button 'بطارية' at (488,-489) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_light: window [700, 708]: button 'خدمة' at (420,-489) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_light: window [700, 708]: button 'نعم' at (40,-182) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_light: window [700, 708]: button 'نعم' at (40,-101) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_light: window [700, 708]: button 'نعم' at (40,-70) 491x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_standard_1366x768_light: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_tire_exempt_1366x768_light: window [700, 708]: button 'إطار' at (560,-489) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_light: window [700, 708]: button 'بطارية' at (488,-489) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_light: window [700, 708]: button 'خدمة' at (420,-489) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_light: window [700, 708]: button 'نعم' at (40,-182) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_light: window [700, 708]: button 'نعم' at (40,-101) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_light: window [700, 708]: button 'نعم' at (40,-70) 491x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_exempt_1366x768_light: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_battery_standard_1366x768_light: window [700, 708]: button 'إطار' at (560,-527) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1366x768_light: window [700, 708]: button 'بطارية' at (488,-527) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1366x768_light: window [700, 708]: button 'خدمة' at (420,-527) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_standard_1366x768_light: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_battery_exempt_1366x768_light: window [700, 708]: button 'إطار' at (560,-527) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1366x768_light: window [700, 708]: button 'بطارية' at (488,-527) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1366x768_light: window [700, 708]: button 'خدمة' at (420,-527) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_exempt_1366x768_light: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_service_standard_1366x768_light: window [700, 708]: button 'إطار' at (560,-6) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_standard_1366x768_light: window [700, 708]: button 'بطارية' at (488,-6) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_standard_1366x768_light: window [700, 708]: button 'خدمة' at (420,-6) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_service_standard_1366x768_light: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_service_exempt_1366x768_light: window [700, 708]: button 'إطار' at (560,-6) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_exempt_1366x768_light: window [700, 708]: button 'بطارية' at (488,-6) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_exempt_1366x768_light: window [700, 708]: button 'خدمة' at (420,-6) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_service_exempt_1366x768_light: dialog 700x708 on screen height 768
+TALL dlg_vat_print_preview_1366x768_light: dialog 1100x708 on screen height 768
+TALL dlg_item_1366x768_light: dialog 700x708 on screen height 768
+TALL dlg_purchase_vat_1366x768_dark: dialog 560x708 on screen height 768
+TALL dlg_purchase_vat_lines_1366x768_dark: dialog 560x708 on screen height 768
+TALL dlg_supplier_expanded_1366x768_dark: dialog 600x708 on screen height 768
+CLIPPED dlg_supplier_vat_1366x768_dark: window [600, 708]: button 'بيانات إضافية (اختيارية)' at (31,-2) 546x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_supplier_vat_1366x768_dark: dialog 600x708 on screen height 768
+CLIPPED dlg_item_vat_tire_standard_1366x768_dark: window [700, 708]: button 'إطار' at (560,-489) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_dark: window [700, 708]: button 'بطارية' at (488,-489) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_dark: window [700, 708]: button 'خدمة' at (420,-489) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_dark: window [700, 708]: button 'نعم' at (40,-182) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_dark: window [700, 708]: button 'نعم' at (40,-101) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1366x768_dark: window [700, 708]: button 'نعم' at (40,-70) 491x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_standard_1366x768_dark: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_tire_exempt_1366x768_dark: window [700, 708]: button 'إطار' at (560,-489) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_dark: window [700, 708]: button 'بطارية' at (488,-489) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_dark: window [700, 708]: button 'خدمة' at (420,-489) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_dark: window [700, 708]: button 'نعم' at (40,-182) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_dark: window [700, 708]: button 'نعم' at (40,-101) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1366x768_dark: window [700, 708]: button 'نعم' at (40,-70) 491x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_exempt_1366x768_dark: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_battery_standard_1366x768_dark: window [700, 708]: button 'إطار' at (560,-527) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1366x768_dark: window [700, 708]: button 'بطارية' at (488,-527) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1366x768_dark: window [700, 708]: button 'خدمة' at (420,-527) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_standard_1366x768_dark: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_battery_exempt_1366x768_dark: window [700, 708]: button 'إطار' at (560,-527) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1366x768_dark: window [700, 708]: button 'بطارية' at (488,-527) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1366x768_dark: window [700, 708]: button 'خدمة' at (420,-527) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_exempt_1366x768_dark: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_service_standard_1366x768_dark: window [700, 708]: button 'إطار' at (560,-6) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_standard_1366x768_dark: window [700, 708]: button 'بطارية' at (488,-6) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_standard_1366x768_dark: window [700, 708]: button 'خدمة' at (420,-6) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_service_standard_1366x768_dark: dialog 700x708 on screen height 768
+CLIPPED dlg_item_vat_service_exempt_1366x768_dark: window [700, 708]: button 'إطار' at (560,-6) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_exempt_1366x768_dark: window [700, 708]: button 'بطارية' at (488,-6) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_exempt_1366x768_dark: window [700, 708]: button 'خدمة' at (420,-6) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_service_exempt_1366x768_dark: dialog 700x708 on screen height 768
+TALL dlg_vat_print_preview_1366x768_dark: dialog 1100x708 on screen height 768
+TALL dlg_item_1366x768_dark: dialog 700x708 on screen height 768
+TALL dlg_supplier_expanded_1920x1080_light: dialog 600x1020 on screen height 1080
+TALL dlg_supplier_vat_1920x1080_light: dialog 600x1020 on screen height 1080
+CLIPPED dlg_item_vat_tire_standard_1920x1080_light: window [700, 1020]: button 'إطار' at (560,-177) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1920x1080_light: window [700, 1020]: button 'بطارية' at (488,-177) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1920x1080_light: window [700, 1020]: button 'خدمة' at (420,-177) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_standard_1920x1080_light: dialog 700x1020 on screen height 1080
+CLIPPED dlg_item_vat_tire_exempt_1920x1080_light: window [700, 1020]: button 'إطار' at (560,-177) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1920x1080_light: window [700, 1020]: button 'بطارية' at (488,-177) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1920x1080_light: window [700, 1020]: button 'خدمة' at (420,-177) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_exempt_1920x1080_light: dialog 700x1020 on screen height 1080
+CLIPPED dlg_item_vat_battery_standard_1920x1080_light: window [700, 1020]: button 'إطار' at (560,-215) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1920x1080_light: window [700, 1020]: button 'بطارية' at (488,-215) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1920x1080_light: window [700, 1020]: button 'خدمة' at (420,-215) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_standard_1920x1080_light: dialog 700x1020 on screen height 1080
+CLIPPED dlg_item_vat_battery_exempt_1920x1080_light: window [700, 1020]: button 'إطار' at (560,-215) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1920x1080_light: window [700, 1020]: button 'بطارية' at (488,-215) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1920x1080_light: window [700, 1020]: button 'خدمة' at (420,-215) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_exempt_1920x1080_light: dialog 700x1020 on screen height 1080
+TALL dlg_vat_print_preview_1920x1080_light: dialog 1100x1020 on screen height 1080
+TALL dlg_item_1920x1080_light: dialog 700x1020 on screen height 1080
+TALL dlg_supplier_expanded_1920x1080_dark: dialog 600x1020 on screen height 1080
+TALL dlg_supplier_vat_1920x1080_dark: dialog 600x1020 on screen height 1080
+CLIPPED dlg_item_vat_tire_standard_1920x1080_dark: window [700, 1020]: button 'إطار' at (560,-177) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1920x1080_dark: window [700, 1020]: button 'بطارية' at (488,-177) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1920x1080_dark: window [700, 1020]: button 'خدمة' at (420,-177) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_standard_1920x1080_dark: dialog 700x1020 on screen height 1080
+CLIPPED dlg_item_vat_tire_exempt_1920x1080_dark: window [700, 1020]: button 'إطار' at (560,-177) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1920x1080_dark: window [700, 1020]: button 'بطارية' at (488,-177) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1920x1080_dark: window [700, 1020]: button 'خدمة' at (420,-177) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_exempt_1920x1080_dark: dialog 700x1020 on screen height 1080
+CLIPPED dlg_item_vat_battery_standard_1920x1080_dark: window [700, 1020]: button 'إطار' at (560,-215) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1920x1080_dark: window [700, 1020]: button 'بطارية' at (488,-215) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1920x1080_dark: window [700, 1020]: button 'خدمة' at (420,-215) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_standard_1920x1080_dark: dialog 700x1020 on screen height 1080
+CLIPPED dlg_item_vat_battery_exempt_1920x1080_dark: window [700, 1020]: button 'إطار' at (560,-215) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1920x1080_dark: window [700, 1020]: button 'بطارية' at (488,-215) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1920x1080_dark: window [700, 1020]: button 'خدمة' at (420,-215) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_exempt_1920x1080_dark: dialog 700x1020 on screen height 1080
+TALL dlg_vat_print_preview_1920x1080_dark: dialog 1100x1020 on screen height 1080
+TALL dlg_item_1920x1080_dark: dialog 700x1020 on screen height 1080
+TALL dlg_purchase_vat_1093x614_light: dialog 560x554 on screen height 614
+CLIPPED dlg_purchase_vat_lines_1093x614_light: window [560, 554]: button 'الشحن خاضع للضريبة حسب الفاتورة' at (31,-54) 506x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_purchase_vat_lines_1093x614_light: dialog 560x554 on screen height 614
+TALL dlg_supplier_expanded_1093x614_light: dialog 600x554 on screen height 614
+CLIPPED dlg_supplier_vat_1093x614_light: window [600, 554]: button 'بيانات إضافية (اختيارية)' at (31,-156) 546x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_supplier_vat_1093x614_light: dialog 600x554 on screen height 614
+CLIPPED dlg_item_vat_tire_standard_1093x614_light: window [700, 554]: button 'إطار' at (560,-643) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_light: window [700, 554]: button 'بطارية' at (488,-643) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_light: window [700, 554]: button 'خدمة' at (420,-643) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_light: window [700, 554]: button 'نعم' at (40,-336) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_light: window [700, 554]: button 'نعم' at (40,-255) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_light: window [700, 554]: button 'نعم' at (40,-224) 491x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_standard_1093x614_light: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_tire_exempt_1093x614_light: window [700, 554]: button 'إطار' at (560,-643) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_light: window [700, 554]: button 'بطارية' at (488,-643) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_light: window [700, 554]: button 'خدمة' at (420,-643) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_light: window [700, 554]: button 'نعم' at (40,-336) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_light: window [700, 554]: button 'نعم' at (40,-255) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_light: window [700, 554]: button 'نعم' at (40,-224) 491x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_exempt_1093x614_light: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_battery_standard_1093x614_light: window [700, 554]: button 'إطار' at (560,-681) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1093x614_light: window [700, 554]: button 'بطارية' at (488,-681) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1093x614_light: window [700, 554]: button 'خدمة' at (420,-681) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1093x614_light: window [700, 554]: button 'نعم' at (40,-124) 468x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_standard_1093x614_light: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_battery_exempt_1093x614_light: window [700, 554]: button 'إطار' at (560,-681) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1093x614_light: window [700, 554]: button 'بطارية' at (488,-681) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1093x614_light: window [700, 554]: button 'خدمة' at (420,-681) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1093x614_light: window [700, 554]: button 'نعم' at (40,-124) 468x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_exempt_1093x614_light: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_service_standard_1093x614_light: window [700, 554]: button 'إطار' at (560,-150) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_standard_1093x614_light: window [700, 554]: button 'بطارية' at (488,-150) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_standard_1093x614_light: window [700, 554]: button 'خدمة' at (420,-150) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_service_standard_1093x614_light: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_service_exempt_1093x614_light: window [700, 554]: button 'إطار' at (560,-150) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_exempt_1093x614_light: window [700, 554]: button 'بطارية' at (488,-150) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_exempt_1093x614_light: window [700, 554]: button 'خدمة' at (420,-150) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_service_exempt_1093x614_light: dialog 700x554 on screen height 614
+TALL dlg_vat_print_preview_1093x614_light: dialog 1053x554 on screen height 614
+TALL dlg_sale_return_legacy_1093x614_light: dialog 1053x554 on screen height 614
+TALL dlg_sale_return_vat_1093x614_light: dialog 1053x554 on screen height 614
+TALL dlg_purchase_return_legacy_1093x614_light: dialog 1053x554 on screen height 614
+TALL dlg_purchase_return_vat_1093x614_light: dialog 1053x554 on screen height 614
+TALL dlg_opening_balances_1093x614_light: dialog 700x554 on screen height 614
+TALL dlg_stock_adjustment_1093x614_light: dialog 640x554 on screen height 614
+TALL dlg_item_1093x614_light: dialog 700x554 on screen height 614
+CLIPPED dlg_customer_1093x614_light: window [640, 554]: button 'بيانات التقسيط والآجل' at (31,539) 586x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_customer_1093x614_light: dialog 640x554 on screen height 614
+TALL dlg_purchase_vat_1093x614_dark: dialog 560x554 on screen height 614
+CLIPPED dlg_purchase_vat_lines_1093x614_dark: window [560, 554]: button 'الشحن خاضع للضريبة حسب الفاتورة' at (31,-54) 506x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_purchase_vat_lines_1093x614_dark: dialog 560x554 on screen height 614
+TALL dlg_supplier_expanded_1093x614_dark: dialog 600x554 on screen height 614
+CLIPPED dlg_supplier_vat_1093x614_dark: window [600, 554]: button 'بيانات إضافية (اختيارية)' at (31,-156) 546x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_supplier_vat_1093x614_dark: dialog 600x554 on screen height 614
+CLIPPED dlg_item_vat_tire_standard_1093x614_dark: window [700, 554]: button 'إطار' at (560,-643) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_dark: window [700, 554]: button 'بطارية' at (488,-643) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_dark: window [700, 554]: button 'خدمة' at (420,-643) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_dark: window [700, 554]: button 'نعم' at (40,-336) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_dark: window [700, 554]: button 'نعم' at (40,-255) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_standard_1093x614_dark: window [700, 554]: button 'نعم' at (40,-224) 491x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_standard_1093x614_dark: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_tire_exempt_1093x614_dark: window [700, 554]: button 'إطار' at (560,-643) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_dark: window [700, 554]: button 'بطارية' at (488,-643) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_dark: window [700, 554]: button 'خدمة' at (420,-643) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_dark: window [700, 554]: button 'نعم' at (40,-336) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_dark: window [700, 554]: button 'نعم' at (40,-255) 491x21 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_tire_exempt_1093x614_dark: window [700, 554]: button 'نعم' at (40,-224) 491x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_tire_exempt_1093x614_dark: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_battery_standard_1093x614_dark: window [700, 554]: button 'إطار' at (560,-681) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1093x614_dark: window [700, 554]: button 'بطارية' at (488,-681) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1093x614_dark: window [700, 554]: button 'خدمة' at (420,-681) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_standard_1093x614_dark: window [700, 554]: button 'نعم' at (40,-124) 468x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_standard_1093x614_dark: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_battery_exempt_1093x614_dark: window [700, 554]: button 'إطار' at (560,-681) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1093x614_dark: window [700, 554]: button 'بطارية' at (488,-681) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1093x614_dark: window [700, 554]: button 'خدمة' at (420,-681) 56x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_battery_exempt_1093x614_dark: window [700, 554]: button 'نعم' at (40,-124) 468x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_battery_exempt_1093x614_dark: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_service_standard_1093x614_dark: window [700, 554]: button 'إطار' at (560,-150) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_standard_1093x614_dark: window [700, 554]: button 'بطارية' at (488,-150) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_standard_1093x614_dark: window [700, 554]: button 'خدمة' at (420,-150) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_service_standard_1093x614_dark: dialog 700x554 on screen height 614
+CLIPPED dlg_item_vat_service_exempt_1093x614_dark: window [700, 554]: button 'إطار' at (560,-150) 47x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_exempt_1093x614_dark: window [700, 554]: button 'بطارية' at (488,-150) 60x36 - inside a scroll area (reachable by scrolling)
+CLIPPED dlg_item_vat_service_exempt_1093x614_dark: window [700, 554]: button 'خدمة' at (420,-150) 56x36 - inside a scroll area (reachable by scrolling)
+TALL dlg_item_vat_service_exempt_1093x614_dark: dialog 700x554 on screen height 614
+TALL dlg_vat_print_preview_1093x614_dark: dialog 1053x554 on screen height 614
+TALL dlg_sale_return_legacy_1093x614_dark: dialog 1053x554 on screen height 614
+TALL dlg_sale_return_vat_1093x614_dark: dialog 1053x554 on screen height 614
+TALL dlg_purchase_return_legacy_1093x614_dark: dialog 1053x554 on screen height 614
+TALL dlg_purchase_return_vat_1093x614_dark: dialog 1053x554 on screen height 614
+TALL dlg_opening_balances_1093x614_dark: dialog 700x554 on screen height 614
+TALL dlg_stock_adjustment_1093x614_dark: dialog 640x554 on screen height 614
+TALL dlg_item_1093x614_dark: dialog 700x554 on screen height 614
+CLIPPED dlg_customer_1093x614_dark: window [640, 554]: button 'بيانات التقسيط والآجل' at (31,539) 586x21 - inside a scroll area (reachable by scrolling)
+TALL dlg_customer_1093x614_dark: dialog 640x554 on screen height 614
