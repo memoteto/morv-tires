@@ -205,7 +205,7 @@ def sales_profit(con, start: str, end: str) -> Table:
         return items.setdefault(item_id, [code, name, 0, 0, 0, 0, 0])      # qty, sales, returns, cost, returned cost
 
     for item_id, code, name, qty, net in con.execute(
-            "SELECT i.id, i.code, i.name, sum(sl.qty), sum(sl.net_total) FROM sale_lines sl JOIN sales s "
+            "SELECT i.id, i.code, i.name, sum(sl.qty), sum(sl.net_total - sl.tax_amount) FROM sale_lines sl JOIN sales s "
             "ON s.id = sl.sale_id JOIN items i ON i.id = sl.item_id WHERE s.sale_date BETWEEN ? AND ? "
             "GROUP BY i.id", (start, end)):
         row = slot(item_id, code, name)
@@ -216,7 +216,7 @@ def sales_profit(con, start: str, end: str) -> Table:
         if item_id in items:
             items[item_id][5] = cost
     for item_id, code, name, qty, value, cost in con.execute(
-            "SELECT i.id, i.code, i.name, sum(rl.qty), sum(rl.value), sum(rl.cost) FROM sale_return_lines rl "
+            "SELECT i.id, i.code, i.name, sum(rl.qty), sum(rl.value - rl.tax_amount), sum(rl.cost) FROM sale_return_lines rl "
             "JOIN sale_returns r ON r.id = rl.return_id JOIN sale_lines sl ON sl.id = rl.sale_line_id "
             "JOIN items i ON i.id = sl.item_id WHERE r.return_date BETWEEN ? AND ? GROUP BY i.id", (start, end)):
         row = slot(item_id, code, name)
@@ -232,7 +232,7 @@ def sales_profit(con, start: str, end: str) -> Table:
     rows.append(("grand", ("", "الإجمالي", "", totals[0], totals[1], totals[2], totals[3],
                            _bp_text(totals[3], totals[0] - totals[1]))))
     return Table("sales_profit", TITLES["sales_profit"],
-                 f"من {start} إلى {end} · التكلفة من تخصيص طبقات المخزون الفعلية",
+                 f"من {start} إلى {end} · المبيعات والمرتجعات دون الضريبة · التكلفة من تخصيص طبقات المخزون الفعلية",
                  ("الكود", "الصنف", "الكمية الصافية", "المبيعات", "المرتجعات", "التكلفة", "الربح", "الهامش"),
                  (CODE, TEXT, CODE, MONEY, MONEY, MONEY, MONEY, CODE), tuple(rows), 1)
 
@@ -403,7 +403,7 @@ def daily_sales(con, start: str, end: str) -> Table:
         totals = [a + b for a, b in zip(totals, days[d], strict=True)]
     rows.append(("grand", ("الإجمالي", str(totals[0]), totals[1], totals[2], totals[1] - totals[2],
                            totals[3], totals[4], totals[5])))
-    return Table("daily_sales", TITLES["daily_sales"], f"من {start} إلى {end} · الصافي بعد المرتجعات",
+    return Table("daily_sales", TITLES["daily_sales"], f"من {start} إلى {end} · مبالغ الفواتير شاملة الضريبة إن وجدت · الصافي بعد المرتجعات",
                  ("التاريخ", "الفواتير", "المبيعات", "المرتجعات", "الصافي", "نقدي", "بطاقة وتحويل ومحفظة", "آجل وتقسيط"),
                  (DATE, CODE, MONEY, MONEY, MONEY, MONEY, MONEY, MONEY), tuple(rows), 0)
 
@@ -413,12 +413,12 @@ def top_items(con, start: str, end: str) -> Table:
     start, end = _range(start, end)
     items: dict[int, list] = {}
     for item_id, code, name, qty, net in con.execute(
-            "SELECT i.id, i.code, i.name, sum(sl.qty), sum(sl.net_total) FROM sale_lines sl JOIN sales s "
+            "SELECT i.id, i.code, i.name, sum(sl.qty), sum(sl.net_total - sl.tax_amount) FROM sale_lines sl JOIN sales s "
             "ON s.id = sl.sale_id JOIN items i ON i.id = sl.item_id WHERE s.sale_date BETWEEN ? AND ? "
             "GROUP BY i.id", (start, end)):
         items[item_id] = [code, name, qty, net]
     for item_id, qty, value in con.execute(
-            "SELECT sl.item_id, sum(rl.qty), sum(rl.value) FROM sale_return_lines rl JOIN sale_returns r "
+            "SELECT sl.item_id, sum(rl.qty), sum(rl.value - rl.tax_amount) FROM sale_return_lines rl JOIN sale_returns r "
             "ON r.id = rl.return_id JOIN sale_lines sl ON sl.id = rl.sale_line_id "
             "WHERE r.return_date BETWEEN ? AND ? GROUP BY sl.item_id", (start, end)):
         if item_id in items:
@@ -429,7 +429,7 @@ def top_items(con, start: str, end: str) -> Table:
     rows = [("line", (str(i), code, name, str(qty), net, _bp_text(net, total)))
             for i, (code, name, qty, net) in enumerate(ranked, start=1)]
     rows.append(("grand", ("", "", "الإجمالي", str(sum(v[2] for v in ranked)), total, _bp_text(total, total))))
-    return Table("top_items", TITLES["top_items"], f"من {start} إلى {end} · مرتبة بقيمة المبيعات الصافية",
+    return Table("top_items", TITLES["top_items"], f"من {start} إلى {end} · مرتبة بقيمة المبيعات الصافية دون الضريبة",
                  ("الترتيب", "الكود", "الصنف", "الكمية الصافية", "المبيعات الصافية", "النسبة"),
                  (CODE, CODE, TEXT, CODE, MONEY, CODE), tuple(rows), 2)
 
@@ -600,24 +600,27 @@ def purchases(con, start: str, end: str) -> Table:
     """Purchase invoices per supplier with their items, tied to the credits posted on account 2110."""
     start, end = _range(start, end)
     suppliers_rows: dict[int, list] = {}
-    for sid, sname, code, name, qty, amount in con.execute(
-            # net_total (not the gross line_total) so this ties to what was actually
-            # posted to 2110, once freight/discount make the two differ (P01/P02).
-            "SELECT s.id, s.name, i.code, i.name, sum(pl.qty), sum(pl.net_total) FROM purchase_invoices p "
+    for sid, sname, code, name, qty, amount, deductible in con.execute(
+            # Gross payable includes the allocated freight/discount and any additive VAT.
+            # Acquisition cost excludes only the saved deductible input VAT.
+            "SELECT s.id, s.name, i.code, i.name, sum(pl.qty), "
+            "sum(pl.net_total + CASE WHEN p.prices_tax_inclusive=0 THEN pl.tax_amount ELSE 0 END), "
+            "sum(pl.deductible_tax_amount) FROM purchase_invoices p "
             "JOIN journal_entries e ON e.id = p.journal_entry_id JOIN suppliers s ON s.id = p.supplier_id "
             "JOIN purchase_lines pl ON pl.invoice_id = p.id JOIN items i ON i.id = pl.item_id "
             "WHERE e.entry_date BETWEEN ? AND ? GROUP BY s.id, i.id ORDER BY s.name, i.code", (start, end)):
-        suppliers_rows.setdefault(sid, [sname, []])[1].append((code, name, qty, amount))
+        suppliers_rows.setdefault(sid, [sname, []])[1].append((code, name, qty, amount, amount - deductible))
     rows, grand = [], 0
     for sname, items in sorted(suppliers_rows.values(), key=lambda v: v[0]):
         total = sum(i[3] for i in items)
         grand += total
         rows.append(("head", (sname, "", "", total, "")))
-        rows += [("line", (name, code, str(qty), amount, (amount + qty // 2) // qty)) for code, name, qty, amount in items]
+        rows += [("line", (name, code, str(qty), amount, (cost + qty // 2) // qty))
+                 for code, name, qty, amount, cost in items]
     rows.append(("grand", ("الإجمالي", "", "", grand, "")))
     tie = _tie(_ledger_net(con, "2110", start, end, "purchase_invoice", credit=True), grand, "2110")
     return Table("purchases", TITLES["purchases"], f"من {start} إلى {end} · {tie}",
-                 ("المورد / الصنف", "الكود", "الكمية", "الإجمالي", "متوسط التكلفة"),
+                 ("المورد / الصنف", "الكود", "الكمية", "المستحق شامل الضريبة", "متوسط تكلفة الاقتناء"),
                  (TEXT, CODE, CODE, MONEY, MONEY), tuple(rows), 0)
 
 
@@ -627,10 +630,10 @@ def returns(con, start: str, end: str) -> Table:
     base = ("FROM sale_return_lines rl JOIN sale_returns r ON r.id = rl.return_id JOIN sale_lines sl "
             "ON sl.id = rl.sale_line_id JOIN items i ON i.id = sl.item_id WHERE r.return_date BETWEEN ? AND ? ")
     sums = ("count(DISTINCT r.id), coalesce(sum(CASE rl.condition WHEN 'sound' THEN rl.qty END), 0), "
-            "coalesce(sum(CASE rl.condition WHEN 'defective' THEN rl.qty END), 0), sum(rl.value) ")
+            "coalesce(sum(CASE rl.condition WHEN 'defective' THEN rl.qty END), 0), sum(rl.value - rl.tax_amount) ")
     rows, total = [], 0
     for title, label, group in (("حسب السبب", "r.reason", "r.reason"), ("حسب الصنف", "i.code || ' · ' || i.name", "i.id")):
-        data = con.execute(f"SELECT {label}, {sums}{base}GROUP BY {group} ORDER BY sum(rl.value) DESC, 1",
+        data = con.execute(f"SELECT {label}, {sums}{base}GROUP BY {group} ORDER BY sum(rl.value - rl.tax_amount) DESC, 1",
                            (start, end)).fetchall()
         section = sum(d[4] for d in data)
         rows.append(("head", (title, "", "", "", "")))
@@ -638,7 +641,7 @@ def returns(con, start: str, end: str) -> Table:
         rows.append(("total", ("المجموع", "", str(sum(d[2] for d in data)), str(sum(d[3] for d in data)), section)))
         total = section
     tie = _tie(_ledger_net(con, "4190", start, end), total, "4190")
-    return Table("returns", TITLES["returns"], f"من {start} إلى {end} · {tie}",
+    return Table("returns", TITLES["returns"], f"من {start} إلى {end} · القيمة دون الضريبة · {tie}",
                  ("البيان", "المرتجعات", "سليم", "معيب", "القيمة"),
                  (TEXT, CODE, CODE, CODE, MONEY), tuple(rows), 0)
 
