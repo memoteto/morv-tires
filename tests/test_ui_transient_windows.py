@@ -29,12 +29,17 @@ def _parentless_show_watcher():
         def __init__(self):
             super().__init__()
             self.seen = []
+            self.errors = []
 
         def eventFilter(self, obj, event):
-            if (event.type() == QEvent.Type.Show and isinstance(obj, QWidget)
-                    and shiboken6.isValid(obj) and obj.parentWidget() is None):
-                text = obj.text()[:40] if hasattr(obj, "text") else ""
-                self.seen.append((obj, f"{type(obj).__name__}({text})"))   # Read now: Qt may delete it later
+            # PySide6 aborts the process when an exception leaves a virtual, so record it and carry on
+            try:
+                if (event.type() == QEvent.Type.Show and isinstance(obj, QWidget)
+                        and shiboken6.isValid(obj) and obj.parentWidget() is None):
+                    text = obj.text()[:40] if hasattr(obj, "text") else ""
+                    self.seen.append((obj, f"{type(obj).__name__}({text})"))   # Qt may delete it later
+            except BaseException as e:
+                self.errors.append(f"{type(e).__name__}: {e}")
             return False
 
         def offenders(self) -> list[str]:
@@ -93,6 +98,19 @@ class TransientWindowTest(unittest.TestCase):
         n.show_message("")
         self.assertFalse(n.isVisible(), "clearing the text must hide the notice as it always did")
 
+    def test_applying_the_theme_under_a_show_filter_is_survivable(self):
+        from morv.ui import theme
+        watch = _parentless_show_watcher()
+        _step("theme-filter-install")
+        self.app.installEventFilter(watch)
+        try:
+            _step("theme-apply")
+            theme.apply(self.app, False, theme.DEFAULT_FONT, theme.DEFAULT_SIZE)
+            _step("theme-applied")
+        finally:
+            self.app.removeEventFilter(watch)
+        self.assertEqual(watch.errors, [], "the filter raised during the application-wide style cascade")
+
     def test_navigating_every_section_shows_nothing_before_it_is_parented(self):
         from morv.ui.shell import NAV, MainWindow
         from morv.ui.widgets import dispose
@@ -124,4 +142,5 @@ class TransientWindowTest(unittest.TestCase):
                 _step("dispose")
                 dispose(window, self.app)
             _step("teardown-done")
+        self.assertEqual(watch.errors, [], "the filter raised while watching navigation")
         self.assertEqual(found, [], "these were shown before anything owned them")
