@@ -399,9 +399,17 @@ class CustomerStatementUiTest(unittest.TestCase):
         dlg.close()
 
     def test_customer_phone_stays_below_name_at_the_right(self):
+        from PySide6.QtCore import Qt
+
+        # Production theme.apply sets RTL. The shared test application may
+        # inherit LTR from another module or start without the theme.
+        # This right-edge assertion must run in the production direction.
+        self.addCleanup(self.app.setLayoutDirection, self.app.layoutDirection())
+        self.app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         dlg = self.dialog()
         dlg.show()
         self.app.processEvents()
+        self.assertEqual(dlg.layoutDirection(), Qt.LayoutDirection.RightToLeft)
         name_right = dlg.customer_name_label.mapTo(
             dlg, dlg.customer_name_label.rect().topRight()).x()
         phone_right = dlg.strip.mapTo(dlg, dlg.strip.rect().topRight()).x()
