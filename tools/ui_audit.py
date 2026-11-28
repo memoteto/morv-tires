@@ -272,6 +272,50 @@ def _capture_sale_returns(win, session, app, out, tag, report, screen_h):
         settings.put(con, "tax.enabled", previous)
 
 
+def _capture_purchase_returns(win, session, app, out, tag, report, screen_h):
+    from morv.infra import purchasing, settings
+    from morv.infra.purchasing import PurchaseLine
+    from morv.ui.purchase_return_dialogs import PurchaseReturnDialog
+
+    con = session.con
+    previous = settings.get(con, "tax.enabled", "0")
+    try:
+        item_ids = [r[0] for r in con.execute("SELECT id FROM items WHERE kind='tire' ORDER BY id LIMIT 2")]
+        if len(item_ids) != 2:
+            raise RuntimeError("audit: two tire items are required")
+        for enabled in (False, True):
+            settings.put(con, "tax.enabled", str(int(enabled)))
+            name = f"مورد مراجعة المرتجع {tag} {int(enabled)}"
+            sid = con.execute("INSERT INTO suppliers (name,name_norm,mobile) VALUES (?,?,?)",
+                              (name, name, "")).lastrowid
+            tax = dict(input_tax_rate=1400, input_tax_deductible=True) if enabled else {}
+            purchasing.post_invoice(
+                con, session.user, request_key=f"audit-preturn-{tag}-{enabled}", supplier_id=sid,
+                supplier_invoice_no=f"AUDIT-{tag}-{enabled}", invoice_date="2026-11-01",
+                lines=[PurchaseLine(i, 3, 100000, "2324", **tax) for i in item_ids])
+            dlg = PurchaseReturnDialog(session, sid, name, win)
+            try:
+                dlg.reason.setText("عيب تصنيع")
+                dlg.model.setData(dlg.model.index(0, dlg.model.QTY), 2)
+                dlg.model.setData(dlg.model.index(1, dlg.model.QTY), 1)
+                dlg.settlement_mode.setCurrentIndex(dlg.settlement_mode.findData("book"))
+                dlg.show()
+                _settle(app)
+                mode = "vat" if enabled else "legacy"
+                if (dlg.scroll is not None or not dlg.post_btn.isEnabled()
+                        or not dlg.screen().availableGeometry().contains(dlg.frameGeometry())
+                        or dlg.view.horizontalScrollBar().isVisible() or _clipped_buttons(dlg)):
+                    raise RuntimeError("audit: purchase return controls or dialog bounds are clipped")
+                _capture_checked(dlg, app, out, f"dlg_purchase_return_{mode}_{tag}", report,
+                                 dialog=True, screen_h=screen_h)
+            finally:
+                dlg.close()
+                dlg.deleteLater()
+                _settle(app)
+    finally:
+        settings.put(con, "tax.enabled", previous)
+
+
 def _capture_vat_print_preview(win, app, out, tag, report, screen_h):
     from morv.ui.printing import PrintPreview
     from tools.print_samples import _shop, _vat_sale
@@ -523,6 +567,7 @@ def run(out: Path, size: tuple) -> dict:
             _capture_item_vat(win, session, app, out, f"{w}x{h}_{mode}", report, h)
             _capture_vat_print_preview(win, app, out, f"{w}x{h}_{mode}", report, h)
             _capture_sale_returns(win, session, app, out, f"{w}x{h}_{mode}", report, h)
+            _capture_purchase_returns(win, session, app, out, f"{w}x{h}_{mode}", report, h)
             for dname, make in _dialogs(session, item_id):
                 name = f"dlg_{dname}_{w}x{h}_{mode}"
                 try:

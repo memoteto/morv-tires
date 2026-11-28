@@ -1,163 +1,316 @@
-"""Supplier return dialogs: preview book value and agree supplier settlement before posting."""
+"""Supplier return dialogs using the shared table-document layout and engine quote."""
 import uuid
 from datetime import date
 
-from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QPushButton
+from PySide6.QtCore import QAbstractTableModel, Qt, Signal
+from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLineEdit, QSpinBox
 
 from morv.core.money import MoneyError, fmt, parse_money
+from morv.core.text import ltr
 from morv.infra import ledger, purchase_returns
 from morv.infra.purchase_returns import PurchaseReturnError, ReturnLine
+from morv.ui.adaptive_layout import AdaptiveFields
+from morv.ui.document_table import DocumentEditor, DocumentTableDialog
 from morv.ui.modal import Modal
-from morv.ui.widgets import DateEdit, danger_button, field, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, card, danger_button, field, form, icon_button, ltr_edit, muted
 
 
-class PurchaseReturnDialog(Modal):
+class PurchaseReturnModel(QAbstractTableModel):
+    NAME, LOT, AVAILABLE, QTY, BOOK, TAX = range(6)
+    HEADERS = ("الصنف", "الدفعة / DOT", "المتاح", "المرتجع", "القيمة الدفترية", "الضريبة")
+    draftChanged = Signal()
+
+    def __init__(self, rows, parent=None):
+        super().__init__(parent)
+        self.rows = tuple(rows)
+        self.quantities = [0] * len(rows)
+        self.tax_inputs = [None] * len(rows)
+        self.amounts = {}
+
+    def rowCount(self, parent=None):
+        return 0 if parent is not None and parent.isValid() else len(self.rows)
+
+    def columnCount(self, parent=None):
+        return 0 if parent is not None and parent.isValid() else len(self.HEADERS)
+
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+            return self.HEADERS[section]
+        return None
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid():
+            return None
+        row, col = index.row(), index.column()
+        source = self.rows[row]
+        qty = self.quantities[row]
+        actual = self.amounts.get(source.purchase_line_id)
+        override = self.tax_inputs[row]
+        if role == Qt.ItemDataRole.EditRole:
+            if col == self.QTY:
+                return qty
+            if col == self.TAX:
+                return override if override is not None else ""
+            return None
+        if role == Qt.ItemDataRole.TextAlignmentRole and col != self.NAME:
+            return int(Qt.AlignmentFlag.AlignCenter)
+        if role == Qt.ItemDataRole.ToolTipRole:
+            if col == self.NAME:
+                return source.name
+            if col == self.TAX and qty:
+                if actual:
+                    return (f"حصة الضريبة الأصلية {fmt(actual.allocated)}؛ "
+                            f"القابلة للخصم {fmt(actual.deductible_amount)}. الفراغ يعيد الحساب التلقائي.")
+                return "أدخل ضريبة مستند المورد أو اترك الحقل فارغًا للحساب التلقائي."
+        if role != Qt.ItemDataRole.DisplayRole:
+            return None
+        tax = ("—" if not qty else
+               (ltr(fmt(actual.tax_amount)) + (" *" if actual.manual else "") if actual else
+                (override or "—")))
+        return (source.name, ltr(source.ref + (" / " + source.dot if source.dot else "")),
+                ltr(str(source.available)), ltr(str(qty)),
+                ltr(fmt(actual.book_value)) if actual else "—", tax)[col]
+
+    def flags(self, index):
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags
+        flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        row, col = index.row(), index.column()
+        if col == self.QTY or (col == self.TAX and self.quantities[row] and self.rows[row].original_tax):
+            flags |= Qt.ItemFlag.ItemIsEditable
+        return flags
+
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
+        if role != Qt.ItemDataRole.EditRole or not self.flags(index) & Qt.ItemFlag.ItemIsEditable:
+            return False
+        row, col = index.row(), index.column()
+        if col == self.QTY:
+            if type(value) is not int or not 0 <= value <= self.rows[row].available:
+                return False
+            if value == self.quantities[row]:
+                return True
+            self.tax_inputs[row] = None
+            self.quantities[row] = value
+        elif col == self.TAX:
+            raw = str(value).strip() or None
+            if raw == self.tax_inputs[row]:
+                return True
+            self.tax_inputs[row] = raw
+        else:
+            return False
+        self.draftChanged.emit()
+        self.dataChanged.emit(self.index(row, self.QTY), self.index(row, self.TAX), [])
+        return True
+
+    def selected_lines(self):
+        lines = []
+        for source, qty, raw in zip(self.rows, self.quantities, self.tax_inputs, strict=True):
+            if not qty:
+                continue
+            try:
+                tax = None if raw is None else parse_money(raw)
+            except MoneyError as exc:
+                raise PurchaseReturnError("ضريبة مستند المورد غير صالحة") from exc
+            lines.append(ReturnLine(source.purchase_line_id, qty, tax))
+        return lines
+
+    def set_quote(self, quote):
+        self.amounts = {r.purchase_line_id: r for r in quote.lines} if quote else {}
+        if self.rows:
+            self.dataChanged.emit(self.index(0, self.BOOK), self.index(len(self.rows) - 1, self.TAX), [])
+
+    def clear_quantities(self):
+        self.quantities = [0] * len(self.rows)
+        self.tax_inputs = [None] * len(self.rows)
+        self.draftChanged.emit()
+        if self.rows:
+            self.dataChanged.emit(self.index(0, self.QTY), self.index(len(self.rows) - 1, self.TAX), [])
+
+
+class PurchaseReturnEditor(DocumentEditor):
+    def createEditor(self, parent, option, index):
+        if index.column() == PurchaseReturnModel.QTY:
+            editor = self.quantity_editor(parent, index.model().rows[index.row()].available)
+        else:
+            editor = ltr_edit("تلقائي")
+            editor.setParent(parent)
+        self.active_editor = editor
+        return editor
+
+    def setEditorData(self, editor, index):
+        value = index.data(Qt.ItemDataRole.EditRole)
+        if isinstance(editor, QSpinBox):
+            editor.setValue(value)
+        else:
+            editor.setText(value)
+
+    def setModelData(self, editor, model, index):
+        if isinstance(editor, QSpinBox):
+            editor.interpretText()
+            value = editor.value()
+        else:
+            value = editor.text()
+        model.setData(index, value)
+
+
+class PurchaseReturnDialog(DocumentTableDialog):
     def __init__(self, session, supplier_id: int, supplier_name: str, parent=None):
-        super().__init__("مرتجع للمورد", parent, width=560)
+        super().__init__(f"مرتجع للمورد — {supplier_name}", parent)
         self.session, self.supplier_id, self.saved = session, supplier_id, None
-        self._key = uuid.uuid4().hex     # one key per dialog: a double click or a retry cannot post twice
-        self.lines: list[ReturnLine] = []
-        self.book_total: int | None = None
-        self.body.addWidget(muted(f"المورد: {supplier_name} · تُستبعد القيمة الدفترية من طبقة الشراء الأصلية."))
-        f = form()
-        self.lot = QComboBox()
-        for line_id, ref, name, dot, avail, _cost in purchase_returns.returnable(session.con, supplier_id):
-            self.lot.addItem(f"{name} · {ref}" + (f" · DOT {dot}" if dot else "") + f" · المتاح {avail}",
-                             (line_id, avail))
-        self.qty = ltr_edit("1")
-        self.qty.setText("1")
+        self._key = uuid.uuid4().hex
+        self._busy = False
+        self.quote = None
+        rows = purchase_returns.returnable_details(session.con, supplier_id)
+        self.model = PurchaseReturnModel(rows, self)
+        self.taxable_source = any(r.original_tax for r in rows)
         self.reason = QLineEdit()
         self.reason.setPlaceholderText("سبب المرتجع (إلزامي)")
         self.date = DateEdit()
         self.date.setText(date.today().isoformat())
-        f.addRow("الدفعة *", self.lot)
-        f.addRow("الكمية *", self.qty)
-        f.addRow("السبب *", self.reason)
-        f.addRow("التاريخ *", self.date)
-        self.body.addLayout(f)
-        self.list_label = muted("لم تُضف أسطر بعد.")
-        self.body.addWidget(self.list_label)
+        self.body.addWidget(self.fields([("سبب المرتجع *", self.reason), ("تاريخ المرتجع *", self.date)]))
+
+        toolbar = QHBoxLayout()
+        toolbar.addWidget(muted("حدّد الكمية في الجدول؛ الصفر يستبعد السطر."))
+        toolbar.addStretch(1)
+        clear = icon_button("مسح الكميات", "close")
+        clear.clicked.connect(self._clear)
+        toolbar.addWidget(clear)
+        self.body.addLayout(toolbar)
+        self.view = self.add_document_table(self.model, PurchaseReturnEditor, stretch_column=self.model.NAME)
+        self.view.setColumnHidden(self.model.TAX, not self.taxable_source)
+
+        bottom = QHBoxLayout()
+        settlement, info = card(compact=True)
         self.settlement_mode = QComboBox()
         self.settlement_mode.addItem("اختر طريقة التسوية", None)
-        self.settlement_mode.addItem("تسوية بالقيمة الدفترية", "book")
+        self.settlement_mode.addItem("التسوية الكاملة", "book")
         self.settlement_mode.addItem("مبلغ متفق عليه مع المورد", "manual")
-        self.body.addWidget(field("طريقة التسوية *", self.settlement_mode))
         self.settlement_edit = ltr_edit("0.00")
-        self.settlement_amount_field = field("مبلغ التسوية (ج.م) *", self.settlement_edit)
-        self.body.addWidget(self.settlement_amount_field)
         self.settlement_reason = QLineEdit()
-        self.settlement_reason_field = field("سبب اختلاف التسوية *", self.settlement_reason)
-        self.body.addWidget(self.settlement_reason_field)
-        self.settlement_label = muted("")
-        self.body.addWidget(self.settlement_label)
+        self.credit_note = QLineEdit()
+        self.credit_note.setPlaceholderText("رقم مستند المورد")
+        mode_field = field("طريقة التسوية *", self.settlement_mode)
+        self.amount_field = field("مبلغ التسوية *", self.settlement_edit)
+        self.reason_field = field("سبب اختلاف التسوية *", self.settlement_reason)
+        self.credit_field = field("مرجع مستند المورد *", self.credit_note)
+        info.addWidget(AdaptiveFields([mode_field, self.amount_field, self.reason_field, self.credit_field]))
+        self.hint = muted("")
+        self.hint.setWordWrap(True)
+        info.addWidget(self.hint)
+        bottom.addWidget(settlement, 1)
+        totals, amounts = card(compact=True)
+        self.book_label = self.amount_row(amounts, "القيمة الدفترية")
+        self.tax_label = self.amount_row(amounts, "إجمالي الضريبة المرتجعة")
+        self.deductible_label = self.amount_row(amounts, "الضريبة القابلة للخصم")
+        self.difference_label = self.amount_row(amounts, "فرق التسوية")
+        self.total_label = self.amount_row(amounts, "تخفيض رصيد المورد", strong=True)
+        bottom.addWidget(totals, 1)
+        self.body.addLayout(bottom)
+        self.post_btn = self.add_footer("تسجيل المرتجع", self.save)
+
+        self.model.draftChanged.connect(self._refresh_preview)
+        self.date.textChanged.connect(self._refresh_preview)
+        self.reason.textChanged.connect(self._refresh_settlement)
         self.settlement_mode.currentIndexChanged.connect(self._refresh_settlement)
         self.settlement_edit.textChanged.connect(self._refresh_settlement)
-        self.date.textChanged.connect(self._refresh_preview)
-        self._refresh_settlement()
-        add = QPushButton("إضافة السطر")
-        add.clicked.connect(self.add_line)
-        self.add_footer_widget(add)
-        self.add_footer("تسجيل المرتجع", self.save)
-        if not self.lot.count():
+        self.settlement_reason.textChanged.connect(self._refresh_settlement)
+        self.credit_note.textChanged.connect(self._refresh_settlement)
+        self._refresh_preview()
+        if not rows:
             self.notice.show_message("لا توجد دفعات متاحة للإرجاع لهذا المورد.")
 
-    def add_line(self) -> None:
-        data = self.lot.currentData()
-        if data is None:
-            return
-        try:
-            qty = int(self.qty.text().strip())
-        except ValueError:
-            self.notice.show_message("الكمية عدد صحيح")
-            return
-        line_id, avail = data
-        if any(x.purchase_line_id == line_id for x in self.lines):
-            self.notice.show_message("الدفعة مضافة سابقًا؛ احذف المرتجع وابدأ من جديد لتعديل الكمية")
-            return
-        if qty <= 0 or qty > avail:
-            self.notice.show_message(f"الكمية بين 1 و{avail}")
-            return
-        candidate = self.lines + [ReturnLine(line_id, qty)]
-        try:
-            total = purchase_returns.preview_book_total(
-                self.session.con, self.supplier_id, candidate, self.date.text().strip())
-        except PurchaseReturnError as e:
-            self.notice.show_message(str(e))
-            return
-        self.lines = candidate
-        self._show_book_total(total)
-        self.notice.show_message("")
+    @property
+    def book_total(self):
+        return self.quote.book_total if self.quote else None
 
-    def _show_book_total(self, total: int | None) -> None:
-        self.book_total = total
-        if total is None:
-            self.list_label.setText("القيمة الدفترية غير متاحة؛ راجع بيانات المرتجع.")
+    def _clear(self):
+        self.editor.finish()
+        self.model.clear_quantities()
+
+    def _refresh_preview(self, *_args):
+        self.quote = None
+        try:
+            lines = self.model.selected_lines()
+            if lines:
+                self.quote = purchase_returns.preview_return(
+                    self.session.con, self.supplier_id, lines, self.date.text().strip())
+        except PurchaseReturnError as exc:
+            self.notice.show_message(str(exc))
         else:
-            self.list_label.setText(f"أسطر المرتجع: {len(self.lines)} · القيمة الدفترية {fmt(total)} ج.م")
+            self.notice.show_message("")
+        self.model.set_quote(self.quote)
         self._refresh_settlement()
 
-    def _refresh_preview(self) -> None:
-        if not self.lines:
-            return
-        try:
-            total = purchase_returns.preview_book_total(
-                self.session.con, self.supplier_id, self.lines, self.date.text().strip())
-        except PurchaseReturnError as e:
-            self._show_book_total(None)
-            self.notice.show_message(str(e))
-            return
-        self._show_book_total(total)
-
-    def _settlement_amount(self) -> int | None:
-        if self.settlement_mode.currentData() == "book":
-            return self.book_total
-        if self.settlement_mode.currentData() == "manual":
+    def _settlement_amount(self):
+        mode = self.settlement_mode.currentData()
+        if mode == "book" and self.quote:
+            return self.quote.default_settlement
+        if mode == "manual":
             try:
                 amount = parse_money(self.settlement_edit.text())
+                return amount if amount >= 0 else None
             except MoneyError:
                 return None
-            if amount >= 0:
-                return amount
         return None
 
-    def _refresh_settlement(self) -> None:
-        manual = self.settlement_mode.currentData() == "manual"
-        self.settlement_amount_field.setVisible(manual)
+    def _refresh_settlement(self, *_args):
+        quote = self.quote
         amount = self._settlement_amount()
-        has_difference = self.book_total is not None and amount is not None and amount != self.book_total
-        self.settlement_reason_field.setVisible(has_difference)
-        if self.book_total is None or amount is None:
-            self.settlement_label.setText("حدد مبلغ التسوية الفعلي بعد إضافة الأسطر.")
-            return
-        diff = amount - self.book_total
-        self.settlement_label.setText(
-            f"تخفيض رصيد المورد: {fmt(amount)} ج.م · فرق التسوية: {fmt(diff)} ج.م")
+        diff = None if amount is None or quote is None else amount - quote.default_settlement
+        manual = any(raw is not None for raw in self.model.tax_inputs)
+        special = bool(manual or diff)
+        has_tax = quote.taxable_source if quote else self.taxable_source
+        self.amount_field.setVisible(self.settlement_mode.currentData() == "manual")
+        self.reason_field.setVisible(special)
+        self.credit_field.setVisible(has_tax and special)
+        for label in (self.tax_label, self.deductible_label):
+            label.parentWidget().setVisible(has_tax)
+        for label, value in (
+            (self.book_label, quote.book_total if quote else None),
+            (self.tax_label, quote.tax_total if quote else None),
+            (self.deductible_label, quote.deductible_tax_total if quote else None),
+            (self.difference_label, diff), (self.total_label, amount),
+        ):
+            label.setText("—" if value is None else ltr(fmt(value)) + " ج.م")
+        needs_tax = bool(quote and quote.taxable_source and special and any(
+            qty and row.original_tax and raw is None
+            for row, qty, raw in zip(self.model.rows, self.model.quantities, self.model.tax_inputs, strict=True)))
+        if needs_tax:
+            hint = "أكّد ضريبة كل سطر خاضع في الجدول وفق مستند المورد."
+        elif has_tax:
+            hint = "الضريبة من الشراء الأصلي؛ * مبلغ محدد يدويًا."
+        else:
+            hint = "الكمية والقيمة من الدفعة الأصلية."
+        self.hint.setText(hint)
+        self.post_btn.setEnabled(bool(quote and amount is not None and not self._busy and not needs_tax
+                                      and len(self.reason.text().strip()) >= 3
+                                      and (not special or len(self.settlement_reason.text().strip()) >= 3)
+                                      and (not (has_tax and special) or self.credit_note.text().strip())
+                                      and amount >= quote.tax_total))
 
-    def save(self) -> None:
-        if not self.lines:
-            self.add_line()
+    def save(self):
+        if self._busy:
             return
-        previous = self.book_total
-        self._refresh_preview()
-        if self.book_total is None:
+        self.editor.finish()
+        if not self.post_btn.isEnabled() or not self.quote:
             return
-        if previous != self.book_total:
-            self.notice.show_message("تغيّرت القيمة الدفترية؛ راجع المبلغ المعروض ثم اعتمد مجددًا.")
-            return
-        settlement = self._settlement_amount()
-        if settlement is None:
-            self.notice.show_message("اختر طريقة التسوية وأدخل مبلغًا صحيحًا غير سالب.")
-            return
-        reason = self.settlement_reason.text().strip() if settlement != self.book_total else ""
+        self._busy = True
+        self.post_btn.setEnabled(False)
         try:
             self.saved = purchase_returns.post_return(
                 self.session.con, self.session.user, request_key=self._key, supplier_id=self.supplier_id,
-                lines=self.lines, reason=self.reason.text(), return_date=self.date.text().strip(),
-                settlement_amount=settlement, settlement_reason=reason, expected_book_total=self.book_total)
-        except (PurchaseReturnError, ledger.LedgerError) as e:
-            self.notice.show_message(str(e))
-            return
-        self.accept()
+                lines=self.model.selected_lines(), reason=self.reason.text(), return_date=self.date.text().strip(),
+                settlement_amount=self._settlement_amount(), settlement_reason=self.settlement_reason.text(),
+                credit_note_ref=self.credit_note.text(), expected_quote=self.quote)
+        except (PurchaseReturnError, ledger.LedgerError) as exc:
+            self._refresh_preview()
+            self.notice.show_message(str(exc))
+        else:
+            self.accept()
+        finally:
+            self._busy = False
+            if self.saved is None:
+                self._refresh_settlement()
 
 
 class ReversePurchaseReturnDialog(Modal):

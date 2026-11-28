@@ -38,9 +38,9 @@ class PurchaseReturnDialogsUiTest(unittest.TestCase):
         from morv.ui.widgets import dispose
         dlg = PurchaseReturnDialog(self.session, self.sup, "مورد وهمي")
         self.addCleanup(dispose, dlg, self.app)
-        dlg.qty.setText("2")
         dlg.reason.setText("عيب تصنيع")
-        dlg.save()  # the first action prepares a visible preview, not a blind posting
+        self.assertTrue(dlg.model.setData(dlg.model.index(0, dlg.model.QTY), 2))
+        dlg.save()  # an explicit settlement choice is still required
         self.assertIsNone(dlg.saved)
         self.assertEqual(dlg.book_total, 200000)
         dlg.settlement_mode.setCurrentIndex(dlg.settlement_mode.findData("book"))
@@ -66,17 +66,16 @@ class PurchaseReturnDialogsUiTest(unittest.TestCase):
         line_id = self.con.execute("SELECT id FROM purchase_lines WHERE invoice_id=?", (inv.id,)).fetchone()[0]
         dlg = PurchaseReturnDialog(self.session, self.sup, "مورد وهمي")
         self.addCleanup(dispose, dlg, self.app)
-        dlg.lot.setCurrentIndex(next(i for i in range(dlg.lot.count()) if dlg.lot.itemData(i)[0] == line_id))
-        dlg.qty.setText("2")
+        row = next(i for i, r in enumerate(dlg.model.rows) if r.purchase_line_id == line_id)
         dlg.reason.setText("عيب تصنيع")
-        dlg.add_line()
+        self.assertTrue(dlg.model.setData(dlg.model.index(row, dlg.model.QTY), 2))
         self.assertEqual(dlg.book_total, 184000)
-        self.assertIn("1,840.00", dlg.list_label.text())
+        self.assertIn("1,840.00", dlg.book_label.text())
         dlg.save()
         self.assertIsNone(dlg.saved)  # a settlement method must be chosen explicitly
         dlg.settlement_mode.setCurrentIndex(dlg.settlement_mode.findData("manual"))
         dlg.settlement_edit.setText("1800")
-        self.assertIn("1,800.00", dlg.settlement_label.text())
+        self.assertIn("1,800.00", dlg.total_label.text())
         dlg.save()
         self.assertIsNone(dlg.saved)  # differing settlement requires a reason
         dlg.settlement_reason.setText("شحن غير مسترد")
@@ -98,3 +97,77 @@ class PurchaseReturnDialogsUiTest(unittest.TestCase):
         dlg.reason.setText("عيب تصنيع")
         dlg.save()
         self.assertIsNone(dlg.saved)
+
+
+    def test_taxable_rows_use_original_quote_and_common_layout(self):
+        from morv.infra import ledger, purchasing, settings
+        from morv.infra.purchasing import PurchaseLine
+        from morv.ui.document_table import DocumentTableDialog
+        from morv.ui.purchase_return_dialogs import PurchaseReturnDialog
+        from morv.ui.widgets import dispose
+
+        item = self.con.execute("SELECT id FROM items WHERE code='TR-1'").fetchone()[0]
+        settings.put(self.con, "tax.enabled", "1")
+        settings.put(self.con, "tax.rate", "1400")
+        inv = purchasing.post_invoice(
+            self.con, self.session.user, request_key="ui-vat-buy-01", supplier_id=self.sup,
+            supplier_invoice_no="VAT-1", invoice_date="2026-11-01",
+            lines=[PurchaseLine(item, 2, 100000, "2324", input_tax_rate=1400, input_tax_deductible=True)])
+        settings.put(self.con, "tax.enabled", "0")
+        line_id = self.con.execute("SELECT id FROM purchase_lines WHERE invoice_id=?", (inv.id,)).fetchone()[0]
+        dlg = PurchaseReturnDialog(self.session, self.sup, "مورد وهمي")
+        self.addCleanup(dispose, dlg, self.app)
+        self.assertIsInstance(dlg, DocumentTableDialog)
+        self.assertIsNone(dlg.scroll)
+        self.assertFalse(dlg.view.isColumnHidden(dlg.model.TAX))
+        row = next(i for i, r in enumerate(dlg.model.rows) if r.purchase_line_id == line_id)
+        index = dlg.model.index(row, dlg.model.QTY)
+        self.assertFalse(dlg.model.setData(index, 3))
+        self.assertTrue(dlg.model.setData(index, 1))
+        self.assertTrue(dlg.model.setData(index, 0))
+        self.assertIsNone(dlg.quote)
+        self.assertTrue(dlg.model.setData(index, 2))
+        dlg.reason.setText("عيب تصنيع")
+        dlg.settlement_mode.setCurrentIndex(dlg.settlement_mode.findData("book"))
+        self.assertEqual((dlg.quote.book_total, dlg.quote.tax_total, dlg.quote.default_settlement),
+                         (200000, 28000, 228000))
+        self.assertIn("280.00", dlg.tax_label.text())
+        self.assertIn("2,280.00", dlg.total_label.text())
+        dlg.save()
+        self.assertIsNotNone(dlg.saved)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 0)
+
+    def test_manual_tax_requires_explicit_amount_reference_and_reason(self):
+        from morv.infra import ledger, purchasing, settings
+        from morv.infra.purchasing import PurchaseLine
+        from morv.ui.purchase_return_dialogs import PurchaseReturnDialog
+        from morv.ui.widgets import dispose
+
+        item = self.con.execute("SELECT id FROM items WHERE code='TR-1'").fetchone()[0]
+        settings.put(self.con, "tax.enabled", "1")
+        settings.put(self.con, "tax.rate", "1400")
+        inv = purchasing.post_invoice(
+            self.con, self.session.user, request_key="ui-vat-buy-02", supplier_id=self.sup,
+            supplier_invoice_no="VAT-2", invoice_date="2026-11-01",
+            lines=[PurchaseLine(item, 1, 100000, "2324", input_tax_rate=1400, input_tax_deductible=True)])
+        line_id = self.con.execute("SELECT id FROM purchase_lines WHERE invoice_id=?", (inv.id,)).fetchone()[0]
+        dlg = PurchaseReturnDialog(self.session, self.sup, "مورد وهمي")
+        self.addCleanup(dispose, dlg, self.app)
+        row = next(i for i, r in enumerate(dlg.model.rows) if r.purchase_line_id == line_id)
+        dlg.model.setData(dlg.model.index(row, dlg.model.QTY), 1)
+        dlg.reason.setText("عيب تصنيع")
+        dlg.settlement_mode.setCurrentIndex(dlg.settlement_mode.findData("manual"))
+        dlg.settlement_edit.setText("1090")
+        dlg.settlement_reason.setText("تسوية مختلفة")
+        dlg.credit_note.setText("CN-1")
+        self.assertFalse(dlg.post_btn.isEnabled())
+        tax_index = dlg.model.index(row, dlg.model.TAX)
+        dlg.model.setData(tax_index, "150")
+        self.assertIsNone(dlg.quote)
+        self.assertFalse(dlg.post_btn.isEnabled())
+        dlg.model.setData(tax_index, "140")
+        self.assertTrue(dlg.post_btn.isEnabled())
+        dlg.save()
+        self.assertIsNotNone(dlg.saved)
+        self.assertEqual(ledger.account_balance(self.con, "5160"), 5000)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 0)

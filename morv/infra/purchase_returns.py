@@ -36,6 +36,18 @@ class LineVat:
     tax_amount: int
     deductible_amount: int
     manual: bool
+    book_value: int
+
+
+@dataclass(frozen=True)
+class ReturnableLot:
+    purchase_line_id: int
+    ref: str
+    name: str
+    dot: str
+    available: int
+    unit_cost: int
+    original_tax: int
 
 
 @dataclass(frozen=True)
@@ -90,12 +102,18 @@ def _stock_row(con, purchase_line_id: int, supplier_id: int):
 
 def returnable(con: sqlite3.Connection, supplier_id: int) -> list[tuple]:
     """Lots of the supplier still in stock: (line id, lot ref, item name, dot, available, unit cost)."""
+    return [(r.purchase_line_id, r.ref, r.name, r.dot, r.available, r.unit_cost)
+            for r in returnable_details(con, supplier_id)]
+
+
+def returnable_details(con: sqlite3.Connection, supplier_id: int) -> list[ReturnableLot]:
+    """Read-only lot metadata, including original VAT rather than current settings."""
     rows = con.execute(
-        "SELECT pl.id, l.ref_no, i.name, coalesce(l.dot, ''), min(l.qty_on_hand, c.qty_remaining), pl.unit_cost "
+        "SELECT pl.id, l.ref_no, i.name, coalesce(l.dot, ''), min(l.qty_on_hand, c.qty_remaining), pl.unit_cost, pl.tax_amount "
         "FROM purchase_lines pl JOIN purchase_invoices p ON p.id = pl.invoice_id JOIN items i ON i.id = pl.item_id "
         "JOIN stock_lots l ON l.purchase_line_id = pl.id JOIN cost_layers c ON c.purchase_line_id = pl.id "
         "WHERE p.supplier_id = ? ORDER BY l.received_date, l.id", (supplier_id,)).fetchall()
-    return [r for r in rows if r[4] > 0]
+    return [ReturnableLot(*r) for r in rows if r[4] > 0]
 
 
 def _shape_return_lines(con, supplier_id: int, lines: list[ReturnLine], day: str) -> list:
@@ -133,7 +151,7 @@ def _quote(con, shaped) -> ReturnQuote:
     """
     taxes = []
     taxable = False
-    for no, ln, _row, _value in shaped:
+    for no, ln, _row, value in shaped:
         original_qty, original_tax, deductible = con.execute(
             "SELECT qty, tax_amount, deductible_tax_amount FROM purchase_lines WHERE id=?",
             (ln.purchase_line_id,)).fetchone()
@@ -159,7 +177,7 @@ def _quote(con, shaped) -> ReturnQuote:
         if manual and not original_tax:
             raise PurchaseReturnError(f"السطر {no}: لا ضريبة أصلية لتحديدها يدويًا")
         taxes.append(LineVat(ln.purchase_line_id, ln.qty, allocated, amount,
-                             amount if deductible else 0, manual))
+                             amount if deductible else 0, manual, value))
     return ReturnQuote(sum(x[3] for x in shaped), tuple(taxes), sum(x.tax_amount for x in taxes),
                        sum(x.deductible_amount for x in taxes), taxable)
 
