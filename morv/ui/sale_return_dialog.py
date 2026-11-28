@@ -211,7 +211,6 @@ class SaleReturnDialog(Modal):
 
         self.model = ReturnTableModel(returnable, self)
         self.view = QTableView()
-        self.view.setObjectName("saleReturnLines")
         self.view.setModel(self.model)
         self.editor = ReturnEditor(self.view)
         self.view.setItemDelegate(self.editor)

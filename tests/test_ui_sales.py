@@ -180,10 +180,10 @@ class SaleReturnUiTest(_Fixture, unittest.TestCase):
 
     def test_dialog_posts_a_return_and_shows_its_value(self):
         dlg = self.dialog()
-        self.assertEqual(dlg.line_combo.count(), 1)
-        dlg.qty.setValue(1)
-        self.assertTrue(dlg.add_line())
-        self.assertEqual(dlg.model.rows[0][4], 100)
+        self.assertEqual(dlg.model.rowCount(), 1)
+        self.assertTrue(dlg.model.setData(dlg.model.index(0, dlg.model.QTY), 1))
+        self.assertEqual(dlg.model.amounts(0), (100, 0))
+        self.assertIn("1.00", dlg.total_label.text())
         dlg.reason.setCurrentText("عيب في الصنف")
         dlg.post()
         self.assertIsNotNone(dlg.posted)
@@ -193,19 +193,34 @@ class SaleReturnUiTest(_Fixture, unittest.TestCase):
         dlg = self.dialog()
         dlg.post()
         self.assertIsNone(dlg.posted)
-        dlg.qty.setValue(1)
-        dlg.add_line()
+        self.assertTrue(dlg.model.setData(dlg.model.index(0, dlg.model.QTY), 1))
         dlg.reason.setCurrentText("لا")
         dlg.post()
         self.assertIsNone(dlg.posted)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sale_returns").fetchone()[0], 0)
 
     def test_available_shrinks_after_a_line_is_added(self):
+        from PySide6.QtCore import Qt
+
         dlg = self.dialog()
-        dlg.qty.setValue(2)
-        dlg.add_line()
-        self.assertEqual(dlg.line_combo.count(), 0)
-        self.assertFalse(dlg.add_btn.isEnabled())
+        qty = dlg.model.index(0, dlg.model.QTY)
+        self.assertEqual(dlg.model.rows[0].available, 2)
+        self.assertTrue(dlg.model.setData(qty, 2))
+        self.assertFalse(dlg.model.setData(qty, 3))
+        self.assertEqual(len(dlg.lines), 1)
+        self.assertEqual(dlg.lines[0].qty, 2)
+        self.assertTrue(dlg.model.setData(qty, 0))
+        self.assertEqual(dlg.lines, [])
+        self.assertTrue(dlg.model.setData(qty, 2))
+        dlg.reason.setCurrentText("عيب في الصنف")
+        dlg.post()
+        self.assertIsNotNone(dlg.posted)
+        reopened = self.dialog()
+        self.assertEqual(reopened.model.rows[0].available, 0)
+        self.assertFalse(reopened.model.flags(reopened.model.index(0, reopened.model.QTY))
+                         & Qt.ItemFlag.ItemIsEditable)
+        self.assertFalse(reopened.all_btn.isEnabled())
+        self.assertFalse(reopened.post_btn.isEnabled())
 
     def test_page_shows_return_button_only_with_permission(self):
         from morv.infra import users

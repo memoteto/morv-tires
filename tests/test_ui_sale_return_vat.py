@@ -18,12 +18,20 @@ class SaleReturnUiTest(_Fixture, unittest.TestCase):
         super().setUp()
         self.app = get_app()
         self.dialogs = []
+        self.parents = []
         self.addCleanup(self.close_dialogs)
 
     def close_dialogs(self):
+        from PySide6.QtCore import QEvent
+
         for dlg in self.dialogs:
             dlg.close()
             dlg.deleteLater()
+        self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        for parent in self.parents:
+            parent.close()
+            parent.deleteLater()
+        self.app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         self.app.processEvents()
 
     def make_dialog(self, vat=True, parent=None):
@@ -130,7 +138,7 @@ class SaleReturnUiTest(_Fixture, unittest.TestCase):
         from PySide6.QtWidgets import QWidget
 
         parent = QWidget()
-        self.addCleanup(parent.close)
+        self.parents.append(parent)
         available = self.app.primaryScreen().availableGeometry()
         parent.resize(300, 240)
         parent.move(available.right() - 100, available.bottom() - 100)
