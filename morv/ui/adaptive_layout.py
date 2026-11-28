@@ -148,8 +148,12 @@ class InvoiceWorkspace(QWidget):
         primary = max(self.primary.minimumWidth(), self.primary.minimumSizeHint().width())
         summary = max(self.summary.minimumWidth(), self.summary.minimumSizeHint().width())
         footer = max(self.footer.minimumWidth(), self.footer.minimumSizeHint().width())
+        # The summary panel's themed frame consumes space outside both children.
+        self._summary_panel.ensurePolished()
+        frame = self._summary_panel.contentsMargins()
         return (primary + self.primary_area.verticalScrollBar().sizeHint().width(),
-                max(footer, summary + self.summary_area.verticalScrollBar().sizeHint().width()))
+                max(footer, summary + self.summary_area.verticalScrollBar().sizeHint().width())
+                + frame.left() + frame.right())
 
     def minimumSizeHint(self):
         margins = self.grid.contentsMargins()

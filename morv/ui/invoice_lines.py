@@ -22,8 +22,10 @@ class InvoiceLineTable(QWidget):
     def __init__(self, headings, *, purchase=False):
         super().__init__()
         self.purchase = purchase
+        self._sale_tax_header = None
         self.total_column = len(headings) - 2
         self.compact_discount = purchase
+        self.compact_sale_discount = False
         self.compact_freight = purchase
         self._discount_budget = 0
         outer = QVBoxLayout(self)
@@ -102,6 +104,78 @@ class InvoiceLineTable(QWidget):
                 focus.setFocus()
         secondary.parentWidget().setVisible(self.compact_discount or self.compact_freight)
 
+    def sale_row_layout(self, widget):
+        """Use the shared two-line pattern only when a VAT sale needs more room."""
+        outer = QVBoxLayout(widget)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        primary, secondary = QWidget(), QWidget()
+        widget._invoice_primary = self.row_layout(primary)
+        widget._invoice_secondary = self.row_layout(secondary)
+        widget._invoice_secondary.addWidget(muted("الخصم"))
+        widget._invoice_secondary.addStretch(1)
+        outer.addWidget(primary)
+        outer.addWidget(secondary)
+        secondary.hide()
+        return widget._invoice_primary
+
+    def register_sale_row(self, widget, tax_cell):
+        primary = widget._invoice_primary
+        widget._invoice_cells = tuple(primary.itemAt(i).widget() for i in range(primary.count()))
+        widget._invoice_tax_cell = tax_cell
+
+    def _place_sale_discount(self, widget):
+        primary, secondary = widget._invoice_primary, widget._invoice_secondary
+        cell = widget._invoice_cells[4]
+        compact = self.compact_sale_discount
+        if compact != (secondary.indexOf(cell) >= 0):
+            restore_focus = cell.hasFocus()
+            if compact:
+                primary.removeWidget(cell)
+                secondary.insertWidget(1, cell, 0, Qt.AlignmentFlag.AlignTop)
+            else:
+                secondary.removeWidget(cell)
+                primary.insertWidget(4, cell, 0, Qt.AlignmentFlag.AlignTop)
+            cell.show()
+            if restore_focus:
+                cell.setFocus()
+        secondary.parentWidget().setVisible(compact)
+
+    def set_sale_tax_visible(self, enabled, rows):
+        """Insert or remove the optional read-only sale VAT column in shared geometry."""
+        if self.purchase:
+            raise ValueError("Sale VAT column is not a purchase adjustment")
+        if self._sale_tax_header is None and not enabled:
+            return
+        if self._sale_tax_header is None:
+            self._sale_tax_header = muted("الضريبة")
+            self._sale_tax_header.setWordWrap(False)
+            self._sale_tax_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header = self._sale_tax_header
+        layout = self.headers[0].parentWidget().layout()
+        if enabled and header not in self.headers:
+            self.headers.insert(5, header)
+            layout.insertWidget(5, header)
+            header.show()
+        elif not enabled and header in self.headers:
+            self.headers.remove(header)
+            layout.removeWidget(header)
+            header.hide()
+        for row, cell in rows:
+            layout = row._invoice_primary
+            if enabled and layout.indexOf(cell) < 0:
+                total = row._invoice_cells[-2]
+                layout.insertWidget(layout.indexOf(total), cell, 0, Qt.AlignmentFlag.AlignTop)
+                cell.show()
+            elif not enabled and layout.indexOf(cell) >= 0:
+                layout.removeWidget(cell)
+                cell.hide()
+        self.total_column = len(self.headers) - 2
+
+    @property
+    def sale_tax_visible(self):
+        return self._sale_tax_header is not None and self._sale_tax_header in self.headers
+
     def set_discount_budget(self, width):
         if width != self._discount_budget:
             self._discount_budget = width
@@ -120,6 +194,8 @@ class InvoiceLineTable(QWidget):
         labels = (cells[0], cells[self.total_column])
         if self.purchase:
             labels += (cells[6].layout().itemAt(1).widget(),)  # calculated freight share
+        elif self.sale_tax_visible:
+            labels += (cells[5],)
         for label in labels:
             if label.minimumHeight() != height or label.maximumHeight() != height:
                 label.setFixedHeight(height)
@@ -130,16 +206,19 @@ class InvoiceLineTable(QWidget):
     def sync_columns(self):
         cells_by_row = [self.headers]
         purchase_rows = []
+        sale_rows = []
         for index in range(self.rows.count()):
             widget = self.rows.itemAt(index).widget()
             if self.purchase:
                 if hasattr(widget, "_invoice_cells"):
                     purchase_rows.append(widget)
                     cells_by_row.append(widget._invoice_cells)
-            else:
-                layout = widget.layout() if widget is not None else None
-                if layout is not None and layout.count() == len(self.headers):
-                    cells_by_row.append([layout.itemAt(i).widget() for i in range(layout.count())])
+            elif hasattr(widget, "_invoice_cells"):
+                sale_rows.append(widget)
+                cells = widget._invoice_cells
+                if self.sale_tax_visible:
+                    cells = cells[:5] + (widget._invoice_tax_cell,) + cells[5:]
+                cells_by_row.append(cells)
 
         widths = [self._text_width(label, label.text()) + 2 for label in self.headers]
         widths[0] = max(widths[0], self._text_width(self.headers[0], "999") + 2)
@@ -150,6 +229,8 @@ class InvoiceLineTable(QWidget):
                                                      for sample in samples) + inset)
         total = self.total_column
         widths[total] = max(widths[total], self._text_width(self.headers[total], "999,999.99") + 4)
+        if self.sale_tax_visible:
+            widths[5] = max(widths[5], self._text_width(self.headers[5], "999,999.99") + 4)
         widths[-1] = LAYOUT["invoice_line_delete_width"]
 
         for cells in cells_by_row[1:]:
@@ -176,6 +257,8 @@ class InvoiceLineTable(QWidget):
                 freight_width = max(self._text_width(edit, sample)
                                     for sample in ("999,999.99", edit.placeholderText(), edit.text()[:17])) + inset
                 widths[6] = max(widths[6], freight_width, self._text_width(value, value.text()) + 4)
+            if self.sale_tax_visible:
+                widths[5] = max(widths[5], self._text_width(cells[5], cells[5].text()) + 4)
             widths[total] = max(widths[total], self._text_width(cells[total], cells[total].text()) + 4)
 
         name_min = max(widths[1], max(widths[3], widths[4], widths[total])
@@ -190,6 +273,13 @@ class InvoiceLineTable(QWidget):
             self.headers[6].setVisible(not self.compact_freight)
             for widget in purchase_rows:
                 self._place_adjustments(widget)
+        else:
+            wide_min = (sum(widths) - widths[1] + name_min + 2 * LAYOUT["invoice_line_margin"]
+                        + (len(widths) - 1) * LAYOUT["invoice_line_column_gap"])
+            self.compact_sale_discount = self.sale_tax_visible and wide_min > self._discount_budget
+            self.headers[4].setVisible(not self.compact_sale_discount)
+            for widget in sale_rows:
+                self._place_sale_discount(widget)
         for cells in cells_by_row:
             for column, cell in enumerate(cells):
                 if column == 1:

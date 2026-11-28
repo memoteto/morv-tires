@@ -140,9 +140,15 @@ class AdaptiveInvoiceTest(PosFixture):
             primary_min = max(area.primary.minimumWidth(), area.primary.minimumSizeHint().width())
             summary_min = max(area.summary.minimumWidth(), area.summary.minimumSizeHint().width())
             footer_min = area.footer.minimumSizeHint().width()
+            frame = area._summary_panel.contentsMargins()
             needed = (primary_min + area.primary_area.verticalScrollBar().sizeHint().width()
                       + max(footer_min, summary_min + area.summary_area.verticalScrollBar().sizeHint().width())
+                      + frame.left() + frame.right()
                       + area.grid.horizontalSpacing() + margins.left() + margins.right())
+            if area.columns == 2:
+                self.assertGreaterEqual(area._summary_panel.width(),
+                                        summary_min + area.summary_area.verticalScrollBar().sizeHint().width()
+                                        + frame.left() + frame.right())
             self.assertEqual(area.columns, 2 if area.width() >= needed else 1)
             if width == 1366:
                 self.assertEqual(area.columns, 2)

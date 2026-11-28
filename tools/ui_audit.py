@@ -197,6 +197,59 @@ def _capture_checked(root, app, out, name, report, *, dialog=False, screen_h=Non
     print(f"audit: captured {name}", flush=True)
 
 
+def _capture_pos_vat(win, page, session, app, out, tag, report):
+    from morv.infra import settings
+
+    con = session.con
+    previous = settings.get(con, "tax.enabled", "0")
+    if page._rows:
+        raise RuntimeError("audit: POS VAT requires an empty audit draft")
+    try:
+        settings.put(con, "tax.enabled", "1")
+        page.refresh()
+        for code in ("AUDIT-SEARCH-0", "AUDIT-SEARCH-4"):
+            row = con.execute("SELECT id,kind,name FROM items WHERE code=?", (code,)).fetchone()
+            page._add_row(*row)
+        page.invoice_disc.setText("100.00")
+        for inclusive in (True, False):
+            page.tax_inclusive.setChecked(inclusive)
+            _settle(app)
+            area = (page.invoice_layout.summary_area if page.invoice_layout.columns == 2
+                    else page.invoice_layout.primary_area)
+            area.ensureWidgetVisible(page.tax_inclusive)
+            _settle(app)
+            if (not page.tax_inclusive.isVisible() or not page.tax_row.isVisible()
+                    or not page.before_tax_row.isVisible() or not page._line_table.sale_tax_visible
+                    or any(row["tax_lbl"].isHidden() for row in page._rows)
+                    or page._tax_quote is None or not page.summary_footer.isVisible()):
+                raise RuntimeError("audit: missing POS VAT preview or fixed footer")
+            mode = "inclusive" if inclusive else "exclusive"
+            _capture_checked(win, app, out, f"page_pos_vat_{mode}_{tag}", report)
+    finally:
+        settings.put(con, "tax.enabled", previous)
+        page._reset_after_post()
+        _settle(app)
+
+
+def _capture_vat_print_preview(win, app, out, tag, report, screen_h):
+    from morv.ui.printing import PrintPreview
+    from tools.print_samples import _shop, _vat_sale
+
+    dlg = PrintPreview(win, _shop(), _vat_sale(False))
+    try:
+        dlg.show()
+        _settle(app)
+        if (dlg.preview_area.verticalScrollBar().maximum()
+                or dlg.preview_area.horizontalScrollBar().maximum()):
+            raise RuntimeError("audit: fitted VAT sheet unexpectedly requires scrolling")
+        _capture_checked(dlg, app, out, f"dlg_vat_print_preview_{tag}", report,
+                         dialog=True, screen_h=screen_h)
+    finally:
+        dlg.close()
+        dlg.deleteLater()
+        _settle(app)
+
+
 def _capture_item_vat(win, session, app, out, tag, report, screen_h):
     from morv.infra import items, settings
     from morv.ui.inventory_page import ItemDialog
@@ -378,6 +431,8 @@ def run(out: Path, size: tuple) -> dict:
                 if key == "pos":
                     _capture_item_search(win.stack.currentWidget(), app, out,
                                          f"popup_pos_search_{w}x{h}_{mode}", 5, report)
+                    _capture_pos_vat(win, win.stack.currentWidget(), session, app, out,
+                                     f"{w}x{h}_{mode}", report)
                 if key == "purchases":
                     page = win.stack.currentWidget()
                     page.open_form()
@@ -425,6 +480,7 @@ def run(out: Path, size: tuple) -> dict:
                     tabs.setCurrentIndex(0)
                     _settle(app)
             _capture_item_vat(win, session, app, out, f"{w}x{h}_{mode}", report, h)
+            _capture_vat_print_preview(win, app, out, f"{w}x{h}_{mode}", report, h)
             for dname, make in _dialogs(session, item_id):
                 name = f"dlg_{dname}_{w}x{h}_{mode}"
                 try:

@@ -34,7 +34,9 @@ class SaleDocumentTest(unittest.TestCase):
         self.assertEqual("S-2026-000154", doc.number)
         self.assertIn(("العميل", "أحمد محمود"), doc.info)
         self.assertIn(("المركبة", "ق س ط 4826"), doc.info)
-        self.assertIn(("الدفع", "نقدي"), doc.info)
+        self.assertIn(("طريقة الدفع", "نقدي"), doc.info)
+        self.assertEqual([], doc.payment_details)
+        self.assertNotIn("نقدي", dict(doc.info))
         self.assertEqual(2, len(doc.lines))
         self.assertEqual("إطار ميشلان", doc.lines[0].name)
         self.assertEqual(1290000, doc.lines[0].total)
@@ -52,6 +54,144 @@ class SaleDocumentTest(unittest.TestCase):
         doc = sale_document(_sale(returned=380000), _shop())
         self.assertIn(("المرتجع", "3,800.00"), doc.totals)
         self.assertEqual("33,700.00 ج.م", dict(doc.totals)["الصافي"])
+
+    def test_vat_totals_and_per_line_treatments_on_all_paper_shapes(self):
+        from morv.ui import print_doc
+        from tools.print_samples import _vat_sale
+
+        for inclusive in (True, False):
+            doc = _vat_sale(inclusive)
+            with self.subTest(inclusive=inclusive):
+                self.assertNotIn("أساس السعر", dict(doc.info))
+                self.assertEqual(doc.totals, [
+                    ("الإجمالي قبل الخصم", "2,000.00"),
+                    ("الخصم", "200.00"),
+                    ("الإجمالي قبل الضريبة", "1,689.47" if inclusive else "1,800.00"),
+                    ("ضريبة القيمة المضافة", "110.53" if inclusive else "126.00"),
+                    ("الإجمالي شامل القيمة المضافة", "1,800.00 ج.م" if inclusive else "1,926.00 ج.م"),
+                ])
+                self.assertIn("ضريبة 14%", doc.lines[0].detail)
+                self.assertEqual(doc.lines[0].discount, 10000)
+                self.assertEqual(doc.lines[0].tax_amount, 11053 if inclusive else 12600)
+                self.assertEqual(doc.lines[1].detail, "معفى")
+                self.assertEqual(doc.lines[1].tax_amount, 0)
+                for shape in print_doc.SHAPES.values():
+                    with self.subTest(shape=shape.key):
+                        rendered = print_doc.render(_shop(), doc, shape)
+                        self.assertIn("ضريبة القيمة المضافة", rendered.toPlainText())
+                        self.assertIn("الإجمالي قبل الضريبة", rendered.toPlainText())
+                        self.assertIn("الإجمالي شامل القيمة المضافة", rendered.toPlainText())
+                        self.assertIn("الضريبة", rendered.toPlainText())
+                        image = print_doc.preview_image(_shop(), doc, shape)
+                        self.assertFalse(image.isNull())
+
+    def test_optional_invoice_identity_and_notes_are_in_document(self):
+        from morv.ui.printing import sale_document
+        sale = _sale(customer_mobile="01000000001", customer_address="المنصورة",
+                     customer_tax_id="123456789", cashier_name="مدير",
+                     recorded_at="2026-11-23 08:00:00", odometer=12000,
+                     notes="تجربة <ملاحظة>")
+        doc = sale_document(sale, _shop())
+        for pair in (("الموبايل", "01000000001"), ("عنوان العميل", "المنصورة"),
+                     ("رقم العميل الضريبي", "123456789"), ("الكاشير", "مدير"),
+                     ("قراءة العداد", "12000"), ("طريقة الدفع", "نقدي")):
+            self.assertIn(pair, doc.info)
+        self.assertEqual("2026-11-23 08:00", doc.date)
+        self.assertNotIn("وقت التسجيل", dict(doc.info))
+        self.assertEqual([], doc.payment_details)
+        self.assertEqual(doc.remarks, sale.notes)
+
+    def test_payment_details_follow_total_on_all_paper_shapes(self):
+        from morv.ui import print_doc
+        from morv.ui.printing import sale_document
+
+        sale = _sale(customer_mobile="01000000001", tax_enabled=True, tax_total=0,
+                     payments=(("cash", 1000000, 1100000, None),
+                               ("card", 2750000, None, "REF-123")))
+        shop = _shop()
+        shop.address = "المنصورة"
+        shop.phone2 = "01222222222"
+        doc = sale_document(sale, shop)
+        self.assertEqual(doc.payment_details, [
+            ("نقدي", "10,000.00"), ("المستلم نقدًا", "11,000.00"),
+            ("الباقي للعميل", "1,000.00"), ("بطاقة", "27,500.00"),
+            ("مرجع بطاقة", "REF-123"),
+        ])
+        self.assertEqual("نقدي + بطاقة", dict(doc.info)["طريقة الدفع"])
+        for label, _value in doc.payment_details:
+            self.assertNotIn(label, dict(doc.info))
+        for shape in print_doc.SHAPES.values():
+            with self.subTest(shape=shape.key):
+                html = print_doc.body_html(shop, doc, shape)
+                self.assertLess(html.index(shop.phone), html.index("العميل"))
+                self.assertLess(html.index(shop.phone2), html.index("العميل"))
+                self.assertEqual(1, html.count(shop.phone))
+                self.assertEqual(1, html.count(shop.phone2))
+                self.assertIn("01000000001", html)
+                self.assertNotIn("أساس السعر", html)
+                total = html.index("الإجمالي شامل القيمة المضافة")
+                for label in ("المستلم نقدًا", "الباقي للعميل", "مرجع بطاقة"):
+                    self.assertGreater(html.index(label), total)
+                self.assertNotIn(shop.phone, print_doc.footer_html(
+                    shop, shape, contact_in_header=True))
+                self.assertFalse(print_doc.preview_image(shop, doc, shape).isNull())
+
+    def test_cash_change_is_conditional_and_missing_customer_mobile_is_omitted(self):
+        from morv.ui.printing import sale_document
+
+        cash = sale_document(_sale(customer_name="عميل نقدي",
+                                   payments=(("cash", 3750000, 3800000, None),)), _shop())
+        self.assertNotIn("الموبايل", dict(cash.info))
+        self.assertEqual(cash.payment_details, [
+            ("المستلم نقدًا", "38,000.00"), ("الباقي للعميل", "500.00"),
+        ])
+        exact = sale_document(_sale(), _shop())
+        self.assertEqual([], exact.payment_details)
+        backdated = sale_document(_sale(recorded_at="2026-11-28 08:00:00"), _shop())
+        self.assertEqual("2026-11-23", backdated.date)
+        returned = sale_document(_sale(returned=380000), _shop())
+        self.assertEqual([("نقدي", "37,500.00")], returned.payment_details)
+
+
+    def test_print_preview_fits_single_sheet_and_can_zoom(self):
+        from morv.ui.printing import PrintPreview, sale_document
+        dlg = PrintPreview(None, _shop(), sale_document(_sale(), _shop()))
+        self.addCleanup(dlg.deleteLater)
+        dlg.show()
+        self.addCleanup(dlg.close)
+        for _ in range(5):
+            self.app.processEvents()
+        self.assertIsNone(dlg.scroll)
+        self.assertEqual(dlg.preview_area.verticalScrollBar().maximum(), 0)
+        self.assertEqual(dlg.preview_area.horizontalScrollBar().maximum(), 0)
+        self.assertTrue(dlg.print_btn.isVisible())
+        self.assertLessEqual(dlg.height(), dlg.screen().availableGeometry().height())
+        self.assertLessEqual(dlg.width(), dlg.screen().availableGeometry().width())
+        self.assertGreater(dlg.page.pixmap().height(), 0)
+        dlg.zoom_btn.click()
+        for _ in range(5):
+            self.app.processEvents()
+        self.assertTrue(dlg.zoom_btn.isChecked())
+        dlg.zoom_btn.click()
+        for _ in range(5):
+            self.app.processEvents()
+        self.assertEqual(dlg.preview_area.verticalScrollBar().maximum(), 0)
+
+    def test_multi_page_preview_can_reach_last_sheet(self):
+        from morv.ui.printing import PrintPreview, sale_document
+        sale = _sale(lines=_sale().lines * 80)
+        dlg = PrintPreview(None, _shop(), sale_document(sale, _shop()))
+        self.addCleanup(dlg.deleteLater)
+        dlg.show()
+        self.addCleanup(dlg.close)
+        self.app.processEvents()
+        self.assertGreater(dlg.page_count, 1)
+        self.assertTrue(dlg.next_btn.isEnabled())
+        dlg.next_btn.click()
+        self.assertEqual(dlg.page_index, 1)
+        dlg._show_page(dlg.page_count - 1)
+        self.assertFalse(dlg.next_btn.isEnabled())
+        self.assertTrue(dlg.previous_btn.isEnabled())
 
     def test_the_paper_follows_the_shop_setting(self):
         from morv.ui.printing import shape_for

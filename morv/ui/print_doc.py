@@ -1,6 +1,7 @@
 """Builds every printed document from the approved design in design/Shop.dc.html, for sheet and roll."""
 import re
 from dataclasses import dataclass, field
+from html import escape
 
 from PySide6.QtCore import QMarginsF, QRectF, QSizeF, Qt, QUrl
 from PySide6.QtGui import QFont, QImage, QPageLayout, QPageSize, QPainter, QTextDocument
@@ -46,6 +47,8 @@ class Line:
     qty: str = ""
     price: int = 0
     total: int = 0
+    discount: int | None = None
+    tax_amount: int | None = None
 
 
 @dataclass
@@ -57,6 +60,9 @@ class Document:
     lines: list[Line] = field(default_factory=list)
     totals: list[tuple[str, str]] = field(default_factory=list)
     note: str = ""                   # stands in for the items table on documents that have no lines
+    remarks: str = ""                # invoice notes, independent of the item table
+    payment_details: list[tuple[str, str]] = field(default_factory=list)
+    contact_in_header: bool = False
 
 
 def _pt(shape: Shape, size: float) -> str:
@@ -125,6 +131,19 @@ def _logo_cell(shop, size: int) -> str:
             f"{shop.initial}</td></tr></table>")
 
 
+def _header_contact(shop, shape: Shape, align: str) -> str:
+    size = max(10, round(12 * shape.scale))
+    phones = list(dict.fromkeys(phone for phone in (shop.phone, shop.phone2) if phone))
+    rows = []
+    if phones:
+        rows.append(f"{_icon('phone', size)}&nbsp;" + " &nbsp; / &nbsp; ".join(
+            _ltr(escape(phone)) for phone in phones))
+    if shop.address:
+        rows.append(f"{_icon('pin', size)}&nbsp;{escape(shop.address)}")
+    return "".join(f"<div align='{align}' dir='rtl' style='color:{INK};"
+                   f"font-size:{_pt(shape, 9)}'>{row}</div>" for row in rows)
+
+
 def _sheet_head(shop, doc: Document, shape: Shape) -> str:
     tax = ""
     if shop.tax_registered and (shop.commercial_register or shop.tax_id):
@@ -142,7 +161,7 @@ def _sheet_head(shop, doc: Document, shape: Shape) -> str:
             f"<div align='right' style='font-size:{_pt(shape, 14)};font-weight:bold;color:{INK}'>"
             f"{shop.name}</div>"
             f"<div align='right' style='color:{MUTED};font-size:{_pt(shape, 8.5)}'>{shop.activity}</div>"
-            f"{tax}</td>")
+            f"{tax}{_header_contact(shop, shape, 'right') if doc.contact_in_header else ''}</td>")
     doc_block = (f"<td width='32%' valign='middle' align='left' dir='ltr'>"
                  f"<div align='left' style='color:{BLUE};font-weight:bold;font-size:{_pt(shape, 12)}'>"
                  f"{doc.title}</div>"
@@ -163,30 +182,43 @@ def _info_box(doc: Document, shape: Shape) -> str:
         for label, value in reversed(pair):      # emitted left to right, so the first pair lands on the right
             # Label and value sit in cells of their own, and a right-to-left mark after the colon
             # keeps that neutral character beside its label instead of at the far edge of the line
-            cells += (f"<td width='37%' align='right' dir='rtl' style='color:{INK};"
-                      f"font-size:{_pt(shape, 9)}'>{value}</td>"
-                      f"<td width='13%' align='right' dir='rtl' style='color:{MUTED};"
-                      f"font-size:{_pt(shape, 9)}'>{label}:&#8207;&nbsp;</td>")
+            cells += (f"<td width='32%' align='right' valign='top' dir='rtl' style='color:{INK};"
+                      f"font-size:{_pt(shape, 9)}'>{escape(str(value))}</td>"
+                      f"<td width='18%' align='left' valign='top' dir='rtl' style='color:{MUTED};"
+                      f"font-size:{_pt(shape, 9)}'>{escape(str(label))}:&#8207;&nbsp;</td>")
         if len(pair) == 1:
-            cells = "<td width='37%'></td><td width='13%'></td>" + cells
+            cells = "<td width='32%'></td><td width='18%'></td>" + cells
         rows += f"<tr>{cells}</tr>"
     return _gap(4) + (f"<table width='100%' cellspacing='0' cellpadding='4' bgcolor='{FILL}' "
                       f"dir='ltr'>{rows}</table>")
 
 
 _COLS = (("الإجمالي", "11%"), ("السعر", "11%"), ("الكمية", "8%"), ("الصنف", "64%"), ("م", "6%"))
+_VAT_COLS = (("الإجمالي", "15%"), ("الضريبة", "13%"), ("الخصم", "12%"),
+             ("السعر", "14%"), ("الكمية", "7%"), ("الصنف", "34%"), ("م", "5%"))
+
+
+def _has_vat_lines(doc: Document) -> bool:
+    return any(line.tax_amount is not None for line in doc.lines)
 
 
 def _lines_table(doc: Document, shape: Shape) -> str:
     if not doc.lines:
         return ""
+    vat = _has_vat_lines(doc)
     head = "".join(f"<td width='{w}' align='center' style='padding:4px;color:{MUTED};font-weight:bold'>{t}</td>"
-                   for t, w in _COLS)
+                   for t, w in (_VAT_COLS if vat else _COLS))
     body = ""
     for i, line in enumerate(doc.lines, 1):
-        name = line.name + (f" <span style='color:{MUTED}'>&#183; {line.detail}</span>" if line.detail else "")
+        name = escape(line.name) + (f" <span style='color:{MUTED}'>&#183; {escape(line.detail)}</span>" if line.detail else "")
+        adjustments = ""
+        if vat:
+            for value in (line.tax_amount, line.discount):
+                adjustments += (f"<td align='left' dir='ltr' style='padding:4px'>"
+                                f"{fmt(value) if value is not None else '—'}</td>")
         body += (f"<tr>"
                  f"<td align='left' dir='ltr' style='padding:4px'>{fmt(line.total)}</td>"
+                 f"{adjustments}"
                  f"<td align='left' dir='ltr' style='padding:4px'>{fmt(line.price)}</td>"
                  f"<td align='center' dir='ltr' style='padding:4px'>{line.qty}</td>"
                  f"<td dir='rtl' style='padding:4px'>{name}</td>"
@@ -211,9 +243,16 @@ def _totals_block(doc: Document, shape: Shape) -> str:
         # The value keeps the paragraph's own direction so a currency word stays where the design puts it
         rows += (f"<tr><td align='left' dir='rtl' style='padding:2px 4px;{style}'>{value}</td>"
                  f"<td align='right' dir='rtl' style='padding:2px 4px;{style}'>{label}</td></tr>")
+    if doc.payment_details:
+        rows += f"<tr><td colspan='2' style='padding:0'>{_band(LINE)}</td></tr>"
+        for label, value in doc.payment_details:
+            style = f"color:{MUTED};font-size:{_pt(shape, 9)}"
+            rows += (f"<tr><td align='left' dir='rtl' style='padding:2px 4px;{style}'>{escape(value)}</td>"
+                     f"<td align='right' dir='rtl' style='padding:2px 4px;{style}'>{escape(label)}</td></tr>")
     inner = f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr'>{rows}</table>"
+    width = 68 if _has_vat_lines(doc) else 48
     return _gap(5) + (f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr'><tr>"
-                      f"<td width='48%'>{inner}</td><td width='52%'></td></tr></table>")
+                      f"<td width='{width}%'>{inner}</td><td width='{100 - width}%'></td></tr></table>")
 
 
 def _sheet_tail(shop, doc: Document, shape: Shape) -> str:
@@ -221,6 +260,9 @@ def _sheet_tail(shop, doc: Document, shape: Shape) -> str:
     if doc.note:
         out += _gap(5) + (f"<div dir='rtl' style='color:{INK};font-size:{_pt(shape, 9.5)}'>"
                           f"{doc.note}</div>")
+    if doc.remarks:
+        out += _gap(5) + (f"<div dir='rtl' style='font-size:{_pt(shape, 9)}'>"
+                          f"ملاحظات: {escape(doc.remarks).replace(chr(10), '<br>')}</div>")
     if shop.thanks:
         out += _gap(7) + (f"<div align='center' style='color:{BLUE};font-weight:bold;"
                           f"font-size:{_pt(shape, 10)}'>{shop.thanks}</div>")
@@ -231,13 +273,14 @@ def _sheet_tail(shop, doc: Document, shape: Shape) -> str:
     return out
 
 
-def _contact_bar(shop, shape: Shape) -> str:
+def _contact_bar(shop, shape: Shape, *, contact_in_header=False) -> str:
     items = []
-    if shop.address:
-        items.append(("pin", shop.address))
-    for phone in (shop.phone, shop.phone2):
-        if phone:
-            items.append(("phone", _ltr(phone)))
+    if not contact_in_header:
+        if shop.address:
+            items.append(("pin", shop.address))
+        for phone in (shop.phone, shop.phone2):
+            if phone:
+                items.append(("phone", _ltr(phone)))
     if shop.show_whatsapp and shop.whatsapp:
         items.append(("chat", _ltr(shop.whatsapp)))
     if shop.show_hours and shop.hours:
@@ -264,7 +307,9 @@ def _roll(shop, doc: Document, shape: Shape) -> str:
     out = f"<div align='center' style='font-weight:bold;font-size:{_pt(shape, 13)};color:{INK}'>{shop.name}</div>"
     if shop.activity:
         out += f"<div align='center' style='color:{MUTED};font-size:{_pt(shape, 8.5)}'>{shop.activity}</div>"
-    if shop.phone:
+    if doc.contact_in_header:
+        out += _header_contact(shop, shape, "center")
+    elif shop.phone:
         out += f"<div align='center' style='font-size:{_pt(shape, 9)}'>{_ltr(shop.phone)}</div>"
     if shop.tax_registered and shop.tax_id:
         out += (f"<div align='center' style='color:{MUTED};font-size:{_pt(shape, 8)}'>"
@@ -276,20 +321,31 @@ def _roll(shop, doc: Document, shape: Shape) -> str:
     if doc.info:
         out += rule()
         for label, value in doc.info:
-            out += row(label, value)
+            out += row(escape(str(label)), escape(str(value)))
     if doc.lines:
         out += rule()
         for line in doc.lines:
-            name = line.name + (f" &#183; {line.detail}" if line.detail else "")
+            name = escape(line.name) + (f" &#183; {escape(line.detail)}" if line.detail else "")
             out += (f"<div dir='rtl' style='font-size:{_pt(shape, 9.5)}'>{name}</div>")
             out += row(f"{line.qty} &#215; {fmt(line.price)}", fmt(line.total))
+            if line.discount is not None:
+                out += row("الخصم", fmt(line.discount))
+            if line.tax_amount is not None:
+                out += row("الضريبة", fmt(line.tax_amount))
     if doc.totals:
         out += rule()
         for i, (label, value) in enumerate(doc.totals):
             out += row(label, value, strong=i == len(doc.totals) - 1)
+    if doc.payment_details:
+        out += rule()
+        for label, value in doc.payment_details:
+            out += row(escape(label), escape(value))
     if doc.note:
         out += rule()
         out += f"<div dir='rtl' style='font-size:{_pt(shape, 9.5)}'>{doc.note}</div>"
+    if doc.remarks:
+        out += rule()
+        out += f"<div dir='rtl'>ملاحظات: {escape(doc.remarks).replace(chr(10), '<br>')}</div>"
     if shop.thanks:
         out += rule()
         out += f"<div align='center' style='font-weight:bold;font-size:{_pt(shape, 9.5)}'>{shop.thanks}</div>"
@@ -303,21 +359,26 @@ def _roll(shop, doc: Document, shape: Shape) -> str:
 
 def body_html(shop, doc: Document, shape: Shape) -> str:
     if shape.roll:
-        return _shell(_roll(shop, doc, shape) + _contact_bar(shop, shape))
+        return _shell(_roll(shop, doc, shape)
+                      + _contact_bar(shop, shape, contact_in_header=doc.contact_in_header))
     return _shell(_sheet_head(shop, doc, shape) + _info_box(doc, shape) + _lines_table(doc, shape)
                   + _totals_block(doc, shape) + _sheet_tail(shop, doc, shape))
 
 
-def footer_html(shop, shape: Shape) -> str:
+def footer_html(shop, shape: Shape, *, contact_in_header=False) -> str:
     """The contact bar, which a sheet pins to the foot of every page instead of letting it flow."""
-    return "" if shape.roll else _shell(_contact_bar(shop, shape))
+    if shape.roll:
+        return ""
+    bar = _contact_bar(shop, shape, contact_in_header=contact_in_header)
+    return _shell(bar) if bar else ""
 
 
 def document_html(shop, doc: Document, shape: Shape) -> str:
     if shape.roll:
         return body_html(shop, doc, shape)
     inner = _sheet_head(shop, doc, shape) + _info_box(doc, shape) + _lines_table(doc, shape) \
-        + _totals_block(doc, shape) + _sheet_tail(shop, doc, shape) + _contact_bar(shop, shape)
+        + _totals_block(doc, shape) + _sheet_tail(shop, doc, shape) \
+        + _contact_bar(shop, shape, contact_in_header=doc.contact_in_header)
     return _shell(inner)
 
 
@@ -368,18 +429,25 @@ def content_px(shape: Shape) -> tuple[float, float]:
     return rect.width(), rect.height()
 
 
-def paint(shop, doc: Document, shape: Shape, painter: QPainter, width_px: float, height_px: float,
-          new_page=None) -> int:
-    """Draws the pages and pins the contact bar to the foot of each, which a flowing document cannot do."""
-    foot_html = footer_html(shop, shape)
+def _page_documents(shop, doc, shape, width_px, height_px):
+    """One pagination path for printer and preview."""
+    foot_html = footer_html(shop, shape, contact_in_header=doc.contact_in_header)
     foot = _layout(foot_html, shop, shape, width_px) if foot_html else None
     foot_h = (foot.size().height() + 8) if foot else 0
     body_h = max(60.0, height_px - foot_h)
     body = _layout(body_html(shop, doc, shape), shop, shape, width_px)
     body.setPageSize(QSizeF(width_px, body_h))
+    return body, foot, body_h
+
+
+def paint(shop, doc: Document, shape: Shape, painter: QPainter, width_px: float, height_px: float,
+          new_page=None, *, page_index=None) -> int:
+    """Draw all pages for the printer or one indexed page for the preview."""
+    body, foot, body_h = _page_documents(shop, doc, shape, width_px, height_px)
     pages = max(1, body.pageCount())
-    for index in range(pages):
-        if index and new_page:
+    indices = range(pages) if page_index is None else range(page_index, min(page_index + 1, pages))
+    for index in indices:
+        if index and new_page and page_index is None:
             new_page()
         painter.save()
         painter.setClipRect(QRectF(0, 0, width_px, body_h))
@@ -394,16 +462,29 @@ def paint(shop, doc: Document, shape: Shape, painter: QPainter, width_px: float,
     return pages
 
 
-def preview_image(shop, doc: Document, shape: Shape, width_px: int = 0) -> QImage:
-    """Draws the paper as it prints, so the preview and the printed sheet cannot drift apart."""
+def _preview_size(shop, doc, shape):
     real_w, real_h = content_px(shape)
     if shape.roll:
-        # A roll has no page end, so it is as long as the document
+        # A roll has no page end, so it is as long as the document.
         real_h = max(1.0, _layout(body_html(shop, doc, shape), shop, shape, real_w).size().height())
+    return real_w, real_h
+
+
+def preview_page_count(shop, doc: Document, shape: Shape) -> int:
+    if shape.roll:
+        return 1
+    real_w, real_h = _preview_size(shop, doc, shape)
+    body, _foot, _height = _page_documents(shop, doc, shape, real_w, real_h)
+    return max(1, body.pageCount())
+
+
+def preview_image(shop, doc: Document, shape: Shape, width_px: int = 0, *, page_index=0) -> QImage:
+    """Draw the requested sheet exactly as it prints, or the continuous receipt."""
+    real_w, real_h = _preview_size(shop, doc, shape)
     image = QImage(round(real_w), round(real_h), QImage.Format.Format_RGB32)
     image.fill(0xFFFFFFFF)
     painter = QPainter(image)
-    paint(shop, doc, shape, painter, real_w, real_h)
+    paint(shop, doc, shape, painter, real_w, real_h, page_index=page_index)
     painter.end()
     if width_px and width_px != round(real_w):
         return image.scaledToWidth(width_px, Qt.TransformationMode.SmoothTransformation)
@@ -415,12 +496,12 @@ def sample_document() -> Document:
     return Document(
         title="فاتورة بيع", number="S-2026-000154", date="2026-11-22 18:40",
         info=[("العميل", "أحمد محمود رمضان"), ("الموبايل", "01000000021"),
-              ("المركبة", "تويوتا كورولا · ق س ط 4826"), ("الدفع", "نقدي")],
+              ("المركبة", "تويوتا كورولا · ق س ط 4826"), ("طريقة الدفع", "نقدي")],
         lines=[Line("إطار ميشلان Primacy 4", "205/55R16 · 91V", "2", 645000, 1290000),
                Line("إطار بريدجستون Ecopia EP150", "195/65R15 · 91H", "4", 520000, 2080000),
                Line("بطارية ACDelco 70 أمبير", "ضمان حتى 2027-11-22", "1", 380000, 380000)],
         totals=[("الإجمالي", fmt(3750000)), ("ض.ق.م 14%", fmt(525000)),
-                ("الصافي", f"{fmt(4275000)} ج.م")])
+                ("الصافي", f"{fmt(4275000)} ج.م")], contact_in_header=True)
 
 
 def to_printer(shop, doc: Document, printer: QPrinter, shape: Shape) -> None:

@@ -1,6 +1,7 @@
 """Read-only views of posted sales for the list and the preview."""
 import sqlite3
 from dataclasses import dataclass
+from morv.core.money import fmt
 from morv.infra import customer_receipts
 
 
@@ -14,6 +15,20 @@ class SaleLineView:
     line_discount: int
     invoice_share: int
     net_total: int
+    tax_treatment: str = "none"
+    tax_rate: int = 0
+    tax_amount: int = 0
+    prices_tax_inclusive: bool = False
+
+    @property
+    def tax_label(self) -> str:
+        if self.tax_treatment == "exempt":
+            return "معفى"
+        if self.tax_treatment == "zero":
+            return "نسبة صفر"
+        if self.tax_treatment == "standard":
+            return f"ضريبة {fmt(self.tax_rate).rstrip('0').rstrip('.')}%"
+        return "بدون ضريبة"
 
 
 @dataclass(frozen=True)
@@ -32,6 +47,23 @@ class SaleView:
     lines: tuple
     returned: int
     returns: tuple
+    tax_enabled: bool = False
+    prices_tax_inclusive: bool = False
+    tax_total: int = 0
+    customer_mobile: str = ""
+    customer_address: str = ""
+    customer_tax_id: str = ""
+    cashier_name: str = ""
+    recorded_at: str = ""
+    notes: str = ""
+
+    @property
+    def tax_basis_label(self) -> str:
+        return "شامل الضريبة" if self.prices_tax_inclusive else "غير شامل الضريبة"
+
+    @property
+    def value_before_tax(self) -> int:
+        return self.total - self.tax_total
 
 
 @dataclass(frozen=True)
@@ -75,19 +107,28 @@ def customer_stats(con: sqlite3.Connection, customer_id: int) -> tuple[int, str 
 def get_sale(con: sqlite3.Connection, sale_id: int) -> SaleView:
     h = con.execute(
         "SELECT s.id, s.number, coalesce(c.name, 'عميل نقدي'), s.sale_date, s.subtotal, s.line_discount, "
-        "s.invoice_discount, s.total, s.odometer, coalesce(s.vehicle_plate, '') "
-        "FROM sales s LEFT JOIN customers c ON c.id = s.customer_id WHERE s.id=?", (sale_id,)).fetchone()
+        "s.invoice_discount, s.total, s.odometer, coalesce(s.vehicle_plate, ''), "
+        "s.tax_enabled, s.prices_tax_inclusive, s.tax_total, "
+        "coalesce(c.mobile,''), coalesce(c.address,''), coalesce(c.tax_id,''), "
+        "coalesce(u.display_name,''), s.at, coalesce(s.notes,'') "
+        "FROM sales s LEFT JOIN customers c ON c.id = s.customer_id "
+        "LEFT JOIN users u ON u.id = s.user_id WHERE s.id=?", (sale_id,)).fetchone()
     if not h:
         raise LookupError("الفاتورة غير موجودة")
     lines = con.execute(
-        "SELECT l.line_no, i.name, l.qty, l.unit_price, l.line_discount, l.invoice_share, l.net_total "
+        "SELECT l.line_no, i.name, l.qty, l.unit_price, l.line_discount, l.invoice_share, l.net_total, "
+        "l.tax_treatment, l.tax_rate, l.tax_amount, l.prices_tax_inclusive "
         "FROM sale_lines l JOIN items i ON i.id = l.item_id WHERE l.sale_id=? ORDER BY l.line_no", (sale_id,)).fetchall()
     pays = con.execute("SELECT method, amount, received, reference FROM sale_payments WHERE sale_id=? ORDER BY id",
                        (sale_id,)).fetchall()
     rets = con.execute("SELECT number, return_date, total, reason, refund_method FROM sale_returns "
                        "WHERE sale_id=? ORDER BY id", (sale_id,)).fetchall()
-    return SaleView(*h, payments=tuple(pays), lines=tuple(SaleLineView(*r) for r in lines),
-                    returned=sum(r[2] for r in rets), returns=tuple(rets))
+    return SaleView(*h[:10], payments=tuple(pays),
+                    lines=tuple(SaleLineView(*r[:10], prices_tax_inclusive=bool(r[10])) for r in lines),
+                    returned=sum(r[2] for r in rets), returns=tuple(rets),
+                    tax_enabled=bool(h[10]), prices_tax_inclusive=bool(h[11]), tax_total=h[12],
+                    customer_mobile=h[13], customer_address=h[14], customer_tax_id=h[15],
+                    cashier_name=h[16], recorded_at=h[17], notes=h[18])
 
 
 def returnable_lines(con: sqlite3.Connection, sale_id: int) -> list[ReturnableLine]:

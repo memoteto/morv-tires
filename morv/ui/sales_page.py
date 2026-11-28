@@ -19,7 +19,7 @@ class SalesPage(ListPage):
         ("الفاتورة", lambda r: ltr(r[1])),
         ("التاريخ", lambda r: ltr(r[3])),
         ("العميل", lambda r: r[2]),
-        ("الدفع", lambda r: r[5] or "—"),
+        ("الدفع", lambda r: "، ".join(PAYMENT_LABELS.get(m, m) for m in r[5].split("، ")) if r[5] else "—"),
         ("الإجمالي", lambda r: ltr(fmt(r[4]))),
         ("المرتجع", lambda r: ltr(fmt(r[6])) if r[6] else "—"),
     ]
@@ -60,14 +60,33 @@ class SalesPage(ListPage):
             details.append(("قراءة العداد", ltr(str(inv.odometer))))
         if inv.invoice_discount:
             details.append(("خصم على الفاتورة", ltr(fmt(inv.invoice_discount))))
+        if inv.tax_enabled:
+            if inv.line_discount:
+                details.append(("خصم الأصناف", ltr(fmt(inv.line_discount))))
+            details.extend([
+                ("أساس السعر", inv.tax_basis_label),
+                ("الإجمالي قبل الضريبة", ltr(fmt(inv.value_before_tax))),
+                ("ضريبة القيمة المضافة", ltr(fmt(inv.tax_total))),
+            ])
+        for label, value in (("الموبايل", inv.customer_mobile), ("عنوان العميل", inv.customer_address),
+                             ("رقم العميل الضريبي", inv.customer_tax_id), ("الكاشير", inv.cashier_name),
+                             ("وقت التسجيل", inv.recorded_at), ("ملاحظات", inv.notes)):
+            if value:
+                details.append((label, value))
         self.summary_details(details)
         self.summary_section("وسائل الدفع", "cash")
         self.summary_details([(PAYMENT_LABELS.get(p[0], p[0]), ltr(fmt(p[1]))) for p in inv.payments])
         self.summary_section("تفاصيل الأصناف", "tire")
-        self.summary_records(
-            ["الصنف", "الكمية", "سعر الوحدة", "الإجمالي"],
-            [(f"{ln.line_no}. {ln.item_name}", ltr(str(ln.qty)),
-              ltr(fmt(ln.unit_price)), ltr(fmt(ln.net_total))) for ln in inv.lines])
+        headers = ["الصنف", "الكمية", "سعر الوحدة", "الإجمالي"]
+        rows = [(f"{ln.line_no}. {ln.item_name}", ltr(str(ln.qty)),
+                 ltr(fmt(ln.unit_price)), ltr(fmt(ln.net_total))) for ln in inv.lines]
+        if inv.tax_enabled:
+            headers[2] = "سعر شامل" if inv.prices_tax_inclusive else "سعر غير شامل"
+            headers.extend(["الخصم", "المعاملة الضريبية", "مبلغ الضريبة"])
+            rows = [row + (ltr(fmt(ln.line_discount + ln.invoice_share)),
+                           ln.tax_label, ltr(fmt(ln.tax_amount)))
+                    for row, ln in zip(rows, inv.lines, strict=True)]
+        self.summary_records(headers, rows)
         if inv.returned:
             self.summary_section("المرتجعات", "alert")
             self.summary_table(

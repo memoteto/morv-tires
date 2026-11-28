@@ -45,6 +45,7 @@ class InvoiceTotal(QPushButton):
 
         label = QLabel(caption)
         label.setObjectName("totalLabel")
+        self.caption = label
 
         self.value = QLabel()
         self.value.setObjectName("totalValue")
