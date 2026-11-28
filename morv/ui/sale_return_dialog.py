@@ -10,7 +10,7 @@ from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra.sale_returns import ReturnError, ReturnLineIn, post_return, preview_installment_refund
 from morv.ui.document_table import DocumentEditor, DocumentTableDialog
-from morv.ui.widgets import DateEdit, card, ltr_edit, muted
+from morv.ui.widgets import DateEdit, ltr_edit, muted
 
 CONDITIONS = (("sound", "سليم"), ("defective", "معيب"))
 REFUND_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
@@ -174,7 +174,7 @@ class SaleReturnDialog(DocumentTableDialog):
         self.view.setColumnHidden(self.model.TAX, not sale.tax_enabled)
 
         bottom = QHBoxLayout()
-        settlement, info = card(compact=True)
+        settlement, info = self.document_card()
         title = QLabel("تسوية المرتجع")
         title.setObjectName("cardTitle")
         info.addWidget(title)
@@ -183,7 +183,7 @@ class SaleReturnDialog(DocumentTableDialog):
         self.refund_breakdown.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         info.addWidget(self.refund_breakdown)
         bottom.addWidget(settlement, 1)
-        totals, totals_layout = card(compact=True)
+        totals, totals_layout = self.document_card()
         self.before_tax_label = self.amount_row(totals_layout, "الإجمالي قبل الضريبة")
         self.tax_label = self.amount_row(totals_layout, "ضريبة القيمة المضافة")
         self.total_label = self.amount_row(

@@ -280,9 +280,9 @@ def _capture_purchase_returns(win, session, app, out, tag, report, screen_h):
     con = session.con
     previous = settings.get(con, "tax.enabled", "0")
     try:
-        item_ids = [r[0] for r in con.execute("SELECT id FROM items WHERE kind='tire' ORDER BY id LIMIT 2")]
-        if len(item_ids) != 2:
-            raise RuntimeError("audit: two tire items are required")
+        item_ids = [r[0] for r in con.execute("SELECT id FROM items WHERE kind='tire' ORDER BY id LIMIT 5")]
+        if len(item_ids) != 5:
+            raise RuntimeError("audit: five tire items are required")
         for enabled in (False, True):
             settings.put(con, "tax.enabled", str(int(enabled)))
             name = f"مورد مراجعة المرتجع {tag} {int(enabled)}"
@@ -304,6 +304,10 @@ def _capture_purchase_returns(win, session, app, out, tag, report, screen_h):
                 dlg.show()
                 _settle(app)
                 mode = "vat" if enabled else "legacy"
+                # A real five-line draft must keep a usable table even on short screens.
+                minimum_rows = 3 if dlg.height() >= 680 else 1
+                if dlg.view.viewport().height() < minimum_rows * dlg.view.rowHeight(0):
+                    raise RuntimeError("audit: document metadata or totals crowd out the purchase return table")
                 if (dlg.scroll is not None or not dlg.post_btn.isEnabled()
                         or not dlg.screen().availableGeometry().contains(dlg.frameGeometry())
                         or dlg.view.horizontalScrollBar().isVisible() or _clipped_buttons(dlg)):

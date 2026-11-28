@@ -1,4 +1,5 @@
 """Shared table-document layout: business rules stay in each document model."""
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QGridLayout, QHeaderView, QHBoxLayout, QLabel, QSizePolicy, QSpinBox,
                                QStyledItemDelegate, QTableView, QWidget)
 
@@ -43,24 +44,41 @@ class DocumentTableDialog(Modal):
                          table_mode=True, height=LAYOUT["document_dialog_height"], keep_on_screen=True)
         x, y = LAYOUT["document_margin_x"], LAYOUT["document_margin_y"]
         self.body.setContentsMargins(x, y, x, y)
-        self.body.setSpacing(LAYOUT["compact_card_spacing"])
+        self.body.setSpacing(LAYOUT["document_spacing"])
 
     @staticmethod
     def fields(entries):
         return AdaptiveFields([field(caption, widget) for caption, widget in entries])
 
+    @staticmethod
+    def document_card():
+        box, layout = card(compact=True)
+        x, y = LAYOUT["document_card_padding_x"], LAYOUT["document_card_padding_y"]
+        layout.setContentsMargins(x, y, x, y)
+        layout.setSpacing(LAYOUT["document_summary_spacing"])
+        return box, layout
+
     def add_document_metrics(self, entries, *, columns=3):
         grid = QGridLayout()
-        grid.setSpacing(LAYOUT["compact_card_spacing"])
+        grid.setSpacing(LAYOUT["document_spacing"])
         labels = {}
+        # One line per card; both Arabic and isolated LTR values align to the physical right.
+        alignment = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute | Qt.AlignmentFlag.AlignVCenter
         for i, (caption, value) in enumerate(entries):
-            box, layout = card(compact=True)
-            layout.addWidget(muted(caption))
+            box, layout = self.document_card()
+            row = QHBoxLayout()
+            row.setSpacing(LAYOUT["document_metric_gap"])
+            title = muted(caption)
+            title.setWordWrap(False)
+            title.setAlignment(alignment)
             label = QLabel(value)
             label.setObjectName("cardTitle")
+            label.setAlignment(alignment)
             label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             label.setToolTip(value)
-            layout.addWidget(label)
+            row.addWidget(title)
+            row.addWidget(label, 1)
+            layout.addLayout(row)
             grid.addWidget(box, i // columns, i % columns)
             grid.setColumnStretch(i % columns, 1)
             labels[caption] = label
@@ -71,8 +89,8 @@ class DocumentTableDialog(Modal):
         toolbar = QHBoxLayout()
         heading = QLabel(title)
         heading.setObjectName("cardTitle")
+        heading.setToolTip(hint)
         toolbar.addWidget(heading)
-        toolbar.addWidget(muted(hint))
         toolbar.addStretch(1)
         self.all_btn = icon_button("إرجاع الكل", "check")
         self.clear_btn = icon_button("تصفير", "close")

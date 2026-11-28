@@ -12,7 +12,7 @@ from morv.infra.purchase_returns import PurchaseReturnError, ReturnLine
 from morv.ui.adaptive_layout import AdaptiveFields
 from morv.ui.document_table import DocumentEditor, DocumentTableDialog
 from morv.ui.modal import Modal
-from morv.ui.widgets import DateEdit, card, danger_button, field, form, ltr_edit, muted
+from morv.ui.widgets import DateEdit, danger_button, field, form, ltr_edit, muted
 
 
 class PurchaseReturnModel(QAbstractTableModel):
@@ -199,7 +199,7 @@ class PurchaseReturnDialog(DocumentTableDialog):
         self.view.setColumnHidden(self.model.TAX, not self.taxable_source)
 
         bottom = QHBoxLayout()
-        settlement, info = card(compact=True)
+        settlement, info = self.document_card()
         self.settlement_mode = QComboBox()
         self.settlement_mode.addItem("اختر طريقة التسوية", None)
         self.settlement_mode.addItem("التسوية الكاملة", "book")
@@ -217,7 +217,7 @@ class PurchaseReturnDialog(DocumentTableDialog):
         self.hint.setWordWrap(True)
         info.addWidget(self.hint)
         bottom.addWidget(settlement, 1)
-        totals, amounts = card(compact=True)
+        totals, amounts = self.document_card()
         self.book_label = self.amount_row(amounts, "القيمة الدفترية")
         self.tax_label = self.amount_row(amounts, "إجمالي الضريبة المرتجعة")
         self.deductible_label = self.amount_row(amounts, "الضريبة القابلة للخصم")
@@ -293,11 +293,12 @@ class PurchaseReturnDialog(DocumentTableDialog):
             for row, qty, raw in zip(self.model.rows, self.model.quantities, self.model.tax_inputs, strict=True)))
         if needs_tax:
             hint = "أكّد ضريبة كل سطر خاضع في الجدول وفق مستند المورد."
-        elif has_tax:
-            hint = "الضريبة من الشراء الأصلي؛ * مبلغ محدد يدويًا."
+        elif manual:
+            hint = "* مبلغ ضريبة محدد يدويًا."
         else:
-            hint = "الكمية والقيمة من الدفعة الأصلية."
+            hint = ""
         self.hint.setText(hint)
+        self.hint.setVisible(bool(hint))
         self.post_btn.setEnabled(bool(quote and amount is not None and not self._busy and not needs_tax
                                       and len(self.reason.text().strip()) >= 3
                                       and (not special or len(self.settlement_reason.text().strip()) >= 3)
