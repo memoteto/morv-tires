@@ -21,29 +21,34 @@ def shape_for(shop) -> print_doc.Shape:
 
 
 def sale_document(sale, shop) -> print_doc.Document:
+    paid = " + ".join(PAYMENT_LABELS.get(p[0], p[0]) for p in sale.payments)
     info = [("العميل", sale.customer_name)]
     for label, value in (
+        ("الكاشير", sale.cashier_name),
         ("الموبايل", sale.customer_mobile),
+        ("طريقة الدفع", paid or "—"),
         ("عنوان العميل", sale.customer_address),
         ("رقم العميل الضريبي", sale.customer_tax_id),
         ("المركبة", sale.vehicle_plate),
         ("قراءة العداد", str(sale.odometer) if sale.odometer is not None else ""),
-        ("الكاشير", sale.cashier_name),
-        ("وقت التسجيل", sale.recorded_at),
     ):
         if value:
             info.append((label, value))
-    paid = " + ".join(PAYMENT_LABELS.get(p[0], p[0]) for p in sale.payments)
-    info.append(("الدفع", paid or "—"))
-    if sale.tax_enabled:
-        info.append(("أساس السعر", sale.tax_basis_label))
+    date = sale.sale_date
+    # Only attach the time when it belongs to the displayed invoice date.
+    if sale.recorded_at.startswith(date + " "):
+        date += " " + sale.recorded_at[len(date) + 1:len(date) + 6]
+    payment_details = []
     for method, amount, received, reference in sale.payments:
         label = PAYMENT_LABELS.get(method, method)
-        info.append((label, fmt(amount)))
+        if len(sale.payments) > 1 or sale.returned:
+            payment_details.append((label, fmt(amount)))
         if method == "cash" and received is not None and received != amount:
-            info.extend([("المستلم نقدًا", fmt(received)), ("الباقي للعميل", fmt(received - amount))])
+            payment_details.append(("المستلم نقدًا", fmt(received)))
+            if received > amount:
+                payment_details.append(("الباقي للعميل", fmt(received - amount)))
         if reference:
-            info.append((f"مرجع {label}", reference))
+            payment_details.append((f"مرجع {label}", reference))
     lines = []
     for line in sale.lines:
         detail = line.tax_label if sale.tax_enabled else ""
@@ -67,9 +72,9 @@ def sale_document(sale, shop) -> print_doc.Document:
     caption = ("الصافي بعد المرتجع" if sale.returned else
                "الإجمالي شامل القيمة المضافة") if sale.tax_enabled else "الصافي"
     totals.append((caption, f"{fmt(sale.total - sale.returned)} ج.م"))
-    return print_doc.Document(title="فاتورة بيع", number=sale.number, date=sale.sale_date,
-                              info=info, lines=lines, totals=totals,
-                              remarks=sale.notes)
+    return print_doc.Document(title="فاتورة بيع", number=sale.number, date=date,
+                              info=info, lines=lines, totals=totals, remarks=sale.notes,
+                              payment_details=payment_details, contact_in_header=True)
 
 
 def printer_for(shop) -> QPrinter:

@@ -61,6 +61,8 @@ class Document:
     totals: list[tuple[str, str]] = field(default_factory=list)
     note: str = ""                   # stands in for the items table on documents that have no lines
     remarks: str = ""                # invoice notes, independent of the item table
+    payment_details: list[tuple[str, str]] = field(default_factory=list)
+    contact_in_header: bool = False
 
 
 def _pt(shape: Shape, size: float) -> str:
@@ -129,6 +131,19 @@ def _logo_cell(shop, size: int) -> str:
             f"{shop.initial}</td></tr></table>")
 
 
+def _header_contact(shop, shape: Shape, align: str) -> str:
+    size = max(10, round(12 * shape.scale))
+    phones = list(dict.fromkeys(phone for phone in (shop.phone, shop.phone2) if phone))
+    rows = []
+    if phones:
+        rows.append(f"{_icon('phone', size)}&nbsp;" + " &nbsp; / &nbsp; ".join(
+            _ltr(escape(phone)) for phone in phones))
+    if shop.address:
+        rows.append(f"{_icon('pin', size)}&nbsp;{escape(shop.address)}")
+    return "".join(f"<div align='{align}' dir='rtl' style='color:{INK};"
+                   f"font-size:{_pt(shape, 9)}'>{row}</div>" for row in rows)
+
+
 def _sheet_head(shop, doc: Document, shape: Shape) -> str:
     tax = ""
     if shop.tax_registered and (shop.commercial_register or shop.tax_id):
@@ -146,7 +161,7 @@ def _sheet_head(shop, doc: Document, shape: Shape) -> str:
             f"<div align='right' style='font-size:{_pt(shape, 14)};font-weight:bold;color:{INK}'>"
             f"{shop.name}</div>"
             f"<div align='right' style='color:{MUTED};font-size:{_pt(shape, 8.5)}'>{shop.activity}</div>"
-            f"{tax}</td>")
+            f"{tax}{_header_contact(shop, shape, 'right') if doc.contact_in_header else ''}</td>")
     doc_block = (f"<td width='32%' valign='middle' align='left' dir='ltr'>"
                  f"<div align='left' style='color:{BLUE};font-weight:bold;font-size:{_pt(shape, 12)}'>"
                  f"{doc.title}</div>"
@@ -228,6 +243,12 @@ def _totals_block(doc: Document, shape: Shape) -> str:
         # The value keeps the paragraph's own direction so a currency word stays where the design puts it
         rows += (f"<tr><td align='left' dir='rtl' style='padding:2px 4px;{style}'>{value}</td>"
                  f"<td align='right' dir='rtl' style='padding:2px 4px;{style}'>{label}</td></tr>")
+    if doc.payment_details:
+        rows += f"<tr><td colspan='2' style='padding:0'>{_band(LINE)}</td></tr>"
+        for label, value in doc.payment_details:
+            style = f"color:{MUTED};font-size:{_pt(shape, 9)}"
+            rows += (f"<tr><td align='left' dir='rtl' style='padding:2px 4px;{style}'>{escape(value)}</td>"
+                     f"<td align='right' dir='rtl' style='padding:2px 4px;{style}'>{escape(label)}</td></tr>")
     inner = f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr'>{rows}</table>"
     width = 68 if _has_vat_lines(doc) else 48
     return _gap(5) + (f"<table width='100%' cellspacing='0' cellpadding='0' dir='ltr'><tr>"
@@ -252,13 +273,14 @@ def _sheet_tail(shop, doc: Document, shape: Shape) -> str:
     return out
 
 
-def _contact_bar(shop, shape: Shape) -> str:
+def _contact_bar(shop, shape: Shape, *, contact_in_header=False) -> str:
     items = []
-    if shop.address:
-        items.append(("pin", shop.address))
-    for phone in (shop.phone, shop.phone2):
-        if phone:
-            items.append(("phone", _ltr(phone)))
+    if not contact_in_header:
+        if shop.address:
+            items.append(("pin", shop.address))
+        for phone in (shop.phone, shop.phone2):
+            if phone:
+                items.append(("phone", _ltr(phone)))
     if shop.show_whatsapp and shop.whatsapp:
         items.append(("chat", _ltr(shop.whatsapp)))
     if shop.show_hours and shop.hours:
@@ -285,7 +307,9 @@ def _roll(shop, doc: Document, shape: Shape) -> str:
     out = f"<div align='center' style='font-weight:bold;font-size:{_pt(shape, 13)};color:{INK}'>{shop.name}</div>"
     if shop.activity:
         out += f"<div align='center' style='color:{MUTED};font-size:{_pt(shape, 8.5)}'>{shop.activity}</div>"
-    if shop.phone:
+    if doc.contact_in_header:
+        out += _header_contact(shop, shape, "center")
+    elif shop.phone:
         out += f"<div align='center' style='font-size:{_pt(shape, 9)}'>{_ltr(shop.phone)}</div>"
     if shop.tax_registered and shop.tax_id:
         out += (f"<div align='center' style='color:{MUTED};font-size:{_pt(shape, 8)}'>"
@@ -312,6 +336,10 @@ def _roll(shop, doc: Document, shape: Shape) -> str:
         out += rule()
         for i, (label, value) in enumerate(doc.totals):
             out += row(label, value, strong=i == len(doc.totals) - 1)
+    if doc.payment_details:
+        out += rule()
+        for label, value in doc.payment_details:
+            out += row(escape(label), escape(value))
     if doc.note:
         out += rule()
         out += f"<div dir='rtl' style='font-size:{_pt(shape, 9.5)}'>{doc.note}</div>"
@@ -331,21 +359,26 @@ def _roll(shop, doc: Document, shape: Shape) -> str:
 
 def body_html(shop, doc: Document, shape: Shape) -> str:
     if shape.roll:
-        return _shell(_roll(shop, doc, shape) + _contact_bar(shop, shape))
+        return _shell(_roll(shop, doc, shape)
+                      + _contact_bar(shop, shape, contact_in_header=doc.contact_in_header))
     return _shell(_sheet_head(shop, doc, shape) + _info_box(doc, shape) + _lines_table(doc, shape)
                   + _totals_block(doc, shape) + _sheet_tail(shop, doc, shape))
 
 
-def footer_html(shop, shape: Shape) -> str:
+def footer_html(shop, shape: Shape, *, contact_in_header=False) -> str:
     """The contact bar, which a sheet pins to the foot of every page instead of letting it flow."""
-    return "" if shape.roll else _shell(_contact_bar(shop, shape))
+    if shape.roll:
+        return ""
+    bar = _contact_bar(shop, shape, contact_in_header=contact_in_header)
+    return _shell(bar) if bar else ""
 
 
 def document_html(shop, doc: Document, shape: Shape) -> str:
     if shape.roll:
         return body_html(shop, doc, shape)
     inner = _sheet_head(shop, doc, shape) + _info_box(doc, shape) + _lines_table(doc, shape) \
-        + _totals_block(doc, shape) + _sheet_tail(shop, doc, shape) + _contact_bar(shop, shape)
+        + _totals_block(doc, shape) + _sheet_tail(shop, doc, shape) \
+        + _contact_bar(shop, shape, contact_in_header=doc.contact_in_header)
     return _shell(inner)
 
 
@@ -398,7 +431,7 @@ def content_px(shape: Shape) -> tuple[float, float]:
 
 def _page_documents(shop, doc, shape, width_px, height_px):
     """One pagination path for printer and preview."""
-    foot_html = footer_html(shop, shape)
+    foot_html = footer_html(shop, shape, contact_in_header=doc.contact_in_header)
     foot = _layout(foot_html, shop, shape, width_px) if foot_html else None
     foot_h = (foot.size().height() + 8) if foot else 0
     body_h = max(60.0, height_px - foot_h)
@@ -463,12 +496,12 @@ def sample_document() -> Document:
     return Document(
         title="فاتورة بيع", number="S-2026-000154", date="2026-11-22 18:40",
         info=[("العميل", "أحمد محمود رمضان"), ("الموبايل", "01000000021"),
-              ("المركبة", "تويوتا كورولا · ق س ط 4826"), ("الدفع", "نقدي")],
+              ("المركبة", "تويوتا كورولا · ق س ط 4826"), ("طريقة الدفع", "نقدي")],
         lines=[Line("إطار ميشلان Primacy 4", "205/55R16 · 91V", "2", 645000, 1290000),
                Line("إطار بريدجستون Ecopia EP150", "195/65R15 · 91H", "4", 520000, 2080000),
                Line("بطارية ACDelco 70 أمبير", "ضمان حتى 2027-11-22", "1", 380000, 380000)],
         totals=[("الإجمالي", fmt(3750000)), ("ض.ق.م 14%", fmt(525000)),
-                ("الصافي", f"{fmt(4275000)} ج.م")])
+                ("الصافي", f"{fmt(4275000)} ج.م")], contact_in_header=True)
 
 
 def to_printer(shop, doc: Document, printer: QPrinter, shape: Shape) -> None:

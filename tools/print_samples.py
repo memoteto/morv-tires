@@ -54,8 +54,8 @@ def _vat_sale(inclusive: bool):
     payable = 90000 if inclusive else 102600
     total = payable + 90000
     sale = SaleView(
-        1, "SI-000001", "عميل نقدي", "2026-11-28", 200000, 0, 20000, total, None, "",
-        (("cash", total, total, None),),
+        1, "SI-000001", "أحمد محمود", "2026-11-28", 200000, 0, 20000, total, None, "",
+        (("cash", total, total + 5000, None),),
         (SaleLineView(1, "خدمة تركيب", 1, 100000, 0, 10000, payable,
                       "standard", 1400, tax, inclusive),
          SaleLineView(2, "خدمة معفاة", 1, 100000, 0, 10000, 90000,
