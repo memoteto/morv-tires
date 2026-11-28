@@ -64,17 +64,17 @@ class VatPeriodReportTest(_Fixture, unittest.TestCase):
         self.assertEqual(a["ضريبة المشتريات القابلة للخصم"], 70000)
         self.assertEqual(a["صافي ضريبة الفترة قبل التسويات"], -28000)
         b = self.values("2026-11-11", "2026-11-19")
-        self.assertEqual((b["رصيد 1520 أول الفترة (مدين)"], b["رصيد 2350 أول الفترة (دائن)"]),
+        self.assertEqual((b["رصيد 1520 ضريبة القيمة المضافة - مدخلات قابلة للخصم أول الفترة (مدين)"], b["رصيد 2350 ضريبة القيمة المضافة - مخرجات مستحقة أول الفترة (دائن)"]),
                          (70000, 42000))
         self.assertEqual((b["ضريبة مرتجعات البيع"], b["ضريبة مرتجعات الشراء القابلة للخصم"],
                           b["ضريبة عكس مرتجعات الشراء"]), (-21000, -42000, 0))
         self.assertEqual(b["صافي ضريبة الفترة قبل التسويات"], 21000)
-        self.assertEqual((b["رصيد 1520 آخر الفترة (مدين)"], b["رصيد 2350 آخر الفترة (دائن)"]),
+        self.assertEqual((b["رصيد 1520 ضريبة القيمة المضافة - مدخلات قابلة للخصم آخر الفترة (مدين)"], b["رصيد 2350 ضريبة القيمة المضافة - مخرجات مستحقة آخر الفترة (دائن)"]),
                          (28000, 21000))
         c = self.values("2026-11-20", "2026-11-30")
         self.assertEqual(c["ضريبة عكس مرتجعات الشراء"], 42000)
         self.assertEqual(c["صافي ضريبة الفترة قبل التسويات"], -42000)
-        self.assertEqual((c["رصيد 1520 آخر الفترة (مدين)"], c["رصيد 2350 آخر الفترة (دائن)"]),
+        self.assertEqual((c["رصيد 1520 ضريبة القيمة المضافة - مدخلات قابلة للخصم آخر الفترة (مدين)"], c["رصيد 2350 ضريبة القيمة المضافة - مخرجات مستحقة آخر الفترة (دائن)"]),
                          (self.balance("1520"), -self.balance("2350")))
         d = self.values("2026-11-01", "2026-11-30")
         self.assertEqual(d["صافي ضريبة الفترة قبل التسويات"], -49000)
@@ -101,8 +101,8 @@ class VatPeriodReportTest(_Fixture, unittest.TestCase):
                               "اختبار حركة غير مصنفة", [("1520", 1000, 0), ("1110", 0, 1000)])
         d = self.values("2026-11-01", "2026-11-30", warning=True)
         self.assertEqual(d["صافي ضريبة الفترة قبل التسويات"], 0)
-        self.assertEqual(d["حركات أخرى في 1520"], 1000)
-        self.assertEqual(d["رصيد 1520 آخر الفترة (مدين)"], 1000)
+        self.assertEqual(d["حركات أخرى في 1520 ضريبة القيمة المضافة - مدخلات قابلة للخصم"], 1000)
+        self.assertEqual(d["رصيد 1520 ضريبة القيمة المضافة - مدخلات قابلة للخصم آخر الفترة (مدين)"], 1000)
         self.assertEqual(d["صافي الرصيد الختامي (دائن / مدين بالسالب)"], -1000)
 
     def test_document_mismatch_warns_and_ledger_is_authoritative(self):
@@ -112,7 +112,7 @@ class VatPeriodReportTest(_Fixture, unittest.TestCase):
         self.con.execute("UPDATE sales SET tax_total=tax_total-1")
         d = self.values("2026-11-01", "2026-11-30", warning=True)
         self.assertEqual(d["ضريبة المبيعات"], 42000)
-        self.assertEqual(d["رصيد 2350 آخر الفترة (دائن)"], 21000)
+        self.assertEqual(d["رصيد 2350 ضريبة القيمة المضافة - مخرجات مستحقة آخر الفترة (دائن)"], 21000)
 
     def test_reversed_date_range_refused(self):
         with self.assertRaises(reports.ReportError):

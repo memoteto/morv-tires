@@ -809,6 +809,9 @@ def vat(con, start: str, end: str) -> Table:
     period_o = sum(v[1] for k, v in groups.items() if k != "opening")
     other_i, other_o = period_i - net_i, period_o - net_o
     closing_i, closing_o = opening_i + period_i, opening_o + period_o
+    accounts = dict(account_choices(con))
+    input_account = accounts.get("1520", "1520")
+    output_account = accounts.get("2350", "2350")
     rows = [
         ("head", ("ضريبة المخرجات", "")),
         ("line", ("ضريبة المبيعات", sale)),
@@ -821,12 +824,12 @@ def vat(con, start: str, end: str) -> Table:
         ("total", ("صافي ضريبة المدخلات", net_i)),
         ("total", ("صافي ضريبة الفترة قبل التسويات", net_o - net_i)),
         ("head", ("أرصدة دفتر الأستاذ", "")),
-        ("line", ("رصيد 1520 أول الفترة (مدين)", opening_i)),
-        ("line", ("رصيد 2350 أول الفترة (دائن)", opening_o)),
-        ("line", ("حركات أخرى في 1520", other_i)),
-        ("line", ("حركات أخرى في 2350", other_o)),
-        ("line", ("رصيد 1520 آخر الفترة (مدين)", closing_i)),
-        ("line", ("رصيد 2350 آخر الفترة (دائن)", closing_o)),
+        ("line", (f"رصيد {input_account} أول الفترة (مدين)", opening_i)),
+        ("line", (f"رصيد {output_account} أول الفترة (دائن)", opening_o)),
+        ("line", (f"حركات أخرى في {input_account}", other_i)),
+        ("line", (f"حركات أخرى في {output_account}", other_o)),
+        ("line", (f"رصيد {input_account} آخر الفترة (مدين)", closing_i)),
+        ("line", (f"رصيد {output_account} آخر الفترة (دائن)", closing_o)),
         ("grand", ("صافي الرصيد الختامي (دائن / مدين بالسالب)", closing_o - closing_i)),
     ]
     mismatches = sum(v[2] for k, v in groups.items() if k not in ("opening", "other"))

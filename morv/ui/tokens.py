@@ -25,6 +25,9 @@ DARK = dict(
     side="#070C17", side_text="#C3CEE2", side_hover="#111C33", select="#21407A",
 )
 
+# Report row semantics shared by the screen and printed reports.
+REPORT_ROW_BACKGROUND = {"head": "border", "total": "bg", "grand": "primary_soft"}
+
 # Logical Qt pixels shared by all list-preview screens.
 LAYOUT = dict(
     page_margin=24, pane_gap=12, preview_padding=16,

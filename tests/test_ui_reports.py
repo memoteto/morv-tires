@@ -133,6 +133,64 @@ class ReportsPageTest(unittest.TestCase):
         self.assertIn("font-size:16pt", html)
         self.assertIn("<span dir='ltr'>", html.split("</p>")[1])      # the subtitle line
 
+    def test_report_row_styles_follow_theme_and_leave_detail_rows_plain(self):
+        from PySide6.QtCore import Qt
+        from morv.ui import theme, tokens
+        page = self.page()
+        page.report_combo.setCurrentIndex(page.report_combo.findData("vat"))
+        previous = self.app.palette()
+        try:
+            for colors in (tokens.LIGHT, tokens.DARK):
+                self.app.setPalette(theme.palette(colors))
+                for row, (_, kind, _) in enumerate(page.model.rows):
+                    index = page.model.index(row, 0)
+                    font = page.model.data(index, Qt.ItemDataRole.FontRole)
+                    brush = page.model.data(index, Qt.ItemDataRole.BackgroundRole)
+                    if kind == "line":
+                        self.assertIsNone(font)
+                        self.assertIsNone(brush)
+                    else:
+                        self.assertTrue(font.bold())
+                        self.assertEqual(brush.color().name(), colors[tokens.REPORT_ROW_BACKGROUND[kind]].lower())
+        finally:
+            self.app.setPalette(previous)
+
+    def test_pdf_columns_and_signed_values_follow_reading_order(self):
+        from PySide6.QtGui import QTextDocument
+        from morv.infra.reports import CODE, DATE, MONEY, TEXT, Table
+        from morv.ui.report_export import table_html
+        table = Table("test", "تقرير", "من 2026-11-01 إلى 2026-11-28",
+                      ("البيان", "المستند", "التاريخ", "المبلغ"), (TEXT, CODE, DATE, MONEY),
+                      (("grand", ("اختبار", "INV-123", "2026-11-01", -20000)),))
+        doc = QTextDocument()
+        doc.setHtml(table_html(table, shop_name="محل اختبار", printed_on="2026-11-28"))
+        doc.setTextWidth(800)
+        doc.documentLayout().documentSize()
+        frame = doc.rootFrame().childFrames()[0]
+        self.assertEqual(frame.columns(), len(table.headers))
+        blocks = [frame.cellAt(0, col).firstCursorPosition().block() for col in range(4)]
+        self.assertEqual([block.text() for block in blocks], list(reversed(table.headers)))
+        xs = [doc.documentLayout().blockBoundingRect(block).x() for block in blocks]
+        self.assertEqual(xs, sorted(set(xs)))
+        cells = [frame.cellAt(1, col).firstCursorPosition().block() for col in range(4)]
+        for block, expected in zip(cells, ("-200.00", "2026-11-01", "INV-123", "اختبار"), strict=True):
+            self.assertEqual(block.text().strip("\u202a\u202c"), expected)
+        amount = cells[0]
+        line = amount.layout().lineAt(0)
+        sign = amount.text().index("-")
+        self.assertLess(line.cursorToX(sign)[0], line.cursorToX(sign + 1)[0])
+        self.assertIn("محل اختبار", doc.toPlainText())
+        self.assertIn("تاريخ الطباعة", doc.toPlainText())
+
+    def test_report_pdf_receives_the_configured_shop_name(self):
+        from unittest.mock import patch
+        from morv.infra import settings
+        settings.put(self.con, "shop.name", "محل اختبار")
+        page = self.page()
+        with patch("morv.ui.report_export.export_pdf") as export:
+            page.export_pdf_to("unused.pdf")
+        export.assert_called_once_with(page.table, "unused.pdf", shop_name="محل اختبار")
+
     def test_slow_moving_offers_day_thresholds_and_journal_exports_everything(self):
         import os
         page = self.page()
