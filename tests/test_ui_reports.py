@@ -83,6 +83,35 @@ class ReportsPageTest(unittest.TestCase):
         with open(os.path.join(self.tmp, "r.pdf"), "rb") as f:
             self.assertEqual(f.read(4), b"%PDF")
 
+    def test_report_header_tracks_the_loaded_report(self):
+        page = self.page()
+        for key in ("vat", "income", "trial"):
+            with self.subTest(key=key):
+                page.report_combo.setCurrentIndex(page.report_combo.findData(key))
+                self.assertEqual(page.table.key, key)
+                self.assertEqual(page.count_label.text(), page.total())
+                self.assertIn(page.table.title, page.count_label.text())
+                self.assertIn(page.table.subtitle, page.count_label.text())
+
+    def test_switching_reports_closes_old_preview_even_with_matching_row_ids(self):
+        page = self.page()
+        page.resize(900, 550)
+        page.show()
+        self.app.processEvents()
+        page.show_preview_id(page.model.rows[0][0])
+        self.assertFalse(page.preview.isHidden())
+        page.report_combo.setCurrentIndex(page.report_combo.findData("vat"))
+        self.assertEqual(page.table.key, "vat")
+        self.assertIsNone(page.current_id)
+        self.assertTrue(page.preview.isHidden())
+        self.assertFalse(page.list_panel.isHidden())
+        page.show_preview_id(page.model.rows[1][0])
+        self.assertEqual(page.preview_title.text(), "ضريبة المبيعات")
+        page.report_combo.setCurrentIndex(page.report_combo.findData("income"))
+        self.assertTrue(page.preview.isHidden())
+        self.assertIsNone(page.current_id)
+        self.assertFalse(page.list_panel.isHidden())
+
     def test_vat_report_uses_the_existing_picker_and_export(self):
         page = self.page()
         page.report_combo.setCurrentIndex(page.report_combo.findData("vat"))
