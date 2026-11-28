@@ -286,8 +286,9 @@ def _capture_purchase_returns(win, session, app, out, tag, report, screen_h):
         for enabled in (False, True):
             settings.put(con, "tax.enabled", str(int(enabled)))
             name = f"مورد مراجعة المرتجع {tag} {int(enabled)}"
+            next_id = con.execute("SELECT coalesce(max(id),0)+1 FROM suppliers").fetchone()[0]
             sid = con.execute("INSERT INTO suppliers (name,name_norm,mobile) VALUES (?,?,?)",
-                              (name, name, "")).lastrowid
+                              (name, name, f"019{next_id:08d}")).lastrowid
             tax = dict(input_tax_rate=1400, input_tax_deductible=True) if enabled else {}
             purchasing.post_invoice(
                 con, session.user, request_key=f"audit-preturn-{tag}-{enabled}", supplier_id=sid,
@@ -295,6 +296,7 @@ def _capture_purchase_returns(win, session, app, out, tag, report, screen_h):
                 lines=[PurchaseLine(i, 3, 100000, "2324", **tax) for i in item_ids])
             dlg = PurchaseReturnDialog(session, sid, name, win)
             try:
+                dlg.date.setText("2026-11-28")
                 dlg.reason.setText("عيب تصنيع")
                 dlg.model.setData(dlg.model.index(0, dlg.model.QTY), 2)
                 dlg.model.setData(dlg.model.index(1, dlg.model.QTY), 1)

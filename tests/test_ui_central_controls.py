@@ -68,3 +68,17 @@ class CentralControlsTest(unittest.TestCase):
         self.addCleanup(dispose, page, self.app)
         self.assertFalse(page.view.showGrid())
         self.assertTrue(page.view.horizontalHeader().defaultAlignment() & Qt.AlignmentFlag.AlignLeading)
+
+
+    def test_returns_use_same_document_layout_and_editor(self):
+        from morv.ui.document_table import DocumentEditor, DocumentTableDialog
+        from morv.ui.purchase_return_dialogs import PurchaseReturnDialog, PurchaseReturnEditor
+        from morv.ui.sale_return_dialog import ReturnEditor, SaleReturnDialog
+
+        self.assertTrue(issubclass(PurchaseReturnDialog, DocumentTableDialog))
+        self.assertTrue(issubclass(SaleReturnDialog, DocumentTableDialog))
+        self.assertTrue(issubclass(PurchaseReturnEditor, DocumentEditor))
+        self.assertTrue(issubclass(ReturnEditor, DocumentEditor))
+        for cls in (PurchaseReturnDialog, SaleReturnDialog):
+            for member in ("fields", "add_document_table", "amount_row"):
+                self.assertNotIn(member, cls.__dict__)
