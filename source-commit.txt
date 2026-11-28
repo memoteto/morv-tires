@@ -1,0 +1,5 @@
+source_ref=fix/transient-qt-windows
+source_sha=b181be183a6d5f15313e6f5c2109aef3e5588e4f
+checkout_sha=16408581b6707711aba0f7fe33789aa684bc9f3b
+run_id=46156181908
+run_attempt=1
