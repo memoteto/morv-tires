@@ -10,6 +10,7 @@ from tests.qt_app import get_app, require_qt
 
 
 def _parentless_show_watcher():
+    import shiboken6
     from PySide6.QtCore import QEvent, QObject
     from PySide6.QtWidgets import QWidget
 
@@ -22,16 +23,18 @@ def _parentless_show_watcher():
 
         def eventFilter(self, obj, event):
             if event.type() == QEvent.Type.Show and isinstance(obj, QWidget) and obj.parentWidget() is None:
-                self.seen.append(obj)
+                text = obj.text()[:40] if hasattr(obj, "text") else ""
+                self.seen.append((obj, f"{type(obj).__name__}({text})"))   # Read now: Qt may delete it later
             return False
 
         def offenders(self) -> list[str]:
             found = set()
-            for w in self.seen:
-                if w.parentWidget() is None:
+            for widget, label in self.seen:
+                if not shiboken6.isValid(widget):
+                    continue                 # Qt destroyed it; touching the wrapper crashes on Windows
+                if widget.parentWidget() is None:
                     continue                 # A window on purpose: a modal, a menu, or the main window
-                text = w.text()[:40] if hasattr(w, "text") else ""
-                found.add(f"{type(w).__name__}({text})")
+                found.add(label)
             return sorted(found)
 
     return ParentlessShowWatcher()
