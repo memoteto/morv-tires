@@ -1,0 +1,5 @@
+source_ref=phase-ci-isolated-ui-audit-images
+source_sha=750726f2659bfa654c480429c70a14895bd3dc22
+checkout_sha=359913d8fee40247e8aaf11eae1f65ab5c6326de
+run_id=46151693352
+run_attempt=1
