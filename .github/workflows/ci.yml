@@ -223,17 +223,28 @@ jobs:
         with:
           name: ui-audit
           path: ui_audit_out
-      - name: رفع الصور إلى فرع معزول للمراجعة (مؤقت)
+      - name: رفع الصور إلى فرع مستقل لكل تشغيل ومحاولة
         if: always()
         shell: bash
+        env:
+          SOURCE_REF: ${{ github.head_ref || github.ref_name }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AUDIT_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+          image_branch="ui-audit-images-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${SOURCE_SHA}"
+          git check-ref-format --branch "$image_branch"
           cd ui_audit_out
-          git init -q -b ui-audit-images
+          printf 'source_ref=%s\nsource_sha=%s\ncheckout_sha=%s\nrun_id=%s\nrun_attempt=%s\n' \
+            "$SOURCE_REF" "$SOURCE_SHA" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > source-commit.txt
+          git init -q -b "$image_branch"
           git config user.name "ui-audit"
           git config user.email "ui-audit@users.noreply.github.com"
           git add -A
-          git commit -q -m "ui audit images from ${{ github.head_ref || github.ref_name }} @ ${{ github.event.pull_request.head.sha || github.sha }}"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ui-audit-images
+          git commit -q -m "ui audit images from $SOURCE_REF @ $SOURCE_SHA"
+          git push "https://x-access-token:${AUDIT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$image_branch"
+          printf '### UI audit images\n- [Images for this run and attempt](%s/%s/tree/%s)\n- Source: `%s`\n- Checkout: `%s`\n' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$image_branch" "$SOURCE_SHA" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
 
   audit:
     runs-on: ubuntu-latest
