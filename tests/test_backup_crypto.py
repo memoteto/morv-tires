@@ -3,6 +3,8 @@ import os
 import shutil
 import sqlite3
 import tempfile
+import threading
+import time
 import unittest
 from unittest import mock
 from datetime import datetime, timedelta
@@ -302,3 +304,243 @@ class RestorePreflightTest(unittest.TestCase):
             backup.restore_file(live, bad)
         self.assertEqual(before, live.read_bytes(), "the live database must stand after a refusal")
         self.assertFalse(live.with_name(live.name + ".restore-new").exists(), "no staged file left behind")
+
+
+class _FlakyWriter:
+    """Fails after a set number of writes, standing in for a disk that fills up mid-body."""
+
+    def __init__(self, f, allowed: int):
+        self._f, self._left = f, allowed
+
+    def write(self, b):
+        if self._left <= 0:
+            raise OSError(28, "No space left on device")
+        self._left -= 1
+        return self._f.write(b)
+
+    def __getattr__(self, name):
+        return getattr(self._f, name)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return self._f.__exit__(*exc)
+
+
+class StreamingVaultTest(unittest.TestCase):
+    """Sealing and opening must hold memory flat and never expose an unverified plaintext."""
+
+    MIB = 1024 * 1024
+    SIZE_MIB = 64
+    BUDGET = 8 * MIB          # Streaming works a chunk at a time, so peak must not track file size
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.plain = self.dir / "plain.bin"
+        with open(self.plain, "wb") as f:
+            block = os.urandom(self.MIB)
+            for _ in range(self.SIZE_MIB):
+                f.write(block)
+        self.rk = security.new_recovery_key()
+        self.dek, self.ring = vault.new_keyring(PW, self.rk)
+        self.sealed = self.dir / "sealed.mtb"
+
+    def _peak_mib(self, fn) -> float:
+        import tracemalloc
+        tracemalloc.start()
+        try:
+            fn()
+            return tracemalloc.get_traced_memory()[1] / self.MIB
+        finally:
+            tracemalloc.stop()
+
+    def _legacy_seal(self, out: Path, overrides: dict | None = None) -> None:
+        """Writes a .mtb exactly as the one-shot writer did, to prove old backups still open."""
+        import base64
+        import hashlib
+        import json
+        import secrets
+        import struct
+
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        from morv import APP_ID
+        data = self.plain.read_bytes()
+        header = {
+            "app_id": APP_ID,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "plain_size": len(data),
+            "plain_sha256": hashlib.sha256(data).hexdigest(),
+            "keyring": self.ring,
+            "body_nonce": base64.b64encode(secrets.token_bytes(12)).decode("ascii"),
+        }
+        header.update(overrides or {})
+        hdr = json.dumps(header, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        body = AESGCM(self.dek).encrypt(base64.b64decode(header["body_nonce"]), data, hdr)
+        out.write_bytes(vault.MAGIC + struct.pack(">I", len(hdr)) + hdr + body)
+
+    def _leftovers(self) -> list[str]:
+        return sorted(p.name for p in self.dir.iterdir() if p.name.endswith(".part"))
+
+    def test_seal_peak_memory_does_not_track_file_size(self):
+        peak = self._peak_mib(lambda: vault.seal(self.plain, self.sealed, self.dek, self.ring))
+        self.assertLess(peak, self.BUDGET / self.MIB, f"seal held {peak:.0f} MiB of a {self.SIZE_MIB} MiB file")
+
+    def test_open_peak_memory_does_not_track_file_size(self):
+        vault.seal(self.plain, self.sealed, self.dek, self.ring)
+        out = self.dir / "restored.bin"
+        peak = self._peak_mib(lambda: vault.open_vault(self.sealed, out, dek=self.dek))
+        self.assertEqual(out.read_bytes(), self.plain.read_bytes())
+        self.assertLess(peak, self.BUDGET / self.MIB, f"open held {peak:.0f} MiB of a {self.SIZE_MIB} MiB file")
+
+    def test_opens_with_streams_and_writes_nothing(self):
+        vault.seal(self.plain, self.sealed, self.dek, self.ring)
+        before = sorted(p.name for p in self.dir.iterdir())
+        peak = self._peak_mib(lambda: self.assertTrue(vault.opens_with(self.sealed, self.dek)))
+        self.assertEqual(sorted(p.name for p in self.dir.iterdir()), before, "opens_with must not write")
+        self.assertLess(peak, self.BUDGET / self.MIB, f"opens_with held {peak:.0f} MiB")
+        self.assertFalse(vault.opens_with(self.sealed, bytes(32)))
+
+    def test_legacy_one_shot_backup_still_opens(self):
+        legacy = self.dir / "legacy.mtb"
+        self._legacy_seal(legacy)
+        out = self.dir / "from_legacy.bin"
+        for secret in (PW, self.rk):
+            vault.open_vault(legacy, out, secret=secret)
+            self.assertEqual(out.read_bytes(), self.plain.read_bytes())
+        vault.open_vault(legacy, out, dek=self.dek)
+        self.assertEqual(out.read_bytes(), self.plain.read_bytes())
+        self.assertTrue(vault.opens_with(legacy, self.dek))
+
+    def test_header_digest_or_size_mismatch_is_refused(self):
+        for bad in ({"plain_sha256": "0" * 64}, {"plain_size": 7}):
+            with self.subTest(**bad):
+                f = self.dir / "mismatch.mtb"
+                self._legacy_seal(f, bad)
+                out = self.dir / "never.bin"
+                with self.assertRaises(vault.VaultError):
+                    vault.open_vault(f, out, dek=self.dek)
+                self.assertFalse(out.exists(), "an unverified plaintext must never be exposed")
+                self.assertEqual(self._leftovers(), [])
+
+    def test_failed_open_keeps_existing_output_and_leaves_no_part(self):
+        vault.seal(self.plain, self.sealed, self.dek, self.ring)
+        out = self.dir / "target.bin"
+        out.write_bytes(b"an earlier restore that must survive")
+        data = bytearray(self.sealed.read_bytes())
+        data[len(data) // 2] ^= 0x01
+        self.sealed.write_bytes(bytes(data))
+        with self.assertRaises(vault.VaultError):
+            vault.open_vault(self.sealed, out, dek=self.dek)
+        self.assertEqual(out.read_bytes(), b"an earlier restore that must survive")
+        self.assertEqual(self._leftovers(), [])
+
+    def test_source_changing_between_passes_is_refused(self):
+        import hashlib
+        real = self.plain.read_bytes()
+        digest = hashlib.sha256(real).hexdigest()
+
+        def hash_then_change(path):
+            self.plain.write_bytes(real[:-1] + bytes([real[-1] ^ 0x01]))
+            return digest, len(real)
+
+        with mock.patch.object(vault, "_hash_file", side_effect=hash_then_change):
+            with self.assertRaises(vault.VaultError):
+                vault.seal(self.plain, self.sealed, self.dek, self.ring)
+        self.assertFalse(self.sealed.exists(), "a snapshot that moved under us must not be sealed")
+        self.assertEqual(self._leftovers(), [])
+
+    def test_disk_full_mid_seal_leaves_no_output(self):
+        real_open = open
+
+        def flaky(path, *a, **k):
+            f = real_open(path, *a, **k)
+            return _FlakyWriter(f, 5) if str(path).endswith(".part") else f
+
+        with mock.patch("builtins.open", flaky), self.assertRaises(OSError):
+            vault.seal(self.plain, self.sealed, self.dek, self.ring)
+        self.assertFalse(self.sealed.exists())
+        self.assertEqual(self._leftovers(), [])
+
+    def test_disk_full_mid_open_leaves_no_output(self):
+        vault.seal(self.plain, self.sealed, self.dek, self.ring)
+        out = self.dir / "restored.bin"
+        real_open = open
+
+        def flaky(path, *a, **k):
+            f = real_open(path, *a, **k)
+            return _FlakyWriter(f, 5) if str(path).endswith(".part") else f
+
+        with mock.patch("builtins.open", flaky), self.assertRaises(OSError):
+            vault.open_vault(self.sealed, out, dek=self.dek)
+        self.assertFalse(out.exists())
+        self.assertEqual(self._leftovers(), [])
+
+    def test_a_killed_restore_leaves_no_plaintext_part_for_the_next_one(self):
+        vault.seal(self.plain, self.sealed, self.dek, self.ring)
+        staged = self.dir / "morv_tires.db.restore-new"
+        orphan = vault.part_path(staged)
+        orphan.write_bytes(b"plaintext from a restore that was killed mid-stream")
+        backup._discard(staged)
+        self.assertFalse(orphan.exists(), "an interrupted restore must not leave decrypted bytes behind")
+
+
+class LeftoverSweepTest(_Device):
+    """An interrupted backup leaves temp files; the sweep must take those and nothing else."""
+
+    def _stray(self, name: str) -> Path:
+        p = self.dir / "backups" / name
+        p.parent.mkdir(exist_ok=True)
+        p.write_bytes(b"leftover from a backup that was killed")
+        return p
+
+    def test_sweep_takes_only_the_programs_own_abandoned_temp_files(self):
+        kept = Path(backup.create_backup(self.con, "manual").path)
+        base = "morv_tires_20261101_120000_000001_daily.mtb"
+        dead = [self._stray(f"{base}.part"), self._stray(f"{base}.snapshot"),
+                self._stray(f"{base}.snapshot-wal")]
+        spared = [self._stray("notes.txt"), self._stray("random.part"),
+                  self._stray("morv_tires_whatever.mtb.snapshot")]
+        removed = backup.sweep_leftovers(self.dir / "backups")
+        self.assertEqual(sorted(removed), sorted(dead))
+        self.assertTrue(kept.exists(), "a healthy backup must survive the sweep")
+        for p in spared:
+            self.assertTrue(p.exists(), f"{p.name} is not this program's temp file")
+
+    def test_a_claimed_temp_file_survives_however_old_it_looks(self):
+        base = "morv_tires_20261101_120000_000002_daily.mtb"
+        claimed = self._stray(f"{base}.snapshot")
+        old = time.time() - 30 * 24 * 3600          # A slow backup must not be judged by the clock
+        os.utime(claimed, (old, old))
+        backup._in_flight.add(claimed.resolve())
+        try:
+            self.assertEqual(backup.sweep_leftovers(self.dir / "backups"), [])
+        finally:
+            backup._in_flight.discard(claimed.resolve())
+        self.assertTrue(claimed.exists())
+
+    def test_a_sweep_running_during_a_backup_spares_that_backups_temp_files(self):
+        dead = self._stray("morv_tires_20261101_120000_000003_daily.mtb.snapshot")
+        swept, finished = [], threading.Event()
+        real_snapshot = backup._snapshot
+
+        def snapshot_then_let_a_sweep_run(con, target):
+            real_snapshot(con, target)
+            worker = threading.Thread(target=lambda: (swept.extend(backup.sweep_leftovers(target.parent)),
+                                                      finished.set()))
+            worker.start()
+            self.assertTrue(finished.wait(30), "the sweep did not finish")
+            worker.join()
+            self.assertTrue(target.exists(), "a running backup must keep its snapshot")
+
+        with mock.patch.object(backup, "_snapshot", snapshot_then_let_a_sweep_run):
+            result = backup.create_backup(self.con, "manual")
+        self.assertTrue(result.ok and result.path.exists())
+        self.assertEqual(swept, [dead], "the sweep must still take the dead file")
+
+    def test_a_finished_backup_leaves_no_plain_snapshot_sidecar(self):
+        backup.create_backup(self.con, "manual")
+        strays = [p.name for p in (self.dir / "backups").iterdir() if ".snapshot" in p.name]
+        self.assertEqual(strays, [], "snapshot -wal/-shm hold unencrypted database pages")

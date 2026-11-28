@@ -72,17 +72,14 @@ jobs:
       - name: نماذج المستندات المطبوعة على ويندوز
         if: runner.os == 'Windows' && matrix.shard == 0
         run: python tools/print_samples.py print_win
-      - name: رفع نماذج ويندوز إلى فرع معزول للمراجعة
+      - name: رفع نماذج ويندوز إلى فرع مستقل لكل تشغيل ومحاولة
         if: runner.os == 'Windows' && matrix.shard == 0 && always()
         shell: bash
-        run: |
-          cd print_win
-          git init -q -b print-images-win
-          git config user.name "print-samples"
-          git config user.email "print-samples@users.noreply.github.com"
-          git add -A
-          git commit -q -m "windows print samples from ${{ github.head_ref || github.ref_name }}"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" print-images-win
+        env:
+          SOURCE_REF: ${{ github.head_ref || github.ref_name }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AUDIT_TOKEN: ${{ github.token }}
+        run: bash tools/publish_ci_images.sh print_win print-images-win print-samples
 
   # Preserve the existing per-OS check names and block packaging on missing coverage.
   test:
@@ -223,17 +220,14 @@ jobs:
         with:
           name: ui-audit
           path: ui_audit_out
-      - name: رفع الصور إلى فرع معزول للمراجعة (مؤقت)
+      - name: رفع الصور إلى فرع مستقل لكل تشغيل ومحاولة
         if: always()
         shell: bash
-        run: |
-          cd ui_audit_out
-          git init -q -b ui-audit-images
-          git config user.name "ui-audit"
-          git config user.email "ui-audit@users.noreply.github.com"
-          git add -A
-          git commit -q -m "ui audit images from ${{ github.head_ref || github.ref_name }} @ ${{ github.event.pull_request.head.sha || github.sha }}"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ui-audit-images
+        env:
+          SOURCE_REF: ${{ github.head_ref || github.ref_name }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AUDIT_TOKEN: ${{ github.token }}
+        run: bash tools/publish_ci_images.sh ui_audit_out ui-audit-images ui-audit
 
   audit:
     runs-on: ubuntu-latest
