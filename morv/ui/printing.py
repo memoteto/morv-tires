@@ -101,6 +101,7 @@ class PrintPreview(Modal):
         self.page_index = 0
         self.page_count = print_doc.preview_page_count(shop, doc, self.shape)
         self._source = QPixmap()
+        self._fit_key = None
         self.page = QLabel()
         self.page.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_area = QScrollArea()
@@ -154,17 +155,22 @@ class PrintPreview(Modal):
             return
         size = self.preview_area.viewport().size()
         width, height = max(1, size.width() - 2), max(1, size.height() - 2)
-        if self.zoom_btn.isChecked() or self.shape.roll:
-            # A long receipt remains readable; a user-selected zoom can scroll.
-            target = min(width, max(self._source.width(), 560)) if self.shape.roll else width
-            pix = self._source.scaledToWidth(target, Qt.TransformationMode.SmoothTransformation)
+        fit_width = min(width, max(1, height * self._source.width() // self._source.height()))
+        zoomed = self.zoom_btn.isChecked()
+        if zoomed:
+            target = min(width, 560) if self.shape.roll else width
+        elif self.shape.roll:
+            # Fit short receipts; keep long ones legible rather than shrink to a strip.
+            target = min(width, max(fit_width, min(self._source.width(), 320)))
         else:
-            pix = self._source.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,
-                                      Qt.TransformationMode.SmoothTransformation)
-        self.zoom_btn.setText("ملاءمة الصفحة" if self.zoom_btn.isChecked() else "تكبير")
-        if self.page.size() != pix.size() or self.page.pixmap().cacheKey() != pix.cacheKey():
+            target = fit_width
+        self.zoom_btn.setText("ملاءمة الصفحة" if zoomed else "تكبير")
+        key = (self._source.cacheKey(), target)
+        if key != self._fit_key:
+            pix = self._source.scaledToWidth(target, Qt.TransformationMode.SmoothTransformation)
             self.page.setPixmap(pix)
-            self.page.resize(pix.size())
+            self.page.setFixedSize(pix.size())
+            self._fit_key = key
 
     def eventFilter(self, watched, event):
         if (hasattr(self, "_fit_timer") and watched is self.preview_area.viewport()

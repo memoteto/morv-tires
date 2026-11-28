@@ -181,7 +181,7 @@ class PosVatTest(_Fixture, unittest.TestCase):
         send.assert_called_once()
         doc = send.call_args.args[1]
         self.assertEqual(dict(doc.totals)["ضريبة القيمة المضافة"], "140.00")
-        self.assertEqual(dict(doc.totals)["الإجمالي المستحق"], "1,140.00 ج.م")
+        self.assertEqual(dict(doc.totals)["الإجمالي شامل القيمة المضافة"], "1,140.00 ج.م")
         settings.put(self.con, "tax.enabled", "0")
         settings.put(self.con, "tax.rate", "500")
         from morv.infra import sale_view, shop

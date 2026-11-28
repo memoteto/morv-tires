@@ -1,7 +1,7 @@
 """Builds every printed document from the approved design in design/Shop.dc.html, for sheet and roll."""
 import re
-from html import escape
 from dataclasses import dataclass, field
+from html import escape
 
 from PySide6.QtCore import QMarginsF, QRectF, QSizeF, Qt, QUrl
 from PySide6.QtGui import QFont, QImage, QPageLayout, QPageSize, QPainter, QTextDocument

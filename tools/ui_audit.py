@@ -219,6 +219,8 @@ def _capture_pos_vat(win, page, session, app, out, tag, report):
             area.ensureWidgetVisible(page.tax_inclusive)
             _settle(app)
             if (not page.tax_inclusive.isVisible() or not page.tax_row.isVisible()
+                    or not page.before_tax_row.isVisible() or not page._line_table.sale_tax_visible
+                    or any(row["tax_lbl"].isHidden() for row in page._rows)
                     or page._tax_quote is None or not page.summary_footer.isVisible()):
                 raise RuntimeError("audit: missing POS VAT preview or fixed footer")
             mode = "inclusive" if inclusive else "exclusive"
@@ -226,6 +228,25 @@ def _capture_pos_vat(win, page, session, app, out, tag, report):
     finally:
         settings.put(con, "tax.enabled", previous)
         page._reset_after_post()
+        _settle(app)
+
+
+def _capture_vat_print_preview(win, app, out, tag, report, screen_h):
+    from morv.ui.printing import PrintPreview
+    from tools.print_samples import _shop, _vat_sale
+
+    dlg = PrintPreview(win, _shop(), _vat_sale(False))
+    try:
+        dlg.show()
+        _settle(app)
+        if (dlg.preview_area.verticalScrollBar().maximum()
+                or dlg.preview_area.horizontalScrollBar().maximum()):
+            raise RuntimeError("audit: fitted VAT sheet unexpectedly requires scrolling")
+        _capture_checked(dlg, app, out, f"dlg_vat_print_preview_{tag}", report,
+                         dialog=True, screen_h=screen_h)
+    finally:
+        dlg.close()
+        dlg.deleteLater()
         _settle(app)
 
 
@@ -459,6 +480,7 @@ def run(out: Path, size: tuple) -> dict:
                     tabs.setCurrentIndex(0)
                     _settle(app)
             _capture_item_vat(win, session, app, out, f"{w}x{h}_{mode}", report, h)
+            _capture_vat_print_preview(win, app, out, f"{w}x{h}_{mode}", report, h)
             for dname, make in _dialogs(session, item_id):
                 name = f"dlg_{dname}_{w}x{h}_{mode}"
                 try:

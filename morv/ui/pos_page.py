@@ -644,6 +644,7 @@ class PosPage(QWidget):
             except MoneyError:
                 disc = 0
             row["total_lbl"].setText(ltr(fmt(max(row["qty_spin"].value() * price - disc, 0))))
+
     def _on_row_changed(self) -> None:
         pieces = sum(row["qty_spin"].value() for row in self._rows)
         self.count_chip.setText(f"{ltr(str(len(self._rows)))} سطر · {ltr(str(pieces))} قطعة")
