@@ -36,6 +36,8 @@ LAYOUT = dict(
     settings_user_list_max=320, settings_partner_preview_max=420,
     compact_card_padding_x=14, compact_card_padding_y=10, compact_card_spacing=6,
     adaptive_table_row_min=36, adaptive_table_control_target=92,
+    document_dialog_width=1120, document_dialog_height=700,
+    document_margin_x=16, document_margin_y=8, document_table_min=64,
     invoice_line_margin=4, invoice_line_row_padding=2, invoice_line_column_gap=6,
     invoice_line_header_gap=12, invoice_line_row_gap=4, invoice_line_delete_width=30,
     invoice_line_edit_inset=26, invoice_line_name_icon_space=22,
