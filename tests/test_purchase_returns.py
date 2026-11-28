@@ -35,6 +35,31 @@ class PurchaseReturnsTest(Base):
         self.assertEqual(treasury.supplier_owed(self.con, self.sup), 100000)
         self.assertReconciled()
 
+    def test_multiple_untaxed_lines_share_one_journal_and_reverse(self):
+        self.buy(self.tire, 2, 100000)
+        self.buy(self.battery, 3, 200000, dot_code=None)
+        before = (self.balance("1410"), self.balance("2110"), treasury.supplier_owed(self.con, self.sup))
+        result = self.send(self.line_id(self.tire), 1, lines=[
+            ReturnLine(self.line_id(self.tire), 1), ReturnLine(self.line_id(self.battery), 2)])
+        self.assertEqual(result.total, 500000)
+        entry = self.con.execute(
+            "SELECT journal_entry_id FROM purchase_returns WHERE id=?", (result.id,)).fetchone()[0]
+        self.assertEqual(self.con.execute(
+            "SELECT item_id, qty, cost_total, journal_entry_id FROM stock_issues "
+            "WHERE source_type='purchase_return' AND source_id=? ORDER BY source_line_id",
+            (result.id,)).fetchall(), [(self.tire, 1, 100000, entry), (self.battery, 2, 400000, entry)])
+        self.assertEqual((self.balance("1410"), self.balance("2110")), (300000, -300000))
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), 300000)
+        self.assertReconciled()
+        self.assertEqual(ledger.unbalanced_entries(self.con), [])
+        purchase_returns.reverse_return(self.con, self.admin, request_key="rev-multi-0001",
+                                        return_id=result.id, reason="تصحيح مرتجع")
+        self.assertEqual((self.balance("1410"), self.balance("2110"), treasury.supplier_owed(self.con, self.sup)),
+                         before)
+        self.assertEqual((inventory.on_hand(self.con, self.tire), inventory.on_hand(self.con, self.battery)), (2, 3))
+        self.assertReconciled()
+        self.assertEqual(ledger.unbalanced_entries(self.con), [])
+
     def test_preview_matches_post_and_rejects_changed_book_total(self):
         from morv.infra.purchasing import PurchaseLine
 
