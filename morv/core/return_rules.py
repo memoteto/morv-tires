@@ -36,5 +36,14 @@ def portion(total: int, done: int, qty: int, all_qty: int) -> int:
     return total * (done + qty) // all_qty - total * done // all_qty
 
 
+def tax_portion(total: int, tax: int, done: int, qty: int, all_qty: int) -> int:
+    """Allocate tax by cumulative gross, never exceeding the gross of any partial return."""
+    if not total:
+        return 0
+    before = total * done // all_qty
+    after = total * (done + qty) // all_qty
+    return tax * after // total - tax * before // total
+
+
 def stock_account(condition: str) -> str:
     return INVENTORY_ACCOUNT if condition == "sound" else DEFECT_ACCOUNT
