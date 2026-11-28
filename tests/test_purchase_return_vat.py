@@ -3,8 +3,11 @@
 The original red regression assertions are retained unchanged.
 """
 
-from morv.infra import inventory, ledger, purchase_returns, settings, treasury
+from morv.core.sales_rules import Payment
+from morv.infra import inventory, ledger, purchase_returns, sales, settings, treasury
 from morv.infra.purchase_returns import ReturnLine
+from morv.infra.purchasing import PurchaseLine
+from morv.infra.sales import SaleLineIn
 from tests.test_purchase_input_vat import Base
 
 
@@ -173,3 +176,100 @@ class PurchaseReturnVatPartialTest(Base):
             self.send(line, expected_quote=quote)
         self.send(line, expected_quote=fresh)
         self.reconciled()
+
+    def test_sale_before_return_preserves_vat_on_sold_units(self):
+        line = self.buy_line(5, 100000)
+        item = self.con.execute("SELECT item_id FROM purchase_lines WHERE id=?", (line,)).fetchone()[0]
+        sales.post_sale(
+            self.con, self.admin, request_key="vat-sale-before-return", customer_id=None,
+            sale_date="2026-11-28", lines=[SaleLineIn(item, 2, 150000)],
+            payments=[Payment("cash", 342000, received=342000)], prices_tax_inclusive=False,
+        )
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 70000)
+        self.assertEqual(ledger.account_balance(self.con, "5110"), 200000)
+        self.assertEqual(ledger.account_balance(self.con, "2350"), -42000)
+        with self.assertRaises(purchase_returns.PurchaseReturnError):
+            self.send(line, 4)
+        returned = self.send(line, 3)
+        self.assertEqual(self.amounts(returned), (300000, 342000, 42000, 42000))
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 28000)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 0)
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), 228000)
+        self.assertEqual(ledger.account_balance(self.con, "5110"), 200000)
+        self.assertEqual(ledger.account_balance(self.con, "2350"), -42000)
+        self.reconciled()
+        self.reverse(returned)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 70000)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 300000)
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), 570000)
+        self.assertEqual(inventory.on_hand(self.con, item), 3)
+        self.reconciled()
+
+    def test_mixed_rates_and_deductibility_on_one_document(self):
+        self.enable_tax()
+        a, b, c, d = (self.item() for _ in range(4))
+        invoice = self.buy(a, 1, 100000, lines=[
+            PurchaseLine(a, 1, 100000, "2324", input_tax_rate=1400, input_tax_deductible=True),
+            PurchaseLine(b, 1, 200000, "2324", input_tax_rate=500, input_tax_deductible=True),
+            PurchaseLine(c, 1, 300000, "2324", input_tax_rate=1400, input_tax_deductible=False),
+            PurchaseLine(d, 1, 400000, "2324", input_tax_rate=0, input_tax_deductible=False),
+        ])
+        ids = [r[0] for r in self.con.execute(
+            "SELECT id FROM purchase_lines WHERE invoice_id=? ORDER BY line_no", (invoice.id,))]
+        self.assertEqual(invoice.total, 1066000)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 24000)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 1042000)
+        self.enable_tax(2000)
+        lines = [ReturnLine(i, 1) for i in ids]
+        quote = purchase_returns.preview_return(self.con, self.sup, lines, "2026-11-28")
+        self.assertEqual((quote.book_total, quote.tax_total, quote.deductible_tax_total, quote.default_settlement),
+                         (1042000, 66000, 24000, 1066000))
+        result = purchase_returns.post_return(
+            self.con, self.admin, request_key="vat-mixed-return", supplier_id=self.sup,
+            lines=lines, reason="مرتجع متعدد الأصناف", return_date="2026-11-28", expected_quote=quote)
+        self.assertEqual(self.amounts(result), (1042000, 1066000, 66000, 24000))
+        self.assertEqual(self.con.execute(
+            "SELECT tax_amount,deductible_tax_amount FROM purchase_return_lines WHERE return_id=? ORDER BY line_no",
+            (result.id,)).fetchall(), [(14000, 14000), (10000, 10000), (42000, 0), (0, 0)])
+        for code in ("1410", "1520", "2110", "5160"):
+            self.assertEqual(ledger.account_balance(self.con, code), 0)
+        self.reconciled()
+        self.assertEqual(self.amounts(self.reverse(result)), self.amounts(result))
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 24000)
+        self.assertEqual(ledger.account_balance(self.con, "1410"), 1042000)
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), 1066000)
+        self.reconciled()
+
+    def test_untaxed_freight_not_refunded(self):
+        line = self.buy_line(1, 100000, freight_amount=10000, freight_taxable=False)
+        result = self.send(line, tax=14000, settlement_amount=114000,
+                           credit_note_ref="CN-UNTAXED", settlement_reason="الشحن غير مسترد")
+        self.assertEqual(self.amounts(result), (110000, 114000, 14000, 14000))
+        self.assertEqual(ledger.account_balance(self.con, "5160"), 10000)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 0)
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), 10000)
+        self.reconciled()
+        self.reverse(result)
+        self.assertEqual(ledger.account_balance(self.con, "5160"), 0)
+        self.assertEqual(ledger.account_balance(self.con, "1520"), 14000)
+        self.assertEqual(treasury.supplier_owed(self.con, self.sup), 124000)
+        self.reconciled()
+
+    def test_confirmed_tax_with_settlement_gain_and_loss(self):
+        line = self.buy_line(1, 100000)
+        for settlement, difference in ((109000, 5000), (119000, -5000)):
+            with self.subTest(settlement=settlement):
+                with self.assertRaises(purchase_returns.PurchaseReturnError):
+                    self.send(line, settlement_amount=settlement, settlement_reason="تسوية مختلفة")
+                result = self.send(line, tax=14000, settlement_amount=settlement,
+                                   credit_note_ref=f"CN-{settlement}", settlement_reason="تسوية مختلفة")
+                self.assertEqual(self.amounts(result), (100000, settlement, 14000, 14000))
+                self.assertEqual(ledger.account_balance(self.con, "5160"), difference)
+                self.assertEqual(ledger.account_balance(self.con, "1520"), 0)
+                self.assertEqual(treasury.supplier_owed(self.con, self.sup), difference)
+                self.reconciled()
+                self.reverse(result)
+                self.assertEqual(ledger.account_balance(self.con, "5160"), 0)
+                self.assertEqual(ledger.account_balance(self.con, "1520"), 14000)
+                self.assertEqual(treasury.supplier_owed(self.con, self.sup), 114000)
+                self.reconciled()
