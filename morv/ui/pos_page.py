@@ -255,9 +255,22 @@ class PosPage(QWidget):
         self.invoice_disc = ltr_edit("0.00")
         self.invoice_disc.setFixedWidth(150)
         self.invoice_disc.textChanged.connect(self._refresh_total)
-        for label, w in (("الإجمالي قبل الخصم", self.subtotal_label),
-                          ("خصم على الفاتورة", self.invoice_disc)):
-            body.addWidget(kv_row(label, w))
+        body.addWidget(kv_row("الإجمالي قبل الخصم", self.subtotal_label))
+        discount_box = QWidget()
+        discount_layout = QVBoxLayout(discount_box)
+        discount_layout.setContentsMargins(0, 0, 0, 0)
+        discount_layout.setSpacing(2)
+        discount_layout.addWidget(self.invoice_disc)
+        self.discount_total = muted("")
+        discount_layout.addWidget(self.discount_total)
+        self.discount_total.hide()
+        self.discount_row = kv_row("خصم على الفاتورة", discount_box)
+        self.discount_caption = self.discount_row.layout().itemAt(0).widget()
+        body.addWidget(self.discount_row)
+        self.before_tax_value = QLabel()
+        self.before_tax_row = kv_row("الإجمالي قبل الضريبة", self.before_tax_value)
+        body.addWidget(self.before_tax_row)
+        self.before_tax_row.setVisible(self._tax_enabled)
         self.tax_value = QLabel()
         self.tax_row = kv_row("منها ضريبة القيمة المضافة", self.tax_value)
         self.tax_caption = self.tax_row.layout().itemAt(0).widget()
@@ -563,6 +576,10 @@ class PosPage(QWidget):
         disc_edit = ltr_edit("0.00")
         h.addWidget(disc_edit, 1, Qt.AlignmentFlag.AlignTop)
 
+        tax_lbl = QLabel("—", row_w)
+        tax_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute
+                             | Qt.AlignmentFlag.AlignVCenter)
+        tax_lbl.hide()
         total_lbl = QLabel(ltr(fmt(0)))
         total_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute
                                | Qt.AlignmentFlag.AlignVCenter)
@@ -577,7 +594,7 @@ class PosPage(QWidget):
 
         row = {"widget": row_w, "item_id": item_id, "kind": kind, "name": name,
               "num_lbl": num_lbl, "qty_spin": qty_spin, "price_edit": price_edit,
-              "disc_edit": disc_edit, "total_lbl": total_lbl}
+              "disc_edit": disc_edit, "total_lbl": total_lbl, "tax_lbl": tax_lbl}
         qty_spin.valueChanged.connect(self._on_row_changed)
         price_edit.textChanged.connect(self._on_row_changed)
         disc_edit.textChanged.connect(self._on_row_changed)
@@ -616,7 +633,7 @@ class PosPage(QWidget):
         for i, row in enumerate(self._rows, start=1):
             row["num_lbl"].setText(str(i))
 
-    def _on_row_changed(self) -> None:
+    def _refresh_untaxed_lines(self) -> None:
         for row in self._rows:
             try:
                 price = parse_money(row["price_edit"].text())
@@ -627,7 +644,7 @@ class PosPage(QWidget):
             except MoneyError:
                 disc = 0
             row["total_lbl"].setText(ltr(fmt(max(row["qty_spin"].value() * price - disc, 0))))
-        self._line_table.sync_columns()
+    def _on_row_changed(self) -> None:
         pieces = sum(row["qty_spin"].value() for row in self._rows)
         self.count_chip.setText(f"{ltr(str(len(self._rows)))} سطر · {ltr(str(pieces))} قطعة")
         self._refresh_total()
@@ -699,6 +716,12 @@ class PosPage(QWidget):
         self.no_tax_chip.setVisible(not enabled)
         self.tax_inclusive.setVisible(enabled)
         self.tax_row.setVisible(enabled)
+        self.before_tax_row.setVisible(enabled)
+        self.discount_caption.setText("الخصم" if enabled else "خصم على الفاتورة")
+        self.invoice_disc.setToolTip("خصم إضافي على الفاتورة" if enabled else "")
+        self.total_box.caption.setText("الإجمالي شامل\nالقيمة المضافة" if enabled else "الإجمالي النهائي")
+        self._line_table.set_sale_tax_visible(enabled, (
+            (row["widget"], row["tax_lbl"]) for row in self._rows))
         self._tax_quote = None
         self._tax_error = None
         self.subtotal_label.setText(ltr(fmt(self.subtotal_minor())))
@@ -721,6 +744,24 @@ class PosPage(QWidget):
             self.tax_value.setText("—" if self._tax_error else ltr(fmt(
                 self._tax_quote.tax_total if self._tax_quote is not None else 0)))
             self.tax_value.setToolTip(self._tax_error or "")
+            quote = self._tax_quote
+            self.before_tax_value.setText("—" if self._tax_error else ltr(fmt(
+                quote.total - quote.tax_total if quote is not None else 0)))
+            for i, row in enumerate(self._rows):
+                amounts = quote.lines[i] if quote is not None else None
+                row["tax_lbl"].setText(ltr(fmt(amounts.tax_amount)) if amounts is not None else "—")
+                row["total_lbl"].setText(ltr(fmt(amounts.payable)) if amounts is not None else "—")
+                row["total_lbl"].setToolTip("الإجمالي المستحق بعد جميع الخصومات والضريبة")
+            line_discount = self._line_discount_minor()
+            self.discount_total.setVisible(bool(line_discount))
+            self.discount_total.setText("إجمالي الخصم: " + (
+                "—" if self._tax_error else ltr(fmt(line_discount + discount))))
+        else:
+            self.discount_total.hide()
+            self._refresh_untaxed_lines()
+            for row in self._rows:
+                row["total_lbl"].setToolTip("")
+        self._line_table.sync_columns()
         try:
             total = self.total_minor()
         except SaleError:

@@ -50,6 +50,12 @@ class SaleView:
     tax_enabled: bool = False
     prices_tax_inclusive: bool = False
     tax_total: int = 0
+    customer_mobile: str = ""
+    customer_address: str = ""
+    customer_tax_id: str = ""
+    cashier_name: str = ""
+    recorded_at: str = ""
+    notes: str = ""
 
     @property
     def tax_basis_label(self) -> str:
@@ -102,8 +108,11 @@ def get_sale(con: sqlite3.Connection, sale_id: int) -> SaleView:
     h = con.execute(
         "SELECT s.id, s.number, coalesce(c.name, 'عميل نقدي'), s.sale_date, s.subtotal, s.line_discount, "
         "s.invoice_discount, s.total, s.odometer, coalesce(s.vehicle_plate, ''), "
-        "s.tax_enabled, s.prices_tax_inclusive, s.tax_total "
-        "FROM sales s LEFT JOIN customers c ON c.id = s.customer_id WHERE s.id=?", (sale_id,)).fetchone()
+        "s.tax_enabled, s.prices_tax_inclusive, s.tax_total, "
+        "coalesce(c.mobile,''), coalesce(c.address,''), coalesce(c.tax_id,''), "
+        "coalesce(u.display_name,''), s.at, coalesce(s.notes,'') "
+        "FROM sales s LEFT JOIN customers c ON c.id = s.customer_id "
+        "LEFT JOIN users u ON u.id = s.user_id WHERE s.id=?", (sale_id,)).fetchone()
     if not h:
         raise LookupError("الفاتورة غير موجودة")
     lines = con.execute(
@@ -117,7 +126,9 @@ def get_sale(con: sqlite3.Connection, sale_id: int) -> SaleView:
     return SaleView(*h[:10], payments=tuple(pays),
                     lines=tuple(SaleLineView(*r[:10], prices_tax_inclusive=bool(r[10])) for r in lines),
                     returned=sum(r[2] for r in rets), returns=tuple(rets),
-                    tax_enabled=bool(h[10]), prices_tax_inclusive=bool(h[11]), tax_total=h[12])
+                    tax_enabled=bool(h[10]), prices_tax_inclusive=bool(h[11]), tax_total=h[12],
+                    customer_mobile=h[13], customer_address=h[14], customer_tax_id=h[15],
+                    cashier_name=h[16], recorded_at=h[17], notes=h[18])
 
 
 def returnable_lines(con: sqlite3.Connection, sale_id: int) -> list[ReturnableLine]:

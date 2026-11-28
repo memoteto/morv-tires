@@ -64,21 +64,78 @@ class SaleDocumentTest(unittest.TestCase):
                 self.assertEqual(doc.totals, [
                     ("الإجمالي قبل الخصم", "2,000.00"),
                     ("الخصم", "200.00"),
-                    ("القيمة قبل الضريبة", "1,689.47" if inclusive else "1,800.00"),
+                    ("الإجمالي قبل الضريبة", "1,689.47" if inclusive else "1,800.00"),
                     ("ضريبة القيمة المضافة", "110.53" if inclusive else "126.00"),
-                    ("الإجمالي المستحق", "1,800.00 ج.م" if inclusive else "1,926.00 ج.م"),
+                    ("الإجمالي شامل القيمة المضافة", "1,800.00 ج.م" if inclusive else "1,926.00 ج.م"),
                 ])
                 self.assertIn("ضريبة 14%", doc.lines[0].detail)
-                self.assertIn("خصم: 100.00", doc.lines[0].detail)
-                self.assertIn("معفى: 0.00", doc.lines[1].detail)
+                self.assertEqual(doc.lines[0].discount, 10000)
+                self.assertEqual(doc.lines[0].tax_amount, 11053 if inclusive else 12600)
+                self.assertEqual(doc.lines[1].detail, "معفى")
+                self.assertEqual(doc.lines[1].tax_amount, 0)
                 for shape in print_doc.SHAPES.values():
                     with self.subTest(shape=shape.key):
                         rendered = print_doc.render(_shop(), doc, shape)
                         self.assertIn("ضريبة القيمة المضافة", rendered.toPlainText())
-                        self.assertIn("القيمة قبل الضريبة", rendered.toPlainText())
-                        self.assertIn("الإجمالي المستحق", rendered.toPlainText())
+                        self.assertIn("الإجمالي قبل الضريبة", rendered.toPlainText())
+                        self.assertIn("الإجمالي شامل القيمة المضافة", rendered.toPlainText())
+                        self.assertIn("الضريبة", rendered.toPlainText())
                         image = print_doc.preview_image(_shop(), doc, shape)
                         self.assertFalse(image.isNull())
+
+    def test_optional_invoice_identity_and_notes_are_in_document(self):
+        from morv.ui.printing import sale_document
+        sale = _sale(customer_mobile="01000000001", customer_address="المنصورة",
+                     customer_tax_id="123456789", cashier_name="مدير",
+                     recorded_at="2026-11-28 08:00:00", odometer=12000,
+                     notes="تجربة <ملاحظة>")
+        doc = sale_document(sale, _shop())
+        for pair in (("الموبايل", "01000000001"), ("عنوان العميل", "المنصورة"),
+                     ("رقم العميل الضريبي", "123456789"), ("الكاشير", "مدير"),
+                     ("وقت التسجيل", "2026-11-28 08:00:00"), ("قراءة العداد", "12000"),
+                     ("نقدي", "37,500.00")):
+            self.assertIn(pair, doc.info)
+        self.assertEqual(doc.remarks, sale.notes)
+
+    def test_print_preview_fits_single_sheet_and_can_zoom(self):
+        from morv.ui.printing import PrintPreview, sale_document
+        dlg = PrintPreview(None, _shop(), sale_document(_sale(), _shop()))
+        self.addCleanup(dlg.deleteLater)
+        dlg.show()
+        self.addCleanup(dlg.close)
+        for _ in range(5):
+            self.app.processEvents()
+        self.assertIsNone(dlg.scroll)
+        self.assertEqual(dlg.preview_area.verticalScrollBar().maximum(), 0)
+        self.assertEqual(dlg.preview_area.horizontalScrollBar().maximum(), 0)
+        self.assertTrue(dlg.print_btn.isVisible())
+        self.assertLessEqual(dlg.height(), dlg.screen().availableGeometry().height())
+        self.assertLessEqual(dlg.width(), dlg.screen().availableGeometry().width())
+        self.assertGreater(dlg.page.pixmap().height(), 0)
+        dlg.zoom_btn.click()
+        for _ in range(5):
+            self.app.processEvents()
+        self.assertTrue(dlg.zoom_btn.isChecked())
+        dlg.zoom_btn.click()
+        for _ in range(5):
+            self.app.processEvents()
+        self.assertEqual(dlg.preview_area.verticalScrollBar().maximum(), 0)
+
+    def test_multi_page_preview_can_reach_last_sheet(self):
+        from morv.ui.printing import PrintPreview, sale_document
+        sale = _sale(lines=_sale().lines * 80)
+        dlg = PrintPreview(None, _shop(), sale_document(sale, _shop()))
+        self.addCleanup(dlg.deleteLater)
+        dlg.show()
+        self.addCleanup(dlg.close)
+        self.app.processEvents()
+        self.assertGreater(dlg.page_count, 1)
+        self.assertTrue(dlg.next_btn.isEnabled())
+        dlg.next_btn.click()
+        self.assertEqual(dlg.page_index, 1)
+        dlg._show_page(dlg.page_count - 1)
+        self.assertFalse(dlg.next_btn.isEnabled())
+        self.assertTrue(dlg.previous_btn.isEnabled())
 
     def test_the_paper_follows_the_shop_setting(self):
         from morv.ui.printing import shape_for

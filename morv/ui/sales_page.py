@@ -65,9 +65,14 @@ class SalesPage(ListPage):
                 details.append(("خصم الأصناف", ltr(fmt(inv.line_discount))))
             details.extend([
                 ("أساس السعر", inv.tax_basis_label),
-                ("القيمة قبل الضريبة", ltr(fmt(inv.value_before_tax))),
+                ("الإجمالي قبل الضريبة", ltr(fmt(inv.value_before_tax))),
                 ("ضريبة القيمة المضافة", ltr(fmt(inv.tax_total))),
             ])
+        for label, value in (("الموبايل", inv.customer_mobile), ("عنوان العميل", inv.customer_address),
+                             ("رقم العميل الضريبي", inv.customer_tax_id), ("الكاشير", inv.cashier_name),
+                             ("وقت التسجيل", inv.recorded_at), ("ملاحظات", inv.notes)):
+            if value:
+                details.append((label, value))
         self.summary_details(details)
         self.summary_section("وسائل الدفع", "cash")
         self.summary_details([(PAYMENT_LABELS.get(p[0], p[0]), ltr(fmt(p[1]))) for p in inv.payments])

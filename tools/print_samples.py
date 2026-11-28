@@ -60,7 +60,10 @@ def _vat_sale(inclusive: bool):
                       "standard", 1400, tax, inclusive),
          SaleLineView(2, "خدمة معفاة", 1, 100000, 0, 10000, 90000,
                       "exempt", 0, 0, inclusive)),
-        0, (), True, inclusive, tax)
+        0, (), True, inclusive, tax,
+        customer_mobile="01000000021", customer_address="المنصورة",
+        cashier_name="المدير", recorded_at="2026-11-28 08:00:00",
+        notes="مثال تجريبي لطباعة فاتورة ضريبية")
     return sale_document(sale, _shop())
 
 
