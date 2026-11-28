@@ -222,11 +222,20 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
             if old[3] != h:
                 raise ReturnError("مفتاح الطلب سبق استخدامه لمرتجع بمحتوى مختلف")
             return PostedReturn(old[0], old[1], old[2], True)
-        # P04-4D will split returned revenue and VAT from the original snapshot.
-        # Until then never reverse a taxable invoice as if its gross were revenue,
-        # even if the current shop setting has since been turned off.
-        if con.execute("SELECT 1 FROM journal_lines WHERE entry_id=? AND account_code='2350' AND credit>0",
-                       (sale[3],)).fetchone():
+        # Historical migration fixtures still post on pre-VAT schemas.
+        vat_schema = any(row[1] == "tax_total" for row in con.execute("PRAGMA table_info(sale_returns)"))
+        posted_tax = con.execute(
+            "SELECT coalesce(sum(credit-debit),0) FROM journal_lines WHERE entry_id=? AND account_code='2350'",
+            (sale[3],)).fetchone()[0]
+        tax_enabled = False
+        if vat_schema:
+            tax_enabled, original_tax = con.execute(
+                "SELECT tax_enabled, tax_total FROM sales WHERE id=?", (sale_id,)).fetchone()
+            line_tax = con.execute("SELECT coalesce(sum(tax_amount),0) FROM sale_lines WHERE sale_id=?",
+                                   (sale_id,)).fetchone()[0]
+            if original_tax != posted_tax or original_tax != line_tax:
+                raise ReturnError("ضريبة الفاتورة الأصلية لا تطابق قيدها وسطورها")
+        elif posted_tax:
             raise ReturnError("مرتجع الفاتورة الضريبية غير متاح حتى اكتمال معالجة الضريبة")
         if len({ln.sale_line_id for ln in lines}) != len(lines):
             raise ReturnError("سطر الفاتورة مكرر في المرتجع؛ اجمعه في سطر واحد")
@@ -239,6 +248,17 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
             except rules.ReturnRuleError as e:
                 raise ReturnError(f"السطر {i}: {e}") from e
             value = rules.portion(net_total, already, qty, sold)
+            tax = 0
+            if vat_schema and tax_enabled:
+                original = con.execute("SELECT tax_amount FROM sale_lines WHERE id=?",
+                                       (ln.sale_line_id,)).fetchone()[0]
+                previous = con.execute(
+                    "SELECT coalesce(sum(value),0), coalesce(sum(tax_amount),0) "
+                    "FROM sale_return_lines WHERE sale_line_id=?", (ln.sale_line_id,)).fetchone()
+                if previous != (rules.portion(net_total, 0, already, sold),
+                                rules.tax_portion(net_total, original, 0, already, sold)):
+                    raise ReturnError(f"السطر {i}: مبالغ المرتجعات السابقة لا تطابق الفاتورة الأصلية")
+                tax = rules.tax_portion(net_total, original, already, qty, sold)
             layer_take, lot_take = [], []
             if kind in COGS_ACCOUNTS:
                 layers, lots = _issue_parts(con, sale_id, ln.sale_line_id)
@@ -248,12 +268,13 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
                 except costing.InsufficientStock as e:
                     raise ReturnError(f"السطر {i}: {e}") from e
             cost = sum(c for _, _, c in layer_take)
-            shaped.append((ln, item_id, kind, qty, value, cost, layer_take, lot_take))
+            shaped.append((ln, item_id, kind, qty, value, cost, layer_take, lot_take, tax))
 
         if method == "installment":
             _require_complete_sale(con, sale_id, lines)
         total = sum(x[4] for x in shaped)
         cost_total = sum(x[5] for x in shaped)
+        tax_total = sum(x[8] for x in shaped)
         if total <= 0 and cost_total <= 0:
             raise ReturnError("المرتجع بلا قيمة ولا تكلفة")
         owner = con.execute("SELECT customer_id FROM sales WHERE id=?", (sale_id,)).fetchone()[0]
@@ -274,9 +295,13 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         number = f"SR-{return_id:06d}"
 
         settlement = _installment_settlement(con, sale_id, total, day) if method == "installment" else None
+        if settlement and tax_enabled and settlement.markup:
+            raise ReturnError("مرتجع التقسيط الضريبي بفوائد موقوف حتى اعتماد معاملة ضريبة الفوائد")
         entry = []
-        if total:
-            entry.append((rules.RETURNS_ACCOUNT, total, 0))
+        if total - tax_total:
+            entry.append((rules.RETURNS_ACCOUNT, total - tax_total, 0))
+        if tax_total:
+            entry.append(("2350", tax_total, 0))
         if settlement:
             if settlement.deferred_reversal:
                 entry.append((installments.DEFERRED_INTEREST_ACCOUNT, settlement.deferred_reversal, 0))
@@ -292,7 +317,7 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
                 entry.append((customer_statement.CUSTOMER_ACCOUNT, 0, credit_part))
         stock_side: dict[str, int] = {}
         cogs_side: dict[str, int] = {}
-        for ln, _item, kind, _qty, _value, cost, _layers, _lots in shaped:
+        for ln, _item, kind, _qty, _value, cost, _layers, _lots, _tax in shaped:
             if not cost:
                 continue
             acc = rules.stock_account(ln.condition)
@@ -313,6 +338,9 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         if credit_part:                                  # the column defaults to 0; schemas before 0025 lack it
             columns.append("credit_part")
             values.append(credit_part)
+        if vat_schema:
+            columns.append("tax_total")
+            values.append(tax_total)
         con.execute(f"INSERT INTO sale_returns ({', '.join(columns)}) VALUES ({', '.join('?' * len(values))})", values)
         if settlement:
             con.execute(
@@ -329,10 +357,15 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
                 con.execute(
                     "INSERT INTO installment_return_allocations (return_id,row_id,amount) VALUES (?,?,?)",
                     (return_id, row_id, amount))
-        for no, (ln, item_id, _kind, qty, value, cost, layer_take, lot_take) in enumerate(shaped, start=1):
+        for no, (ln, item_id, _kind, qty, value, cost, layer_take, lot_take, tax) in enumerate(shaped, start=1):
+            line_columns = "return_id, line_no, sale_line_id, qty, condition, value, cost"
+            line_values = (return_id, no, ln.sale_line_id, qty, ln.condition, value, cost)
+            if vat_schema:
+                line_columns += ", tax_amount"
+                line_values += (tax,)
             cur = con.execute(
-                "INSERT INTO sale_return_lines (return_id, line_no, sale_line_id, qty, condition, value, cost) "
-                "VALUES (?,?,?,?,?,?,?)", (return_id, no, ln.sale_line_id, qty, ln.condition, value, cost))
+                f"INSERT INTO sale_return_lines ({line_columns}) VALUES ({','.join('?' for _ in line_values)})",
+                line_values)
             if ln.condition != "sound":
                 continue                                  # defective returns neither to sellable stock nor to its layer
             for lot_id, q, _ in lot_take:
