@@ -158,7 +158,15 @@ def preview_installment_refund(con, sale_id: int, lines: list,
         except rules.ReturnRuleError as exc:
             raise ReturnError(str(exc)) from exc
         total += rules.portion(net, already, qty, sold)
-    return _installment_settlement(con, sale_id, total, day)
+    settlement = _installment_settlement(con, sale_id, total, day)
+    tax_enabled = con.execute("SELECT tax_enabled FROM sales WHERE id=?", (sale_id,)).fetchone()[0]
+    _check_installment_vat(settlement, tax_enabled)
+    return settlement
+
+
+def _check_installment_vat(settlement, tax_enabled):
+    if settlement and tax_enabled and settlement.markup:
+        raise ReturnError("مرتجع التقسيط الضريبي بفوائد موقوف حتى اعتماد معاملة ضريبة الفوائد")
 
 
 def _sale_line(con, sale_id: int, line_id: int) -> tuple:
@@ -186,7 +194,8 @@ def _issue_parts(con, sale_id: int, line_id: int) -> tuple:
 
 def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, lines: list, reason: str,
                 refund_method: str | None = None, return_date: str | None = None,
-                notes: str | None = None) -> PostedReturn:
+                notes: str | None = None,
+                expected_amounts: dict[int, tuple[int, int, int]] | None = None) -> PostedReturn:
     if by is None or not has_permission(con, by, "sales.return"):
         raise ReturnError("لا تملك صلاحية ترحيل مرتجعات البيع")
     key = (request_key or "").strip()
@@ -259,6 +268,8 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
                                 rules.tax_portion(net_total, original, 0, already, sold)):
                     raise ReturnError(f"السطر {i}: مبالغ المرتجعات السابقة لا تطابق الفاتورة الأصلية")
                 tax = rules.tax_portion(net_total, original, already, qty, sold)
+            if expected_amounts is not None and expected_amounts.get(ln.sale_line_id) != (already, value, tax):
+                raise ReturnError("تغيّرت معاينة المرتجع؛ أعد فتح النافذة وراجع الكميات والضريبة")
             layer_take, lot_take = [], []
             if kind in COGS_ACCOUNTS:
                 layers, lots = _issue_parts(con, sale_id, ln.sale_line_id)
@@ -295,8 +306,7 @@ def post_return(con: sqlite3.Connection, by, *, request_key: str, sale_id: int, 
         number = f"SR-{return_id:06d}"
 
         settlement = _installment_settlement(con, sale_id, total, day) if method == "installment" else None
-        if settlement and tax_enabled and settlement.markup:
-            raise ReturnError("مرتجع التقسيط الضريبي بفوائد موقوف حتى اعتماد معاملة ضريبة الفوائد")
+        _check_installment_vat(settlement, tax_enabled)
         entry = []
         if total - tax_total:
             entry.append((rules.RETURNS_ACCOUNT, total - tax_total, 0))

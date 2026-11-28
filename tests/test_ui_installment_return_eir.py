@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from morv.core.sales_rules import Payment
 from morv.infra import interest_recognition, ledger, sale_view, sales, users, installments
 from morv.infra.db.bootstrap import open_main_db
-from morv.infra.sale_returns import ReturnLineIn
 from morv.infra.sales import SaleLineIn
 from tests.qt_app import get_app, require_qt
 
@@ -67,16 +66,14 @@ class InstallmentReturnEirUiTest(unittest.TestCase):
     def test_partial_return_disables_post_and_explains_refusal(self):
         self.assertEqual(self.dialog.refund.currentData(), "installment")
         self.assertFalse(self.dialog.post_btn.isEnabled())
-        self.dialog.lines = [ReturnLineIn(self.line_id, 1)]
-        self.dialog._refresh_lines()
+        self.assertTrue(self.dialog.model.setData(self.dialog.model.index(0, self.dialog.model.QTY), 1))
         self.assertFalse(self.dialog.post_btn.isEnabled())
         self.assertIn("جزئي", self.dialog.refund_breakdown.text())
         self.assertEqual(self.con.execute("SELECT count(*) FROM sale_returns").fetchone()[0], 0)
 
     def test_full_return_previews_paid_debt_and_recognized_interest_before_posting(self):
-        self.dialog.lines = [ReturnLineIn(self.line_id, 2)]
         self.dialog.reason.setCurrentText("عيب في الصنف")
-        self.dialog._refresh_lines()
+        self.assertTrue(self.dialog.model.setData(self.dialog.model.index(0, self.dialog.model.QTY), 2))
         self.assertTrue(self.dialog.post_btn.isEnabled())
         self.assertIn("سيُرد للعميل", self.dialog.refund_breakdown.text())
         self.assertIn("تُلغى المديونية", self.dialog.refund_breakdown.text())
