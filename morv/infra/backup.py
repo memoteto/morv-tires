@@ -30,6 +30,8 @@ STALE_DAYS = 2
 OFF_DEVICE_STALE_DAYS = 7      # RPO for the copy that survives losing the machine
 OFF_DEVICE_LOST_DAYS = 14      # past this the shop counts as having no off-device copy at all
 _NAME = re.compile(r"^morv_tires_(\d{8})_(\d{6})_\d+_([a-z_]+)\.(db|mtb)$")
+_TEMP_NAME = re.compile(r"^morv_tires_\d{8}_\d{6}_\d+_[a-z_]+\.(?:db|mtb)\.(?:snapshot(?:-wal|-shm)?|part)$")
+_in_flight: set[Path] = set()      # Claimed temp paths; one process holds the data folder, so the rest are dead
 _TS = "%Y-%m-%d %H:%M:%S"
 
 
@@ -243,6 +245,8 @@ def create_backup(con: sqlite3.Connection, kind: str = "manual", dest_dir=None, 
     encrypted = is_encryption_ready(con) and not plain
     final = dest / f"morv_tires_{stamp}_{kind}{vault.EXT if encrypted else '.db'}"
     tmp = dest / f"{final.name}.snapshot"
+    mine = {tmp.resolve(), vault.part_path(final).resolve()}
+    _in_flight.update(mine)                 # Claimed before the files exist, so a sweep can never see them unclaimed
     try:
         _snapshot(con, tmp)
         ok, detail = verify_db_file(tmp)
@@ -260,7 +264,8 @@ def create_backup(con: sqlite3.Connection, kind: str = "manual", dest_dir=None, 
         _record(con, "backup", kind, started, result, username)
         raise BackupError(f"فشلت النسخة الاحتياطية: {e}") from e
     finally:
-        tmp.unlink(missing_ok=True)         # Also covers an interruption, which no except clause would catch
+        _discard(tmp)                       # Snapshot plus its -wal/-shm, which hold plain database pages
+        _in_flight.difference_update(mine)
     _record(con, "backup", kind, started, result, username)
     if kind != "safety":
         settings.put(con, "backup.last_ok_at", _now_s())
@@ -280,6 +285,21 @@ def list_backups(dest_dir=None) -> list[BackupInfo]:
         out.append(BackupInfo(p, at, m.group(3), m.group(4) == "mtb", p.stat().st_size))
     out.sort(key=lambda b: b.at, reverse=True)
     return out
+
+
+def sweep_leftovers(dest_dir=None) -> list[Path]:
+    """Removes abandoned snapshot and part files; a claimed one is spared whatever its age."""
+    dest = Path(dest_dir) if dest_dir else paths.backups_dir()
+    removed = []
+    for p in sorted(dest.iterdir()) if dest.exists() else []:
+        if not _TEMP_NAME.match(p.name) or p.resolve() in _in_flight:
+            continue
+        try:
+            p.unlink()
+        except OSError:                     # Still open, as a live writer keeps it on Windows: try again next run
+            continue
+        removed.append(p)
+    return removed
 
 
 def prune(dest_dir=None) -> list[Path]:
@@ -545,6 +565,9 @@ def _test_target(con) -> tuple[BackupInfo | None, str]:
 
 def run_scheduled(con, username: str | None = None) -> list[str]:
     done = []
+    stray = sweep_leftovers()
+    if stray:
+        done.append(f"تنظيف ملفات مؤقتة من عملية متوقفة: {ltr(str(len(stray)))}")
     if not is_encryption_ready(con):
         return ["التشفير غير مُعدّ؛ لا نسخ تلقائي"]
     today = datetime.now().date()

@@ -3,6 +3,8 @@ import os
 import shutil
 import sqlite3
 import tempfile
+import threading
+import time
 import unittest
 from unittest import mock
 from datetime import datetime, timedelta
@@ -483,3 +485,62 @@ class StreamingVaultTest(unittest.TestCase):
         orphan.write_bytes(b"plaintext from a restore that was killed mid-stream")
         backup._discard(staged)
         self.assertFalse(orphan.exists(), "an interrupted restore must not leave decrypted bytes behind")
+
+
+class LeftoverSweepTest(_Device):
+    """An interrupted backup leaves temp files; the sweep must take those and nothing else."""
+
+    def _stray(self, name: str) -> Path:
+        p = self.dir / "backups" / name
+        p.parent.mkdir(exist_ok=True)
+        p.write_bytes(b"leftover from a backup that was killed")
+        return p
+
+    def test_sweep_takes_only_the_programs_own_abandoned_temp_files(self):
+        kept = Path(backup.create_backup(self.con, "manual").path)
+        base = "morv_tires_20261101_120000_000001_daily.mtb"
+        dead = [self._stray(f"{base}.part"), self._stray(f"{base}.snapshot"),
+                self._stray(f"{base}.snapshot-wal")]
+        spared = [self._stray("notes.txt"), self._stray("random.part"),
+                  self._stray("morv_tires_whatever.mtb.snapshot")]
+        removed = backup.sweep_leftovers(self.dir / "backups")
+        self.assertEqual(sorted(removed), sorted(dead))
+        self.assertTrue(kept.exists(), "a healthy backup must survive the sweep")
+        for p in spared:
+            self.assertTrue(p.exists(), f"{p.name} is not this program's temp file")
+
+    def test_a_claimed_temp_file_survives_however_old_it_looks(self):
+        base = "morv_tires_20261101_120000_000002_daily.mtb"
+        claimed = self._stray(f"{base}.snapshot")
+        old = time.time() - 30 * 24 * 3600          # A slow backup must not be judged by the clock
+        os.utime(claimed, (old, old))
+        backup._in_flight.add(claimed.resolve())
+        try:
+            self.assertEqual(backup.sweep_leftovers(self.dir / "backups"), [])
+        finally:
+            backup._in_flight.discard(claimed.resolve())
+        self.assertTrue(claimed.exists())
+
+    def test_a_sweep_running_during_a_backup_spares_that_backups_temp_files(self):
+        dead = self._stray("morv_tires_20261101_120000_000003_daily.mtb.snapshot")
+        swept, finished = [], threading.Event()
+        real_snapshot = backup._snapshot
+
+        def snapshot_then_let_a_sweep_run(con, target):
+            real_snapshot(con, target)
+            worker = threading.Thread(target=lambda: (swept.extend(backup.sweep_leftovers(target.parent)),
+                                                      finished.set()))
+            worker.start()
+            self.assertTrue(finished.wait(30), "the sweep did not finish")
+            worker.join()
+            self.assertTrue(target.exists(), "a running backup must keep its snapshot")
+
+        with mock.patch.object(backup, "_snapshot", snapshot_then_let_a_sweep_run):
+            result = backup.create_backup(self.con, "manual")
+        self.assertTrue(result.ok and result.path.exists())
+        self.assertEqual(swept, [dead], "the sweep must still take the dead file")
+
+    def test_a_finished_backup_leaves_no_plain_snapshot_sidecar(self):
+        backup.create_backup(self.con, "manual")
+        strays = [p.name for p in (self.dir / "backups").iterdir() if ".snapshot" in p.name]
+        self.assertEqual(strays, [], "snapshot -wal/-shm hold unencrypted database pages")
