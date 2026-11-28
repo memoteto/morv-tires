@@ -26,8 +26,9 @@ class PosVatTest(_Fixture, unittest.TestCase):
         p = self.page()
         p._rows[0]["disc_edit"].setText("140.00")
         exempt = self.con.execute(
-            "INSERT INTO items (kind,code,name,name_norm,price_retail,tax_treatment) "
-            "VALUES ('service','EX','معفى','معفى',100000,'exempt') RETURNING id").fetchone()[0]
+            "INSERT INTO items (kind,code,name,name_norm,price_retail,price_wholesale,"
+            "price_super,tax_treatment) "
+            "VALUES ('service','EX','معفى','معفى',100000,100000,100000,'exempt') RETURNING id").fetchone()[0]
         p._add_row(exempt, "service", "خدمة معفاة")
         p.invoice_disc.setText("200.00")
         return p
