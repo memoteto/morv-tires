@@ -1,0 +1,2396 @@
+{
+ "platform": "offscreen",
+ "screen": [
+  1920,
+  1080
+ ],
+ "pages": {
+  "page_home_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_pos_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "popup_pos_search_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    840,
+    266
+   ],
+   "search_width": 840,
+   "minimum_popup_width": 840,
+   "fits_screen": true,
+   "search_labels": [
+    {
+     "row": 0,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Bridgestone Turanza",
+     "width": 531,
+     "height": 33,
+     "needed_width": 154,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "muted",
+     "text": "⁦225/45R17⁩",
+     "width": 70,
+     "height": 21,
+     "needed_width": 70,
+     "needed_height": 21,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "pillDanger",
+     "text": "متوفر: ⁦0⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 71,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "chip",
+     "text": "⁦9,900.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Continental PremiumContact 6 215/60R16 95V",
+     "width": 607,
+     "height": 33,
+     "needed_width": 373,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "pillWarn",
+     "text": "متوفر: ⁦2⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 66,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "chip",
+     "text": "⁦8,750.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Michelin Primacy 205/55R16",
+     "width": 607,
+     "height": 32,
+     "needed_width": 191,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "pillOk",
+     "text": "متوفر: ⁦12⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 74,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "chip",
+     "text": "⁦12,500.50⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 93,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "cardTitle",
+     "text": "بطارية تجريبية Varta 70 أمبير",
+     "width": 607,
+     "height": 33,
+     "needed_width": 180,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "pillOk",
+     "text": "متوفر: ⁦8⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 66,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "chip",
+     "text": "⁦4,650.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 4,
+     "role": "cardTitle",
+     "text": "خدمة تجريبية ترصيص العجلات",
+     "width": 607,
+     "height": 33,
+     "needed_width": 186,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 4,
+     "role": "chip",
+     "text": "⁦150.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 76,
+     "needed_height": 24,
+     "clipped": false
+    }
+   ]
+  },
+  "page_pos_vat_inclusive_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_pos_vat_exclusive_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_sales_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_purchases_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 1
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "popup_purchase_search_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1080,
+    224
+   ],
+   "search_width": 1080,
+   "minimum_popup_width": 1080,
+   "fits_screen": true,
+   "search_labels": [
+    {
+     "row": 0,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Bridgestone Turanza",
+     "width": 950,
+     "height": 33,
+     "needed_width": 154,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "muted",
+     "text": "⁦225/45R17⁩",
+     "width": 70,
+     "height": 21,
+     "needed_width": 70,
+     "needed_height": 21,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Continental PremiumContact 6 215/60R16 95V",
+     "width": 1026,
+     "height": 33,
+     "needed_width": 373,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Michelin Primacy 205/55R16",
+     "width": 1026,
+     "height": 33,
+     "needed_width": 191,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "cardTitle",
+     "text": "بطارية تجريبية Varta 70 أمبير",
+     "width": 1026,
+     "height": 33,
+     "needed_width": 180,
+     "needed_height": 22,
+     "clipped": false
+    }
+   ]
+  },
+  "form_purchase_vat_exclusive_no_freight_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_exclusive_no_freight_summary_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_exclusive_freight_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_exclusive_freight_summary_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_inclusive_no_freight_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_inclusive_no_freight_summary_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_inclusive_freight_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_inclusive_freight_summary_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_inventory_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1570,
+     "columns_w": 1570,
+     "h_scroll": false,
+     "rows": 85
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_inventory_tab_lots_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1578,
+     "columns_w": 1578,
+     "h_scroll": false,
+     "rows": 3
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_inventory_tab_stock_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1570,
+     "columns_w": 1570,
+     "h_scroll": false,
+     "rows": 76
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_customers_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1620,
+     "columns_w": 1620,
+     "h_scroll": false,
+     "rows": 60
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_customers_preview_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1068,
+     "columns_w": 1068,
+     "h_scroll": false,
+     "rows": 60
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_suppliers_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 12
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_suppliers_preview_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1076,
+     "columns_w": 1076,
+     "h_scroll": false,
+     "rows": 12
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_installments_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_treasury_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_reports_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 8
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_reports_preview_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1076,
+     "columns_w": 1076,
+     "h_scroll": false,
+     "rows": 8
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_sidebar_collapsed_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_shop_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_printing_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_item_fields_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableWidget",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 14
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_partners_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1196,
+     "columns_w": 1196,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_opening_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_users_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_audit_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1590,
+     "columns_w": 1590,
+     "h_scroll": false,
+     "rows": 155
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_backup_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1598,
+     "columns_w": 1598,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_appearance_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 940,
+     "columns_w": 940,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_shortcuts_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_reports_vat_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1076,
+     "columns_w": 1076,
+     "h_scroll": false,
+     "rows": 18
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_home_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_pos_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "popup_pos_search_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    840,
+    266
+   ],
+   "search_width": 840,
+   "minimum_popup_width": 840,
+   "fits_screen": true,
+   "search_labels": [
+    {
+     "row": 0,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Bridgestone Turanza",
+     "width": 531,
+     "height": 33,
+     "needed_width": 154,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "muted",
+     "text": "⁦225/45R17⁩",
+     "width": 70,
+     "height": 21,
+     "needed_width": 70,
+     "needed_height": 21,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "pillDanger",
+     "text": "متوفر: ⁦0⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 71,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "chip",
+     "text": "⁦9,900.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Continental PremiumContact 6 215/60R16 95V",
+     "width": 607,
+     "height": 33,
+     "needed_width": 373,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "pillWarn",
+     "text": "متوفر: ⁦2⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 66,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "chip",
+     "text": "⁦8,750.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Michelin Primacy 205/55R16",
+     "width": 607,
+     "height": 32,
+     "needed_width": 191,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "pillOk",
+     "text": "متوفر: ⁦12⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 74,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "chip",
+     "text": "⁦12,500.50⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 93,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "cardTitle",
+     "text": "بطارية تجريبية Varta 70 أمبير",
+     "width": 607,
+     "height": 33,
+     "needed_width": 180,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "pillOk",
+     "text": "متوفر: ⁦8⁩",
+     "width": 74,
+     "height": 29,
+     "needed_width": 66,
+     "needed_height": 29,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "chip",
+     "text": "⁦4,650.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 86,
+     "needed_height": 24,
+     "clipped": false
+    },
+    {
+     "row": 4,
+     "role": "cardTitle",
+     "text": "خدمة تجريبية ترصيص العجلات",
+     "width": 607,
+     "height": 33,
+     "needed_width": 186,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 4,
+     "role": "chip",
+     "text": "⁦150.00⁩ ج.م",
+     "width": 93,
+     "height": 24,
+     "needed_width": 76,
+     "needed_height": 24,
+     "clipped": false
+    }
+   ]
+  },
+  "page_pos_vat_inclusive_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_pos_vat_exclusive_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_sales_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_sales_preview_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1076,
+     "columns_w": 1076,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_purchases_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 3
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "popup_purchase_search_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1080,
+    224
+   ],
+   "search_width": 1080,
+   "minimum_popup_width": 1080,
+   "fits_screen": true,
+   "search_labels": [
+    {
+     "row": 0,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Bridgestone Turanza",
+     "width": 950,
+     "height": 33,
+     "needed_width": 154,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 0,
+     "role": "muted",
+     "text": "⁦225/45R17⁩",
+     "width": 70,
+     "height": 21,
+     "needed_width": 70,
+     "needed_height": 21,
+     "clipped": false
+    },
+    {
+     "row": 1,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Continental PremiumContact 6 215/60R16 95V",
+     "width": 1026,
+     "height": 33,
+     "needed_width": 373,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 2,
+     "role": "cardTitle",
+     "text": "إطار تجريبي Michelin Primacy 205/55R16",
+     "width": 1026,
+     "height": 33,
+     "needed_width": 191,
+     "needed_height": 22,
+     "clipped": false
+    },
+    {
+     "row": 3,
+     "role": "cardTitle",
+     "text": "بطارية تجريبية Varta 70 أمبير",
+     "width": 1026,
+     "height": 33,
+     "needed_width": 180,
+     "needed_height": 22,
+     "clipped": false
+    }
+   ]
+  },
+  "form_purchase_vat_exclusive_no_freight_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_exclusive_no_freight_summary_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_exclusive_freight_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_exclusive_freight_summary_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_inclusive_no_freight_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_inclusive_no_freight_summary_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_inclusive_freight_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "form_purchase_vat_inclusive_freight_summary_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_inventory_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1570,
+     "columns_w": 1570,
+     "h_scroll": false,
+     "rows": 85
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_inventory_tab_lots_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1578,
+     "columns_w": 1578,
+     "h_scroll": false,
+     "rows": 13
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_inventory_tab_stock_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1570,
+     "columns_w": 1570,
+     "h_scroll": false,
+     "rows": 76
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_customers_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1620,
+     "columns_w": 1620,
+     "h_scroll": false,
+     "rows": 60
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_customers_preview_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1068,
+     "columns_w": 1068,
+     "h_scroll": false,
+     "rows": 60
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_suppliers_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 14
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_suppliers_preview_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1076,
+     "columns_w": 1076,
+     "h_scroll": false,
+     "rows": 14
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_installments_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_treasury_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_treasury_preview_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1076,
+     "columns_w": 1076,
+     "h_scroll": false,
+     "rows": 2
+    },
+    {
+     "name": "summaryTable",
+     "viewport_w": 486,
+     "columns_w": 486,
+     "h_scroll": false,
+     "rows": 3
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_reports_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 9
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_reports_preview_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1076,
+     "columns_w": 1076,
+     "h_scroll": false,
+     "rows": 9
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_sidebar_collapsed_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_shop_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_printing_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_item_fields_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableWidget",
+     "viewport_w": 1628,
+     "columns_w": 1628,
+     "h_scroll": false,
+     "rows": 14
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_partners_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1196,
+     "columns_w": 1196,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_opening_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_users_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_audit_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1590,
+     "columns_w": 1590,
+     "h_scroll": false,
+     "rows": 163
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_backup_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1598,
+     "columns_w": 1598,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_appearance_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 940,
+     "columns_w": 940,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_settings_tab_shortcuts_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1920,
+    1040
+   ]
+  },
+  "page_reports_vat_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1076,
+     "columns_w": 1076,
+     "h_scroll": false,
+     "rows": 18
+    }
+   ],
+   "window": [
+    1920,
+    1040
+   ]
+  }
+ },
+ "dialogs": {
+  "dlg_purchase_vat_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    798
+   ],
+   "size": [
+    560,
+    798
+   ],
+   "screen_h": 1080
+  },
+  "dlg_purchase_vat_lines_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    798
+   ],
+   "size": [
+    560,
+    798
+   ],
+   "screen_h": 1080
+  },
+  "dlg_supplier_expanded_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    1020
+   ],
+   "size": [
+    600,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_supplier_vat_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    1020
+   ],
+   "size": [
+    600,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_tire_standard_1920x1080_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -177,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -177,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -177,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_tire_exempt_1920x1080_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -177,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -177,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -177,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_battery_standard_1920x1080_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -215,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -215,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -215,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_battery_exempt_1920x1080_light": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -215,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -215,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -215,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_service_standard_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    700,
+    849
+   ],
+   "size": [
+    700,
+    849
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_service_exempt_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    700,
+    799
+   ],
+   "size": [
+    700,
+    799
+   ],
+   "screen_h": 1080
+  },
+  "dlg_vat_print_preview_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1100,
+    1020
+   ],
+   "size": [
+    1100,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_sale_return_legacy_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1086,
+     "columns_w": 1086,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1120,
+    700
+   ],
+   "size": [
+    1120,
+    700
+   ],
+   "screen_h": 1080
+  },
+  "dlg_sale_return_vat_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1086,
+     "columns_w": 1086,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1120,
+    700
+   ],
+   "size": [
+    1120,
+    700
+   ],
+   "screen_h": 1080
+  },
+  "dlg_purchase_return_legacy_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1086,
+     "columns_w": 1086,
+     "h_scroll": false,
+     "rows": 5
+    }
+   ],
+   "window": [
+    1120,
+    700
+   ],
+   "size": [
+    1120,
+    700
+   ],
+   "screen_h": 1080
+  },
+  "dlg_purchase_return_vat_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1086,
+     "columns_w": 1086,
+     "h_scroll": false,
+     "rows": 5
+    }
+   ],
+   "window": [
+    1120,
+    700
+   ],
+   "size": [
+    1120,
+    700
+   ],
+   "screen_h": 1080
+  },
+  "dlg_opening_balances_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "summaryTable",
+     "viewport_w": 652,
+     "columns_w": 652,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    700,
+    644
+   ],
+   "size": [
+    700,
+    644
+   ],
+   "screen_h": 1080
+  },
+  "dlg_stock_adjustment_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    640,
+    567
+   ],
+   "size": [
+    640,
+    567
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_customer_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    640,
+    649
+   ],
+   "size": [
+    640,
+    649
+   ],
+   "screen_h": 1080
+  },
+  "dlg_supplier_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    438
+   ],
+   "size": [
+    600,
+    438
+   ],
+   "screen_h": 1080
+  },
+  "dlg_new_user_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    460,
+    381
+   ],
+   "size": [
+    460,
+    381
+   ],
+   "screen_h": 1080
+  },
+  "dlg_treasury_movement_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    501
+   ],
+   "size": [
+    600,
+    501
+   ],
+   "screen_h": 1080
+  },
+  "dlg_treasury_close_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    483
+   ],
+   "size": [
+    520,
+    483
+   ],
+   "screen_h": 1080
+  },
+  "dlg_safe_count_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    450
+   ],
+   "size": [
+    520,
+    450
+   ],
+   "screen_h": 1080
+  },
+  "dlg_reconciliation_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    550
+   ],
+   "size": [
+    560,
+    550
+   ],
+   "screen_h": 1080
+  },
+  "dlg_profit_distribution_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    440
+   ],
+   "size": [
+    560,
+    440
+   ],
+   "screen_h": 1080
+  },
+  "dlg_period_lock_1920x1080_light": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    371
+   ],
+   "size": [
+    520,
+    371
+   ],
+   "screen_h": 1080
+  },
+  "dlg_purchase_vat_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    798
+   ],
+   "size": [
+    560,
+    798
+   ],
+   "screen_h": 1080
+  },
+  "dlg_purchase_vat_lines_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    798
+   ],
+   "size": [
+    560,
+    798
+   ],
+   "screen_h": 1080
+  },
+  "dlg_supplier_expanded_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    1020
+   ],
+   "size": [
+    600,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_supplier_vat_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    1020
+   ],
+   "size": [
+    600,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_tire_standard_1920x1080_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -177,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -177,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -177,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_tire_exempt_1920x1080_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -177,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -177,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -177,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_battery_standard_1920x1080_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -215,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -215,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -215,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_battery_exempt_1920x1080_dark": {
+   "clipped_buttons": [
+    {
+     "text": "إطار",
+     "x": 560,
+     "y": -215,
+     "w": 47,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "بطارية",
+     "x": 488,
+     "y": -215,
+     "w": 60,
+     "h": 36,
+     "in_scroll": true
+    },
+    {
+     "text": "خدمة",
+     "x": 420,
+     "y": -215,
+     "w": 56,
+     "h": 36,
+     "in_scroll": true
+    }
+   ],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_service_standard_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    700,
+    849
+   ],
+   "size": [
+    700,
+    849
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_vat_service_exempt_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    700,
+    799
+   ],
+   "size": [
+    700,
+    799
+   ],
+   "screen_h": 1080
+  },
+  "dlg_vat_print_preview_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    1100,
+    1020
+   ],
+   "size": [
+    1100,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_sale_return_legacy_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1086,
+     "columns_w": 1086,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1120,
+    700
+   ],
+   "size": [
+    1120,
+    700
+   ],
+   "screen_h": 1080
+  },
+  "dlg_sale_return_vat_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1086,
+     "columns_w": 1086,
+     "h_scroll": false,
+     "rows": 2
+    }
+   ],
+   "window": [
+    1120,
+    700
+   ],
+   "size": [
+    1120,
+    700
+   ],
+   "screen_h": 1080
+  },
+  "dlg_purchase_return_legacy_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1086,
+     "columns_w": 1086,
+     "h_scroll": false,
+     "rows": 5
+    }
+   ],
+   "window": [
+    1120,
+    700
+   ],
+   "size": [
+    1120,
+    700
+   ],
+   "screen_h": 1080
+  },
+  "dlg_purchase_return_vat_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "QTableView",
+     "viewport_w": 1086,
+     "columns_w": 1086,
+     "h_scroll": false,
+     "rows": 5
+    }
+   ],
+   "window": [
+    1120,
+    700
+   ],
+   "size": [
+    1120,
+    700
+   ],
+   "screen_h": 1080
+  },
+  "dlg_opening_balances_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [
+    {
+     "name": "summaryTable",
+     "viewport_w": 652,
+     "columns_w": 652,
+     "h_scroll": false,
+     "rows": 0
+    }
+   ],
+   "window": [
+    700,
+    644
+   ],
+   "size": [
+    700,
+    644
+   ],
+   "screen_h": 1080
+  },
+  "dlg_stock_adjustment_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    640,
+    567
+   ],
+   "size": [
+    640,
+    567
+   ],
+   "screen_h": 1080
+  },
+  "dlg_item_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    700,
+    1020
+   ],
+   "size": [
+    700,
+    1020
+   ],
+   "screen_h": 1080
+  },
+  "dlg_customer_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    640,
+    649
+   ],
+   "size": [
+    640,
+    649
+   ],
+   "screen_h": 1080
+  },
+  "dlg_supplier_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    438
+   ],
+   "size": [
+    600,
+    438
+   ],
+   "screen_h": 1080
+  },
+  "dlg_new_user_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    460,
+    381
+   ],
+   "size": [
+    460,
+    381
+   ],
+   "screen_h": 1080
+  },
+  "dlg_treasury_movement_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    600,
+    501
+   ],
+   "size": [
+    600,
+    501
+   ],
+   "screen_h": 1080
+  },
+  "dlg_treasury_close_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    483
+   ],
+   "size": [
+    520,
+    483
+   ],
+   "screen_h": 1080
+  },
+  "dlg_safe_count_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    450
+   ],
+   "size": [
+    520,
+    450
+   ],
+   "screen_h": 1080
+  },
+  "dlg_reconciliation_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    550
+   ],
+   "size": [
+    560,
+    550
+   ],
+   "screen_h": 1080
+  },
+  "dlg_profit_distribution_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    560,
+    440
+   ],
+   "size": [
+    560,
+    440
+   ],
+   "screen_h": 1080
+  },
+  "dlg_period_lock_1920x1080_dark": {
+   "clipped_buttons": [],
+   "tables": [],
+   "window": [
+    520,
+    371
+   ],
+   "size": [
+    520,
+    371
+   ],
+   "screen_h": 1080
+  }
+ }
+}
