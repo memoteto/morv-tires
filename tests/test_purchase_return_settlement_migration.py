@@ -167,6 +167,79 @@ class PurchaseReturnSettlementMigrationTest(unittest.TestCase):
                                   for table in tables})
         self.assertEqual(inventory.reconcile(self.con), [])
 
+    def test_upgrade_0039_preserves_legacy_returns_reversals_and_postings(self):
+        self.assertEqual(migrate(self.con, load_migrations()[:38]), list(range(32, 39)))
+        tables = ("purchase_returns", "purchase_return_lines", "purchase_invoices", "purchase_lines",
+                  "journal_entries", "journal_lines", "stock_lots", "stock_movements", "stock_issues",
+                  "cost_layers", "cost_allocations")
+        columns = {t: [r[1] for r in self.con.execute(f"PRAGMA table_info({t})")] for t in tables}
+
+        def snapshot():
+            return {t: self.con.execute(f"SELECT {','.join(columns[t])} FROM {t} ORDER BY id").fetchall()
+                    for t in tables}
+
+        before = snapshot()
+        self.assertEqual(migrate(self.con, load_migrations()[:39]), [39])
+        self.assertEqual(snapshot(), before)
+        self.assertEqual(self.con.execute(
+            "SELECT tax_total,deductible_tax_total,credit_note_ref,settlement_reason FROM purchase_returns"
+        ).fetchall(), [(0, 0, "", ""), (0, 0, "", "")])
+        self.assertEqual(self.con.execute(
+            "SELECT tax_allocated,tax_amount,deductible_tax_amount,tax_mode FROM purchase_return_lines"
+        ).fetchall(), [(0, 0, 0, "legacy"), (0, 0, 0, "legacy")])
+        for sql in ("UPDATE purchase_returns SET tax_total=1", "DELETE FROM purchase_returns",
+                    "UPDATE purchase_return_lines SET tax_amount=1", "DELETE FROM purchase_return_lines"):
+            with self.assertRaises(sqlite3.DatabaseError):
+                self.con.execute(sql)
+        self.assertEqual(self.con.execute("PRAGMA foreign_key_check").fetchall(), [])
+        self.assertEqual(self.con.execute("PRAGMA integrity_check").fetchone(), ("ok",))
+        self.assertEqual(inventory.reconcile(self.con), [])
+        self.assertEqual(ledger.unbalanced_entries(self.con), [])
+
+    def test_upgrade_0040_preserves_live_children_and_journal_guards(self):
+        self.assertEqual(migrate(self.con, load_migrations()[:39]), list(range(32, 40)))
+        inventory.issue(self.con, self.admin, self.item_id, 1, source_type="test",
+                        source_id=101, source_line_id=1, issue_date="2026-11-01")
+        tables = ("stock_issues", "stock_movements", "cost_allocations", "stock_lots", "cost_layers",
+                  "journal_entries", "journal_lines", "purchase_returns", "purchase_return_lines",
+                  "purchase_invoices", "purchase_lines")
+
+        def snapshot():
+            return {t: self.con.execute(f"SELECT * FROM {t} ORDER BY id").fetchall() for t in tables}
+
+        before = snapshot()
+        self.assertEqual(inventory.reconcile(self.con), [])
+        backup_calls = []
+        self.assertEqual(migrate(self.con, load_migrations()[:40],
+                                 before_apply=lambda: backup_calls.append(current_version(self.con))), [40])
+        self.assertEqual(backup_calls, [39])
+        self.assertEqual(snapshot(), before)
+        self.assertEqual(self.con.execute("PRAGMA foreign_keys").fetchone(), (1,))
+        self.assertEqual(self.con.execute("PRAGMA foreign_key_check").fetchall(), [])
+        self.assertEqual(self.con.execute("PRAGMA integrity_check").fetchone(), ("ok",))
+        ret_entry = self.con.execute(
+            "SELECT journal_entry_id FROM purchase_returns WHERE id=?", (self.return_id,)).fetchone()[0]
+        normal_entry = self.con.execute(
+            "SELECT journal_entry_id FROM stock_issues WHERE source_type='test'").fetchone()[0]
+        insert = ("INSERT INTO stock_issues (item_id, qty, cost_total, source_type, source_id, "
+                  "source_line_id, journal_entry_id) VALUES (?,1,1,?,?,?,?)")
+        for source, doc, line, entry in (
+            ("test", 102, 1, normal_entry),         # ordinary journal still unique
+            ("test", 103, 1, ret_entry),            # cross-source reuse
+            ("purchase_return", self.return_id, 2, normal_entry),  # reverse insertion order
+            ("purchase_return", self.reversal_id, 2, ret_entry),   # another document
+            ("purchase_return", self.return_id, 1, ret_entry),     # duplicate source line
+        ):
+            with self.subTest(source=source, doc=doc, line=line), self.assertRaises(sqlite3.IntegrityError):
+                with transaction(self.con):
+                    self.con.execute(insert, (self.item_id, source, doc, line, entry))
+        for sql in ("UPDATE stock_issues SET qty=2", "DELETE FROM stock_issues"):
+            with self.assertRaises(sqlite3.DatabaseError):
+                self.con.execute(sql)
+        self.assertEqual(snapshot(), before)
+        self.assertEqual(inventory.reconcile(self.con), [])
+        self.assertEqual(ledger.unbalanced_entries(self.con), [])
+
 
 if __name__ == "__main__":
     unittest.main()

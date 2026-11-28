@@ -3,17 +3,14 @@ import uuid
 from datetime import date
 
 from PySide6.QtCore import QAbstractTableModel, Qt
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHeaderView, QHBoxLayout, QLabel, QSizePolicy,
-                               QSpinBox, QStyledItemDelegate, QTableView)
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QSizePolicy, QSpinBox
 
 from morv.core import return_rules
 from morv.core.money import fmt
 from morv.core.text import ltr
 from morv.infra.sale_returns import ReturnError, ReturnLineIn, post_return, preview_installment_refund
-from morv.ui.adaptive_layout import AdaptiveFields
-from morv.ui.modal import Modal
-from morv.ui.tokens import LAYOUT
-from morv.ui.widgets import DateEdit, card, field, icon_button, ltr_edit, muted
+from morv.ui.document_table import DocumentEditor, DocumentTableDialog
+from morv.ui.widgets import DateEdit, ltr_edit, muted
 
 CONDITIONS = (("sound", "سليم"), ("defective", "معيب"))
 REFUND_LABELS = {"cash": "نقدي", "card": "بطاقة / ماكينة POS", "transfer": "تحويل / محفظة", "wallet": "محفظة",
@@ -99,6 +96,11 @@ class ReturnTableModel(QAbstractTableModel):
         if self.rows:
             self.dataChanged.emit(self.index(0, self.QTY), self.index(len(self.rows) - 1, self.TOTAL), [])
 
+    def clear_quantities(self):
+        self.quantities = [0] * len(self.rows)
+        if self.rows:
+            self.dataChanged.emit(self.index(0, self.QTY), self.index(len(self.rows) - 1, self.TOTAL), [])
+
     def selected_lines(self):
         return [ReturnLineIn(r.sale_line_id, qty, condition)
                 for r, qty, condition in zip(self.rows, self.quantities, self.conditions, strict=True) if qty]
@@ -108,16 +110,10 @@ class ReturnTableModel(QAbstractTableModel):
                 for i, r in enumerate(self.rows) if self.quantities[i]}
 
 
-class ReturnEditor(QStyledItemDelegate):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.active_editor = None
-
+class ReturnEditor(DocumentEditor):
     def createEditor(self, parent, option, index):
         if index.column() == ReturnTableModel.QTY:
-            editor = QSpinBox(parent)
-            editor.setRange(0, index.model().rows[index.row()].available)
-            editor.setKeyboardTracking(False)
+            editor = self.quantity_editor(parent, index.model().rows[index.row()].available)
         else:
             editor = QComboBox(parent)
             for key, label in CONDITIONS:
@@ -140,45 +136,19 @@ class ReturnEditor(QStyledItemDelegate):
             value = editor.currentData()
         model.setData(index, value)
 
-    def destroyEditor(self, editor, index):
-        if self.active_editor is editor:
-            self.active_editor = None
-        super().destroyEditor(editor, index)
 
-    def finish(self):
-        # Ctrl+S must also submit the value still being edited.
-        editor = self.active_editor
-        if editor is not None:
-            self.commitData.emit(editor)
-            if self.active_editor is editor:
-                self.closeEditor.emit(editor, QStyledItemDelegate.EndEditHint.NoHint)
-
-
-class SaleReturnDialog(Modal):
+class SaleReturnDialog(DocumentTableDialog):
     def __init__(self, session, sale, returnable, methods, parent=None):
-        super().__init__(f"مرتجع بيع — {ltr(sale.number)}", parent, width=1120,
-                         table_mode=True, height=700, keep_on_screen=True)
+        super().__init__(f"مرتجع بيع — {ltr(sale.number)}", parent)
         self.session = session
         self.sale = sale
         self.posted = None
         self._busy = False
         self._request_key = uuid.uuid4().hex
-        self.body.setContentsMargins(16, 8, 16, 8)
-        self.body.setSpacing(LAYOUT["compact_card_spacing"])
-
-        metrics = QHBoxLayout()
-        for caption, value in (("العميل", sale.customer_name),
-                               ("إجمالي الفاتورة", ltr(fmt(sale.total))),
-                               ("المتاح للإرجاع", ltr(fmt(sale.total - sale.returned)))):
-            box, layout = card(compact=True)
-            layout.addWidget(muted(caption))
-            label = QLabel(value)
-            label.setObjectName("cardTitle")
-            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-            label.setToolTip(value)
-            layout.addWidget(label)
-            metrics.addWidget(box, 1)
-        self.body.addLayout(metrics)
+        self.metrics = self.add_document_metrics([
+            ("العميل", sale.customer_name), ("إجمالي الفاتورة", ltr(fmt(sale.total))),
+            ("المتاح للإرجاع", ltr(fmt(sale.total - sale.returned))),
+        ])
 
         self.return_date = DateEdit()
         self.return_date.setText(max(date.today().isoformat(), sale.sale_date))
@@ -192,45 +162,19 @@ class SaleReturnDialog(Modal):
         self.refund.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.refund.setMinimumContentsLength(12)
         self.note = ltr_edit("ملاحظة (اختيارية)")
-        self.body.addWidget(AdaptiveFields([
-            field("تاريخ المرتجع *", self.return_date), field("سبب المرتجع *", self.reason),
-            field("طريقة الرد", self.refund), field("ملاحظة", self.note),
+        self.body.addWidget(self.fields([
+            ("تاريخ المرتجع *", self.return_date), ("سبب المرتجع *", self.reason),
+            ("طريقة الرد", self.refund), ("ملاحظة", self.note),
         ]))
 
-        toolbar = QHBoxLayout()
-        heading = QLabel("أصناف الفاتورة")
-        heading.setObjectName("cardTitle")
-        toolbar.addWidget(heading)
-        toolbar.addWidget(muted("حدّد الكمية مباشرة في الجدول"))
-        toolbar.addStretch(1)
-        self.all_btn = icon_button("إرجاع الكل", "check")
-        self.all_btn.setEnabled(any(r.available > 0 for r in returnable))
-        self.all_btn.clicked.connect(self._select_all)
-        toolbar.addWidget(self.all_btn)
-        self.body.addLayout(toolbar)
+        self.add_quantity_toolbar("أصناف الفاتورة", "حدّد الكمية مباشرة في الجدول")
 
         self.model = ReturnTableModel(returnable, self)
-        self.view = QTableView()
-        self.view.setModel(self.model)
-        self.editor = ReturnEditor(self.view)
-        self.view.setItemDelegate(self.editor)
-        self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
-        self.view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.view.setEditTriggers(QAbstractItemView.EditTrigger.CurrentChanged |
-                                  QAbstractItemView.EditTrigger.SelectedClicked |
-                                  QAbstractItemView.EditTrigger.EditKeyPressed |
-                                  QAbstractItemView.EditTrigger.AnyKeyPressed)
-        self.view.setAlternatingRowColors(True)
-        self.view.verticalHeader().hide()
-        self.view.verticalHeader().setDefaultSectionSize(LAYOUT["adaptive_table_row_min"])
-        self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.view.horizontalHeader().setSectionResizeMode(self.model.NAME, QHeaderView.ResizeMode.Stretch)
+        self.view = self.add_document_table(self.model, ReturnEditor, stretch_column=self.model.NAME)
         self.view.setColumnHidden(self.model.TAX, not sale.tax_enabled)
-        self.view.setMinimumHeight(64)
-        self.body.addWidget(self.view, 1)
 
         bottom = QHBoxLayout()
-        settlement, info = card(compact=True)
+        settlement, info = self.document_card()
         title = QLabel("تسوية المرتجع")
         title.setObjectName("cardTitle")
         info.addWidget(title)
@@ -239,10 +183,10 @@ class SaleReturnDialog(Modal):
         self.refund_breakdown.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         info.addWidget(self.refund_breakdown)
         bottom.addWidget(settlement, 1)
-        totals, totals_layout = card(compact=True)
-        self.before_tax_label = self._amount_row(totals_layout, "الإجمالي قبل الضريبة")
-        self.tax_label = self._amount_row(totals_layout, "ضريبة القيمة المضافة")
-        self.total_label = self._amount_row(
+        totals, totals_layout = self.document_card()
+        self.before_tax_label = self.amount_row(totals_layout, "الإجمالي قبل الضريبة")
+        self.tax_label = self.amount_row(totals_layout, "ضريبة القيمة المضافة")
+        self.total_label = self.amount_row(
             totals_layout, "إجمالي المرتجع شامل الضريبة" if sale.tax_enabled else "إجمالي المرتجع",
             strong=True)
         self.before_tax_label.parentWidget().setVisible(sale.tax_enabled)
@@ -256,33 +200,12 @@ class SaleReturnDialog(Modal):
         self.return_date.textChanged.connect(self._refresh_total)
         self._refresh_total()
 
-    @staticmethod
-    def _amount_row(layout, caption, *, strong=False):
-        from PySide6.QtWidgets import QWidget
-
-        widget = QWidget()
-        row = QHBoxLayout(widget)
-        row.setContentsMargins(0, 0, 0, 0)
-        label = QLabel(caption) if strong else muted(caption)
-        value = QLabel()
-        if strong:
-            label.setObjectName("cardTitle")
-            value.setObjectName("totalValue")
-        row.addWidget(label)
-        row.addStretch(1)
-        row.addWidget(value)
-        layout.addWidget(widget)
-        return value
-
     @property
     def lines(self):
         return self.model.selected_lines()
 
-    def _select_all(self):
-        self.editor.finish()
-        self.model.select_all()
-
     def _refresh_total(self, *_args):
+        self.refresh_quantity_actions()
         amounts = self.model.expected_amounts()
         total = sum(a[1] for a in amounts.values())
         tax = sum(a[2] for a in amounts.values())
