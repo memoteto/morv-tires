@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from morv import APP_ID
@@ -20,6 +21,7 @@ EXT = ".mtb"
 _KDF = dict(n=2 ** 15, r=8, p=1)   # About 100-200ms on the shop machine; stored in the header to reopen later
 _MAX_HEADER = 64 * 1024            # A real header is under 2KB; anything longer means a corrupt file
 _GCM_TAG = 16                      # The shortest possible body is the GCM tag alone
+_CHUNK = 1 << 20                   # The body moves a megabyte at a time, so peak memory never tracks the database
 
 
 class VaultError(RuntimeError):
@@ -132,30 +134,54 @@ def unlock(ring: dict, secret: str) -> bytes:
 
 # ---------- Reading and writing the file ----------
 
+def _hash_file(path) -> tuple[str, int]:
+    h = hashlib.sha256()
+    size = 0
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(_CHUNK), b""):
+            h.update(chunk)
+            size += len(chunk)
+    return h.hexdigest(), size
+
+
 def seal(plain_path, out_path, dek: bytes, ring: dict, meta: dict | None = None) -> dict:
+    """Streams the body; refuses the seal if the source moved between the hash and the cipher pass."""
     src = Path(plain_path)
     out = Path(out_path)
-    data = src.read_bytes()
+    digest, size = _hash_file(src)          # The digest goes in the header, which is the body's AAD, so it comes first
     header = {
         "app_id": APP_ID,
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "plain_size": len(data),
-        "plain_sha256": hashlib.sha256(data).hexdigest(),
+        "plain_size": size,
+        "plain_sha256": digest,
         "keyring": ring,
         "body_nonce": _b64(secrets.token_bytes(12)),
     }
     header.update(meta or {})
     hdr = json.dumps(header, ensure_ascii=False, sort_keys=True).encode("utf-8")
-    body = AESGCM(dek).encrypt(_unb64(header["body_nonce"]), data, hdr)
     part = out.with_suffix(out.suffix + ".part")
-    with open(part, "wb") as f:
-        f.write(MAGIC)
-        f.write(struct.pack(">I", len(hdr)))
-        f.write(hdr)
-        f.write(body)
-        f.flush()
-        os.fsync(f.fileno())
-    part.replace(out)
+    try:
+        with open(src, "rb") as fin, open(part, "wb") as f:
+            f.write(MAGIC)
+            f.write(struct.pack(">I", len(hdr)))
+            f.write(hdr)
+            enc = Cipher(algorithms.AES(dek), modes.GCM(_unb64(header["body_nonce"]))).encryptor()
+            enc.authenticate_additional_data(hdr)
+            seen, written = hashlib.sha256(), 0
+            for chunk in iter(lambda: fin.read(_CHUNK), b""):
+                seen.update(chunk)
+                written += len(chunk)
+                f.write(enc.update(chunk))
+            if written != size or seen.hexdigest() != digest:
+                raise VaultError("تغيّر الملف أثناء التشفير، فأُلغيت النسخة")
+            f.write(enc.finalize())
+            f.write(enc.tag)
+            f.flush()
+            os.fsync(f.fileno())
+        part.replace(out)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
     return header
 
 
@@ -191,37 +217,74 @@ def read_header(vault_path) -> dict:
         raise VaultError(f"تعذّرت قراءة ملف النسخة: {e}") from e
 
 
+def _open_body(f, header: dict, hdr: bytes, dek: bytes, sink) -> None:
+    """Streams the body to sink, refusing unless the GCM tag, the digest and the size all match."""
+    start = f.tell()
+    end = os.fstat(f.fileno()).st_size - _GCM_TAG
+    if end < start:
+        raise VaultError("ملف النسخة مقطوع (ناقص)")
+    f.seek(end)
+    tag = f.read(_GCM_TAG)
+    if len(tag) != _GCM_TAG:
+        raise VaultError("ملف النسخة مقطوع (ناقص)")
+    f.seek(start)
+    dec = Cipher(algorithms.AES(dek), modes.GCM(_unb64(header["body_nonce"]), tag)).decryptor()
+    dec.authenticate_additional_data(hdr)
+    seen, size, left = hashlib.sha256(), 0, end - start
+    while left > 0:
+        chunk = f.read(min(_CHUNK, left))
+        if not chunk:
+            raise VaultError("ملف النسخة مقطوع (ناقص)")
+        left -= len(chunk)
+        plain = dec.update(chunk)
+        seen.update(plain)
+        size += len(plain)
+        if sink is not None:
+            sink(plain)
+    dec.finalize()                          # Raises InvalidTag unless the whole body authenticates
+    if seen.hexdigest() != header["plain_sha256"]:
+        raise VaultError("بصمة المحتوى لا تطابق الرأس")
+    if header.get("plain_size") != size:
+        raise VaultError("حجم المحتوى لا يطابق الرأس")
+
+
 def opens_with(vault_path, dek: bytes) -> bool:
     try:
         with open(vault_path, "rb") as f:
             header, hdr = _read_header(f)
-            body = f.read()
-        AESGCM(dek).decrypt(_unb64(header["body_nonce"]), body, hdr)
+            _open_body(f, header, hdr, dek, None)
     except (OSError, VaultError, InvalidTag, ValueError):
         return False
     return True
 
 
 def open_vault(vault_path, out_plain_path, *, dek: bytes | None = None, secret: str | None = None) -> dict:
+    """Decrypts into a .part file first; the plaintext appears only once every check has passed."""
+    out = Path(out_plain_path)
+    part = Path(str(out) + ".part")
     try:
-        with open(vault_path, "rb") as f:
-            header, hdr = _read_header(f)
-            body = f.read()
+        f = open(vault_path, "rb")
     except OSError as e:
         raise VaultError(f"تعذّرت قراءة ملف النسخة: {e}") from e
-    if len(body) < _GCM_TAG:
-        raise VaultError("ملف النسخة مقطوع (ناقص)")
-    if dek is None:
-        if secret is None:
-            raise VaultError("مطلوب كلمة المرور أو مفتاح الاسترداد")
-        dek = unlock(header["keyring"], secret)
     try:
-        data = AESGCM(dek).decrypt(_unb64(header["body_nonce"]), body, hdr)
+        with f:
+            header, hdr = _read_header(f)
+            if dek is None:
+                if secret is None:
+                    raise VaultError("مطلوب كلمة المرور أو مفتاح الاسترداد")
+                dek = unlock(header["keyring"], secret)
+            with open(part, "wb") as g:
+                _open_body(f, header, hdr, dek, g.write)
+                g.flush()
+                os.fsync(g.fileno())
+        part.replace(out)                   # Atomic, so a failure leaves any earlier file at out untouched
     except InvalidTag as e:
+        part.unlink(missing_ok=True)
         raise VaultError("النسخة تالفة أو عُبث بها، أو المفتاح لا يخصها") from e
     except ValueError as e:
+        part.unlink(missing_ok=True)
         raise VaultError("رأس الملف تالف") from e
-    if hashlib.sha256(data).hexdigest() != header["plain_sha256"]:
-        raise VaultError("بصمة المحتوى لا تطابق الرأس")
-    Path(out_plain_path).write_bytes(data)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
     return header

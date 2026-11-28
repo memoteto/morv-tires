@@ -251,16 +251,16 @@ def create_backup(con: sqlite3.Connection, kind: str = "manual", dest_dir=None, 
         if encrypted:
             dek = _checked_device_dek(con)
             vault.seal(tmp, final, dek, _keyring(con), {"kind": kind, "db_detail": detail})
-            tmp.unlink(missing_ok=True)
             detail += " · مشفّرة"
         else:
             tmp.replace(final)
         result = BackupResult(True, final, final.stat().st_size, _sha256(final), detail)
     except (sqlite3.Error, OSError, BackupError, vault.VaultError) as e:
-        tmp.unlink(missing_ok=True)
         result = BackupResult(False, None, 0, "", str(e))
         _record(con, "backup", kind, started, result, username)
         raise BackupError(f"فشلت النسخة الاحتياطية: {e}") from e
+    finally:
+        tmp.unlink(missing_ok=True)         # Also covers an interruption, which no except clause would catch
     _record(con, "backup", kind, started, result, username)
     if kind != "safety":
         settings.put(con, "backup.last_ok_at", _now_s())
