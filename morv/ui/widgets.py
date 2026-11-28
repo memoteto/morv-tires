@@ -489,6 +489,7 @@ class Notice(QLabel):
         super().__init__()
         self.setWordWrap(True)
         self.setObjectName("noticeError")
+        self._wanted = False
         self.hide()
 
     def show_message(self, text: str, level: str = "error") -> None:
@@ -496,7 +497,17 @@ class Notice(QLabel):
         self.style().unpolish(self)
         self.style().polish(self)
         self.setText(text)
-        self.setVisible(bool(text))
+        self._wanted = bool(text)
+        self._apply_wanted()
+
+    def _apply_wanted(self) -> None:
+        # A parentless widget turned visible is a native top-level window, which flashes a title bar on screen
+        self.setVisible(self._wanted and self.parentWidget() is not None)
+
+    def event(self, e) -> bool:
+        if e.type() == QEvent.Type.ParentChange:
+            self._apply_wanted()            # Callers set the message first, then add the notice to a layout
+        return super().event(e)
 
 
 def dispose(widget, app) -> None:
